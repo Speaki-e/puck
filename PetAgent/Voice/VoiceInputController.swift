@@ -13,6 +13,7 @@ import Foundation
 protocol SpeechRecognitionServicing: AnyObject {
     var onPartialResult: ((String) -> Void)? { get set }
     var onFinalResult: ((String) -> Void)? { get set }
+    var onError: ((Error) -> Void)? { get set }
     func startStreaming()
     func stopStreaming()
 }
@@ -39,6 +40,10 @@ final class VoiceInputController {
     var onPartialText: ((String) -> Void)?
     /// The submitted transcription — protocol 3.3 user_input(source: "voice").
     var onFinalText: ((String) -> Void)?
+    /// Speech-service errors (e.g. recognizer unavailable, audio engine
+    /// failed to start) -- previously dropped silently, leaving the FSM
+    /// stuck in ListenState with no feedback until a manual key release.
+    var onError: ((Error) -> Void)?
 
     init(speechService: SpeechRecognitionServicing, now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
         self.speechService = speechService
@@ -47,6 +52,15 @@ final class VoiceInputController {
         speechService.onFinalResult = { [weak self] text in
             guard self?.heldLongEnough == true else { return }
             self?.onFinalText?(text)
+        }
+        speechService.onError = { [weak self] error in
+            guard let self else { return }
+            self.onError?(error)
+            if self.isActive {
+                self.isActive = false
+                self.pressStartUptime = nil
+                self.onListenEnd?()
+            }
         }
     }
 

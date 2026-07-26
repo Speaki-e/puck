@@ -301,6 +301,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         voiceController.onFinalText = { [weak self] text in
             self?.sendUserInput(text: text, source: .voice)
         }
+        voiceController.onError = { error in
+            AppLogger.shared.log(.error, "Speech recognition error: \(error)")
+        }
         voiceInputController = voiceController
 
         manager.onPushToTalkDown = { [weak voiceController] in voiceController?.pushToTalkDown() }

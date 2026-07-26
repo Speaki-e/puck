@@ -24,6 +24,11 @@ final class SpeechRecognitionService: SpeechRecognitionServicing {
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    /// Bumped on every startStreaming() -- lets a still-in-flight previous
+    /// session's completion closure (endAudio() lets it finish naturally
+    /// rather than being cancelled) detect it's been superseded and ignore
+    /// its late result instead of misdelivering it into the new session.
+    private var generation = 0
 
     /// Defaults to the system locale (ko-KR on a Korean system), per
     /// plan/02_pet-app.md F7 ("언어: 시스템 로케일(ko-KR) 기본, 설정 변경").
@@ -36,6 +41,17 @@ final class SpeechRecognitionService: SpeechRecognitionServicing {
             onError?(SpeechRecognitionServiceError.recognizerUnavailable)
             return
         }
+
+        if recognitionRequest != nil {
+            // A previous session's endAudio() was never sent (startStreaming
+            // called again without an intervening stopStreaming) -- force it
+            // closed now instead of silently leaking it.
+            recognitionRequest?.endAudio()
+            recognitionTask?.cancel()
+        }
+
+        generation += 1
+        let sessionGeneration = generation
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -58,16 +74,21 @@ final class SpeechRecognitionService: SpeechRecognitionServicing {
         }
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self else { return }
+            // A short discarded tap's real final result can arrive after a
+            // subsequent hold has already started a new session -- generation
+            // stops it from being misdelivered as that session's result.
+            guard let self, self.generation == sessionGeneration else { return }
             if let result {
                 if result.isFinal {
                     onFinalResult?(result.bestTranscription.formattedString)
+                    self.recognitionTask = nil
                 } else {
                     onPartialResult?(result.bestTranscription.formattedString)
                 }
             }
             if let error {
                 onError?(error)
+                self.recognitionTask = nil
             }
         }
     }
@@ -75,10 +96,11 @@ final class SpeechRecognitionService: SpeechRecognitionServicing {
     func stopStreaming() {
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
+        // endAudio() (not cancel()) lets the task finish transcribing
+        // already-buffered audio and deliver its real final result through
+        // the completion closure above -- cancelling here aborted it first.
         recognitionRequest?.endAudio()
-        recognitionTask?.cancel()
         recognitionRequest = nil
-        recognitionTask = nil
     }
 }
 

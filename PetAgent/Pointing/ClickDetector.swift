@@ -23,7 +23,11 @@ final class ClickDetector: ClickDetectorProviding {
     private var monitor: Any?
     private var targetFrame: CGRect = .zero
 
+    /// Calling this again without an intervening stopMonitoring() (e.g.
+    /// re-pointing at a new target before the previous point released)
+    /// previously leaked the earlier global monitor.
     func startMonitoring(targetFrame: CGRect) {
+        stopMonitoring()
         self.targetFrame = targetFrame
         monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             self?.handleClick(at: NSEvent.mouseLocation)

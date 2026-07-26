@@ -15,12 +15,15 @@ import XCTest
 private final class FakeSpeechRecognitionService: SpeechRecognitionServicing {
     var onPartialResult: ((String) -> Void)?
     var onFinalResult: ((String) -> Void)?
+    var onError: ((Error) -> Void)?
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
 
     func startStreaming() { startCallCount += 1 }
     func stopStreaming() { stopCallCount += 1 }
 }
+
+private struct FakeError: Error {}
 
 final class VoiceInputControllerTests: XCTestCase {
     func test_pushToTalkDown_startsListeningAndStreaming() {
@@ -102,6 +105,24 @@ final class VoiceInputControllerTests: XCTestCase {
         speech.onFinalResult?("테스트 돌려줘")
 
         XCTAssertEqual(receivedFinal, "테스트 돌려줘")
+    }
+
+    func test_speechServiceError_forwardsErrorAndEndsListen_soFSMDoesntGetStuck() {
+        // Previously dropped silently -- if startStreaming() failed (e.g.
+        // recognizer unavailable), onListenStart already fired unconditionally
+        // and nothing ever reverted it without a manual key release.
+        let speech = FakeSpeechRecognitionService()
+        let controller = VoiceInputController(speechService: speech, now: { 0 })
+        var receivedError: Error?
+        var listenEnded = false
+        controller.onError = { receivedError = $0 }
+        controller.onListenEnd = { listenEnded = true }
+
+        controller.pushToTalkDown()
+        speech.onError?(FakeError())
+
+        XCTAssertNotNil(receivedError)
+        XCTAssertTrue(listenEnded)
     }
 
     func test_partialResults_areAlwaysForwarded_regardlessOfDuration() {

@@ -15,16 +15,20 @@ macOS 데스크톱 펫 앱 (Swift). 펫 렌더링/움직임 + 시스템 도구 �
 
 ## 현재 상태
 
-이 저장소는 아직 **디렉터리 구조 초안 + 스텁 파일** 단계다. 실 구현은 없고, 기능별 폴더와 각 파일의 책임(파일 헤더 주석)만 잡아둔 상태다. 전체 구조와 설계 근거는 [`docs/directory-structure.md`](docs/directory-structure.md)를 참고한다.
+기능별 폴더 구조가 잡혀 있고, 렌더링(F1)에 의존하지 않는 모듈부터 순서대로 구현 중이다. 전체 구조와 설계 근거, 진행 순서는 [`docs/directory-structure.md`](docs/directory-structure.md)를 참고한다.
 
-Xcode 프로젝트(`.xcodeproj`)는 아직 생성되지 않았다 — Xcode에서 macOS App 타깃 `PetAgent`를 생성한 뒤 `PetAgent/`, `PetAgentTests/` 하위 폴더를 그룹으로 추가하고 기존 스텁 파일을 타깃에 포함시키는 것이 다음 단계다.
+Xcode 프로젝트(`.xcodeproj`)는 커밋하지 않는다 — [xcodegen](https://github.com/yonaskolb/XcodeGen)으로 `project.yml`에서 생성한다. 타깃 구조를 바꿀 때는 Xcode에서 직접 프로젝트 파일을 만지지 말고 `project.yml`을 수정한 뒤 재생성한다 (`project.pbxproj` 병합 충돌 방지).
 
-## 클론 → 실행 (예정 절차)
+## 클론 → 실행
 
-1. Xcode 15+ 에서 `PetAgent.xcodeproj`를 연다 (프로젝트 파일 생성 후).
-2. 최초 실행 시 요구되는 TCC 권한을 허용한다: Accessibility(단축키·UI 조회·클릭 합성), 마이크, 음성 인식, Screen Recording(선택, 폴백용).
-3. 빌드 후 실행하면 `PetAgent/Resources/Avatars/dummy/`의 더미 아바타로 소켓 연결 없이 바로 동작해야 한다 (M-A 마일스톤 기준).
-4. `workspace` 저장소를 함께 실행하면 로컬 Unix 소켓(`~/Library/Application Support/PetAgent/bridge.sock`)으로 연동된다.
+1. `brew install xcodegen` (없다면).
+2. 저장소 루트에서 `xcodegen generate` — `PetAgent.xcodeproj`와 `PetAgent/Resources/Info.plist`가 생성된다.
+3. `PetAgent.xcodeproj`를 Xcode 15+ 로 연다.
+4. 최초 실행 시 요구되는 TCC 권한을 허용한다: Accessibility(단축키·UI 조회·클릭 합성), 마이크, 음성 인식, Screen Recording(선택, 폴백용).
+5. 빌드 후 실행하면 `PetAgent/Resources/Avatars/dummy/`의 더미 아바타로 소켓 연결 없이 바로 동작해야 한다 (M-A 마일스톤 기준).
+6. `workspace` 저장소를 함께 실행하면 로컬 Unix 소켓(`~/Library/Application Support/PetAgent/bridge.sock`)으로 연동된다.
+
+CLI에서 빌드/테스트만 확인하려면: `xcodebuild -project PetAgent.xcodeproj -scheme PetAgent build` / `xcodebuild -project PetAgent.xcodeproj -scheme PetAgent test`.
 
 ## 스택 요약
 

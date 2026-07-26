@@ -1,10 +1,11 @@
 # pet-app 디렉터리 구조 초안
 
-이 문서는 `plan/02_pet-app.md`(1조: 강상우·박해영 기획서), `plan/01_protocol.md`, `plan/프로젝트_개요.md`를 근거로 pet-app 저장소의 소스 트리를 설계한 초안이다. 아직 Xcode 프로젝트(`.xcodeproj`)는 생성하지 않았고, 실제 구현 파일 대신 각 파일의 책임·담당·연관 기능 코드(F1~F11)를 헤더 주석으로 채운 스텁만 존재한다. 실제 코드는 P0~P9 구현 순서(02_pet-app.md 2절)에 따라 강상우·박해영이 채워 넣는다.
+이 문서는 `plan/02_pet-app.md`(1조: 강상우·박해영 기획서), `plan/01_protocol.md`, `plan/프로젝트_개요.md`를 근거로 pet-app 저장소의 소스 트리를 설계한 초안이다. 실제 코드는 P0~P9 구현 순서(02_pet-app.md 2절)에 따라 강상우·박해영(및 위임받은 에이전트)이 채워 넣는다.
 
 ## 0. 설계 원칙
 
-- **레이어가 아니라 기능(F1~F11)으로 최상위 그룹을 나눈다.** MVVM의 Model/View/ViewModel 대신 Overlay/Avatar/Movement/WindowSensing/... 처럼 02_pet-app.md의 기능 단위를 그대로 폴더 경계로 삼는다. 강상우·박해영이 각자 맡은 기능 폴더 안에서 대부분의 작업을 끝낼 수 있어야 Xcode 프로젝트 파일 충돌(협업 규칙 5절)이 최소화된다.
+- **`project.yml`(xcodegen)이 Xcode 프로젝트의 단일 진실 소스다.** `PetAgent.xcodeproj`와 `PetAgent/Resources/Info.plist`는 둘 다 `xcodegen generate`의 생성물이며 커밋하지 않는다(`.gitignore`). `project.pbxproj`는 텍스트지만 사실상 사람이 diff/merge하기 어려운 포맷이라, 02_pet-app.md 협업 규칙 5절이 우려하는 "Xcode 프로젝트 파일 충돌"을 애초에 발생시키지 않는 방법을 택했다. 타깃/그룹/빌드 설정을 바꿀 때는 `project.yml`을 수정하고 `xcodegen generate`를 다시 실행한다.
+- **레이어가 아니라 기능(F1~F11)으로 최상위 그룹을 나눈다.** MVVM의 Model/View/ViewModel 대신 Overlay/Avatar/Movement/WindowSensing/... 처럼 02_pet-app.md의 기능 단위를 그대로 폴더 경계로 삼는다. 강상우·박해영이 각자 맡은 기능 폴더 안에서 대부분의 작업을 끝낼 수 있어야 소스 레벨 충돌도 최소화된다.
 - **FSM은 protocol 하나 + 상태별 파일 1개.** `Movement/StateHandler.swift`(protocol) + `Movement/States/*State.swift`(구현체 12개)로, 02_pet-app.md 3절의 상태 전이표에 있는 12개 상태(Idle/Walk/Climb/WalkOnTop/Fall/Land/MoveTo/Point/Type/Listen/ReactClick/ReactDrag)와 1:1 대응시켰다.
 - **소켓 계약은 `Bridge/`에 격리.** `protocol` 저장소가 유일한 진실 소스이므로, `Bridge/BridgeMessages.swift`는 `protocol/swift/BridgeMessages.swift`를 수동 동기화하는 사본이라는 것을 파일 헤더에 명시했다. 이 파일 변경은 항상 protocol 저장소 스키마 변경 PR과 짝을 이뤄야 한다.
 - **아바타 타입은 `AvatarPlayable` 프로토콜 뒤로 숨긴다.** FSM(`CharacterController`)은 `AvatarPlayable`만 알고 `USDZAvatar`/`VideoAvatar`/`SpriteAvatar` 중 무엇이 실제로 재생되는지 모른다(02_pet-app.md F2). `VideoAvatar`/`SpriteAvatar`는 1차 구현 범위가 아니므로 인터페이스만 유지하는 빈 스텁으로 자리만 잡아둔다.
@@ -16,6 +17,7 @@
 pet-app/
 ├── .gitignore
 ├── .gitattributes                 # usdz/wav/mp3/m4a → Git LFS
+├── project.yml                    # xcodegen 스펙 (Xcode 프로젝트의 단일 진실 소스)
 ├── README.md
 ├── docs/
 │   ├── directory-structure.md     # 본 문서
@@ -108,7 +110,7 @@ pet-app/
 │   │   ├── PermissionOnboarding.swift
 │   │   └── AppLogger.swift
 │   └── Resources/
-│       ├── Info.plist
+│       ├── Info.plist              # xcodegen 생성물, 커밋 안 함 (project.yml이 source of truth)
 │       ├── Assets.xcassets/
 │       │   ├── Contents.json
 │       │   └── AppIcon.appiconset/Contents.json
@@ -146,8 +148,8 @@ pet-app/
 
 ## 3. 아직 없는 것 / 다음 단계
 
-- **`.xcodeproj`는 아직 생성하지 않았다.** Xcode 프로젝트 파일은 Xcode가 생성·관리하는 바이너리 유사 포맷이라 손으로 만들지 않았다. 담당자가 Xcode에서 `File ▸ New ▸ Project ▸ macOS App`으로 `PetAgent` 타깃을 만든 뒤, 위 트리의 폴더를 그대로 그룹으로 추가하고 기존 스텁 파일들을 타깃에 포함시키면 된다. 협업 규칙(02_pet-app.md 5절: "구조 변경 PR은 즉시 머지, 가급적 한 사람이 몰아서")에 따라 최초 프로젝트 파일 생성은 한 사람이 맡아 한 번에 커밋하는 것을 권장한다.
-- **실제 로직은 전부 미구현.** 모든 `.swift` 파일은 파일 헤더 주석(담당/기능 코드/한 줄 설명)만 있는 빈 스텁이다. 02_pet-app.md 2절의 P0~P9 순서대로 채워 나간다.
+- **`.xcodeproj`는 커밋하지 않는다.** `project.yml`을 수정한 뒤 `xcodegen generate`(사전에 `brew install xcodegen`)를 실행하면 `PetAgent.xcodeproj`와 `PetAgent/Resources/Info.plist`가 재생성된다. 타깃/그룹 추가, 빌드 설정 변경은 전부 `project.yml` PR로 한다 — 협업 규칙(02_pet-app.md 5절: "구조 변경 PR은 즉시 머지")이 우려하던 지점이 파일 자체가 아니라 `project.yml`이라는 짧은 diff로 옮겨졌다.
+- **로직은 순서대로 구현 중.** 모든 `.swift` 파일은 파일 헤더 주석(담당/기능 코드/한 줄 설명)으로 시작하며, 02_pet-app.md 2절의 P0~P9 순서(단, 렌더링에 의존하지 않는 모듈을 먼저 구현하는 순서로 재배열됨 — 4절 표 참고)대로 채워 나간다.
 - **Git LFS 설정 필요.** `.gitattributes`에 `*.usdz`, `*.wav`, `*.mp3`, `*.m4a` 추적 규칙은 넣어뒀지만, 실제로 `git lfs install` 및 LFS 자산 추가는 강상우가 더미 아바타 실 자산을 넣는 시점에 진행한다.
 - **`protocol` 저장소 확정 대기.** `Bridge/BridgeMessages.swift`, `Avatar/AvatarManifest.swift`의 필드는 `plan/01_protocol.md`에 적힌 초안 스키마를 반영했다. `프로젝트_개요.md` 4절의 "첫 주 전원 합의 사항"(소켓 스키마·manifest 스키마 확정)이 끝나면 protocol 저장소의 실제 파일과 다시 대조해야 한다.
 

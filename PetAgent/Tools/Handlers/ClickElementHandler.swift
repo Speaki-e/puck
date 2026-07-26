@@ -5,5 +5,23 @@
 //  F11 · owner: Haeyoung Park
 //  Delegates to F10 SyntheticClick; approval itself is gated by the agent core
 //
-//  TODO(P9): implement once Pointing/SyntheticClick.swift exists — must
-//  surface not_supported_target for system-dialog targets (protocol 4절).
+//  TODO(F4 level 2): classifying "is this target a system security dialog"
+//  (to return not_supported_target instead of clicking, per protocol section
+//  4) needs UIElementInspector's AX role/owner inspection, which doesn't
+//  exist yet. Until then this always attempts the click.
+
+import CoreGraphics
+
+final class ClickElementHandler: ToolHandler {
+    let toolName = "click_element"
+
+    func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+        guard let frame = args.extractFrame() else {
+            completion(.failure(.executionFailed("click_element requires a frame {x,y,width,height}")))
+            return
+        }
+
+        SyntheticClick.click(at: CGPoint(x: frame.midX, y: frame.midY))
+        completion(.success(nil))
+    }
+}

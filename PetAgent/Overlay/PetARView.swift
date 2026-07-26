@@ -22,6 +22,10 @@ final class PetARView: ARView {
     private let cameraAnchor = AnchorEntity(world: .zero)
     private let cameraEntity = PerspectiveCamera()
 
+    /// Where avatar entities attach, in world space — kept separate from
+    /// `cameraAnchor` so avatar positioning is independent of camera space.
+    let contentAnchor = AnchorEntity(world: .zero)
+
     required init(frame frameRect: CGRect) {
         // Unlike iOS/visionOS, macOS's ARView has no camera-passthrough AR
         // session at all (no `cameraMode`/`automaticallyConfigureSession`
@@ -30,6 +34,7 @@ final class PetARView: ARView {
         super.init(frame: frameRect)
         configureTransparentBackground()
         configureCamera()
+        scene.addAnchor(contentAnchor)
     }
 
     @available(*, unavailable)

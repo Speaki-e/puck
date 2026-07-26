@@ -13,8 +13,10 @@ import RealityKit
 @testable import PetAgent
 
 final class PetARViewTests: XCTestCase {
-    func test_initDoesNotCrash_andAddsACameraAnchor() {
+    func test_initDoesNotCrash_andAddsCameraAndContentAnchors() {
         let view = PetARView(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
-        XCTAssertEqual(view.scene.anchors.count, 1)
+        // One anchor for the fixed camera, one (separate, world-space) anchor
+        // avatar entities attach to — see PetARView.contentAnchor's doc comment.
+        XCTAssertEqual(view.scene.anchors.count, 2)
     }
 }

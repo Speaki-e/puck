@@ -50,6 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpGlobalHotkeys()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        hotkeyManager?.stop()
+    }
+
     // MARK: - Menu bar
 
     private func setUpMenuBar() {

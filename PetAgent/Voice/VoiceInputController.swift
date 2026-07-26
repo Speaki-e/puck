@@ -29,6 +29,7 @@ final class VoiceInputController {
     private let now: () -> TimeInterval
     private var pressStartUptime: TimeInterval?
     private var heldLongEnough = false
+    private var isActive = false
 
     /// Enter Listen state + listen_start SFX (F3/F5's responsibility to react to this).
     var onListenStart: (() -> Void)?
@@ -49,7 +50,12 @@ final class VoiceInputController {
         }
     }
 
+    /// Idempotent -- defense in depth alongside GlobalHotkeyManager's own
+    /// key-repeat guard. A duplicate down while already active must not
+    /// slide the hold-start time forward or restart streaming.
     func pushToTalkDown() {
+        guard !isActive else { return }
+        isActive = true
         pressStartUptime = now()
         heldLongEnough = false
         onListenStart?()
@@ -57,6 +63,8 @@ final class VoiceInputController {
     }
 
     func pushToTalkUp() {
+        guard isActive else { return }
+        isActive = false
         defer { pressStartUptime = nil }
         if let start = pressStartUptime, now() - start >= Self.minimumHoldDuration {
             heldLongEnough = true

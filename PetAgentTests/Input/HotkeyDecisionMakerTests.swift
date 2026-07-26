@@ -40,6 +40,18 @@ final class HotkeyDecisionMakerTests: XCTestCase {
         XCTAssertEqual(action, .characterSummonRequested)
     }
 
+    func test_keyDown_matchingPushToTalk_whileAlreadyActive_returnsNone() {
+        // OS key-repeat re-sends keyDown for a physically held key. Without
+        // this guard, each repeat re-fires pushToTalkDown and slides the
+        // hold's start time forward, making genuine long holds measure as
+        // under the minimum duration at release.
+        let action = HotkeyDecisionMaker.decide(
+            eventType: .keyDown, keyCode: 49, flags: [.maskAlternate],
+            bindings: bindings, isPushToTalkActive: true
+        )
+        XCTAssertEqual(action, .none)
+    }
+
     func test_keyDown_unrelatedKey_returnsNone() {
         let action = HotkeyDecisionMaker.decide(
             eventType: .keyDown, keyCode: 0, flags: [],

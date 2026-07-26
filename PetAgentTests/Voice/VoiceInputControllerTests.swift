@@ -50,6 +50,28 @@ final class VoiceInputControllerTests: XCTestCase {
         XCTAssertTrue(listenEnded)
     }
 
+    func test_pushToTalkDown_whileAlreadyActive_doesNotResetHoldStartTime() {
+        // Defense in depth alongside HotkeyDecisionMaker's key-repeat guard --
+        // a duplicate down signal while already active must not slide the
+        // hold-start time forward or restart streaming.
+        let speech = FakeSpeechRecognitionService()
+        var uptime: TimeInterval = 0
+        let controller = VoiceInputController(speechService: speech, now: { uptime })
+        var receivedFinal: String?
+        controller.onFinalText = { receivedFinal = $0 }
+
+        controller.pushToTalkDown()
+        uptime = 0.2
+        controller.pushToTalkDown() // duplicate/repeat signal while still active
+        uptime = 0.4 // 0.4s since the FIRST down -- over the 0.3s minimum
+        controller.pushToTalkUp()
+
+        speech.onFinalResult?("held long enough")
+
+        XCTAssertEqual(receivedFinal, "held long enough")
+        XCTAssertEqual(speech.startCallCount, 1)
+    }
+
     func test_finalResult_isIgnored_whenHeldShorterThanMinimum() {
         let speech = FakeSpeechRecognitionService()
         var uptime: TimeInterval = 0

@@ -34,7 +34,9 @@ enum HotkeyDecisionMaker {
     ) -> HotkeyAction {
         switch eventType {
         case .keyDown:
-            if bindings.pushToTalk.matches(keyCode: keyCode, modifierFlags: flags) {
+            // OS key-repeat re-sends keyDown for a physically held key --
+            // without this guard, each repeat re-fires pushToTalkDown.
+            if !isPushToTalkActive, bindings.pushToTalk.matches(keyCode: keyCode, modifierFlags: flags) {
                 return .pushToTalkDown
             }
             if bindings.textInput.matches(keyCode: keyCode, modifierFlags: flags) {
@@ -77,6 +79,7 @@ final class GlobalHotkeyManager {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var runLoop: CFRunLoop?
 
     init(bindings: HotkeyBindings = .defaults) {
         self.bindings = bindings
@@ -111,20 +114,26 @@ final class GlobalHotkeyManager {
         eventTap = tap
         let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
         runLoopSource = source
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+        let currentRunLoop = CFRunLoopGetCurrent()
+        runLoop = currentRunLoop
+        CFRunLoopAddSource(currentRunLoop, source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         return true
     }
 
+    /// Removes the source from the same run loop start() added it to --
+    /// CFRunLoopGetCurrent() at stop() time isn't guaranteed to be the same
+    /// run loop if this were ever called from a different thread/context.
     func stop() {
         if let eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
         }
-        if let runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        if let runLoopSource, let runLoop {
+            CFRunLoopRemoveSource(runLoop, runLoopSource, .commonModes)
         }
         eventTap = nil
         runLoopSource = nil
+        runLoop = nil
     }
 
     private func handle(type: CGEventType, event: CGEvent) {

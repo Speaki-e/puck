@@ -5,9 +5,11 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 170 passing (`xcodebuild test`) · **Latest commit:** `1ade7ba`
+**Last updated:** 2026-07-27 · **Tests:** 179 passing (`xcodebuild test`) · **Latest commit:** `de05780`
 
-**Manually verified end-to-end on-device:** built the app, launched it, screenshotted the real screen — a usdz model rendered transparently over other windows via the overlay pipeline (window + RealityKit + USDZAvatar all working together, not just compiling). Used a local Apple-provided usdz (Crayon.usdz from the Xcode/iOS-Simulator install) as a placeholder in `~/Library/Application Support/PetAgent/Avatars/dummy/` — never committed to the repo. The real per-clip avatar assets (idle.usdz/walk.usdz/... with actual walk animation) are still 강상우's pending work; this only confirms the rendering pipeline itself.
+**All 13 planned implementation tasks are now done.** Every module in `docs/directory-structure.md` exists and is wired together in a real `AppDelegate.applicationDidFinishLaunching` bootstrap: permission self-check -> menu bar -> overlay/avatar/FSM/SFX -> window sensing -> tool executor -> bridge server (with `EventRouter` now wired to the live `characterController`/`sfxPlayer`, closing the gap noted in the previous update) -> global hotkeys -> voice input -> text bubble fallback.
+
+**Manually verified end-to-end on-device, twice:** built the real signed `.app`, launched it via `open`, confirmed via `pgrep` it stayed running (including with `BridgeServer`/`WindowListWatcher`/`GlobalHotkeyManager` now live), screenshotted the real screen (`screencapture`), and read the PNG back — a usdz model rendered transparently over other windows both before and after the full bootstrap wiring was added. Also confirmed via the real `AppLogger` JSONL log files that `PermissionOnboarding` and the rest of the chain ran for real across both launches, not just compiled. Used a local Apple-provided usdz (Crayon.usdz from the Xcode/iOS-Simulator install) as a placeholder in `~/Library/Application Support/PetAgent/Avatars/dummy/` — never committed to the repo. The real per-clip avatar assets (idle.usdz/walk.usdz/... with actual walk animation) are still 강상우's pending work; this only confirms the rendering pipeline itself.
 
 ## Legend
 
@@ -33,7 +35,8 @@ order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 | P6 | F7 PTT+STT | [x] done |
 | P7 | socket server + F11 executor | [x] done (`BridgeServer`, `BridgeConnection`, `EventRouter`, `ToolExecutor`, 5/8 handlers) |
 | P8 | F4 level 2 + F10 pointing | [~] F10 pointing done (`PointingController`, `ClickDetector`, `PointAtHandler`); F4 level 2 (`UIElementInspector`, `FindUIElementHandler`) not started |
-| P9 | F10 click_element, avatar-switch UI | [~] `SyntheticClick`/`ClickElementHandler` done; `Settings/AvatarManagementView` not started |
+| P9 | F10 click_element, avatar-switch UI | [x] `SyntheticClick`/`ClickElementHandler` and `Settings/AvatarManagementView` (import/validate/install flow) done |
+| — | Settings/Diagnostics/App bootstrap | [x] done — `PermissionOnboarding`, `MenuBarController`, `SettingsView`, `AppLogger`, full `AppDelegate` wiring of every module above |
 
 Order was reshuffled versus the plan doc's literal P0-P9 sequence to front-load
 modules that don't depend on rendering (F1) — see
@@ -53,19 +56,34 @@ modules that don't depend on rendering (F1) — see
 | Input (F6) | `HotkeyBindings`, `GlobalHotkeyManager`, `TextInputBubbleWindow`, `TextInputBubbleView` | 17 | `HotkeyDecisionMaker` handles releasing the modifier before the key during PTT hold (flagsChanged), matching the plan's explicit mention of that event type. `TextInputBubbleWindow` is the one window allowed to become key. |
 | Voice (F7) | `VoiceInputController`, `SpeechRecognitionService`, `MicrophonePermission` | 5 | On-device-vs-server STT decided upfront via `supportsOnDeviceRecognition`, not reactive error retry (unstable across macOS versions). Holds under 0.3s still occupy the mic but their final transcription is discarded. |
 | Pointing (F10) | `PointingController`, `ClickDetector`, `SyntheticClick` | 7 | `beginPointing()` assumes the FSM already arrived at the target -- MoveTo's real movement math isn't implemented yet. System-dialog click classification needs F4 level 2. |
-| Settings/Diagnostics/App bootstrap | `PetAgentApp`/`AppDelegate` | 0 | `AppDelegate` now wires ScreenManager -> OverlayWindowController -> AvatarLoader -> USDZAvatar -> CharacterController(IdleState) — enough to show a static/idle avatar with zero permissions. `PermissionOnboarding`, `BridgeServer`, `GlobalHotkeyManager` wiring still pending. |
+| Settings/Diagnostics/App bootstrap | `AppDelegate`, `MenuBarController`, `PermissionOnboarding`, `AppLogger`, `SettingsView`, `AvatarManagementView` | 8 | `AppDelegate.applicationDidFinishLaunching` wires every module: permission self-check -> menu bar -> overlay/avatar/FSM/SFX -> window sensing -> tool executor (7 handlers) -> bridge server (`EventRouter.reaction(for:)` now applied to the real `characterController`/`sfxPlayer`) -> global hotkeys -> voice input, with a text-bubble fallback when there's no active bridge connection. `AvatarManagementView` wires `NSOpenPanel` -> `AvatarImportValidator` -> install to `Application Support`. |
 
 ## Known gaps / blocked items
 
+- **`FindUIElementHandler` / F4 level 2 (`UIElementInspector`) not started.**
+  Only handler not registered in `ToolExecutor` — needs Accessibility-API UI
+  tree traversal, deferred as the one item genuinely blocked on more design
+  work rather than review/priority.
+- **No real avatar assets with actual motion.** The dummy avatar is Apple's
+  own `Crayon.usdz` (from the Xcode/iOS-Simulator install) copied to
+  `idle.usdz`/`walk.usdz` locally — confirms the render pipeline but has no
+  real walk animation. Never committed to git. 강상우 is providing a real
+  animated usdz; swap it in and re-verify FSM playback once it arrives.
 - **`await_approval` has no manifest sound key.** `EventRouter` produces this
   SFX key but the `protocol` repo's manifest schema (section 6) doesn't define
   it yet, and `protocol` has no commits to PR against. Tracked (not silently
   patched) by `ManifestSFXKeyCoverageTests`.
-- **Avatar mesh height/scale/loop-pose validation** isn't automated yet —
-  needs RealityKit/ModelIO plus a real usdz fixture, both of which arrive
-  with P0 (Overlay). Manual verification until then (`docs/avatar-spec.md`).
-- **No real avatar assets** — `Resources/Avatars/dummy/manifest.json` exists;
-  the actual per-clip `.usdz`/`.wav` files are still pending (owner: 강상우).
+- **Per-state movement math (F3) is metadata-only.** FSM states carry
+  `clipKey`/`loopsClip` but no real Walk/Climb/Fall motion; `summonCharacter()`
+  and `PointingController.beginPointing()` both assume the avatar is already
+  at the target rather than computing a path there.
+- **Alpha-halo mitigation (steps 2-4) and idle frame-rate downshift** need a
+  real avatar to tune against; not implemented speculatively.
+- **SFX fade-out-on-loop-replace** stops immediately instead of ramping down
+  — documented TODO in `SFXPlayer`, needs a real sound to tune against.
+- **Avatar mesh height/scale/loop-pose validation** isn't automated — needs
+  RealityKit/ModelIO plus a real usdz fixture. Manual verification until
+  then (`docs/avatar-spec.md`).
 
 ## Review history
 
@@ -78,3 +96,6 @@ modules that don't depend on rendering (F1) — see
 - USD/RealityKit single-animation-per-file constraint found during avatar
   model sourcing research → corrected F2 design (`plan/02_pet-app.md` lines
   60/174-175 updated), `docs/avatar-spec.md` added.
+- Task 13 (final module) closed a previously-tracked gap on inspection: wired
+  `EventRouter.reaction(for:)` to the real `characterController`/`sfxPlayer`
+  inside `AppDelegate`, which earlier updates had left as a known TODO.

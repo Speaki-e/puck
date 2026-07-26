@@ -6,8 +6,18 @@
 //  manifest.json Codable model (mirrors protocol repo section 6 schema).
 //
 
-/// A value in the clips table. usdz/sprites types use a clip-name string;
-/// video type uses a {"in":sec,"out":sec} time range.
+/// A value in the clips table.
+///
+/// For `type: usdz`, `.name(String)` is the file stem of a **single-animation**
+/// usdz living alongside manifest.json (e.g. "idle" -> Avatars/{name}/idle.usdz)
+/// — NOT an animation name to look up inside one shared model. RealityKit
+/// effectively only plays a usdz's first animation regardless of how many
+/// `availableAnimations` entries it reports, so one avatar with 10 named clips
+/// baked into a single usdz does not work; each clip needs its own file. See
+/// pet-app/docs/avatar-spec.md for the full external-creator requirements.
+///
+/// `type: sprites` reuses the same file-stem convention. `type: video` uses
+/// a {"in":sec,"out":sec} time range instead (`.timeRange`).
 enum ClipReference: Equatable {
     case name(String)
     case timeRange(in: Double, out: Double)

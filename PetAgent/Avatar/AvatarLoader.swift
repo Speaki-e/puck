@@ -73,9 +73,11 @@ enum AvatarLoader {
         return AvatarLoadResult(manifest: manifest, missingRecommendedClips: missingRecommended)
     }
 
-    /// Returns the requested clip's name if present in the manifest, otherwise
-    /// falls back to idle's name, otherwise nil if even idle is missing
-    /// (string clip names only, i.e. the usdz/sprites case).
+    /// Returns the requested clip's file stem (e.g. "idle" for idle.usdz) if
+    /// present in the manifest, otherwise falls back to idle's, otherwise nil
+    /// if idle itself isn't a string-named file (usdz/sprites case only — see
+    /// ClipReference's doc comment for why manifest clip values are file
+    /// stems, not animation names, under the usdz one-file-per-clip design).
     static func resolvedClipName(for clip: String, in result: AvatarLoadResult) -> String? {
         if case .name(let name) = result.manifest.clips[clip] {
             return name

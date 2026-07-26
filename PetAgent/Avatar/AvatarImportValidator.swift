@@ -5,3 +5,72 @@
 //  F2 · owner: Sangwoo Kang
 //  Import-menu validator: checks manifest schema + clip existence, reports missing items
 //
+//  Checks manifest schema/required-clip-keys (via AvatarLoader) plus the
+//  file-per-clip layout from docs/avatar-spec.md: each clip's {name}.usdz
+//  must actually exist in the package directory and fit the size budget.
+//  Does NOT check mesh height/scale or loop pose-matching — that needs
+//  RealityKit/ModelIO plus a real usdz fixture to verify against, neither of
+//  which exist yet (see docs/avatar-spec.md).
+
+import Foundation
+
+enum AvatarImportValidator {
+    /// Per-clip usdz size budget from docs/avatar-spec.md (~2MB/file, ~20MB total across ~10 clips).
+    static let maxClipFileSizeBytes = 2 * 1024 * 1024
+
+    struct Report: Equatable {
+        let manifest: AvatarManifest
+        /// Required clip files missing from disk — fatal; AvatarManagementView should refuse import.
+        let missingRequiredClipFiles: [String]
+        /// Recommended clip files missing from disk — non-fatal, falls back to idle at runtime.
+        let missingRecommendedClipFiles: [String]
+        /// Present but over the size budget — non-fatal, the budget is a "recommended" guideline.
+        let oversizedClipFiles: [String]
+
+        var isValid: Bool { missingRequiredClipFiles.isEmpty }
+    }
+
+    private enum ClipFileStatus: Equatable {
+        case ok
+        case missing
+        case oversized
+    }
+
+    /// Validates a package directory. Throws whatever AvatarLoader.load throws
+    /// (manifest not decodable, unsupported schema version, missing required
+    /// clip *keys*) before doing the file-per-clip disk checks this type adds.
+    static func validate(packageDirectory: URL) throws -> Report {
+        let loadResult = try AvatarLoader.load(avatarDirectory: packageDirectory)
+        return report(for: loadResult, packageDirectory: packageDirectory)
+    }
+
+    static func report(for loadResult: AvatarLoadResult, packageDirectory: URL) -> Report {
+        let manifest = loadResult.manifest
+
+        func status(for clip: String) -> ClipFileStatus {
+            guard case .name(let fileName) = manifest.clips[clip] else {
+                return .missing
+            }
+            let url = packageDirectory.appendingPathComponent("\(fileName).usdz")
+            guard
+                let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                let size = attributes[.size] as? Int
+            else {
+                return .missing
+            }
+            return size > maxClipFileSizeBytes ? .oversized : .ok
+        }
+
+        let missingRequired = AvatarLoader.requiredClips.filter { status(for: $0) == .missing }
+        let missingRecommended = AvatarLoader.recommendedClips.filter { status(for: $0) == .missing }
+        let oversized = (AvatarLoader.requiredClips + AvatarLoader.recommendedClips)
+            .filter { status(for: $0) == .oversized }
+
+        return Report(
+            manifest: manifest,
+            missingRequiredClipFiles: missingRequired,
+            missingRecommendedClipFiles: missingRecommended,
+            oversizedClipFiles: oversized
+        )
+    }
+}

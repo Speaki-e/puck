@@ -14,6 +14,8 @@ project (codename PetAgent); the overall picture lives in
   only consumes avatar packages that satisfy `protocol`'s manifest schema, and
   includes just one dummy avatar for development.
 
+See [`PROGRESS.md`](PROGRESS.md) for live implementation status.
+
 ## Ownership
 
 | Person | Modules |
@@ -66,5 +68,7 @@ CGEvent.tapCreate (global input), SFSpeechRecognizer (STT), AVAudioEngine
 - [`docs/directory-structure.md`](docs/directory-structure.md) — directory
   structure draft and design rationale
 - [`docs/qa-cases.md`](docs/qa-cases.md) — per-milestone QA scenarios
+- [`docs/avatar-spec.md`](docs/avatar-spec.md) — avatar package requirements
+  for external creators (one usdz per clip, scale/loop rules, clip sources)
 - `plan/02_pet-app.md`, `plan/01_protocol.md`, `plan/프로젝트_개요.md` — the
   upper-level planning docs (Speaki-e repo)

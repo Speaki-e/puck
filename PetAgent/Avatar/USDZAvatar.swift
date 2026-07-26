@@ -27,6 +27,11 @@ final class USDZAvatar: AvatarPlayable {
         self.loadResult = loadResult
         self.screenSpaceMapper = screenSpaceMapper
         rootEntity = Entity()
+        // manifest.scale compensates for source meshes not natively 1 unit
+        // tall (docs/avatar-spec.md's "scale gotcha") -- without this, a
+        // Mixamo-style rig authored in cm renders ~100x too large.
+        let scale = Float(loadResult.manifest.scale)
+        rootEntity.scale = SIMD3(repeating: scale)
         parent.addChild(rootEntity)
     }
 

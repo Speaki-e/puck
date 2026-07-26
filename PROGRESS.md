@@ -9,7 +9,9 @@ order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
 **All 13 planned implementation tasks are now done.** Every module in `docs/directory-structure.md` exists and is wired together in a real `AppDelegate.applicationDidFinishLaunching` bootstrap: permission self-check -> menu bar -> overlay/avatar/FSM/SFX -> window sensing -> tool executor -> bridge server (with `EventRouter` now wired to the live `characterController`/`sfxPlayer`, closing the gap noted in the previous update) -> global hotkeys -> voice input -> text bubble fallback.
 
-**Manually verified end-to-end on-device, twice:** built the real signed `.app`, launched it via `open`, confirmed via `pgrep` it stayed running (including with `BridgeServer`/`WindowListWatcher`/`GlobalHotkeyManager` now live), screenshotted the real screen (`screencapture`), and read the PNG back — a usdz model rendered transparently over other windows both before and after the full bootstrap wiring was added. Also confirmed via the real `AppLogger` JSONL log files that `PermissionOnboarding` and the rest of the chain ran for real across both launches, not just compiled. Used a local Apple-provided usdz (Crayon.usdz from the Xcode/iOS-Simulator install) as a placeholder in `~/Library/Application Support/PetAgent/Avatars/dummy/` — never committed to the repo. The real per-clip avatar assets (idle.usdz/walk.usdz/... with actual walk animation) are still 강상우's pending work; this only confirms the rendering pipeline itself.
+**Manually verified end-to-end on-device, twice:** built the real signed `.app`, launched it via `open`, confirmed via `pgrep` it stayed running (including with `BridgeServer`/`WindowListWatcher`/`GlobalHotkeyManager` now live), screenshotted the real screen (`screencapture`), and read the PNG back — a usdz model rendered transparently over other windows both before and after the full bootstrap wiring was added. Also confirmed via the real `AppLogger` JSONL log files that `PermissionOnboarding` and the rest of the chain ran for real across both launches, not just compiled.
+
+**강상우's real animated usdz pack is now in local use** (`death`/`idle`/`jumping`/`punching`/`running`/`walking.usdz`, not committed — same "local Application Support only" pattern as before). Mapped into the dummy manifest as `idle`->`idle`, `walk`->`walking`, `fall`->`death`, `react_click`->`punching`; `jumping`/`running` are currently unreferenced by any FSM clip slot (no obvious fit among the remaining `climb`/`land`/`point`/`type`/`listen`/`react_drag` recommended clips — left in the directory unused rather than force-mapped). Swapping in a real mesh immediately surfaced a real bug: `AvatarManifest.scale` was decoded but never applied anywhere in `USDZAvatar` — harmless with the placeholder Crayon.usdz (already ~1 unit tall) but the real Mixamo-sourced rig measures ~180 units tall raw (`usdcat`/a throwaway `Entity.load` + `visualBounds` check confirmed this — a baked `xformOp:scale=(100,100,100)` from the gltf2usd conversion pipeline stacked on the source rig's own scale), so it rendered ~100x oversized, filling the whole screen. Fixed by applying `manifest.scale` to `rootEntity.scale` in `USDZAvatar.init` and setting the dummy manifest's `scale` to `0.00554` (`1/180.51`) to compensate. Re-verified on-device: the model now renders at the intended ~100px human-figure size at screen center.
 
 ## Legend
 
@@ -47,7 +49,7 @@ modules that don't depend on rendering (F1) — see
 | Module | Files | Tests | Notes |
 |---|---|---|---|
 | Bridge (F11/socket) | `BridgeMessages`, `JSONValue`, `BridgeServer`, `BridgeConnection`, `EventRouter` | 44 | Real end-to-end UDS socket test (no mocks). Listener-failure detection, single-instance guard, buffer cap all added post-review. |
-| Avatar (F2) | `AvatarManifest`, `AvatarLoader`, `AvatarPlayable`, `AvatarImportValidator`, `USDZAvatar` | 26 | **Design correction**: one usdz per clip, not one shared usdz (RealityKit only plays a usdz's first animation) — see `docs/avatar-spec.md`. Validator checks clip-file existence + size budget; mesh height/scale/loop still manual. `USDZAvatar` implemented and manually verified rendering a real usdz on-device. `VideoAvatar`/`SpriteAvatar` still stubs (later priority per plan). |
+| Avatar (F2) | `AvatarManifest`, `AvatarLoader`, `AvatarPlayable`, `AvatarImportValidator`, `USDZAvatar` | 26 | **Design correction**: one usdz per clip, not one shared usdz (RealityKit only plays a usdz's first animation) — see `docs/avatar-spec.md`. Validator checks clip-file existence + size budget; mesh height/scale/loop still manual. `USDZAvatar` now applies `manifest.scale` to `rootEntity` (found missing when a real ~180-unit-tall rig exposed it — see below). Manually verified rendering a real animated usdz on-device at the correct size. `VideoAvatar`/`SpriteAvatar` still stubs (later priority per plan). |
 | Movement (F3) | `CharacterController`, `GlobalScreenSpace`, `WanderScheduler`, `StateHandler`, 12 states | 20 | FSM skeleton + coordinate normalization done; per-state movement math (actual walking/climbing/falling) still TODO, needs F1/F4 live data. |
 | WindowSensing (F4 level 1) | `WindowInfo`, `WindowListWatcher`, `LandingSurfaceResolver`, `AccessibilityPermission` | 12 | Level 2 (`UIElementInspector`, `ScreenCaptureFallback`) not started. |
 | Tools (F11) | `ToolExecutor`, `ToolExecutionLogger`, 7/8 handlers | 13 | `LaunchAppHandler`, `ListRunningAppsHandler`, `GetFrontmostWindowHandler`, `RunShellHandler`, `RunAppleScriptHandler`, `PointAtHandler`, `ClickElementHandler` real. `FindUIElementHandler` still blocked on F4 level 2. |
@@ -64,11 +66,11 @@ modules that don't depend on rendering (F1) — see
   Only handler not registered in `ToolExecutor` — needs Accessibility-API UI
   tree traversal, deferred as the one item genuinely blocked on more design
   work rather than review/priority.
-- **No real avatar assets with actual motion.** The dummy avatar is Apple's
-  own `Crayon.usdz` (from the Xcode/iOS-Simulator install) copied to
-  `idle.usdz`/`walk.usdz` locally — confirms the render pipeline but has no
-  real walk animation. Never committed to git. 강상우 is providing a real
-  animated usdz; swap it in and re-verify FSM playback once it arrives.
+- **Real animated assets are in place locally but `climb`/`land`/`point`/`type`/
+  `listen`/`react_drag` still have no matching clip file** in 강상우's current
+  pack (only idle/walk/fall/react_click were mappable) — those states still
+  fall back to idle per `AvatarLoader`'s existing recommended-clip handling.
+  `jumping.usdz`/`running.usdz` are unused for the same reason.
 - **`await_approval` has no manifest sound key.** `EventRouter` produces this
   SFX key but the `protocol` repo's manifest schema (section 6) doesn't define
   it yet, and `protocol` has no commits to PR against. Tracked (not silently
@@ -99,3 +101,8 @@ modules that don't depend on rendering (F1) — see
 - Task 13 (final module) closed a previously-tracked gap on inspection: wired
   `EventRouter.reaction(for:)` to the real `characterController`/`sfxPlayer`
   inside `AppDelegate`, which earlier updates had left as a known TODO.
+- Swapping in 강상우's real animated usdz pack found `USDZAvatar` never
+  applied `AvatarManifest.scale` — invisible with the ~1-unit-tall Crayon.usdz
+  placeholder, but a real ~180-unit-tall Mixamo-sourced rig rendered ~100x
+  oversized. Fixed in `USDZAvatar.init`; confirmed via `usdcat`/`Entity.load`
+  bounds measurement and a corrected on-device screenshot.

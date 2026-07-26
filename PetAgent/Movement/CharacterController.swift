@@ -11,9 +11,14 @@ import Foundation
 /// The minimal interface F5 (Audio/SFXPlayer) will implement. Kept here so the
 /// FSM doesn't need to know about the concrete SFX implementation.
 protocol SFXTriggering: AnyObject {
-    /// Triggers the sound mapped to an FSM state name or socket event name key
-    /// (silent if the manifest's sounds table has no match).
-    func trigger(_ key: String)
+    /// Triggers the sound mapped to an FSM clip key or socket event name key
+    /// (silent if the manifest's sounds table has no match). `loop` mirrors
+    /// AvatarPlayable.play(clip:loop:) — a looping trigger (e.g. "walk")
+    /// keeps playing until a *different* loop key is triggered, at which
+    /// point F5 fades the old one out (02_pet-app.md F5: "루프 사운드(walk)는
+    /// 상태 유지 중 반복, exit()에서 페이드아웃"). One-shot (loop: false)
+    /// triggers (react_click, task_success, ...) never interrupt a loop.
+    func trigger(_ key: String, loop: Bool)
 }
 
 /// Drives and transitions the current StateHandler. On every state entry,
@@ -49,7 +54,7 @@ final class CharacterController {
         // Use clipKey (e.g. "walk"), not name (e.g. "Walk") — the manifest sounds
         // table is keyed by lowercase clip/event names (protocol section 6), so
         // triggering with the capitalized FSM state name would never match.
-        sfxPlayer.trigger(currentState.clipKey)
+        sfxPlayer.trigger(currentState.clipKey, loop: currentState.loopsClip)
         currentState.enter()
     }
 }

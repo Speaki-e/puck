@@ -25,7 +25,11 @@ final class SpyAvatarPlayable: AvatarPlayable {
 
 final class SpySFXTriggering: SFXTriggering {
     private(set) var triggeredKeys: [String] = []
-    func trigger(_ key: String) { triggeredKeys.append(key) }
+    private(set) var triggeredCalls: [(key: String, loop: Bool)] = []
+    func trigger(_ key: String, loop: Bool) {
+        triggeredKeys.append(key)
+        triggeredCalls.append((key, loop))
+    }
 }
 
 private final class SpyState: StateHandler {
@@ -59,6 +63,17 @@ final class StateTransitionTests: XCTestCase {
         XCTAssertEqual(avatar.playedClips.map(\.loop), [true])
         XCTAssertEqual(sfx.triggeredKeys, ["idle"]) // clipKey, not the capitalized state name
         XCTAssertEqual(idle.enterCallCount, 1)
+    }
+
+    func test_sfxTrigger_receivesTheStatesLoopsClipFlag() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let reactClick = SpyState(name: "ReactClick", clipKey: "react_click", loopsClip: false)
+
+        _ = CharacterController(initialState: reactClick, avatar: avatar, sfxPlayer: sfx)
+
+        XCTAssertEqual(sfx.triggeredCalls.map(\.key), ["react_click"])
+        XCTAssertEqual(sfx.triggeredCalls.map(\.loop), [false])
     }
 
     func test_transition_exitsOldState_entersNewState_playsNewClip() {

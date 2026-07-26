@@ -5,7 +5,7 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 97 passing (`xcodebuild test`) · **Latest commit:** `1bb8ff2`
+**Last updated:** 2026-07-27 · **Tests:** 117 passing (`xcodebuild test`) · **Latest commit:** (pending push — F1 Overlay)
 
 ## Legend
 
@@ -22,9 +22,9 @@ order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
 | Order | Item | Status |
 |---|---|---|
-| P0 | F1 overlay + rendering (`Overlay/`) | [ ] not started |
+| P0 | F1 overlay + rendering (`Overlay/`) | [x] done (window/RealityKit plumbing; no real avatar to visually verify against yet) |
 | P1 | F2 avatar loader + F3 FSM skeleton | [x] done |
-| P2 | F3 on-screen movement, multi-display | [~] FSM skeleton done; per-state movement logic (Walk/Climb/etc. actual motion) still TODO, blocked on F1/F4 wiring |
+| P2 | F3 on-screen movement, multi-display | [~] FSM skeleton + coordinate math done; per-state movement logic (Walk/Climb/etc. actual motion) still TODO, blocked on F4 live wiring |
 | P3 | F4 level 1 + moving on top of windows | [x] level 1 done (`WindowListWatcher`, `LandingSurfaceResolver`, `AccessibilityPermission`); state-machine wiring to F4 still TODO |
 | P4 | F5 SFX | [ ] not started (`SFXPlayer`, `PlayerNodePool`, `SoundTable`, `FocusModeObserver` still stubs) |
 | P5 | F6 global hotkeys + text input | [ ] not started |
@@ -46,7 +46,7 @@ modules that don't depend on rendering (F1) — see
 | Movement (F3) | `CharacterController`, `GlobalScreenSpace`, `WanderScheduler`, `StateHandler`, 12 states | 20 | FSM skeleton + coordinate normalization done; per-state movement math (actual walking/climbing/falling) still TODO, needs F1/F4 live data. |
 | WindowSensing (F4 level 1) | `WindowInfo`, `WindowListWatcher`, `LandingSurfaceResolver`, `AccessibilityPermission` | 12 | Level 2 (`UIElementInspector`, `ScreenCaptureFallback`) not started. |
 | Tools (F11) | `ToolExecutor`, `ToolExecutionLogger`, 5/8 handlers | 9 | `LaunchAppHandler`, `ListRunningAppsHandler`, `GetFrontmostWindowHandler`, `RunShellHandler`, `RunAppleScriptHandler` real. `FindUIElementHandler`/`PointAtHandler`/`ClickElementHandler` blocked on F4-level-2/F10. |
-| Overlay (F1) | — | 0 | Not started. |
+| Overlay (F1) | `OverlayWindow`, `OverlayWindowController`, `ScreenManager`, `ScreenSpaceMapper`, `ClickThroughController`, `PetARView` | 20 | One window+`PetARView` per real display, positioned via AppKit frames (not the normalized FSM-logic space). Found/fixed a real API bug: macOS's `ARView` has no `cameraMode`/`automaticallyConfigureSession` at all (no camera-passthrough AR on Mac) — plan doc corrected. Alpha-halo mitigation steps 2-4 and idle frame-rate downshift need a real avatar to evaluate against; not implemented speculatively. |
 | Audio (F5) | — | 0 | Not started. |
 | Input (F6) | — | 0 | Not started. |
 | Voice (F7) | — | 0 | Not started. |

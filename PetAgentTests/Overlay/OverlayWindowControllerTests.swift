@@ -33,4 +33,17 @@ final class OverlayWindowControllerTests: XCTestCase {
 
         XCTAssertTrue(controller.windows.isEmpty)
     }
+
+    func test_start_firesOnWindowsRebuilt_soConsumersCanReparentTheAvatar() throws {
+        let screenManager = try XCTUnwrap(ScreenManager())
+        let controller = OverlayWindowController(screenManager: screenManager)
+
+        var rebuiltCount = 0
+        controller.onWindowsRebuilt = { rebuiltCount += 1 }
+
+        controller.start()
+        defer { controller.stop() }
+
+        XCTAssertEqual(rebuiltCount, 1)
+    }
 }

@@ -17,7 +17,7 @@ import simd
 final class USDZAvatar: AvatarPlayable {
     private let avatarDirectory: URL
     private let loadResult: AvatarLoadResult
-    private let screenSpaceMapper: ScreenSpaceMapper
+    private var screenSpaceMapper: ScreenSpaceMapper
     private let rootEntity: Entity
     private var loadedEntities: [String: Entity] = [:]
     private var currentEntity: Entity?
@@ -62,6 +62,17 @@ final class USDZAvatar: AvatarPlayable {
         rootEntity.transform.rotation = facing == .left
             ? simd_quatf(angle: .pi, axis: [0, 1, 0])
             : simd_quatf(angle: 0, axis: [0, 1, 0])
+    }
+
+    /// OverlayWindowController tears down and recreates its window+PetARView
+    /// on every real display change, orphaning whatever the avatar was
+    /// parented to at setup time. Callers must re-parent (to the rebuilt
+    /// PetARView's contentAnchor) and supply a mapper sized to the new
+    /// window whenever OverlayWindowController.onWindowsRebuilt fires.
+    func reparent(to newParent: Entity, screenSpaceMapper: ScreenSpaceMapper) {
+        rootEntity.removeFromParent()
+        newParent.addChild(rootEntity)
+        self.screenSpaceMapper = screenSpaceMapper
     }
 
     /// Only caches on a successful load -- caching a failure's placeholder

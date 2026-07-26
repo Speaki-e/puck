@@ -91,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.screenManager = screenManager
 
         let overlayController = OverlayWindowController(screenManager: screenManager)
+        overlayController.onWindowsRebuilt = { [weak self] in self?.handleWindowsRebuilt() }
         overlayController.start()
         self.overlayController = overlayController
 
@@ -144,6 +145,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// against) is AppKit's global screen space (bottom-left origin, Y-up).
     private func globalAppKitPoint(fromWindowLocal point: CGPoint, window: NSWindow) -> CGPoint {
         CGPoint(x: window.frame.origin.x + point.x, y: window.frame.origin.y + (window.frame.height - point.y))
+    }
+
+    /// OverlayWindowController tears down and recreates every window+PetARView
+    /// on a real display change (monitor plug/unplug, resolution change).
+    /// Without this, the avatar/click-through stayed parented to the now-gone
+    /// window and silently disappeared. `avatar`/`clickThroughController` are
+    /// nil on the very first call (fired from inside overlayController.start(),
+    /// before setUpOverlayAndAvatar has built them yet) -- nothing to do then.
+    private func handleWindowsRebuilt() {
+        guard
+            let window = overlayController?.windows.first,
+            let arView = window.contentView as? PetARView,
+            let avatar
+        else {
+            return
+        }
+
+        let position = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+        avatar.reparent(to: arView.contentAnchor, screenSpaceMapper: ScreenSpaceMapper(viewportSize: window.frame.size))
+        avatar.setScreenPosition(position)
+
+        clickThroughController?.stopMonitoring()
+        let clickThrough = ClickThroughController(window: window)
+        clickThrough.updateCharacter(
+            screenPosition: globalAppKitPoint(fromWindowLocal: position, window: window),
+            hitboxSize: avatarHitboxSize
+        )
+        clickThrough.startMonitoring()
+        clickThroughController = clickThrough
     }
 
     // MARK: - Window sensing (F4 level 1)

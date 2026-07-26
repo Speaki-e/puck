@@ -23,6 +23,12 @@ final class OverlayWindowController {
     private(set) var windows: [OverlayWindow] = []
     private let screenManager: ScreenManager
 
+    /// Fires every time `windows` is torn down and recreated (initial start()
+    /// and every real display change) -- consumers holding a reference into a
+    /// specific window/PetARView (e.g. the avatar's RealityKit parent entity)
+    /// must re-fetch it here or they're left pointing at an orphaned window.
+    var onWindowsRebuilt: (() -> Void)?
+
     init(screenManager: ScreenManager) {
         self.screenManager = screenManager
     }
@@ -51,5 +57,6 @@ final class OverlayWindowController {
             window.orderFrontRegardless()
             return window
         }
+        onWindowsRebuilt?()
     }
 }

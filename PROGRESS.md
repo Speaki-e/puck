@@ -5,7 +5,9 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 179 passing (`xcodebuild test`) · **Latest commit:** `de05780`
+**Last updated:** 2026-07-27 · **Tests:** 194 passing (`xcodebuild test`) · **Latest commit:** `c1f4e87`
+
+**Self-directed refactor + code-review pass just completed** (6 parallel reviews across every module, ~20 real findings, ~15 fixed across 7 commits) — see "Self-review pass" under Review history below for the full list of what was fixed and what was deliberately left alone.
 
 **All 13 planned implementation tasks are now done.** Every module in `docs/directory-structure.md` exists and is wired together in a real `AppDelegate.applicationDidFinishLaunching` bootstrap: permission self-check -> menu bar -> overlay/avatar/FSM/SFX -> window sensing -> tool executor -> bridge server (with `EventRouter` now wired to the live `characterController`/`sfxPlayer`, closing the gap noted in the previous update) -> global hotkeys -> voice input -> text bubble fallback.
 
@@ -56,7 +58,7 @@ modules that don't depend on rendering (F1) — see
 | Overlay (F1) | `OverlayWindow`, `OverlayWindowController`, `ScreenManager`, `ScreenSpaceMapper`, `ClickThroughController`, `PetARView` | 20 | One window+`PetARView` per real display, positioned via AppKit frames (not the normalized FSM-logic space). Found/fixed a real API bug: macOS's `ARView` has no `cameraMode`/`automaticallyConfigureSession` at all (no camera-passthrough AR on Mac) — plan doc corrected. Alpha-halo mitigation steps 2-4 and idle frame-rate downshift need a real avatar to evaluate against; not implemented speculatively. |
 | Audio (F5) | `SFXPlayer`, `PlayerNodePool`, `SoundTable`, `FocusModeObserver` | 12 | `SFXTriggering` protocol gained a `loop` param (symmetric with `AvatarPlayable.play`) so F5 knows which triggers should loop. Fade-out-on-loop-replace stops immediately for now (documented TODO, needs a real sound to tune a volume ramp against). `FocusModeObserver` is explicitly best-effort/unverified on modern macOS — see its doc comment. |
 | Input (F6) | `HotkeyBindings`, `GlobalHotkeyManager`, `TextInputBubbleWindow`, `TextInputBubbleView` | 17 | `HotkeyDecisionMaker` handles releasing the modifier before the key during PTT hold (flagsChanged), matching the plan's explicit mention of that event type. `TextInputBubbleWindow` is the one window allowed to become key. |
-| Voice (F7) | `VoiceInputController`, `SpeechRecognitionService`, `MicrophonePermission` | 5 | On-device-vs-server STT decided upfront via `supportsOnDeviceRecognition`, not reactive error retry (unstable across macOS versions). Holds under 0.3s still occupy the mic but their final transcription is discarded. |
+| Voice (F7) | `VoiceInputController`, `SpeechRecognitionService`, `MicrophonePermission` | 7 | On-device-vs-server STT decided upfront via `supportsOnDeviceRecognition`, not reactive error retry (unstable across macOS versions). Holds under 0.3s still occupy the mic but their final transcription is discarded. `stopStreaming()` no longer cancels early (was losing real final results); a generation counter guards against cross-session result contamination. `onError` now flows protocol -> controller -> AppDelegate instead of being dropped. |
 | Pointing (F10) | `PointingController`, `ClickDetector`, `SyntheticClick` | 7 | `beginPointing()` assumes the FSM already arrived at the target -- MoveTo's real movement math isn't implemented yet. System-dialog click classification needs F4 level 2. |
 | Settings/Diagnostics/App bootstrap | `AppDelegate`, `MenuBarController`, `PermissionOnboarding`, `AppLogger`, `SettingsView`, `AvatarManagementView` | 8 | `AppDelegate.applicationDidFinishLaunching` wires every module: permission self-check -> menu bar -> overlay/avatar/FSM/SFX -> window sensing -> tool executor (7 handlers) -> bridge server (`EventRouter.reaction(for:)` now applied to the real `characterController`/`sfxPlayer`) -> global hotkeys -> voice input, with a text-bubble fallback when there's no active bridge connection. `AvatarManagementView` wires `NSOpenPanel` -> `AvatarImportValidator` -> install to `Application Support`. |
 
@@ -106,3 +108,60 @@ modules that don't depend on rendering (F1) — see
   placeholder, but a real ~180-unit-tall Mixamo-sourced rig rendered ~100x
   oversized. Fixed in `USDZAvatar.init`; confirmed via `usdcat`/`Entity.load`
   bounds measurement and a corrected on-device screenshot.
+- **Self-review pass** (byeolki asked for a full refactor + self-review):
+  6 parallel reviews covering every module, then fixed across 7 commits
+  (`36d6980`, `4aff2d5`, `aae181f`, `5055643`, `5dbb011`, `a40d2be`, `c1f4e87`):
+  - `ToolExecutor.completeOnce`'s completion guard raced between the timeout
+    closure and a handler's own (often background-queue) completion — now
+    synchronized through a serial queue.
+  - `BridgeServer.start()` wrote its PID lock file *before* `NWListener`
+    construction; a throw there left a stale lock naming the still-alive
+    process, permanently blocking every later `start()` in it.
+  - Deduped `JSONValue.extractFrame`/new `extractString` across 4 handlers;
+    added missing tests for `RunShellHandler`/`RunAppleScriptHandler`.
+  - `USDZAvatar` cached a *failed* clip load as a permanent empty
+    placeholder — now only caches on success and logs the failure.
+  - `ClickThroughController` only used a global `NSEvent` monitor, which
+    macOS stops delivering once the window itself starts accepting clicks —
+    clicks stayed enabled forever after the cursor's first hitbox entry.
+    Added a local monitor, and wired the whole class into `AppDelegate`
+    using `manifest.hitbox` (decoded since F2, never consumed until now).
+  - `OverlayWindowController` tore down/recreated every window on a real
+    display change with no hook for consumers — the avatar stayed parented
+    to the orphaned old window. Added `onWindowsRebuilt` + `USDZAvatar.
+    reparent(to:screenSpaceMapper:)`.
+  - `HotkeyDecisionMaker`'s `.keyDown` branch had no `isPushToTalkActive`
+    guard (unlike `keyUp`/`flagsChanged`), so OS key-repeat during a held
+    PTT key kept re-firing `pushToTalkDown`, sliding the hold-start time
+    forward and making genuine long holds measure as too short at release.
+  - Settings' Volume/Mute toggles only wrote to `UserDefaults`; `AppDelegate`
+    copied them into `SFXPlayer` once at launch, so live changes had no
+    effect until restart. `SFXPlayer.isMuted` also only gated *new*
+    `trigger()` calls, not an already-playing loop. Both now route through
+    `engine.mainMixerNode.outputVolume` live. `FocusModeObserver` (F5,
+    fully implemented) was never instantiated anywhere — `autoMuteOnFocus`
+    did nothing; now wired.
+  - `SpeechRecognitionService.stopStreaming()` called `endAudio()`
+    immediately followed by `cancel()`, aborting the task before the real
+    final transcription arrived — PTT results were routinely lost. Now
+    only `endAudio()` is called; a generation counter stops a late result
+    from a superseded session being misdelivered into a newer one.
+  - `ClickDetector.startMonitoring()` leaked its previous global monitor if
+    called again without an intervening `stopMonitoring()`.
+  - `AppDelegate.applyEventReaction` (and `onListenStart`/`onListenEnd`)
+    constructed a fresh state instance per transition, defeating
+    `CharacterController`'s reference-equality same-state guard — confirmed
+    real impact: `IdleState`'s `WanderScheduler` timer reset and loop
+    clip/SFX replayed on every repeated same-kind event. Now one shared
+    instance per state kind, reused everywhere.
+  - `AvatarManagementView.importAvatar` never created the `Avatars/`
+    parent directory before `copyItem`, and folded a post-validation copy
+    failure into a misleading "Failed to validate" message.
+  - **Deliberately not fixed**, with reasoning: collapsing the 12 mostly-
+    identical `Movement/States/*` files into one generic class (real
+    duplication, but the reviewer's own finding flagged it as only worth
+    doing if more states are added — high risk/low reward to do blind);
+    `AvatarImportValidator.status(for:)` conflating two distinct "missing"
+    reasons (cosmetic); `AppLogger`'s `ts`-vs-filename `Date()` mismatch
+    across UTC midnight (cosmetic edge case); deduping
+    `showSettingsWindow`/`showAvatarManagementWindow` (only 2 call sites).

@@ -67,7 +67,7 @@ final class AvatarManifestParsingTests: XCTestCase {
         let result = try AvatarLoader.load(manifestData: Data(dummyManifestJSON.utf8))
 
         XCTAssertEqual(result.manifest.name, "dummy")
-        XCTAssertTrue(result.missingClips.isEmpty)
+        XCTAssertTrue(result.missingRecommendedClips.isEmpty)
     }
 
     func test_load_withOnlyRequiredClips_reportsMissingRecommendedClips() throws {
@@ -82,7 +82,7 @@ final class AvatarManifestParsingTests: XCTestCase {
         let result = try AvatarLoader.load(manifestData: Data(json.utf8))
 
         XCTAssertEqual(
-            Set(result.missingClips),
+            Set(result.missingRecommendedClips),
             Set(["climb", "fall", "land", "point", "type", "listen", "react_click", "react_drag"])
         )
     }
@@ -92,6 +92,57 @@ final class AvatarManifestParsingTests: XCTestCase {
             guard case AvatarLoaderError.manifestNotDecodable = error else {
                 return XCTFail("expected .manifestNotDecodable, got \(error)")
             }
+        }
+    }
+
+    func test_load_withMissingIdle_throwsMissingRequiredClips() {
+        let json = """
+        {
+          "schema_version": 1, "name": "no-idle", "type": "usdz", "scale": 1.0,
+          "hitbox": { "width": 100, "height": 100 },
+          "clips": { "walk": "walk" },
+          "sounds": {}
+        }
+        """
+        XCTAssertThrowsError(try AvatarLoader.load(manifestData: Data(json.utf8))) { error in
+            guard case AvatarLoaderError.missingRequiredClips(let missing) = error else {
+                return XCTFail("expected .missingRequiredClips, got \(error)")
+            }
+            XCTAssertEqual(missing, ["idle"])
+        }
+    }
+
+    func test_load_withUnsupportedSchemaVersion_throws() {
+        let json = """
+        {
+          "schema_version": 2, "name": "future", "type": "usdz", "scale": 1.0,
+          "hitbox": { "width": 100, "height": 100 },
+          "clips": { "idle": "idle", "walk": "walk" },
+          "sounds": {}
+        }
+        """
+        XCTAssertThrowsError(try AvatarLoader.load(manifestData: Data(json.utf8))) { error in
+            guard case AvatarLoaderError.unsupportedSchemaVersion(let version) = error else {
+                return XCTFail("expected .unsupportedSchemaVersion, got \(error)")
+            }
+            XCTAssertEqual(version, 2)
+        }
+    }
+
+    func test_load_withMissingIdleAndWalk_reportsBothInError() {
+        let json = """
+        {
+          "schema_version": 1, "name": "no-required-clips", "type": "usdz", "scale": 1.0,
+          "hitbox": { "width": 100, "height": 100 },
+          "clips": {},
+          "sounds": {}
+        }
+        """
+        XCTAssertThrowsError(try AvatarLoader.load(manifestData: Data(json.utf8))) { error in
+            guard case AvatarLoaderError.missingRequiredClips(let missing) = error else {
+                return XCTFail("expected .missingRequiredClips, got \(error)")
+            }
+            XCTAssertEqual(Set(missing), Set(["idle", "walk"]))
         }
     }
 
@@ -115,12 +166,16 @@ final class AvatarManifestParsingTests: XCTestCase {
         XCTAssertEqual(AvatarLoader.resolvedClipName(for: "climb", in: result), "idle")
     }
 
-    func test_resolvedClipName_returnsNil_whenClipAndIdleBothMissing() throws {
+    func test_resolvedClipName_returnsNil_whenIdleIsNotAStringNamedClip() throws {
+        // idle/walk are both present (satisfies the required-clip check), but as
+        // video-style {in,out} time ranges rather than usdz/sprites clip names —
+        // resolvedClipName only understands the .name case, so idle can't be used
+        // as a fallback target here even though the key technically exists.
         let json = """
         {
-          "schema_version": 1, "name": "no-idle", "type": "usdz", "scale": 1.0,
+          "schema_version": 1, "name": "video-avatar", "type": "video", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
-          "clips": { "walk": "walk" },
+          "clips": { "idle": {"in": 0, "out": 1}, "walk": {"in": 1, "out": 2} },
           "sounds": {}
         }
         """

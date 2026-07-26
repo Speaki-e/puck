@@ -57,7 +57,7 @@ final class StateTransitionTests: XCTestCase {
 
         XCTAssertEqual(avatar.playedClips.map(\.clip), ["idle"])
         XCTAssertEqual(avatar.playedClips.map(\.loop), [true])
-        XCTAssertEqual(sfx.triggeredKeys, ["Idle"])
+        XCTAssertEqual(sfx.triggeredKeys, ["idle"]) // clipKey, not the capitalized state name
         XCTAssertEqual(idle.enterCallCount, 1)
     }
 
@@ -73,7 +73,7 @@ final class StateTransitionTests: XCTestCase {
         XCTAssertEqual(idle.exitCallCount, 1)
         XCTAssertEqual(walk.enterCallCount, 1)
         XCTAssertEqual(avatar.playedClips.map(\.clip), ["idle", "walk"])
-        XCTAssertEqual(sfx.triggeredKeys, ["Idle", "Walk"])
+        XCTAssertEqual(sfx.triggeredKeys, ["idle", "walk"])
         XCTAssertTrue(controller.currentState === walk)
     }
 

@@ -46,7 +46,10 @@ final class CharacterController {
 
     private func enterCurrentState() {
         avatar.play(clip: currentState.clipKey, loop: currentState.loopsClip)
-        sfxPlayer.trigger(currentState.name)
+        // Use clipKey (e.g. "walk"), not name (e.g. "Walk") — the manifest sounds
+        // table is keyed by lowercase clip/event names (protocol section 6), so
+        // triggering with the capitalized FSM state name would never match.
+        sfxPlayer.trigger(currentState.clipKey)
         currentState.enter()
     }
 }

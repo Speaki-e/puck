@@ -12,16 +12,28 @@ import Foundation
 enum AvatarLoaderError: Error, Equatable {
     case avatarNotFound(name: String)
     case manifestNotDecodable(underlying: String)
+    /// idle/walk are required because there's no fallback target for them —
+    /// unlike recommendedClips, a manifest missing these is rejected outright
+    /// rather than "successfully" loaded with a caller left to notice later.
+    case missingRequiredClips([String])
+    /// A manifest can decode successfully under a *future* schema version
+    /// while meaning something different (fields reinterpreted, new required
+    /// semantics) — silently trusting it as v1 would misload it with no error.
+    case unsupportedSchemaVersion(Int)
 }
 
-/// Result of a manifest load: the parsed manifest, plus the clips that are
-/// missing and must fall back to idle.
+/// Result of a manifest load: the parsed manifest, plus recommended clips
+/// that are missing (idle-fallback still applies to those, with a startup
+/// warning). Required clips (idle, walk) are guaranteed present — `load`
+/// throws instead of returning a result when they're missing.
 struct AvatarLoadResult: Equatable {
     let manifest: AvatarManifest
-    let missingClips: [String]
+    let missingRecommendedClips: [String]
 }
 
 enum AvatarLoader {
+    /// The only manifest schema version (protocol section 6) this loader understands.
+    static let supportedSchemaVersion = 1
     /// Clips that must exist — there's no fallback target if these are missing.
     static let requiredClips = ["idle", "walk"]
     /// Clips that fall back to idle if missing, but are still warned about at startup.
@@ -38,7 +50,8 @@ enum AvatarLoader {
         return try load(manifestData: data)
     }
 
-    /// Parses manifest.json bytes and computes which required/recommended clips are missing.
+    /// Parses manifest.json bytes, rejects it if a required clip is missing,
+    /// and computes which recommended clips are missing.
     static func load(manifestData: Data) throws -> AvatarLoadResult {
         let manifest: AvatarManifest
         do {
@@ -47,8 +60,17 @@ enum AvatarLoader {
             throw AvatarLoaderError.manifestNotDecodable(underlying: String(describing: error))
         }
 
-        let missingClips = (requiredClips + recommendedClips).filter { manifest.clips[$0] == nil }
-        return AvatarLoadResult(manifest: manifest, missingClips: missingClips)
+        guard manifest.schemaVersion == supportedSchemaVersion else {
+            throw AvatarLoaderError.unsupportedSchemaVersion(manifest.schemaVersion)
+        }
+
+        let missingRequired = requiredClips.filter { manifest.clips[$0] == nil }
+        guard missingRequired.isEmpty else {
+            throw AvatarLoaderError.missingRequiredClips(missingRequired)
+        }
+
+        let missingRecommended = recommendedClips.filter { manifest.clips[$0] == nil }
+        return AvatarLoadResult(manifest: manifest, missingRecommendedClips: missingRecommended)
     }
 
     /// Returns the requested clip's name if present in the manifest, otherwise

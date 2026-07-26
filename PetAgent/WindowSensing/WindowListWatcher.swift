@@ -23,7 +23,9 @@ final class WindowListWatcher {
     private let selfPID: pid_t
     private let minimumSize: CGSize
     private var pollTimer: Timer?
-    private var burstEndTime: Date?
+    /// Monotonic (ProcessInfo.systemUptime), not Date() — a wall-clock jump from
+    /// NTP sync or waking from sleep must not affect when the burst window ends.
+    private var burstEndUptime: TimeInterval?
     private var observerTokens: [NSObjectProtocol] = []
 
     init(
@@ -60,22 +62,26 @@ final class WindowListWatcher {
     }
 
     private func triggerBurst() {
-        burstEndTime = Date().addingTimeInterval(Self.burstDuration)
+        burstEndUptime = ProcessInfo.processInfo.systemUptime + Self.burstDuration
         scheduleTimer(hz: Self.burstPollHz)
         refresh()
     }
 
     private func scheduleTimer(hz: Double) {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / hz, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 1.0 / hz, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        // .common (not the default add(timer:forMode:) mode) so polling doesn't
+        // pause while the user has a menu open or a modal/tracking loop is active.
+        RunLoop.main.add(timer, forMode: .common)
+        pollTimer = timer
     }
 
     private func tick() {
         refresh()
-        if let end = burstEndTime, Date() >= end {
-            burstEndTime = nil
+        if let end = burstEndUptime, ProcessInfo.processInfo.systemUptime >= end {
+            burstEndUptime = nil
             scheduleTimer(hz: Self.idlePollHz)
         }
     }

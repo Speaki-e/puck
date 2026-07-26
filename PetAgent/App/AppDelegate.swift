@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var sfxPlayer: SFXPlayer?
     private var clickThroughController: ClickThroughController?
     private var avatarHitboxSize: CGSize = .zero
+    private var focusModeObserver: FocusModeObserver?
 
     private var windowListWatcher: WindowListWatcher?
     private var toolExecutor: ToolExecutor?
@@ -128,6 +129,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sfxPlayer.volume = settingsStore.volume
         sfxPlayer.isMuted = settingsStore.isMuted
         self.sfxPlayer = sfxPlayer
+
+        // Previously copied once at launch only -- Settings' Volume/Mute
+        // toggles had no live effect on a running session until restart.
+        settingsStore.onVolumeChanged = { [weak sfxPlayer] volume in sfxPlayer?.volume = volume }
+        settingsStore.onMuteChanged = { [weak sfxPlayer] isMuted in sfxPlayer?.isMuted = isMuted }
+
+        // autoMuteOnFocus existed as a setting with nothing acting on it --
+        // FocusModeObserver was implemented but never instantiated anywhere.
+        let focusObserver = FocusModeObserver()
+        focusObserver.onChange = { [weak self, weak sfxPlayer] isFocusActive in
+            guard let self, self.settingsStore.autoMuteOnFocus else { return }
+            sfxPlayer?.isMuted = isFocusActive
+        }
+        focusObserver.startObserving()
+        focusModeObserver = focusObserver
 
         characterController = CharacterController(initialState: IdleState(), avatar: avatar, sfxPlayer: sfxPlayer)
 

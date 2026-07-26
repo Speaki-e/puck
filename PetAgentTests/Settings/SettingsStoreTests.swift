@@ -65,6 +65,26 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(SettingsStore(defaults: defaults).hotkeyBindings, .defaults)
     }
 
+    func test_settingVolume_firesOnVolumeChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: Float?
+        store.onVolumeChanged = { received = $0 }
+
+        store.volume = 0.6
+
+        XCTAssertEqual(received, 0.6)
+    }
+
+    func test_settingIsMuted_firesOnMuteChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: Bool?
+        store.onMuteChanged = { received = $0 }
+
+        store.isMuted = true
+
+        XCTAssertEqual(received, true)
+    }
+
     func test_hotkeyBindings_roundTrip() {
         let store = SettingsStore(defaults: defaults)
         var bindings = HotkeyBindings.defaults

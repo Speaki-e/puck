@@ -37,11 +37,26 @@ final class SFXPlayer: SFXTriggering {
     private var soundTable: SoundTable
     private var currentLoopKey: String?
     private var currentLoopNode: AVAudioPlayerNode?
+    private var baseVolume: Float = 1.0
 
-    var isMuted = false
+    /// Muting only guarded new trigger() calls, not an already-playing loop --
+    /// driving both through the mixer's master output volume fixes that (a
+    /// currently-looping walk cue goes silent immediately) and makes Settings'
+    /// Volume/Mute toggles take effect live instead of only after a restart.
+    var isMuted = false {
+        didSet { applyOutputVolume() }
+    }
+
     var volume: Float {
-        get { engine.mainMixerNode.outputVolume }
-        set { engine.mainMixerNode.outputVolume = newValue }
+        get { baseVolume }
+        set {
+            baseVolume = newValue
+            applyOutputVolume()
+        }
+    }
+
+    private func applyOutputVolume() {
+        engine.mainMixerNode.outputVolume = isMuted ? 0 : baseVolume
     }
 
     init(soundTable: SoundTable, poolSize: Int = 6) {

@@ -23,18 +23,31 @@ final class SettingsStore {
 
     private let defaults: UserDefaults
 
+    /// Settings changes only persisted to UserDefaults with no way for a
+    /// running session to react -- AppDelegate subscribes to these so
+    /// Volume/Mute in Settings take effect on the live SFXPlayer immediately
+    /// instead of only after a restart.
+    var onVolumeChanged: ((Float) -> Void)?
+    var onMuteChanged: ((Bool) -> Void)?
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
     var volume: Float {
         get { defaults.object(forKey: Keys.volume) as? Float ?? 1.0 }
-        set { defaults.set(newValue, forKey: Keys.volume) }
+        set {
+            defaults.set(newValue, forKey: Keys.volume)
+            onVolumeChanged?(newValue)
+        }
     }
 
     var isMuted: Bool {
         get { defaults.bool(forKey: Keys.isMuted) }
-        set { defaults.set(newValue, forKey: Keys.isMuted) }
+        set {
+            defaults.set(newValue, forKey: Keys.isMuted)
+            onMuteChanged?(newValue)
+        }
     }
 
     /// Off by default — FocusModeObserver's Do Not Disturb detection is

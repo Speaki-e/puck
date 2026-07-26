@@ -5,7 +5,9 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 130 passing (`xcodebuild test`) · **Latest commit:** `3943f31`
+**Last updated:** 2026-07-27 · **Tests:** 130 passing (`xcodebuild test`) · **Latest commit:** `380d750`
+
+**Manually verified end-to-end on-device:** built the app, launched it, screenshotted the real screen — a usdz model rendered transparently over other windows via the overlay pipeline (window + RealityKit + USDZAvatar all working together, not just compiling). Used a local Apple-provided usdz (Crayon.usdz from the Xcode/iOS-Simulator install) as a placeholder in `~/Library/Application Support/PetAgent/Avatars/dummy/` — never committed to the repo. The real per-clip avatar assets (idle.usdz/walk.usdz/... with actual walk animation) are still 강상우's pending work; this only confirms the rendering pipeline itself.
 
 ## Legend
 
@@ -22,7 +24,7 @@ order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
 | Order | Item | Status |
 |---|---|---|
-| P0 | F1 overlay + rendering (`Overlay/`) | [x] done (window/RealityKit plumbing; no real avatar to visually verify against yet) |
+| P0 | F1 overlay + rendering (`Overlay/`) | [x] done, manually verified on-device (see above) |
 | P1 | F2 avatar loader + F3 FSM skeleton | [x] done |
 | P2 | F3 on-screen movement, multi-display | [~] FSM skeleton + coordinate math done; per-state movement logic (Walk/Climb/etc. actual motion) still TODO, blocked on F4 live wiring |
 | P3 | F4 level 1 + moving on top of windows | [x] level 1 done (`WindowListWatcher`, `LandingSurfaceResolver`, `AccessibilityPermission`); state-machine wiring to F4 still TODO |
@@ -42,7 +44,7 @@ modules that don't depend on rendering (F1) — see
 | Module | Files | Tests | Notes |
 |---|---|---|---|
 | Bridge (F11/socket) | `BridgeMessages`, `JSONValue`, `BridgeServer`, `BridgeConnection`, `EventRouter` | 44 | Real end-to-end UDS socket test (no mocks). Listener-failure detection, single-instance guard, buffer cap all added post-review. |
-| Avatar (F2) | `AvatarManifest`, `AvatarLoader`, `AvatarPlayable`, `AvatarImportValidator` | 26 | **Design correction**: one usdz per clip, not one shared usdz (RealityKit only plays a usdz's first animation) — see `docs/avatar-spec.md`. Validator checks clip-file existence + size budget; mesh height/scale/loop still manual. `USDZAvatar`/`VideoAvatar`/`SpriteAvatar` still stubs (P0/F1 territory). |
+| Avatar (F2) | `AvatarManifest`, `AvatarLoader`, `AvatarPlayable`, `AvatarImportValidator`, `USDZAvatar` | 26 | **Design correction**: one usdz per clip, not one shared usdz (RealityKit only plays a usdz's first animation) — see `docs/avatar-spec.md`. Validator checks clip-file existence + size budget; mesh height/scale/loop still manual. `USDZAvatar` implemented and manually verified rendering a real usdz on-device. `VideoAvatar`/`SpriteAvatar` still stubs (later priority per plan). |
 | Movement (F3) | `CharacterController`, `GlobalScreenSpace`, `WanderScheduler`, `StateHandler`, 12 states | 20 | FSM skeleton + coordinate normalization done; per-state movement math (actual walking/climbing/falling) still TODO, needs F1/F4 live data. |
 | WindowSensing (F4 level 1) | `WindowInfo`, `WindowListWatcher`, `LandingSurfaceResolver`, `AccessibilityPermission` | 12 | Level 2 (`UIElementInspector`, `ScreenCaptureFallback`) not started. |
 | Tools (F11) | `ToolExecutor`, `ToolExecutionLogger`, 5/8 handlers | 9 | `LaunchAppHandler`, `ListRunningAppsHandler`, `GetFrontmostWindowHandler`, `RunShellHandler`, `RunAppleScriptHandler` real. `FindUIElementHandler`/`PointAtHandler`/`ClickElementHandler` blocked on F4-level-2/F10. |
@@ -51,7 +53,7 @@ modules that don't depend on rendering (F1) — see
 | Input (F6) | — | 0 | Not started. |
 | Voice (F7) | — | 0 | Not started. |
 | Pointing (F10) | — | 0 | Not started. |
-| Settings/Diagnostics/App bootstrap | minimal `PetAgentApp`/`AppDelegate` only | 0 | Just enough to link; full bootstrap wiring pending. |
+| Settings/Diagnostics/App bootstrap | `PetAgentApp`/`AppDelegate` | 0 | `AppDelegate` now wires ScreenManager -> OverlayWindowController -> AvatarLoader -> USDZAvatar -> CharacterController(IdleState) — enough to show a static/idle avatar with zero permissions. `PermissionOnboarding`, `BridgeServer`, `GlobalHotkeyManager` wiring still pending. |
 
 ## Known gaps / blocked items
 

@@ -5,7 +5,7 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 97 passing (`xcodebuild test`) · **Latest commit:** (pending push — avatar-spec + import validator)
+**Last updated:** 2026-07-27 · **Tests:** 97 passing (`xcodebuild test`) · **Latest commit:** `1bb8ff2`
 
 ## Legend
 

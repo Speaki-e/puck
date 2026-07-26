@@ -4,7 +4,9 @@
 //
 //  Socket test · owner: 박해영 (Haeyoung Park)
 //  Incremental JSON Lines parsing over an arbitrarily-chunked byte stream,
-//  per protocol/01_protocol.md section 2 ("인코딩: JSON Lines").
+//  per protocol/01_protocol.md section 2 ("인코딩: JSON Lines"). Also covers
+//  code-review findings on commit 57615a8: unbounded buffer growth and
+//  unobservable malformed-line drops (#5).
 //
 
 import XCTest
@@ -17,17 +19,18 @@ final class JSONLinesDecoderTests: XCTestCase {
 
     func test_feedsOneCompleteLine_returnsOneMessage() {
         var decoder = JSONLinesDecoder()
-        let messages = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
+        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
 
-        XCTAssertEqual(messages, [.event(.agentThinking)])
+        XCTAssertEqual(result.messages, [.event(.agentThinking)])
+        XCTAssertFalse(result.didOverflow)
     }
 
     func test_feedsPartialLine_returnsNothingUntilNewlineArrives() {
         var decoder = JSONLinesDecoder()
         let partial = Data(#"{"type":"event","event":"agent_thinking""#.utf8) // no closing brace, no newline
 
-        XCTAssertEqual(decoder.feed(partial), [])
-        XCTAssertEqual(decoder.feed(Data("}\n".utf8)), [.event(.agentThinking)])
+        XCTAssertEqual(decoder.feed(partial).messages, [])
+        XCTAssertEqual(decoder.feed(Data("}\n".utf8)).messages, [.event(.agentThinking)])
     }
 
     func test_feedsMultipleLinesAtOnce_returnsAllMessages() {
@@ -35,18 +38,49 @@ final class JSONLinesDecoderTests: XCTestCase {
         let chunk = line(#"{"type":"event","event":"agent_thinking"}"#)
             + line(#"{"type":"event","event":"tool_result","ok":true}"#)
 
-        XCTAssertEqual(decoder.feed(chunk), [.event(.agentThinking), .event(.toolResult(ok: true))])
+        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking), .event(.toolResult(ok: true))])
     }
 
     func test_malformedLine_isSkipped_subsequentLinesStillParse() {
         var decoder = JSONLinesDecoder()
         let chunk = line("not json") + line(#"{"type":"event","event":"agent_thinking"}"#)
 
-        XCTAssertEqual(decoder.feed(chunk), [.event(.agentThinking)])
+        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking)])
+    }
+
+    func test_malformedLine_incrementsDroppedLineCount() {
+        var decoder = JSONLinesDecoder()
+        _ = decoder.feed(line("not json") + line("also not json"))
+
+        XCTAssertEqual(decoder.droppedLineCount, 2)
     }
 
     func test_emptyLine_isSkipped() {
         var decoder = JSONLinesDecoder()
-        XCTAssertEqual(decoder.feed(Data("\n".utf8)), [])
+        XCTAssertEqual(decoder.feed(Data("\n".utf8)).messages, [])
+    }
+
+    // MARK: - #5: unbounded buffer growth
+
+    func test_lineExceedingMaxLength_withoutNewline_reportsOverflowAndClearsBuffer() {
+        var decoder = JSONLinesDecoder(maxLineLength: 16)
+        let oversized = Data(repeating: UInt8(ascii: "a"), count: 32) // no newline, over the cap
+
+        let result = decoder.feed(oversized)
+
+        XCTAssertTrue(result.didOverflow)
+        XCTAssertEqual(result.messages, [])
+
+        // Buffer was cleared, so a fresh valid line after the overflow parses normally.
+        let next = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
+        XCTAssertEqual(next.messages, [.event(.agentThinking)])
+        XCTAssertFalse(next.didOverflow)
+    }
+
+    func test_lineUnderMaxLength_doesNotOverflow() {
+        var decoder = JSONLinesDecoder(maxLineLength: 1024)
+        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
+
+        XCTAssertFalse(result.didOverflow)
     }
 }

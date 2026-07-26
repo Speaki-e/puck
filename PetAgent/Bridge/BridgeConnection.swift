@@ -13,25 +13,52 @@ import Network
 /// section 2) from a byte stream that may arrive in arbitrarily-sized chunks.
 /// Feed raw bytes via `feed(_:)`; it returns every complete, decodable message
 /// found so far and buffers any trailing partial line for the next call.
-/// Malformed lines are dropped without breaking subsequent parsing.
+/// Malformed lines are dropped (counted in `droppedLineCount`) without
+/// breaking subsequent parsing. A line that never terminates and exceeds
+/// `maxLineLength` is treated as abusive: the buffer is cleared and
+/// `didOverflow` is reported so the caller can close the connection, instead
+/// of letting a buggy/hostile client grow this buffer forever on a
+/// long-lived, menu-bar-resident process.
 struct JSONLinesDecoder {
+    struct FeedResult {
+        let messages: [BridgeMessage]
+        let didOverflow: Bool
+    }
+
     private var buffer = Data()
     private let decoder = JSONDecoder()
+    private let maxLineLength: Int
+    private(set) var droppedLineCount = 0
 
-    mutating func feed(_ data: Data) -> [BridgeMessage] {
+    init(maxLineLength: Int = 1_048_576) {
+        self.maxLineLength = maxLineLength
+    }
+
+    mutating func feed(_ data: Data) -> FeedResult {
         buffer.append(data)
 
         var messages: [BridgeMessage] = []
         while let newlineIndex = buffer.firstIndex(of: 0x0A) {
             let lineData = buffer[..<newlineIndex]
             buffer.removeSubrange(...newlineIndex)
-            guard !lineData.isEmpty, let message = try? decoder.decode(BridgeMessage.self, from: lineData) else {
-                continue
+            guard !lineData.isEmpty else { continue }
+            if let message = try? decoder.decode(BridgeMessage.self, from: lineData) {
+                messages.append(message)
+            } else {
+                droppedLineCount += 1
             }
-            messages.append(message)
         }
-        return messages
+
+        guard buffer.count <= maxLineLength else {
+            buffer.removeAll()
+            return FeedResult(messages: messages, didOverflow: true)
+        }
+        return FeedResult(messages: messages, didOverflow: false)
     }
+}
+
+enum BridgeConnectionError: Error, Equatable {
+    case encodingFailed
 }
 
 /// Wraps a single NWConnection (one workspace client) and handles JSON Lines
@@ -40,9 +67,16 @@ final class BridgeConnection {
     private let connection: NWConnection
     private var linesDecoder = JSONLinesDecoder()
     private let encoder = JSONEncoder()
+    private var hasClosed = false
 
     var onMessage: ((BridgeMessage) -> Void)?
+    /// Fires exactly once per connection, regardless of whether the close was
+    /// observed via stateUpdateHandler or the receive completion handler.
     var onClose: (() -> Void)?
+    /// Fires when a message fails to encode, or the transport itself reports
+    /// a send error — previously both were silently swallowed, leaving the
+    /// agent side to time out with no diagnostic on our end.
+    var onSendError: ((Error) -> Void)?
 
     init(connection: NWConnection) {
         self.connection = connection
@@ -52,7 +86,7 @@ final class BridgeConnection {
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
             case .cancelled, .failed:
-                self?.onClose?()
+                self?.close()
             default:
                 break
             }
@@ -62,25 +96,46 @@ final class BridgeConnection {
     }
 
     func send(_ message: BridgeMessage) {
-        guard var data = try? encoder.encode(message) else { return }
+        guard var data = try? encoder.encode(message) else {
+            onSendError?(BridgeConnectionError.encodingFailed)
+            return
+        }
         data.append(0x0A)
-        connection.send(content: data, completion: .contentProcessed { _ in })
+        connection.send(
+            content: data,
+            completion: .contentProcessed { [weak self] error in
+                if let error {
+                    self?.onSendError?(error)
+                }
+            }
+        )
     }
 
     func cancel() {
         connection.cancel()
     }
 
+    private func close() {
+        guard !hasClosed else { return }
+        hasClosed = true
+        onClose?()
+    }
+
     private func receiveNext() {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
             guard let self else { return }
             if let data, !data.isEmpty {
-                for message in self.linesDecoder.feed(data) {
+                let result = self.linesDecoder.feed(data)
+                for message in result.messages {
                     self.onMessage?(message)
+                }
+                if result.didOverflow {
+                    self.cancel() // triggers stateUpdateHandler -> .cancelled -> close()
+                    return
                 }
             }
             if isComplete || error != nil {
-                self.onClose?()
+                self.close()
                 return
             }
             self.receiveNext()

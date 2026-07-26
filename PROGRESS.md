@@ -5,7 +5,7 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 130 passing (`xcodebuild test`) · **Latest commit:** `380d750`
+**Last updated:** 2026-07-27 · **Tests:** 152 passing (`xcodebuild test`) · **Latest commit:** `aff12ab`
 
 **Manually verified end-to-end on-device:** built the app, launched it, screenshotted the real screen — a usdz model rendered transparently over other windows via the overlay pipeline (window + RealityKit + USDZAvatar all working together, not just compiling). Used a local Apple-provided usdz (Crayon.usdz from the Xcode/iOS-Simulator install) as a placeholder in `~/Library/Application Support/PetAgent/Avatars/dummy/` — never committed to the repo. The real per-clip avatar assets (idle.usdz/walk.usdz/... with actual walk animation) are still 강상우's pending work; this only confirms the rendering pipeline itself.
 
@@ -29,7 +29,7 @@ order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 | P2 | F3 on-screen movement, multi-display | [~] FSM skeleton + coordinate math done; per-state movement logic (Walk/Climb/etc. actual motion) still TODO, blocked on F4 live wiring |
 | P3 | F4 level 1 + moving on top of windows | [x] level 1 done (`WindowListWatcher`, `LandingSurfaceResolver`, `AccessibilityPermission`); state-machine wiring to F4 still TODO |
 | P4 | F5 SFX | [x] done |
-| P5 | F6 global hotkeys + text input | [ ] not started |
+| P5 | F6 global hotkeys + text input | [x] done |
 | P6 | F7 PTT+STT | [ ] not started |
 | P7 | socket server + F11 executor | [x] done (`BridgeServer`, `BridgeConnection`, `EventRouter`, `ToolExecutor`, 5/8 handlers) |
 | P8 | F4 level 2 + F10 pointing | [ ] not started (`UIElementInspector`, `Pointing/`, `FindUIElementHandler`, `PointAtHandler`) |
@@ -50,7 +50,7 @@ modules that don't depend on rendering (F1) — see
 | Tools (F11) | `ToolExecutor`, `ToolExecutionLogger`, 5/8 handlers | 9 | `LaunchAppHandler`, `ListRunningAppsHandler`, `GetFrontmostWindowHandler`, `RunShellHandler`, `RunAppleScriptHandler` real. `FindUIElementHandler`/`PointAtHandler`/`ClickElementHandler` blocked on F4-level-2/F10. |
 | Overlay (F1) | `OverlayWindow`, `OverlayWindowController`, `ScreenManager`, `ScreenSpaceMapper`, `ClickThroughController`, `PetARView` | 20 | One window+`PetARView` per real display, positioned via AppKit frames (not the normalized FSM-logic space). Found/fixed a real API bug: macOS's `ARView` has no `cameraMode`/`automaticallyConfigureSession` at all (no camera-passthrough AR on Mac) — plan doc corrected. Alpha-halo mitigation steps 2-4 and idle frame-rate downshift need a real avatar to evaluate against; not implemented speculatively. |
 | Audio (F5) | `SFXPlayer`, `PlayerNodePool`, `SoundTable`, `FocusModeObserver` | 12 | `SFXTriggering` protocol gained a `loop` param (symmetric with `AvatarPlayable.play`) so F5 knows which triggers should loop. Fade-out-on-loop-replace stops immediately for now (documented TODO, needs a real sound to tune a volume ramp against). `FocusModeObserver` is explicitly best-effort/unverified on modern macOS — see its doc comment. |
-| Input (F6) | — | 0 | Not started. |
+| Input (F6) | `HotkeyBindings`, `GlobalHotkeyManager`, `TextInputBubbleWindow`, `TextInputBubbleView` | 17 | `HotkeyDecisionMaker` handles releasing the modifier before the key during PTT hold (flagsChanged), matching the plan's explicit mention of that event type. `TextInputBubbleWindow` is the one window allowed to become key. |
 | Voice (F7) | — | 0 | Not started. |
 | Pointing (F10) | — | 0 | Not started. |
 | Settings/Diagnostics/App bootstrap | `PetAgentApp`/`AppDelegate` | 0 | `AppDelegate` now wires ScreenManager -> OverlayWindowController -> AvatarLoader -> USDZAvatar -> CharacterController(IdleState) — enough to show a static/idle avatar with zero permissions. `PermissionOnboarding`, `BridgeServer`, `GlobalHotkeyManager` wiring still pending. |

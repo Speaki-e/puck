@@ -24,6 +24,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var avatarHitboxSize: CGSize = .zero
     private var focusModeObserver: FocusModeObserver?
 
+    // One shared instance per FSM state, reused for every transition into it.
+    // CharacterController.transition's same-state no-op guard is reference
+    // equality (StateHandler: AnyObject) -- constructing a fresh instance per
+    // transition (e.g. `IdleState()` each time) defeated that guard, silently
+    // resetting IdleState's WanderScheduler timer and replaying loop clip/SFX
+    // on every repeated same-kind event.
+    private let idleState = IdleState()
+    private let typeState = TypeState()
+    private let pointState = PointState()
+    private let reactClickState = ReactClickState()
+    private let listenState = ListenState()
+
     private var windowListWatcher: WindowListWatcher?
     private var toolExecutor: ToolExecutor?
 
@@ -145,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         focusObserver.startObserving()
         focusModeObserver = focusObserver
 
-        characterController = CharacterController(initialState: IdleState(), avatar: avatar, sfxPlayer: sfxPlayer)
+        characterController = CharacterController(initialState: idleState, avatar: avatar, sfxPlayer: sfxPlayer)
 
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
         // is the piece that uses it (click-through everywhere except over the
@@ -259,18 +271,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyEventReaction(_ reaction: EventReaction) {
-        // NOTE: creates a fresh state instance per reaction rather than
-        // reusing shared singletons, so CharacterController's same-state
-        // no-op guard (reference equality) won't catch re-entering the same
-        // logical state twice in a row. Sharing one instance per state is a
-        // reasonable follow-up polish item, not required for this to work.
         if let kind = reaction.stateTransition, let characterController {
             let state: StateHandler
             switch kind {
-            case .idle: state = IdleState()
-            case .type: state = TypeState()
-            case .point: state = PointState()
-            case .reactClick: state = ReactClickState()
+            case .idle: state = idleState
+            case .type: state = typeState
+            case .point: state = pointState
+            case .reactClick: state = reactClickState
             }
             characterController.transition(to: state)
         }
@@ -291,11 +298,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         voiceController.onListenStart = { [weak self] in
             guard let self, let characterController = self.characterController else { return }
             self.stateBeforeListen = characterController.currentState
-            characterController.transition(to: ListenState())
+            characterController.transition(to: self.listenState)
         }
         voiceController.onListenEnd = { [weak self] in
             guard let self, let characterController = self.characterController else { return }
-            characterController.transition(to: self.stateBeforeListen ?? IdleState())
+            characterController.transition(to: self.stateBeforeListen ?? self.idleState)
             self.stateBeforeListen = nil
         }
         voiceController.onFinalText = { [weak self] text in

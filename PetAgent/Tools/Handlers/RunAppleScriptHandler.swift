@@ -13,7 +13,7 @@ final class RunAppleScriptHandler: ToolHandler {
     let toolName = "run_applescript"
 
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
-        guard case .object(let fields) = args, case .string(let script) = fields["script"] else {
+        guard let script = args.extractString(key: "script") else {
             completion(.failure(.executionFailed("run_applescript requires a script string")))
             return
         }

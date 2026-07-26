@@ -56,12 +56,16 @@ final class BridgeServer {
             throw BridgeServerError.alreadyRunning
         }
         try? FileManager.default.removeItem(at: socketURL) // stale socket file from a previous (now-dead) run
-        Self.writeLockFile(at: lockFileURL, pid: ProcessInfo.processInfo.processIdentifier)
 
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = NWEndpoint.unix(path: socketURL.path)
 
+        // Written only once NWListener construction has actually succeeded --
+        // writing it earlier meant a throw here left a lock file naming this
+        // still-alive process, permanently blocking every later start() call
+        // in the same process with a false alreadyRunning.
         let listener = try NWListener(using: parameters)
+        Self.writeLockFile(at: lockFileURL, pid: ProcessInfo.processInfo.processIdentifier)
         listener.newConnectionHandler = { [weak self] newConnection in
             self?.accept(newConnection)
         }

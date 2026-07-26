@@ -40,6 +40,11 @@ protocol ToolHandler {
 final class ToolExecutor {
     private var handlers: [String: ToolHandler] = [:]
     private let logger: ToolExecutionLogging?
+    // Guards each dispatch's completeOnce check-and-set: the timeout closure
+    // (DispatchQueue.global()) and a handler's own completion (often fired
+    // from a background queue, e.g. RunShellHandler/RunAppleScriptHandler)
+    // can race on the same request's didComplete flag without this.
+    private let completionQueue = DispatchQueue(label: "PetAgent.ToolExecutor.completion")
 
     init(logger: ToolExecutionLogging? = nil) {
         self.logger = logger
@@ -56,9 +61,13 @@ final class ToolExecutor {
         logger?.log(.execStart(id: request.id))
 
         var didComplete = false
-        let completeOnce: (Bool, JSONValue?, String?) -> Void = { [logger] ok, data, error in
-            guard !didComplete else { return }
-            didComplete = true
+        let completeOnce: (Bool, JSONValue?, String?) -> Void = { [logger, completionQueue] ok, data, error in
+            let shouldComplete: Bool = completionQueue.sync {
+                guard !didComplete else { return false }
+                didComplete = true
+                return true
+            }
+            guard shouldComplete else { return }
             logger?.log(.execEnd(id: request.id, ok: ok))
             completion(ToolResult(id: request.id, ok: ok, data: data, error: error))
         }

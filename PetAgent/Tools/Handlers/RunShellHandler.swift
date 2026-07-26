@@ -15,7 +15,7 @@ final class RunShellHandler: ToolHandler {
     let toolName = "run_shell"
 
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
-        guard case .object(let fields) = args, case .string(let command) = fields["command"] else {
+        guard let command = args.extractString(key: "command") else {
             completion(.failure(.executionFailed("run_shell requires a command string")))
             return
         }

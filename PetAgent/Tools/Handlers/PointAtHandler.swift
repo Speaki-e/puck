@@ -13,24 +13,6 @@
 
 import CoreGraphics
 
-/// args: `{"frame": {"x":_, "y":_, "width":_, "height":_}}` (protocol section 4).
-extension JSONValue {
-    func extractFrame(key: String = "frame") -> CGRect? {
-        guard case .object(let fields) = self, case .object(let frameFields) = fields[key] else {
-            return nil
-        }
-        guard
-            case .number(let x)? = frameFields["x"],
-            case .number(let y)? = frameFields["y"],
-            case .number(let width)? = frameFields["width"],
-            case .number(let height)? = frameFields["height"]
-        else {
-            return nil
-        }
-        return CGRect(x: x, y: y, width: width, height: height)
-    }
-}
-
 final class PointAtHandler: ToolHandler {
     let toolName = "point_at"
     private let pointingController: PointingController

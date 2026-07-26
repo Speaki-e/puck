@@ -17,7 +17,8 @@ import CoreGraphics
 /// through to whatever's behind it.
 final class ClickThroughController {
     private weak var window: NSWindow?
-    private var monitor: Any?
+    private var globalMonitor: Any?
+    private var localMonitor: Any?
     private var characterScreenPosition: CGPoint = .zero
     private var hitboxSize: CGSize = .zero
 
@@ -32,17 +33,30 @@ final class ClickThroughController {
         self.hitboxSize = hitboxSize
     }
 
+    /// A *global* monitor only delivers events sent to OTHER apps -- the
+    /// instant handleMouseMoved() sets ignoresMouseEvents = false, our own
+    /// window starts receiving mouseMoved itself, and the global monitor goes
+    /// silent for it. Without a local monitor too, clicks stayed enabled
+    /// permanently after the cursor's first hitbox entry.
     func startMonitoring() {
-        monitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             self?.handleMouseMoved()
+        }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+            self?.handleMouseMoved()
+            return event
         }
     }
 
     func stopMonitoring() {
-        if let monitor {
-            NSEvent.removeMonitor(monitor)
+        if let globalMonitor {
+            NSEvent.removeMonitor(globalMonitor)
         }
-        monitor = nil
+        if let localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+        }
+        globalMonitor = nil
+        localMonitor = nil
     }
 
     private func handleMouseMoved() {

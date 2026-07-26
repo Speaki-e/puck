@@ -20,6 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var characterController: CharacterController?
     private var avatar: USDZAvatar?
     private var sfxPlayer: SFXPlayer?
+    private var clickThroughController: ClickThroughController?
+    private var avatarHitboxSize: CGSize = .zero
 
     private var windowListWatcher: WindowListWatcher?
     private var toolExecutor: ToolExecutor?
@@ -113,7 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             parent: arView.contentAnchor,
             screenSpaceMapper: mapper
         )
-        avatar.setScreenPosition(CGPoint(x: window.frame.width / 2, y: window.frame.height / 2))
+        let initialPosition = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+        avatar.setScreenPosition(initialPosition)
         self.avatar = avatar
 
         let sfxPlayer = SFXPlayer(soundTable: SoundTable(avatarDirectory: avatarDirectory, sounds: loadResult.manifest.sounds))
@@ -122,6 +125,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.sfxPlayer = sfxPlayer
 
         characterController = CharacterController(initialState: IdleState(), avatar: avatar, sfxPlayer: sfxPlayer)
+
+        // manifest.hitbox was decoded but had no consumer -- ClickThroughController
+        // is the piece that uses it (click-through everywhere except over the
+        // character), just never instantiated here.
+        avatarHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
+        let clickThrough = ClickThroughController(window: window)
+        clickThrough.updateCharacter(
+            screenPosition: globalAppKitPoint(fromWindowLocal: initialPosition, window: window),
+            hitboxSize: avatarHitboxSize
+        )
+        clickThrough.startMonitoring()
+        clickThroughController = clickThrough
+    }
+
+    /// ScreenSpaceMapper's screen points are window-local (top-left origin,
+    /// Y-down); NSEvent.mouseLocation (which ClickThroughController hit-tests
+    /// against) is AppKit's global screen space (bottom-left origin, Y-up).
+    private func globalAppKitPoint(fromWindowLocal point: CGPoint, window: NSWindow) -> CGPoint {
+        CGPoint(x: window.frame.origin.x + point.x, y: window.frame.origin.y + (window.frame.height - point.y))
     }
 
     // MARK: - Window sensing (F4 level 1)
@@ -281,6 +303,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // needs MoveTo's real movement math, which isn't implemented yet.
         // For now this just re-centers the avatar on the primary display.
         guard let window = overlayController?.windows.first else { return }
-        avatar?.setScreenPosition(CGPoint(x: window.frame.width / 2, y: window.frame.height / 2))
+        let position = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+        avatar?.setScreenPosition(position)
+        clickThroughController?.updateCharacter(
+            screenPosition: globalAppKitPoint(fromWindowLocal: position, window: window),
+            hitboxSize: avatarHitboxSize
+        )
     }
 }

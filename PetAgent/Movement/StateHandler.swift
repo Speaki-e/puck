@@ -10,10 +10,11 @@ import Foundation
 
 /// A single FSM state. name/clipKey correspond to the state transition table
 /// in plan/02_pet-app.md section 3 and the avatar manifest's clips keys.
-/// On transition, CharacterController calls AvatarPlayable.play with
-/// clipKey/loopsClip, and triggers SFX with name.
+/// On transition, CharacterController calls AvatarPlayable.play AND triggers
+/// SFX using clipKey (not name) -- the manifest's sounds table is keyed by
+/// the same lowercase clip names as clips, not the capitalized state name.
 protocol StateHandler: AnyObject {
-    /// FSM state name (e.g. "Idle", "WalkOnTop"). Also used as the SFX trigger key.
+    /// FSM state name (e.g. "Idle", "WalkOnTop") -- display/debugging only.
     var name: String { get }
     /// Lookup key into the avatar manifest's clips. States without a dedicated
     /// clip (WalkOnTop, MoveTo) reuse "walk".

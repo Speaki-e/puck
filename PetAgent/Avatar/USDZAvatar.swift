@@ -64,13 +64,22 @@ final class USDZAvatar: AvatarPlayable {
             : simd_quatf(angle: 0, axis: [0, 1, 0])
     }
 
+    /// Only caches on a successful load -- caching a failure's placeholder
+    /// Entity would make a transient load error (e.g. file briefly locked
+    /// during an avatar import) permanent for the rest of the process, with
+    /// no retry and nothing ever surfaced.
     private func loadedEntity(named fileName: String) -> Entity {
         if let cached = loadedEntities[fileName] {
             return cached
         }
         let url = avatarDirectory.appendingPathComponent("\(fileName).usdz")
-        let entity = (try? Entity.load(contentsOf: url)) ?? Entity()
-        loadedEntities[fileName] = entity
-        return entity
+        do {
+            let entity = try Entity.load(contentsOf: url)
+            loadedEntities[fileName] = entity
+            return entity
+        } catch {
+            AppLogger.shared.log(.error, "Failed to load avatar clip at \(url.path): \(error)")
+            return Entity()
+        }
     }
 }

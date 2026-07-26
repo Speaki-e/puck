@@ -1,41 +1,70 @@
 # pet-app
 
-macOS 데스크톱 펫 앱 (Swift). 펫 렌더링/움직임 + 시스템 도구 실행기 + 음성/텍스트 입력을 담당한다. `Speaki-e` 프로젝트(가칭 PetAgent)의 메인앱 저장소로, 전체 조망은 `plan/프로젝트_개요.md`, 본 저장소 상세 기획은 `plan/02_pet-app.md`를 따른다.
+macOS desktop pet app (Swift). Owns pet rendering/movement, the system tool
+executor, and voice/text input. This is the main-app repo of the `Speaki-e`
+project (codename PetAgent); the overall picture lives in
+`plan/프로젝트_개요.md`, and this repo's detailed plan is `plan/02_pet-app.md`.
 
-- **독립성 원칙**: `workspace`와의 로컬 소켓이 연결되어 있지 않아도 순수 데스크톱 펫으로 완전히 동작해야 한다.
-- **의존 계약**: `protocol` 저장소(소켓 스키마, 도구 레지스트리, 아바타 manifest 스키마)만 참조하며, 다른 저장소 코드를 직접 참조하지 않는다.
-- **아바타/사운드 리소스**는 팀 외부에서 제작·공급된다. 이 저장소는 `protocol`의 manifest 스키마를 만족하는 아바타 패키지를 소비하기만 하고, 개발용 더미 아바타 1개만 포함한다.
+- **Independence principle**: even without a local socket connection to
+  `workspace`, this must fully function as a pure desktop pet.
+- **Dependency contract**: only references the `protocol` repo (socket
+  schema, tool registry, avatar manifest schema); never references other
+  repos' code directly.
+- **Avatar/sound resources** are produced/supplied outside the team. This repo
+  only consumes avatar packages that satisfy `protocol`'s manifest schema, and
+  includes just one dummy avatar for development.
 
-## 담당
+## Ownership
 
-| 사람 | 모듈 |
+| Person | Modules |
 |---|---|
-| 강상우 | F1 투명 오버레이 렌더링, F2 아바타 로더, F5 SFX, 아바타 수입 규격 검증기 |
-| 박해영 | F3 움직임 FSM, F4 창 인식, F6 전역 단축키, F7 PTT+STT, F10 포인팅, F11 시스템 도구 실행기 |
+| 강상우 (Sangwoo Kang) | F1 transparent overlay rendering, F2 avatar loader, F5 SFX, avatar import spec validator |
+| 박해영 (Haeyoung Park) | F3 movement FSM, F4 window sensing, F6 global hotkeys, F7 PTT+STT, F10 pointing, F11 system tool executor |
 
-## 현재 상태
+## Current status
 
-기능별 폴더 구조가 잡혀 있고, 렌더링(F1)에 의존하지 않는 모듈부터 순서대로 구현 중이다. 전체 구조와 설계 근거, 진행 순서는 [`docs/directory-structure.md`](docs/directory-structure.md)를 참고한다.
+The feature-oriented folder structure is in place, and modules that don't
+depend on rendering (F1) are being implemented first. See
+[`docs/directory-structure.md`](docs/directory-structure.md) for the full
+structure, design rationale, and implementation order.
 
-Xcode 프로젝트(`.xcodeproj`)는 커밋하지 않는다 — [xcodegen](https://github.com/yonaskolb/XcodeGen)으로 `project.yml`에서 생성한다. 타깃 구조를 바꿀 때는 Xcode에서 직접 프로젝트 파일을 만지지 말고 `project.yml`을 수정한 뒤 재생성한다 (`project.pbxproj` 병합 충돌 방지).
+The Xcode project (`.xcodeproj`) is not committed — it's generated from
+`project.yml` via [xcodegen](https://github.com/yonaskolb/XcodeGen). When
+changing the target structure, don't touch the project file directly in
+Xcode; edit `project.yml` and regenerate instead (avoids `project.pbxproj`
+merge conflicts).
 
-## 클론 → 실행
+## Clone -> run
 
-1. `brew install xcodegen` (없다면).
-2. 저장소 루트에서 `xcodegen generate` — `PetAgent.xcodeproj`와 `PetAgent/Resources/Info.plist`가 생성된다.
-3. `PetAgent.xcodeproj`를 Xcode 15+ 로 연다.
-4. 최초 실행 시 요구되는 TCC 권한을 허용한다: Accessibility(단축키·UI 조회·클릭 합성), 마이크, 음성 인식, Screen Recording(선택, 폴백용).
-5. 빌드 후 실행하면 `PetAgent/Resources/Avatars/dummy/`의 더미 아바타로 소켓 연결 없이 바로 동작해야 한다 (M-A 마일스톤 기준).
-6. `workspace` 저장소를 함께 실행하면 로컬 Unix 소켓(`~/Library/Application Support/PetAgent/bridge.sock`)으로 연동된다.
+1. `brew install xcodegen` (if you don't have it).
+2. From the repo root, run `xcodegen generate` — this creates
+   `PetAgent.xcodeproj` and `PetAgent/Resources/Info.plist`.
+3. Open `PetAgent.xcodeproj` in Xcode 15+.
+4. Grant the TCC permissions requested on first launch: Accessibility
+   (hotkeys/UI inspection/synthetic clicks), microphone, speech recognition,
+   Screen Recording (optional, fallback only).
+5. Build and run — it should work immediately with the dummy avatar in
+   `PetAgent/Resources/Avatars/dummy/`, with no socket connection required
+   (per the M-A milestone).
+6. Running the `workspace` repo alongside it connects them over a local Unix
+   socket (`~/Library/Application Support/PetAgent/bridge.sock`).
 
-CLI에서 빌드/테스트만 확인하려면: `xcodebuild -project PetAgent.xcodeproj -scheme PetAgent build` / `xcodebuild -project PetAgent.xcodeproj -scheme PetAgent test`.
+To just build/test from the CLI:
+`xcodebuild -project PetAgent.xcodeproj -scheme PetAgent build` /
+`xcodebuild -project PetAgent.xcodeproj -scheme PetAgent test`.
 
-## 스택 요약
+## Stack summary
 
-Swift 5.10+ / macOS 14+, AppKit(메뉴바 상주, LSUIElement) + RealityKit(ARView `.nonAR`, USDZ), CGWindowList + AXUIElement(창 인식), CGEvent.tapCreate(전역 입력), SFSpeechRecognizer(STT), AVAudioEngine(SFX), Network.framework `NWListener`(UDS 소켓 서버). 상세는 `plan/02_pet-app.md` 4절.
+Swift 5.10+ / macOS 14+, AppKit (menu-bar resident, LSUIElement) + RealityKit
+(ARView `.nonAR`, USDZ), CGWindowList + AXUIElement (window sensing),
+CGEvent.tapCreate (global input), SFSpeechRecognizer (STT), AVAudioEngine
+(SFX), Network.framework `NWListener` (UDS socket server). Details in
+`plan/02_pet-app.md` section 4.
 
-## 문서
+## Docs
 
-- [`docs/directory-structure.md`](docs/directory-structure.md) — 디렉터리 구조 초안과 설계 근거
-- [`docs/qa-cases.md`](docs/qa-cases.md) — 마일스톤별 QA 시나리오
-- `plan/02_pet-app.md`, `plan/01_protocol.md`, `plan/프로젝트_개요.md` — 상위 기획 문서 (Speaki-e 저장소)
+- [`docs/directory-structure.md`](docs/directory-structure.md) — directory
+  structure draft and design rationale
+- [`docs/qa-cases.md`](docs/qa-cases.md) — per-milestone QA scenarios
+- `plan/02_pet-app.md`, `plan/01_protocol.md`, `plan/프로젝트_개요.md` — the
+  upper-level planning docs (Speaki-e repo)

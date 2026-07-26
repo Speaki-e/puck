@@ -26,9 +26,9 @@ targets:
       properties:
         LSUIElement: true
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
-        NSMicrophoneUsageDescription: "PTT(Push-to-Talk)로 음성 명령을 인식하기 위해 마이크를 사용합니다."
-        NSSpeechRecognitionUsageDescription: "음성으로 말한 명령을 텍스트로 변환하기 위해 음성 인식을 사용합니다."
-        NSAppleEventsUsageDescription: "run_applescript 도구 실행을 위해 다른 앱을 제어할 수 있어야 합니다."
+        NSMicrophoneUsageDescription: "Used to recognize voice commands via Push-to-Talk (PTT)."
+        NSSpeechRecognitionUsageDescription: "Used to convert spoken commands into text."
+        NSAppleEventsUsageDescription: "Needs to control other apps to run the run_applescript tool."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PetAgent

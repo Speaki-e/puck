@@ -2,6 +2,6 @@
 //  MenuBarController.swift
 //  PetAgent
 //
-//  공통 · 담당: 강상우/박해영
-//  NSStatusItem 메뉴: 설정 열기, 아바타 교체, 종료
+//  Shared · owner: Sangwoo Kang / Haeyoung Park
+//  NSStatusItem menu: open settings, switch avatar, quit
 //

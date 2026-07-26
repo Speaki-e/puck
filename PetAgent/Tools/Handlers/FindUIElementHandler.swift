@@ -2,6 +2,6 @@
 //  FindUIElementHandler.swift
 //  PetAgent
 //
-//  F11 · 담당: 박해영
-//  F4 레벨2 조회 결과를 {role,title,frame}으로 반환
+//  F11 · owner: Haeyoung Park
+//  Returns F4 level-2 lookup results as {role,title,frame}
 //

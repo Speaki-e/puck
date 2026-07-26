@@ -2,6 +2,6 @@
 //  PlayerNodePool.swift
 //  PetAgent
 //
-//  F5 · 담당: 강상우
-//  PlayerNode 풀(4~8개) 동시 재생 관리
+//  F5 · owner: Sangwoo Kang
+//  Manages a pool of 4-8 concurrently playable PlayerNodes
 //

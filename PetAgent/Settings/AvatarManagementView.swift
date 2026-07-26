@@ -2,6 +2,6 @@
 //  AvatarManagementView.swift
 //  PetAgent
 //
-//  F2 · 담당: 강상우
-//  아바타 가져오기/교체 UI, AvatarImportValidator 연동
+//  F2 · owner: Sangwoo Kang
+//  Avatar import/switch UI, wired to AvatarImportValidator
 //

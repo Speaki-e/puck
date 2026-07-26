@@ -1,4 +1,4 @@
-# 아바타/사운드 바이너리 자산은 Git LFS로 추적 (02_pet-app.md "협업 규칙")
+# Avatar/sound binary assets are tracked with Git LFS (02_pet-app.md "협업 규칙" / collaboration rules)
 *.usdz filter=lfs diff=lfs merge=lfs -text
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.mp3 filter=lfs diff=lfs merge=lfs -text

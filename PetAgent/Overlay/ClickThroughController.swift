@@ -2,6 +2,6 @@
 //  ClickThroughController.swift
 //  PetAgent
 //
-//  F1 · 담당: 강상우
-//  히트박스 AABB 기준 ignoresMouseEvents 토글
+//  F1 · owner: Sangwoo Kang
+//  Toggles ignoresMouseEvents based on the manifest hitbox AABB
 //

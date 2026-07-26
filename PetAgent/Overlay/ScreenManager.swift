@@ -2,6 +2,6 @@
 //  ScreenManager.swift
 //  PetAgent
 //
-//  F1 · 담당: 강상우
-//  NSScreen 목록 추적, didChangeScreenParametersNotification 대응
+//  F1 · owner: Sangwoo Kang
+//  Tracks NSScreen list, responds to didChangeScreenParametersNotification
 //

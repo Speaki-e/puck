@@ -2,6 +2,6 @@
 //  RunAppleScriptHandler.swift
 //  PetAgent
 //
-//  F11 · 담당: 박해영
-//  NSAppleScript 실행
+//  F11 · owner: Haeyoung Park
+//  Executes NSAppleScript
 //

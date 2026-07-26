@@ -2,11 +2,12 @@
 //  AvatarPlayable.swift
 //  PetAgent
 //
-//  F2 · 담당: 강상우
+//  F2 · owner: 강상우 (Sangwoo Kang)
 //  protocol: play(clip:loop:) / stop / setScreenPosition / setFacing
 //
-//  FSM(Movement/CharacterController)은 이 프로토콜만 알고 USDZAvatar/VideoAvatar/SpriteAvatar
-//  중 무엇이 실제로 재생 중인지 모른다 (02_pet-app.md F2).
+//  The FSM (Movement/CharacterController) only knows this protocol — it has no
+//  idea whether USDZAvatar/VideoAvatar/SpriteAvatar is actually playing
+//  (02_pet-app.md F2).
 
 import CoreGraphics
 

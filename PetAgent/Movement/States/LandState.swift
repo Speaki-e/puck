@@ -2,6 +2,13 @@
 //  LandState.swift
 //  PetAgent
 //
-//  F3 · 담당: 박해영
-//  Land 상태 StateHandler 구현
+//  F3 · owner: Haeyoung Park
+//  Land state's StateHandler implementation
 //
+//  TODO(P3): a brief landing pose, then transition to Idle.
+
+final class LandState: StateHandler {
+    let name = "Land"
+    let clipKey = "land"
+    let loopsClip = false
+}

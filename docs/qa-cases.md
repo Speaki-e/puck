@@ -1,15 +1,30 @@
-# QA 시나리오
+# QA scenarios
 
-출처: `plan/02_pet-app.md` "아바타 리소스 소비" 절. 마일스톤마다 1조(강상우·박해영)가 수행한다.
+Source: the "아바타 리소스 소비" (Avatar Resource Consumption) section of `plan/02_pet-app.md`. Run each
+scenario at every milestone by Team 1 (강상우 · 박해영).
 
-- [ ] 겹친 창 착지 — 여러 창이 겹쳐 있을 때 캐릭터 x좌표 기준으로 실제로 보이는 창 상단 엣지에만 착지하는지 (`LandingSurfaceResolver`)
-- [ ] 창 최소화/닫기 낙하 — WalkOnTop 상태에서 지지 창이 최소화·종료될 때 Fall로 전이하는지
-- [ ] 멀티 디스플레이 경계 — `GlobalScreenSpace` 정규화 좌표계에서 디스플레이 경계를 넘나드는 이동이 끊김 없이 처리되는지
-- [ ] 풀스크린 Space — 다른 Space(풀스크린 앱 포함)로 전환 시 오버레이 윈도우 동작(따라가지 않음/유지 등 정책) 확인
-- [ ] 단축키 충돌 — PTT / 텍스트 입력 / 캐릭터 호출 단축키가 시스템·타 앱 단축키와 충돌할 때 `HotkeyBindings` 충돌 검사 동작
-- [ ] 소켓 재연결 — `workspace`가 지수 백오프(1s→2s→4s, 최대 30s)로 재연결할 때 `BridgeServer` 측 상태(연결 끊김 → 순수 펫 모드 → 재연결) 전환이 올바른지
+- [ ] Landing on overlapping windows — with several windows overlapping, does
+      the character land only on the top edge of the window that's actually
+      visible at its x-coordinate (`LandingSurfaceResolver`)?
+- [ ] Falling on window minimize/close — does WalkOnTop transition to Fall
+      when its supporting window is minimized or closed?
+- [ ] Multi-display boundaries — does movement across display boundaries in
+      `GlobalScreenSpace`'s normalized coordinate space stay seamless?
+- [ ] Full-screen Spaces — verify overlay window behavior (follow / stay /
+      whatever the policy is) when switching to another Space, including
+      full-screen apps.
+- [ ] Hotkey conflicts — does `HotkeyBindings`' conflict check work when
+      PTT / text input / character-summon hotkeys clash with system or other
+      apps' hotkeys?
+- [ ] Socket reconnection — when `workspace` reconnects with exponential
+      backoff (1s -> 2s -> 4s, max 30s), does `BridgeServer`'s state
+      transition correctly (connection lost -> pure pet mode -> reconnected)?
 
-## 마일스톤 연계
+## Milestone tie-in
 
-- M-A(소켓 없이 화면/창 위 이동)까지는 개발용 더미 아바타(`PetAgent/Resources/Avatars/dummy/`)로 위 시나리오 중 소켓 무관 항목(겹친 창 착지, 창 낙하, 멀티 디스플레이, 풀스크린 Space, 단축키 충돌)을 먼저 검증한다.
-- 소켓 재연결 시나리오는 P7(소켓 서버 + F11 실행기) 이후, `workspace` 저장소와의 통합 시점에 검증한다.
+- Up through M-A (moving across the screen/windows without a socket), verify
+  the socket-independent scenarios first (overlapping-window landing, window
+  fall, multi-display, full-screen Space, hotkey conflicts) using the dummy
+  development avatar (`PetAgent/Resources/Avatars/dummy/`).
+- Verify the socket reconnection scenario after P7 (socket server + F11
+  executor), at the point of integration with the `workspace` repo.

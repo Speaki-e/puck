@@ -1,11 +1,16 @@
-# dummy 아바타 (개발용)
+# dummy avatar (development only)
 
-M-A 마일스톤("소켓 없이 펫이 화면/창 위를 돌아다닌다")을 클론 직후 바로 실행 가능하게 하기 위한 개발용 더미 아바타입니다.
-`manifest.json`은 `protocol` 저장소 6절 스키마를 그대로 따릅니다.
+A development-only dummy avatar so the M-A milestone ("the pet roams the
+screen/windows without a socket connection") runs immediately after cloning.
+`manifest.json` follows the `protocol` repo's section 6 schema as-is.
 
-## 아직 없는 실 자산 (강상우 담당, 추가 예정)
+## Real assets not yet included (owner: 강상우 Sangwoo Kang, to be added)
 
-- `dummy.usdz` — Meshy 프리셋 등을 리네이밍한 수준으로 충분 (02_pet-app.md "아바타 리소스 소비" 절 참고). 필수 클립: `idle`, `walk`. 권장: `climb`, `fall`, `land`, `point`, `type`, `listen`, `react_click`, `react_drag`.
-- `sounds/*.wav` — `manifest.json`의 `sounds` 테이블이 참조하는 7개 파일.
+- `dummy.usdz` — a renamed Meshy preset or similar is enough (see 02_pet-app.md's
+  "아바타 리소스 소비" (Avatar Resource Consumption) section). Required clips: `idle`, `walk`. Recommended:
+  `climb`, `fall`, `land`, `point`, `type`, `listen`, `react_click`, `react_drag`.
+- `sounds/*.wav` — the 7 files referenced by `manifest.json`'s `sounds` table.
 
-usdz/오디오 바이너리는 Git LFS로 추적합니다 (`.gitattributes` 참고). 이 폴더에 실 파일을 추가하기 전까지 `AvatarLoader`는 누락 클립을 idle로 폴백하고 시작 시 경고를 남기도록 설계되어 있습니다 (02_pet-app.md F2).
+usdz/audio binaries are tracked with Git LFS (see `.gitattributes`). Until real
+files are added here, `AvatarLoader` is designed to fall back missing clips to
+idle and log a startup warning (02_pet-app.md F2).

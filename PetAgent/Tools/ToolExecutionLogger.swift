@@ -2,6 +2,6 @@
 //  ToolExecutionLogger.swift
 //  PetAgent
 //
-//  F11 · 담당: 박해영
-//  protocol 7절 로그 포맷 (tool_exec_start/end) 기록
+//  F11 · owner: Haeyoung Park
+//  Records tool_exec_start/end in the protocol section 7 log format
 //

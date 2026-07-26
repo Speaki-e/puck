@@ -2,6 +2,6 @@
 //  ScreenCaptureFallback.swift
 //  PetAgent
 //
-//  F4 · 담당: 박해영
-//  CGWindowListCreateImage + 비전 좌표 추정 폴백 (Screen Recording 권한)
+//  F4 · owner: Haeyoung Park
+//  CGWindowListCreateImage + vision-based coordinate-estimate fallback (Screen Recording permission)
 //

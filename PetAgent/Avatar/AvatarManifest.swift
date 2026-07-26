@@ -2,11 +2,12 @@
 //  AvatarManifest.swift
 //  PetAgent
 //
-//  F2 · 담당: 강상우
-//  manifest.json Codable 모델 (protocol 저장소 6절 스키마 미러)
+//  F2 · owner: 강상우 (Sangwoo Kang)
+//  manifest.json Codable model (mirrors protocol repo section 6 schema).
 //
 
-/// clips 테이블의 값. usdz/sprites 타입은 클립 이름 문자열, video 타입은 {"in":초,"out":초} 구간이다.
+/// A value in the clips table. usdz/sprites types use a clip-name string;
+/// video type uses a {"in":sec,"out":sec} time range.
 enum ClipReference: Equatable {
     case name(String)
     case timeRange(in: Double, out: Double)

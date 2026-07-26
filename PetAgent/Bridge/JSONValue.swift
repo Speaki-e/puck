@@ -2,13 +2,14 @@
 //  JSONValue.swift
 //  PetAgent
 //
-//  F11/소켓 · 담당: 박해영
-//  BridgeMessages의 자유 형식 필드(args/data/detail)를 표현하는 최소 JSON 트리
+//  F11/socket · owner: 박해영 (Haeyoung Park)
+//  A minimal JSON tree for BridgeMessages' free-form fields (args/data/detail).
 //
 
-/// tool_dispatch.args, tool_result.data, event(tool_call).detail처럼 도구별로 모양이 달라지는
-/// 필드를 표현한다. protocol 저장소 스키마가 이 필드들의 내부 구조를 규정하지 않으므로,
-/// pet-app 쪽은 구조를 강제하지 않고 그대로 보존/전달한다.
+/// Represents fields whose shape varies per tool, like tool_dispatch.args,
+/// tool_result.data, or event(tool_call).detail. The protocol repo's schema
+/// does not constrain the internal structure of these fields, so pet-app
+/// preserves and forwards them as-is instead of enforcing a shape.
 enum JSONValue: Equatable {
     case string(String)
     case number(Double)
@@ -36,7 +37,7 @@ extension JSONValue: Codable {
         } else {
             throw DecodingError.dataCorruptedError(
                 in: container,
-                debugDescription: "지원하지 않는 JSON 값"
+                debugDescription: "Unsupported JSON value"
             )
         }
     }

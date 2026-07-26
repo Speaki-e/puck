@@ -2,15 +2,15 @@
 //  AvatarManifestParsingTests.swift
 //  PetAgent
 //
-//  F2 테스트 · 담당: 강상우
-//  manifest.json 파싱 + 필수 클립 폴백 검증
+//  F2 test · owner: 강상우 (Sangwoo Kang)
+//  manifest.json parsing + required-clip fallback verification.
 //
 
 import XCTest
 @testable import PetAgent
 
 final class AvatarManifestParsingTests: XCTestCase {
-    // protocol/01_protocol.md 6절 예시와 동일한 구조 (PetAgent/Resources/Avatars/dummy/manifest.json 사본)
+    // Same structure as the example in protocol/01_protocol.md section 6 (copy of PetAgent/Resources/Avatars/dummy/manifest.json)
     private let dummyManifestJSON = """
     {
       "schema_version": 1,
@@ -36,7 +36,7 @@ final class AvatarManifestParsingTests: XCTestCase {
     }
     """
 
-    // MARK: - AvatarManifest 파싱
+    // MARK: - AvatarManifest parsing
 
     func test_decodesManifest_allFields() throws {
         let manifest = try JSONDecoder().decode(AvatarManifest.self, from: Data(dummyManifestJSON.utf8))
@@ -61,7 +61,7 @@ final class AvatarManifestParsingTests: XCTestCase {
         XCTAssertEqual(ref, .timeRange(in: 0.5, out: 1.5))
     }
 
-    // MARK: - AvatarLoader: 데이터로부터 로드 + 클립 검증
+    // MARK: - AvatarLoader: load from data + clip validation
 
     func test_load_withAllClipsPresent_reportsNoMissingClips() throws {
         let result = try AvatarLoader.load(manifestData: Data(dummyManifestJSON.utf8))
@@ -95,7 +95,7 @@ final class AvatarManifestParsingTests: XCTestCase {
         }
     }
 
-    // MARK: - 누락 클립 -> idle 폴백
+    // MARK: - Missing clip -> idle fallback
 
     func test_resolvedClipName_returnsRequestedClip_whenPresent() throws {
         let result = try AvatarLoader.load(manifestData: Data(dummyManifestJSON.utf8))
@@ -128,7 +128,7 @@ final class AvatarManifestParsingTests: XCTestCase {
         XCTAssertNil(AvatarLoader.resolvedClipName(for: "climb", in: result))
     }
 
-    // MARK: - 디스크에서 로드 (경로 스캔)
+    // MARK: - Load from disk (directory scan)
 
     func test_loadFromDirectory_readsManifestFromDisk() throws {
         let directory = FileManager.default.temporaryDirectory

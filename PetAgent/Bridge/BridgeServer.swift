@@ -2,6 +2,6 @@
 //  BridgeServer.swift
 //  PetAgent
 //
-//  F11/소켓 · 담당: 박해영
-//  Network.framework NWListener(UDS), ~/Library/Application Support/PetAgent/bridge.sock
+//  F11/socket · owner: Haeyoung Park
+//  Network.framework NWListener(UDS) at ~/Library/Application Support/PetAgent/bridge.sock
 //

@@ -2,19 +2,20 @@
 //  BridgeMessages.swift
 //  PetAgent
 //
-//  F11/소켓 · 담당: 박해영
-//  protocol 저장소 /swift/BridgeMessages.swift 동기화 사본 (Codable 메시지 타입)
-//  스키마 근거: plan/01_protocol.md 3절. 이 파일과 protocol 저장소 스키마는 항상 같이 수정한다.
+//  F11/socket · owner: 박해영 (Haeyoung Park)
+//  Mirrors protocol repo's /swift/BridgeMessages.swift (Codable message types).
+//  Schema source: plan/01_protocol.md section 3. Always update this file together
+//  with the protocol repo's schema.
 //
 
-/// workspace -> pet-app: 도구 실행 요청 (protocol 3.1)
+/// workspace -> pet-app: tool execution request (protocol 3.1)
 struct ToolDispatch: Equatable {
     let id: String
     let tool: String
     let args: JSONValue
 }
 
-/// pet-app -> workspace: 도구 실행 결과 (protocol 3.1)
+/// pet-app -> workspace: tool execution result (protocol 3.1)
 struct ToolResult: Equatable {
     let id: String
     let ok: Bool
@@ -22,7 +23,7 @@ struct ToolResult: Equatable {
     let error: String?
 }
 
-/// workspace -> pet-app: 펫 반응용 상태 이벤트 (protocol 3.2)
+/// workspace -> pet-app: state events driving the pet's reactions (protocol 3.2)
 enum BridgeEvent: Equatable {
     case agentThinking
     case toolCall(tool: String, detail: JSONValue?)
@@ -31,7 +32,7 @@ enum BridgeEvent: Equatable {
     case agentDone(ok: Bool, summary: String)
 }
 
-/// pet-app -> workspace: 음성/텍스트 명령 입력 (protocol 3.3)
+/// pet-app -> workspace: voice/text command input (protocol 3.3)
 struct UserInput: Equatable {
     enum Source: String, Codable {
         case voice
@@ -42,7 +43,7 @@ struct UserInput: Equatable {
     let source: Source
 }
 
-/// 소켓으로 오가는 모든 JSON Lines 메시지의 최상위 타입. "type" 필드로 구분한다.
+/// Top-level type for every JSON Lines message on the socket, discriminated by "type".
 enum BridgeMessage: Equatable {
     case toolDispatch(ToolDispatch)
     case toolResult(ToolResult)

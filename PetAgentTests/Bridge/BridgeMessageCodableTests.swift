@@ -2,8 +2,9 @@
 //  BridgeMessageCodableTests.swift
 //  PetAgent
 //
-//  소켓 테스트 · 담당: 박해영
-//  BridgeMessages Codable 인코딩/디코딩 검증 (plan/01_protocol.md 3절 예시 JSON 기준)
+//  Socket test · owner: 박해영 (Haeyoung Park)
+//  Verifies BridgeMessages Codable encoding/decoding against the example JSON
+//  in plan/01_protocol.md section 3.
 //
 
 import XCTest
@@ -65,7 +66,7 @@ final class BridgeMessageCodableTests: XCTestCase {
         XCTAssertNil(result.data)
     }
 
-    // MARK: - event (workspace -> pet-app, 펫 반응용)
+    // MARK: - event (workspace -> pet-app, drives the pet's reactions)
 
     func test_decodesEvent_agentThinking() throws {
         let json = #"{"type":"event","event":"agent_thinking"}"#
@@ -124,7 +125,7 @@ final class BridgeMessageCodableTests: XCTestCase {
         XCTAssertEqual(decoded, original)
     }
 
-    // MARK: - 오류 처리
+    // MARK: - Error handling
 
     func test_decodingUnknownType_throws() {
         let json = #"{"type":"something_else"}"#

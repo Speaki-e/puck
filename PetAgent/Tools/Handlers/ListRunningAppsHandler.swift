@@ -2,6 +2,6 @@
 //  ListRunningAppsHandler.swift
 //  PetAgent
 //
-//  F11 · 담당: 박해영
-//  실행 중 앱 목록 반환 (NSWorkspace)
+//  F11 · owner: Haeyoung Park
+//  Returns the list of running apps (NSWorkspace)
 //

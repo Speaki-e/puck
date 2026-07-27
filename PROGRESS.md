@@ -5,9 +5,11 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 194 passing (`xcodebuild test`) · **Latest commit:** `c1f4e87`
+**Last updated:** 2026-07-27 · **Tests:** 295 passing (`xcodebuild test`) · **`main`:** `a57c254` · **open PR:** #9 (`feat/pet-interaction`)
 
-**Self-directed refactor + code-review pass just completed** (6 parallel reviews across every module, ~20 real findings, ~15 fixed across 7 commits) — see "Self-review pass" under Review history below for the full list of what was fixed and what was deliberately left alone.
+**M-A is closed.** The pet renders from committed assets, wanders on its own, walks up and along windows, falls when they go away, and reacts to being clicked and dragged. Seven PRs (#1, #8, #3, #4, #5, #6, #7) were reviewed and squash-merged to `main`; #9 is open with the interaction/MoveTo/F4-level-2/cleanup work.
+
+**Every planned feature now exists.** F1-F7, F10, F11 are implemented and wired; all 8 pet-app tools are registered in `ToolExecutor`. What remains is cleanup and the cross-repo `protocol` contract, not missing features.
 
 **All 13 planned implementation tasks are now done.** Every module in `docs/directory-structure.md` exists and is wired together in a real `AppDelegate.applicationDidFinishLaunching` bootstrap: permission self-check -> menu bar -> overlay/avatar/FSM/SFX -> window sensing -> tool executor -> bridge server (with `EventRouter` now wired to the live `characterController`/`sfxPlayer`, closing the gap noted in the previous update) -> global hotkeys -> voice input -> text bubble fallback.
 
@@ -32,13 +34,13 @@ order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 |---|---|---|
 | P0 | F1 overlay + rendering (`Overlay/`) | [x] done, manually verified on-device (see above) |
 | P1 | F2 avatar loader + F3 FSM skeleton | [x] done |
-| P2 | F3 on-screen movement, multi-display | [~] FSM skeleton + coordinate math done; per-state movement logic (Walk/Climb/etc. actual motion) still TODO, blocked on F4 live wiring |
-| P3 | F4 level 1 + moving on top of windows | [x] level 1 done (`WindowListWatcher`, `LandingSurfaceResolver`, `AccessibilityPermission`); state-machine wiring to F4 still TODO |
+| P2 | F3 on-screen movement, multi-display | [~] movement done (`MovementSolver`, `CharacterBody`, `StateContext`, `FrameClock`; all 12 states have behavior). Multi-display still single-window: the avatar lives on `windows.first` only |
+| P3 | F4 level 1 + moving on top of windows | [x] done — `WindowSupport` + `StateContext.windows` drive Walk→Climb→WalkOnTop→Fall→Land; `landingY` comes from `LandingSurfaceResolver` |
 | P4 | F5 SFX | [x] done |
 | P5 | F6 global hotkeys + text input | [x] done |
 | P6 | F7 PTT+STT | [x] done |
-| P7 | socket server + F11 executor | [x] done (`BridgeServer`, `BridgeConnection`, `EventRouter`, `ToolExecutor`, 5/8 handlers) |
-| P8 | F4 level 2 + F10 pointing | [~] F10 pointing done (`PointingController`, `ClickDetector`, `PointAtHandler`); F4 level 2 (`UIElementInspector`, `FindUIElementHandler`) not started |
+| P7 | socket server + F11 executor | [x] done — 8/8 handlers registered. `BridgeMessageRouter` hops socket messages to the main thread before touching RealityKit |
+| P8 | F4 level 2 + F10 pointing | [x] done — `UIElementSearch`/`UIElementInspector`/`FindUIElementHandler` verified against a live Calculator; `point_at` now walks the pet there and replies at Point start |
 | P9 | F10 click_element, avatar-switch UI | [x] `SyntheticClick`/`ClickElementHandler` and `Settings/AvatarManagementView` (import/validate/install flow) done |
 | — | Settings/Diagnostics/App bootstrap | [x] done — `PermissionOnboarding`, `MenuBarController`, `SettingsView`, `AppLogger`, full `AppDelegate` wiring of every module above |
 
@@ -64,32 +66,77 @@ modules that don't depend on rendering (F1) — see
 
 ## Known gaps / blocked items
 
-- **`FindUIElementHandler` / F4 level 2 (`UIElementInspector`) not started.**
-  Only handler not registered in `ToolExecutor` — needs Accessibility-API UI
-  tree traversal, deferred as the one item genuinely blocked on more design
-  work rather than review/priority.
-- **Real animated assets are in place locally but `climb`/`land`/`point`/`type`/
-  `listen`/`react_drag` still have no matching clip file** in 강상우's current
-  pack (only idle/walk/fall/react_click were mappable) — those states still
-  fall back to idle per `AvatarLoader`'s existing recommended-clip handling.
-  `jumping.usdz`/`running.usdz` are unused for the same reason.
-- **`await_approval` has no manifest sound key.** `EventRouter` produces this
-  SFX key but the `protocol` repo's manifest schema (section 6) doesn't define
-  it yet, and `protocol` has no commits to PR against. Tracked (not silently
-  patched) by `ManifestSFXKeyCoverageTests`.
-- **Per-state movement math (F3) is metadata-only.** FSM states carry
-  `clipKey`/`loopsClip` but no real Walk/Climb/Fall motion; `summonCharacter()`
-  and `PointingController.beginPointing()` both assume the avatar is already
-  at the target rather than computing a path there.
-- **Alpha-halo mitigation (steps 2-4) and idle frame-rate downshift** need a
-  real avatar to tune against; not implemented speculatively.
-- **SFX fade-out-on-loop-replace** stops immediately instead of ramping down
-  — documented TODO in `SFXPlayer`, needs a real sound to tune against.
-- **Avatar mesh height/scale/loop-pose validation** isn't automated — needs
-  RealityKit/ModelIO plus a real usdz fixture. Manual verification until
-  then (`docs/avatar-spec.md`).
+Ordered by what actually blocks progress.
+
+- **`protocol` repo is empty — this blocks two other teams, not us.**
+  workspace's W5 and ai-module's A2 both wait on `types/`. pet-app has
+  already implemented the contract in Swift out of necessity
+  (`Bridge/BridgeMessages.swift`, `Avatar/AvatarManifest.swift`,
+  `Tools/ToolExecutor.swift` error codes), so the TS types should be written
+  to match the shipped Swift unless a divergence is deliberate. Seven open
+  questions are listed in `protocol/CLAUDE.md`, including: `frame` has no
+  defined coordinate space; `sounds` has no `await_approval` key; there is no
+  error code for an unknown tool; `tool_result.error` carries only a code so
+  failure detail reaches neither the wire nor the log; the manifest `clips`
+  shape as written is not implementable (USD has one animation timeline);
+  and nothing declares an asset's real height, so `scale` is a per-asset
+  magic number.
+- **CPU while idle is ~31%, and the plan's fix does not address it.**
+  `sample` puts essentially all of it in `ARView.commonRenderCallback()` —
+  RealityKit renders on its own display-linked loop regardless of FSM tick
+  rate, so `IdleFrameRatePolicy` (F1's 60→15 downshift) changes nothing
+  measurable. It also barely engages: F3's wander timer fires every 8-30s, so
+  the pet almost never stays idle for the required 30 consecutive seconds.
+  Needs a plan decision — throttle/park the ARView, lower the threshold, or
+  wander less.
+- **Multi-display is single-window.** The avatar is parented to
+  `overlayController.windows.first`, and F4 frames are rebased against that
+  one window's origin. Roaming across displays is not implemented.
+- **Mixamo assets are committed to a repo.** Mixamo's terms permit use in a
+  project but not redistribution of the animation data on its own. Fine for
+  an internal unreleased project; if this repo ever goes public, swapping in
+  CC0 assets (Quaternius/Kenney) removes the question.
+- **`climb`/`point`/`type`/`listen`/`react_drag` have no clip file** in the
+  committed pack — only `idle`/`walk`/`fall`/`land`/`react_click` were
+  mappable. Those states fall back to idle per `AvatarLoader`.
+- **`EventReaction.jump` and `bubbleText` are not wired.** `applyEventReaction`
+  has a TODO; `agent_done` summaries have nowhere to display even though
+  `TextInputBubbleView.showMessage` now exists for exactly that.
+- **`AvatarImportValidator` hardcodes `.usdz`** regardless of `manifest.type`,
+  so a `sprites`/`video` package would be reported as entirely missing.
+- **`ManifestSFXKeyCoverageTests` duplicates the dummy manifest** as a string
+  literal with a keep-in-sync comment — the drift it exists to prevent.
+- **Settings/avatar windows lack `isReleasedWhenClosed = false`** while being
+  cached in strong properties: closing and reopening is a use-after-free path.
+- **Startup does not validate that clip files exist.** `AvatarLoader` checks
+  manifest keys only; `AvatarImportValidator` checks files but runs on import.
+  A package with no usdz "loads" and then fails silently once per clip.
+- **AX titles are localized** — Calculator's on-screen "AC" answers to `삭제`.
+  ai-module's prompt work cannot assume English labels.
+- **SFX fade-out-on-loop-replace** stops immediately instead of ramping down;
+  needs a real sound to tune against.
+- **Avatar mesh height/loop-pose validation** isn't automated — needs
+  RealityKit/ModelIO plus a real fixture (`docs/avatar-spec.md`).
 
 ## Review history
+
+- External code review across `524c70e..60e81c7`, then 9 PRs of fixes.
+  Confirmed by reproduction before fixing, in rough order of severity:
+  `run_shell` deadlocked past 64KB of output (`waitUntilExit` before draining
+  the pipes; 200KB hung for the full 10s timeout, now 0.08s); socket messages
+  mutated RealityKit off the main thread; `ToolExecutor`'s completion guard
+  raced; nothing called `CharacterController.update(dt:)` so every timer was
+  inert; `AppDelegate` cached a dead `BridgeConnection` forever; typing with
+  workspace offline reopened the input bubble in a loop; nothing seeded the
+  bundled avatar so a fresh clone had no pet; `PermissionOnboarding` was dead
+  code and the app never asked for anything; hardened runtime blocked the
+  microphone without `com.apple.security.device.audio-input`; ad-hoc signing
+  made TCC grants expire on every rebuild; the avatar pack's non-idle files
+  carry no mesh, so entity-swapping per clip made the pet vanish on its first
+  step; the hitbox never followed the pet; `point_at` replied before the pet
+  had moved. Two regressions of my own were caught and fixed the same way:
+  a vacuous socket-file test that passed because the file had not been
+  created yet, and an Accessibility prompt that fired on every launch.
 
 - Code review at commit `57615a8` → 10 findings fixed across `bf88362` and
   `b8189fc` (listener failure handling, a real connections-array data race,

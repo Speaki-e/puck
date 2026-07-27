@@ -33,3 +33,11 @@ extension JSONValue {
         return value
     }
 }
+
+extension JSONValue {
+    /// pids arrive as JSON numbers (protocol section 4's find_ui_element).
+    func extractPID(key: String = "pid") -> pid_t? {
+        guard case .object(let fields) = self, case .number(let value)? = fields[key] else { return nil }
+        return pid_t(value)
+    }
+}

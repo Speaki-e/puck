@@ -58,8 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var textInputBubbleWindow: TextInputBubbleWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let permissionStatus = PermissionOnboarding.currentStatus()
-        AppLogger.shared.log(.info, "Launch permission status: \(permissionStatus)")
+        requestPermissions()
 
         setUpMenuBar()
         setUpOverlayAndAvatar()
@@ -85,6 +84,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowListWatcher?.stop()
         focusModeObserver?.stopObserving()
         clickThroughController?.stopMonitoring()
+    }
+
+    // MARK: - Permissions
+
+    /// PermissionOnboarding existed but nothing ever called it: launch only
+    /// logged `currentStatus()` and moved on, so the app never asked for
+    /// anything. Microphone and speech recognition stayed `notDetermined`
+    /// forever — VoiceInputController would try to record and fail silently —
+    /// and Accessibility could only be granted by hand, which is exactly the
+    /// flow that breaks on stale System Settings entries.
+    private func requestPermissions() {
+        AppLogger.shared.log(.info, "Launch permission status: \(PermissionOnboarding.currentStatus())")
+
+        // Only prompts the ones still undecided; already-answered permissions
+        // (granted or denied) are left alone rather than re-asked every launch.
+        PermissionOnboarding.requestUndecidedPermissions { status in
+            AppLogger.shared.log(.info, "Permission status after prompting: \(status)")
+        }
+
+        // Accessibility can't be requested silently — this shows macOS's own
+        // "open System Settings" prompt. Only when we don't already have it,
+        // so a granted install never sees it.
+        if !AccessibilityPermission.isTrusted(prompt: false) {
+            _ = AccessibilityPermission.isTrusted(prompt: true)
+        }
     }
 
     // MARK: - Menu bar

@@ -106,4 +106,47 @@ final class BridgeServerStartGuardTests: XCTestCase {
         XCTAssertNoThrow(try server.start())
         server.stop()
     }
+
+    /// stop() must clean up everything start() created. NWListener binds the
+    /// socket path asynchronously, so this waits for the file to actually
+    /// appear first — asserting removal without that wait passes vacuously
+    /// (the file simply hasn't been created yet) while the real app leaks a
+    /// stale socket into Application Support on every quit.
+    func test_stop_removesBothLockFileAndSocketFile() throws {
+        let server = BridgeServer(socketURL: socketURL)
+        try server.start()
+
+        let socketAppeared = expectation(description: "listener bound the socket path")
+        pollUntil(timeout: 5, expectation: socketAppeared) {
+            FileManager.default.fileExists(atPath: self.socketURL.path)
+        }
+        wait(for: [socketAppeared], timeout: 6)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: socketURL.appendingPathExtension("lock").path),
+            "precondition: lock file should exist while running"
+        )
+
+        server.stop()
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: socketURL.appendingPathExtension("lock").path),
+            "lock file survived stop()"
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: socketURL.path),
+            "socket file survived stop()"
+        )
+    }
+
+    private func pollUntil(timeout: TimeInterval, expectation: XCTestExpectation, condition: @escaping () -> Bool) {
+        let deadline = Date().addingTimeInterval(timeout)
+        func poll() {
+            if condition() {
+                expectation.fulfill()
+            } else if Date() < deadline {
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.05, execute: poll)
+            }
+        }
+        poll()
+    }
 }

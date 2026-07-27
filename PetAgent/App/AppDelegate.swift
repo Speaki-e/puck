@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var toolExecutor: ToolExecutor?
 
     private var bridgeServer: BridgeServer?
+    private var bridgeMessageRouter: BridgeMessageRouter?
     private var activeConnection: BridgeConnection?
 
     private var hotkeyManager: GlobalHotkeyManager?
@@ -64,7 +65,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Everything started in applicationDidFinishLaunching gets torn down
+        // here. BridgeServer is the one that matters beyond this process:
+        // stop() removes the lock file and unlinks the socket, and skipping it
+        // left a lock file naming this (now dead) PID in Application Support.
+        // A dead PID is currently recovered from at next launch, but if the OS
+        // recycles that PID onto any live process, start() refuses forever with
+        // .alreadyRunning and nothing tells the user which file to delete.
         hotkeyManager?.stop()
+        voiceInputController?.pushToTalkUp()
+        bridgeServer?.stop()
+        windowListWatcher?.stop()
+        focusModeObserver?.stopObserving()
+        clickThroughController?.stopMonitoring()
     }
 
     // MARK: - Menu bar
@@ -238,13 +251,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpBridgeServer() {
         guard let toolExecutor else { return }
 
+        let router = BridgeMessageRouter(toolExecutor: toolExecutor)
+        router.onEventReaction = { [weak self] reaction in self?.applyEventReaction(reaction) }
+        bridgeMessageRouter = router
+
         let server = BridgeServer()
         server.onFailure = { error in
             AppLogger.shared.log(.error, "BridgeServer failed: \(error)")
         }
         server.onMessage = { [weak self] message, connection in
+            // Delivered on BridgeServer's background queue. The router hops to
+            // main before touching anything (RealityKit, NSWorkspace,
+            // WindowListWatcher) — do not add main-thread work here.
             self?.activeConnection = connection
-            self?.handleBridgeMessage(message, connection: connection, toolExecutor: toolExecutor)
+            router.handle(message) { reply in connection.send(reply) }
         }
 
         do {
@@ -254,19 +274,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Independence principle: pet-app still works as a pure desktop
             // pet even if the socket can't be set up.
             AppLogger.shared.log(.error, "BridgeServer failed to start: \(error)")
-        }
-    }
-
-    private func handleBridgeMessage(_ message: BridgeMessage, connection: BridgeConnection, toolExecutor: ToolExecutor) {
-        switch message {
-        case .toolDispatch(let dispatch):
-            toolExecutor.dispatch(dispatch) { result in
-                connection.send(.toolResult(result))
-            }
-        case .event(let event):
-            applyEventReaction(EventRouter.reaction(for: event))
-        case .toolResult, .userInput:
-            break // pet-app only ever sends these, never receives them
         }
     }
 

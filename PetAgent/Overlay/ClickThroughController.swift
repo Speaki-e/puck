@@ -21,6 +21,12 @@ final class ClickThroughController {
     private var localMonitor: Any?
     private var characterScreenPosition: CGPoint = .zero
     private var hitboxSize: CGSize = .zero
+    private var gestureRecognizer = PetGestureRecognizer()
+
+    /// Emitted when the user clicks or drags the character itself. Cursor
+    /// positions are AppKit global screen coordinates — the same space
+    /// `updateCharacter(screenPosition:)` is given.
+    var onGesture: ((PetGesture) -> Void)?
 
     init(window: NSWindow) {
         self.window = window
@@ -42,8 +48,14 @@ final class ClickThroughController {
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             self?.handleMouseMoved()
         }
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
-            self?.handleMouseMoved()
+        // Mouse-down/drag/up only reach the *local* monitor, because the
+        // window stops ignoring mouse events precisely when the cursor is over
+        // the character — so those events are delivered to us, not to the app
+        // behind. The global monitor would never see them.
+        localMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .leftMouseUp]
+        ) { [weak self] event in
+            self?.handle(event)
             return event
         }
     }
@@ -57,6 +69,32 @@ final class ClickThroughController {
         }
         globalMonitor = nil
         localMonitor = nil
+    }
+
+    private func handle(_ event: NSEvent) {
+        let cursor = NSEvent.mouseLocation
+        let gesture: PetGesture?
+        switch event.type {
+        case .leftMouseDown:
+            // Only a press that actually landed on the character counts —
+            // ignoresMouseEvents may not have caught up with a fast cursor.
+            guard Self.shouldAllowClicks(
+                cursorPosition: cursor,
+                characterScreenPosition: characterScreenPosition,
+                hitboxSize: hitboxSize
+            ) else { return }
+            gesture = gestureRecognizer.mouseDown(at: cursor)
+        case .leftMouseDragged:
+            gesture = gestureRecognizer.mouseDragged(to: cursor)
+        case .leftMouseUp:
+            gesture = gestureRecognizer.mouseUp(at: cursor)
+        default:
+            handleMouseMoved()
+            return
+        }
+        if let gesture {
+            onGesture?(gesture)
+        }
     }
 
     private func handleMouseMoved() {

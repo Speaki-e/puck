@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
     private var sfxPlayer: SFXPlayer?
     private var clickThroughController: ClickThroughController?
     private var avatarHitboxSize: CGSize = .zero
+    private var characterBody: CharacterBody?
     private var focusModeObserver: FocusModeObserver?
 
     // One shared instance per FSM state, reused for every transition into it.
@@ -226,6 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
         focusModeObserver = focusObserver
 
         let body = CharacterBody(avatar: avatar, position: initialPosition)
+        characterBody = body
         let controller = CharacterController(initialState: idleState, body: body, sfxPlayer: sfxPlayer)
         for (kind, state) in [
             (StateKind.idle, idleState as StateHandler),
@@ -265,6 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
             screenPosition: globalAppKitPoint(fromWindowLocal: initialPosition, window: window),
             hitboxSize: avatarHitboxSize
         )
+        clickThrough.onGesture = { [weak self] gesture in self?.handlePetGesture(gesture) }
         clickThrough.startMonitoring()
         clickThroughController = clickThrough
     }
@@ -301,6 +304,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
             screenPosition: globalAppKitPoint(fromWindowLocal: position, window: window),
             hitboxSize: avatarHitboxSize
         )
+        // Rebuilding the window drops the old monitor with its handler; without
+        // re-attaching, clicking the pet silently stops working after a display
+        // change.
+        clickThrough.onGesture = { [weak self] gesture in self?.handlePetGesture(gesture) }
         clickThrough.startMonitoring()
         clickThroughController = clickThrough
     }
@@ -364,8 +371,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
             guard let self else { return }
             self.characterController?.update(dt: dt)
             self.pointingController.tick(dt: dt)
+            // The hitbox has to follow the pet, or clicks only work where it
+            // first appeared.
+            if let body = self.characterBody, let window = self.overlayController?.windows.first {
+                self.clickThroughController?.updateCharacter(
+                    screenPosition: self.globalAppKitPoint(fromWindowLocal: body.position, window: window),
+                    hitboxSize: self.avatarHitboxSize
+                )
+            }
         }
         frameClock.start()
+    }
+
+    // MARK: - Pet interaction (F1/F3)
+
+    /// Clicking the pet makes it react; dragging carries it and dropping it
+    /// lets it fall (plan/02_pet-app.md section 3). Gesture coordinates are
+    /// AppKit global (bottom-left origin); the FSM works in overlay-local
+    /// pixels (top-left origin), so they are converted on the way in.
+    private func handlePetGesture(_ gesture: PetGesture) {
+        guard let controller = characterController else { return }
+        switch gesture {
+        case .tapped:
+            controller.transition(to: .reactClick)
+        case .dragBegan(let point):
+            reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
+            controller.transition(to: .reactDrag)
+        case .dragMoved(let point):
+            reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
+        case .dragEnded:
+            reactDragState.release()
+        }
+    }
+
+    /// Inverse of globalAppKitPoint(fromWindowLocal:window:).
+    private func windowLocalPoint(fromGlobalAppKit point: CGPoint) -> CGPoint {
+        guard let window = overlayController?.windows.first else { return point }
+        return CGPoint(x: point.x - window.frame.origin.x, y: window.frame.height - (point.y - window.frame.origin.y))
     }
 
     // MARK: - Window sensing (F4 level 1)

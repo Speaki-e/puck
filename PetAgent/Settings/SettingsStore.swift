@@ -19,6 +19,7 @@ final class SettingsStore {
         static let pushToTalk = "PetAgent.hotkey.pushToTalk"
         static let textInput = "PetAgent.hotkey.textInput"
         static let characterSummon = "PetAgent.hotkey.characterSummon"
+        static let hasRequestedAccessibility = "PetAgent.hasRequestedAccessibility"
     }
 
     private let defaults: UserDefaults
@@ -32,6 +33,14 @@ final class SettingsStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+    }
+
+    /// Whether the Accessibility prompt has already been raised once. Must
+    /// outlive the process, or every launch is a first launch and the user is
+    /// asked again every time.
+    var hasRequestedAccessibility: Bool {
+        get { defaults.bool(forKey: Keys.hasRequestedAccessibility) }
+        set { defaults.set(newValue, forKey: Keys.hasRequestedAccessibility) }
     }
 
     var volume: Float {

@@ -34,6 +34,20 @@ struct SettingsView: View {
                 Toggle("Auto-mute during Focus (best-effort, may not detect reliably)", isOn: $autoMuteOnFocus)
                     .onChange(of: autoMuteOnFocus) { store.autoMuteOnFocus = $0 }
             }
+            Section("Permissions") {
+                // The launch prompt only appears once, so this is the way back
+                // for anyone who dismissed it or revoked the grant later.
+                LabeledContent("Accessibility") {
+                    Text(AccessibilityPermission.isTrusted(prompt: false) ? "Granted" : "Not granted")
+                        .foregroundStyle(.secondary)
+                }
+                Button("Open System Settings…") {
+                    AccessibilityPermission.openSystemSettings()
+                }
+                Text("Needed for global hotkeys, reading other apps' UI, and synthetic clicks.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             Section("Movement") {
                 Toggle("Don't climb over the focused window", isOn: $avoidClimbingFocusedWindow)
                     .onChange(of: avoidClimbingFocusedWindow) { store.avoidClimbingFocusedWindow = $0 }

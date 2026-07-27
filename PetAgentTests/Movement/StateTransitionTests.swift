@@ -47,7 +47,7 @@ private final class SpyState: StateHandler {
     }
 
     func enter() { enterCallCount += 1 }
-    func update(dt: TimeInterval) { lastUpdateDt = dt }
+    func update(dt: TimeInterval, context: StateContext) { lastUpdateDt = dt }
     func exit() { exitCallCount += 1 }
 }
 
@@ -57,7 +57,7 @@ final class StateTransitionTests: XCTestCase {
         let sfx = SpySFXTriggering()
         let idle = SpyState(name: "Idle", clipKey: "idle", loopsClip: true)
 
-        _ = CharacterController(initialState: idle, avatar: avatar, sfxPlayer: sfx)
+        _ = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
 
         XCTAssertEqual(avatar.playedClips.map(\.clip), ["idle"])
         XCTAssertEqual(avatar.playedClips.map(\.loop), [true])
@@ -70,7 +70,7 @@ final class StateTransitionTests: XCTestCase {
         let sfx = SpySFXTriggering()
         let reactClick = SpyState(name: "ReactClick", clipKey: "react_click", loopsClip: false)
 
-        _ = CharacterController(initialState: reactClick, avatar: avatar, sfxPlayer: sfx)
+        _ = CharacterController(initialState: reactClick, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
 
         XCTAssertEqual(sfx.triggeredCalls.map(\.key), ["react_click"])
         XCTAssertEqual(sfx.triggeredCalls.map(\.loop), [false])
@@ -81,7 +81,7 @@ final class StateTransitionTests: XCTestCase {
         let sfx = SpySFXTriggering()
         let idle = SpyState(name: "Idle", clipKey: "idle", loopsClip: true)
         let walk = SpyState(name: "Walk", clipKey: "walk", loopsClip: true)
-        let controller = CharacterController(initialState: idle, avatar: avatar, sfxPlayer: sfx)
+        let controller = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
 
         controller.transition(to: walk)
 
@@ -96,7 +96,7 @@ final class StateTransitionTests: XCTestCase {
         let avatar = SpyAvatarPlayable()
         let sfx = SpySFXTriggering()
         let idle = SpyState(name: "Idle", clipKey: "idle")
-        let controller = CharacterController(initialState: idle, avatar: avatar, sfxPlayer: sfx)
+        let controller = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
 
         controller.transition(to: idle)
 
@@ -109,7 +109,7 @@ final class StateTransitionTests: XCTestCase {
         let avatar = SpyAvatarPlayable()
         let sfx = SpySFXTriggering()
         let idle = SpyState(name: "Idle", clipKey: "idle")
-        let controller = CharacterController(initialState: idle, avatar: avatar, sfxPlayer: sfx)
+        let controller = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
 
         controller.update(dt: 0.016)
 

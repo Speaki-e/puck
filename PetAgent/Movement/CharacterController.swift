@@ -26,14 +26,39 @@ protocol SFXTriggering: AnyObject {
 /// from the same spot (enterCurrentState) — 02_pet-app.md F3's shared "enter()" requirement.
 final class CharacterController {
     private(set) var currentState: StateHandler
-    private let avatar: AvatarPlayable
+    private let body: CharacterBody
     private let sfxPlayer: SFXTriggering
 
-    init(initialState: StateHandler, avatar: AvatarPlayable, sfxPlayer: SFXTriggering) {
+    /// StateKind -> the one long-lived instance for that kind. States are
+    /// reused rather than recreated so their timers survive (see EventRouter's
+    /// note); a kind with nothing registered is simply not reachable.
+    private var states: [StateKind: StateHandler] = [:]
+
+    /// Where the pet may roam, and what it lands on. Set at bootstrap and
+    /// refreshed when the display configuration or window list changes.
+    var roamableArea: CGRect = .zero
+    var landingY: (CGPoint) -> CGFloat = { _ in .zero }
+
+    /// A state asking to be replaced. Applied after update() returns so a
+    /// state never swaps itself out mid-frame.
+    private var pendingTransition: StateKind?
+
+    init(initialState: StateHandler, body: CharacterBody, sfxPlayer: SFXTriggering) {
         self.currentState = initialState
-        self.avatar = avatar
+        self.body = body
         self.sfxPlayer = sfxPlayer
         enterCurrentState()
+    }
+
+    func register(_ state: StateHandler, as kind: StateKind) {
+        states[kind] = state
+    }
+
+    /// Transition by kind — how states and EventRouter reactions ask, since
+    /// neither holds concrete instances.
+    func transition(to kind: StateKind) {
+        guard let state = states[kind] else { return }
+        transition(to: state)
     }
 
     /// Allows transitioning from any state to any state (tools/events/PTT/click
@@ -46,11 +71,22 @@ final class CharacterController {
     }
 
     func update(dt: TimeInterval) {
-        currentState.update(dt: dt)
+        let context = StateContext(
+            body: body,
+            roamableArea: roamableArea,
+            landingY: landingY,
+            requestTransition: { [weak self] kind in self?.pendingTransition = kind }
+        )
+        currentState.update(dt: dt, context: context)
+
+        if let kind = pendingTransition {
+            pendingTransition = nil
+            transition(to: kind)
+        }
     }
 
     private func enterCurrentState() {
-        avatar.play(clip: currentState.clipKey, loop: currentState.loopsClip)
+        body.play(clip: currentState.clipKey, loop: currentState.loopsClip)
         // Use clipKey (e.g. "walk"), not name (e.g. "Walk") — the manifest sounds
         // table is keyed by lowercase clip/event names (protocol section 6), so
         // triggering with the capitalized FSM state name would never match.

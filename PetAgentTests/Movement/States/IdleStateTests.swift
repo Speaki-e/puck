@@ -21,7 +21,7 @@ final class IdleStateTests: XCTestCase {
         let delegate = SpyWanderDelegate()
         state.wanderDelegate = delegate
 
-        state.update(dt: 8)
+        state.update(dt: 8, context: TestStateWorld().context)
 
         XCTAssertEqual(delegate.received, [.walkToRandomPoint])
     }

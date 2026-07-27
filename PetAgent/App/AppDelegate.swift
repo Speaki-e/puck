@@ -12,7 +12,7 @@ import CoreGraphics
 import Foundation
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
     private let settingsStore = SettingsStore()
 
     private var screenManager: ScreenManager?
@@ -31,10 +31,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // resetting IdleState's WanderScheduler timer and replaying loop clip/SFX
     // on every repeated same-kind event.
     private let idleState = IdleState()
+    private let walkState = WalkState()
+    private let climbState = ClimbState()
+    private let walkOnTopState = WalkOnTopState()
+    private let fallState = FallState()
+    private let landState = LandState()
+    private let moveToState = MoveToState()
     private let typeState = TypeState()
     private let pointState = PointState()
-    private let reactClickState = ReactClickState()
     private let listenState = ListenState()
+    private let reactClickState = ReactClickState()
+    private let reactDragState = ReactDragState()
 
     private let frameClock = FrameClock()
     // Shared: PointAtHandler starts a pointing session on it, and the frame
@@ -218,7 +225,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         focusObserver.startObserving()
         focusModeObserver = focusObserver
 
-        characterController = CharacterController(initialState: idleState, avatar: avatar, sfxPlayer: sfxPlayer)
+        let body = CharacterBody(avatar: avatar, position: initialPosition)
+        let controller = CharacterController(initialState: idleState, body: body, sfxPlayer: sfxPlayer)
+        for (kind, state) in [
+            (StateKind.idle, idleState as StateHandler),
+            (.walk, walkState), (.climb, climbState), (.walkOnTop, walkOnTopState),
+            (.fall, fallState), (.land, landState), (.moveTo, moveToState),
+            (.point, pointState), (.type, typeState), (.listen, listenState),
+            (.reactClick, reactClickState), (.reactDrag, reactDragState),
+        ] {
+            controller.register(state, as: kind)
+        }
+        controller.roamableArea = CGRect(origin: .zero, size: window.frame.size)
+        // F4 supplies the real surfaces; until Climb/WalkOnTop are wired to the
+        // window list, the bottom of the roamable area is the only floor.
+        controller.landingY = { [weak controller] _ in controller?.roamableArea.maxY ?? 0 }
+        idleState.wanderDelegate = self
+        characterController = controller
 
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
         // is the piece that uses it (click-through everywhere except over the
@@ -267,6 +290,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         clickThrough.startMonitoring()
         clickThroughController = clickThrough
+    }
+
+    // MARK: - Wander (F3)
+
+    /// IdleState computes a wander outcome and previously had nowhere to send
+    /// it — `wanderDelegate` was never assigned, so the scheduler fired into
+    /// the void. Picking the destination needs the roamable area (and, later,
+    /// the window list), which is bootstrap knowledge, not state knowledge.
+    func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) {
+        guard let controller = characterController else { return }
+        switch outcome {
+        case .walkToRandomPoint:
+            walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+            controller.transition(to: .walk)
+        case .climbNearestWindow:
+            // Needs F4's window list to choose a window; until Climb is wired
+            // to it, roam instead of standing still.
+            walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+            controller.transition(to: .walk)
+        case .stay:
+            break
+        }
+    }
+
+    private static func randomRoamPoint(in area: CGRect) -> CGPoint {
+        guard area.width > 0 else { return .zero }
+        return CGPoint(x: CGFloat.random(in: area.minX...area.maxX), y: area.maxY)
     }
 
     // MARK: - Frame loop (F3)
@@ -340,15 +390,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyEventReaction(_ reaction: EventReaction) {
-        if let kind = reaction.stateTransition, let characterController {
-            let state: StateHandler
-            switch kind {
-            case .idle: state = idleState
-            case .type: state = typeState
-            case .point: state = pointState
-            case .reactClick: state = reactClickState
-            }
-            characterController.transition(to: state)
+        if let kind = reaction.stateTransition {
+            characterController?.transition(to: kind)
         }
         if let sfxKey = reaction.sfxKey {
             sfxPlayer?.trigger(sfxKey, loop: false)

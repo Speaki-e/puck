@@ -113,10 +113,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             AppLogger.shared.log(.info, "Permission status after prompting: \(status)")
         }
 
-        // Accessibility can't be requested silently — this shows macOS's own
-        // "open System Settings" prompt. Only when we don't already have it,
-        // so a granted install never sees it.
-        if !AccessibilityPermission.isTrusted(prompt: false) {
+        // Accessibility can't be requested silently — the only way to ask is
+        // macOS's own modal. Ask once and then stay quiet: prompting on every
+        // launch means anyone who dismisses it, or who is part-way through
+        // granting it in System Settings, gets the dialog again next time.
+        // Settings has a button for granting it later.
+        if PermissionPromptPolicy.shouldPromptForAccessibility(
+            isTrusted: AccessibilityPermission.isTrusted(prompt: false),
+            hasAskedBefore: settingsStore.hasRequestedAccessibility
+        ) {
+            settingsStore.hasRequestedAccessibility = true
             _ = AccessibilityPermission.isTrusted(prompt: true)
         }
     }

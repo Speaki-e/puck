@@ -12,7 +12,7 @@ import CoreGraphics
 import Foundation
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, PetPointingCoordinating {
     private let settingsStore = SettingsStore()
 
     private var screenManager: ScreenManager?
@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
     private var clickThroughController: ClickThroughController?
     private var avatarHitboxSize: CGSize = .zero
     private var characterBody: CharacterBody?
+    private var pendingPointFrame: CGRect?
+    private var pendingPointStarted: (() -> Void)?
     private var focusModeObserver: FocusModeObserver?
 
     // One shared instance per FSM state, reused for every transition into it.
@@ -256,6 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
             )
         }
         idleState.wanderDelegate = self
+        pointState.onEnter = { [weak self] in self?.beginPointingTimer() }
         characterController = controller
 
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
@@ -383,6 +386,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
         frameClock.start()
     }
 
+    /// Walks the pet over to a freshly launched app's window (M-1's visible
+    /// half). The window doesn't exist the instant the app launches, so F4's
+    /// list is polled briefly rather than read once.
+    private func sendPetToWindow(ownedBy pid: pid_t, attemptsRemaining: Int = 20) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self, let controller = self.characterController else { return }
+            guard let window = self.overlayLocalWindows(excluding: nil).first(where: { $0.ownerPID == pid }) else {
+                guard attemptsRemaining > 0 else { return } // the app never showed a window
+                self.sendPetToWindow(ownedBy: pid, attemptsRemaining: attemptsRemaining - 1)
+                return
+            }
+            self.moveToState.target = CGPoint(x: window.frame.midX, y: window.frame.minY)
+            self.moveToState.nextState = .idle
+            controller.transition(to: .moveTo)
+        }
+    }
+
+    // MARK: - Pointing (F10/F11)
+
+    /// point_at: walk to the target, then point at it. The tool only learns
+    /// the pet arrived when Point is actually entered, which is what protocol
+    /// section 4 promises the agent.
+    func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let controller = self.characterController else {
+                onPointingStarted() // nothing can point; don't strand the caller
+                return
+            }
+
+            // Stand beside the target rather than on top of it, so the
+            // character isn't covering what it is trying to show.
+            let standOffset: CGFloat = 60
+            self.moveToState.target = CGPoint(x: frame.midX - standOffset, y: frame.maxY)
+            self.moveToState.nextState = .point
+
+            self.pendingPointFrame = frame
+            self.pendingPointStarted = onPointingStarted
+            controller.transition(to: .moveTo)
+        }
+    }
+
+    /// Called by PointState once the pet is in place and the point clip is up.
+    private func beginPointingTimer() {
+        guard let frame = pendingPointFrame else { return }
+        pendingPointFrame = nil
+
+        pointingController.onPointingReleased = { [weak self] in
+            self?.characterController?.transition(to: .idle)
+        }
+        pointingController.beginPointing(targetFrame: frame)
+        pendingPointStarted?()
+        pendingPointStarted = nil
+    }
+
     // MARK: - Pet interaction (F1/F3)
 
     /// Clicking the pet makes it react; dragging carries it and dropping it
@@ -424,12 +481,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
         guard let windowListWatcher else { return }
 
         let executor = ToolExecutor(logger: ToolExecutionLogger())
-        executor.register(LaunchAppHandler())
+        let launchApp = LaunchAppHandler()
+        launchApp.onAppLaunched = { [weak self] pid in self?.sendPetToWindow(ownedBy: pid) }
+        executor.register(launchApp)
         executor.register(ListRunningAppsHandler())
         executor.register(GetFrontmostWindowHandler(watcher: windowListWatcher))
         executor.register(RunShellHandler())
         executor.register(RunAppleScriptHandler())
-        executor.register(PointAtHandler(pointingController: pointingController))
+        executor.register(PointAtHandler(coordinator: self))
         executor.register(ClickElementHandler())
         // FindUIElementHandler still needs F4 level 2 (UIElementInspector) — not registered yet.
         toolExecutor = executor

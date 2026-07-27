@@ -5,20 +5,28 @@
 //  F11 · owner: Haeyoung Park
 //  Delegates a MoveTo+Point command to the F3 FSM (tool execution = pet action, a special case)
 //
-//  TODO(F3): PointingController.beginPointing assumes the pet has already
-//  arrived at the target — real MoveTo movement math isn't implemented yet
-//  (Movement/States/MoveToState.swift), so this currently starts the Point
-//  loop/click-or-8s-release timer immediately rather than actually walking
-//  there first. Wire in real MoveTo-arrival once F3 lands it.
+//  protocol section 4: point_at is "펫이 좌표로 이동해 가리킴" and returns
+//  "Point 시작 시점에". The handler owns neither the walking nor the pointing
+//  timer — it hands the target to whoever drives the FSM and replies once
+//  that reports the pet has actually started pointing.
+//
 
 import CoreGraphics
 
+/// How PointAtHandler asks the FSM to carry out a point_at. Implemented at
+/// bootstrap, where the character controller and pointing timer both live.
+protocol PetPointingCoordinating: AnyObject {
+    /// Walks the pet to `frame` and starts pointing at it.
+    /// - Parameter onPointingStarted: called when Point actually begins.
+    func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void)
+}
+
 final class PointAtHandler: ToolHandler {
     let toolName = "point_at"
-    private let pointingController: PointingController
+    private let coordinator: PetPointingCoordinating
 
-    init(pointingController: PointingController) {
-        self.pointingController = pointingController
+    init(coordinator: PetPointingCoordinating) {
+        self.coordinator = coordinator
     }
 
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
@@ -27,10 +35,8 @@ final class PointAtHandler: ToolHandler {
             return
         }
 
-        // tool_result(ok) fires here, at Point *start* — not when pointing ends.
-        pointingController.onPointingStarted = {
+        coordinator.pointAt(frame: frame) {
             completion(.success(nil))
         }
-        pointingController.beginPointing(targetFrame: frame)
     }
 }

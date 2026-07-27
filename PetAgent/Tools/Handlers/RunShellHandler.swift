@@ -14,6 +14,15 @@ import Foundation
 final class RunShellHandler: ToolHandler {
     let toolName = "run_shell"
 
+    /// The in-flight process, so a timed-out call can actually kill it
+    /// instead of leaving it running with nobody reading its pipes.
+    private var runningProcess: Process?
+
+    func cancel() {
+        runningProcess?.terminate()
+        runningProcess = nil
+    }
+
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let command = args.extractString(key: "command") else {
             completion(.failure(.executionFailed("run_shell requires a command string")))
@@ -21,6 +30,7 @@ final class RunShellHandler: ToolHandler {
         }
 
         let process = Process()
+        runningProcess = process
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = ["-lc", command]
 
@@ -51,6 +61,7 @@ final class RunShellHandler: ToolHandler {
                 stderrQueue.sync {} // barrier: stderrData is fully written past this point
 
                 process.waitUntilExit()
+                self.runningProcess = nil
                 let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
                 let stderr = String(data: stderrData, encoding: .utf8) ?? ""
                 completion(

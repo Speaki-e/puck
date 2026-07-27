@@ -9,8 +9,8 @@
 //  arrival (plan/02_pet-app.md section 3). Whoever transitions into Walk sets
 //  the target first — Idle's wander does so via IdleWanderDelegate.
 //
-//  TODO(P3): detect touching a window's left/right edge -> Climb. Needs the
-//  F4 window list plumbed into StateContext.
+//  A window standing in the path is walked up to and then climbed, rather
+//  than walked through (section 3: "Walk | 창 좌/우 모서리 접촉 | Climb").
 
 import CoreGraphics
 import Foundation
@@ -48,6 +48,25 @@ final class WalkState: StateHandler {
 
         if let facing = MovementSolver.facing(from: context.body.position, toward: target) {
             context.body.facing = facing
+        }
+
+        // A window in the way is what starts a climb — the pet walks up to its
+        // side rather than through it (section 3: "Walk | 창 좌/우 모서리 접촉 | Climb").
+        if let blocking = WindowSupport.blockingWindow(
+            walkingFrom: context.body.position, toward: target, in: context.windows
+        ) {
+            let edgeX = target.x > context.body.position.x ? blocking.frame.minX : blocking.frame.maxX
+            let step = MovementSolver.step(
+                from: context.body.position,
+                toward: CGPoint(x: edgeX, y: context.body.position.y),
+                dt: dt
+            )
+            context.body.position = step.position
+            if step.hasArrived {
+                hasRequestedIdle = true
+                context.requestTransition(.climb)
+            }
+            return
         }
 
         let step = MovementSolver.step(from: context.body.position, toward: target, dt: dt)

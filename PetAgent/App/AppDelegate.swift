@@ -237,9 +237,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
             controller.register(state, as: kind)
         }
         controller.roamableArea = CGRect(origin: .zero, size: window.frame.size)
-        // F4 supplies the real surfaces; until Climb/WalkOnTop are wired to the
-        // window list, the bottom of the roamable area is the only floor.
-        controller.landingY = { [weak controller] _ in controller?.roamableArea.maxY ?? 0 }
+        // F4 reports global Quartz frames; the pet lives in overlay-local
+        // pixels. Rebase once here so no state has to know both spaces.
+        controller.windows = { [weak self, weak window] in
+            guard let self, let window else { return [] }
+            return self.overlayLocalWindows(excluding: window)
+        }
+        controller.landingY = { [weak self, weak controller] point in
+            let floor = controller?.roamableArea.maxY ?? 0
+            guard let self, let controller else { return floor }
+            return LandingSurfaceResolver.landingY(
+                atX: point.x,
+                fallingFromY: point.y,
+                windows: self.overlayLocalWindows(excluding: nil),
+                screenBottomY: controller.roamableArea.maxY
+            )
+        }
         idleState.wanderDelegate = self
         characterController = controller
 
@@ -290,6 +303,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate {
         )
         clickThrough.startMonitoring()
         clickThroughController = clickThrough
+    }
+
+    /// F4's window list rebased from global Quartz coordinates into the
+    /// overlay window's local space, with our own overlay filtered out — the
+    /// pet must not try to stand on the window it is drawn in.
+    private func overlayLocalWindows(excluding overlay: NSWindow?) -> [WindowInfo] {
+        guard let watcher = windowListWatcher, let origin = overlayController?.windows.first?.frame.origin else {
+            return []
+        }
+        let overlayNumber = overlay.map { CGWindowID($0.windowNumber) }
+        return watcher.windows.compactMap { info in
+            guard info.windowID != overlayNumber else { return nil }
+            return WindowInfo(
+                windowID: info.windowID,
+                ownerPID: info.ownerPID,
+                ownerName: info.ownerName,
+                title: info.title,
+                layer: info.layer,
+                frame: info.frame.offsetBy(dx: -origin.x, dy: -origin.y)
+            )
+        }
     }
 
     // MARK: - Wander (F3)

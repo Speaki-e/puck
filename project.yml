@@ -22,6 +22,14 @@ targets:
         excludes:
           - Resources/Info.plist
           - Resources/PetAgent.entitlements
+          - Resources/Avatars
+      # Folder reference, not a group: the avatar package must keep its
+      # Avatars/<name>/{manifest.json,*.usdz,sounds/} layout inside the app
+      # bundle. As a group, Xcode flattens every file into Resources/ and
+      # AvatarInstaller has nothing structured to copy out.
+      - path: PetAgent/Resources/Avatars
+        type: folder
+        buildPhase: resources
     info:
       path: PetAgent/Resources/Info.plist
       properties:

@@ -90,4 +90,43 @@ final class BridgeServerTests: XCTestCase {
         wait(for: [clientReceived], timeout: 5)
         client.cancel()
     }
+
+    /// The real defect behind the stale-connection bug: AppDelegate cached a
+    /// BridgeConnection forever, so it had no way to notice a disconnect.
+    /// hasConnectedClients must track the live socket, not a remembered one.
+    func test_hasConnectedClients_followsTheClientLifecycle() {
+        XCTAssertFalse(server.hasConnectedClients, "no client has connected yet")
+
+        let client = makeClient()
+        let connected = expectation(description: "server saw the client")
+        server.onMessage = { _, _ in connected.fulfill() }
+        client.stateUpdateHandler = { state in
+            if case .ready = state {
+                var data = try! JSONEncoder().encode(BridgeMessage.userInput(UserInput(text: "hi", source: .text)))
+                data.append(0x0A)
+                client.send(content: data, completion: .contentProcessed { _ in })
+            }
+        }
+        client.start(queue: .main)
+        wait(for: [connected], timeout: 5)
+        XCTAssertTrue(server.hasConnectedClients)
+
+        client.cancel()
+
+        let disconnected = expectation(description: "server dropped the closed connection")
+        pollUntilTrue(timeout: 5, expectation: disconnected) { !self.server.hasConnectedClients }
+        wait(for: [disconnected], timeout: 6)
+    }
+
+    private func pollUntilTrue(timeout: TimeInterval, expectation: XCTestExpectation, condition: @escaping () -> Bool) {
+        let deadline = Date().addingTimeInterval(timeout)
+        func poll() {
+            if condition() {
+                expectation.fulfill()
+            } else if Date() < deadline {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: poll)
+            }
+        }
+        poll()
+    }
 }

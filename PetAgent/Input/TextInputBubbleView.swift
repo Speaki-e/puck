@@ -14,6 +14,7 @@ import AppKit
 
 final class TextInputBubbleView: NSVisualEffectView {
     private let textField = NSTextField()
+    private var isShowingMessage = false
 
     var onSubmit: ((String) -> Void)?
     var onCancel: (() -> Void)?
@@ -35,6 +36,27 @@ final class TextInputBubbleView: NSVisualEffectView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        guard !isShowingMessage else { return }
+        window?.makeFirstResponder(textField)
+    }
+
+    /// Read-only notice mode — used for F6's "워크스페이스 꺼져있음" and, later,
+    /// agent_done summaries (EventReaction.bubbleText). Nothing can be typed
+    /// or submitted while a notice is showing.
+    func showMessage(_ text: String) {
+        isShowingMessage = true
+        textField.isEditable = false
+        textField.isSelectable = false
+        textField.stringValue = text
+        window?.makeFirstResponder(nil)
+    }
+
+    /// Back to the editable input field.
+    func showInput() {
+        isShowingMessage = false
+        textField.isEditable = true
+        textField.isSelectable = true
+        textField.stringValue = ""
         window?.makeFirstResponder(textField)
     }
 
@@ -55,6 +77,10 @@ final class TextInputBubbleView: NSVisualEffectView {
 
 extension TextInputBubbleView: NSTextFieldDelegate {
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        // A notice bubble has nothing to submit; let Escape still dismiss it.
+        if isShowingMessage, commandSelector == #selector(NSResponder.insertNewline(_:)) {
+            return false
+        }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
             onSubmit?(textField.stringValue)
             textField.stringValue = ""

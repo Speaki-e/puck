@@ -28,7 +28,7 @@ final class IdleState: StateHandler {
         self.scheduler = scheduler
     }
 
-    func update(dt: TimeInterval) {
+    func update(dt: TimeInterval, context: StateContext) {
         if let outcome = scheduler.tick(dt: dt) {
             wanderDelegate?.idleStateDidRequestWander(outcome)
         }

@@ -3,7 +3,7 @@
 //  PetAgent
 //
 //  F3 · owner: 박해영 (Haeyoung Park)
-//  protocol: enter() / update(dt) / exit()
+//  protocol: enter() / update(dt:context:) / exit()
 //
 
 import Foundation
@@ -23,13 +23,13 @@ protocol StateHandler: AnyObject {
     var loopsClip: Bool { get }
 
     func enter()
-    func update(dt: TimeInterval)
+    func update(dt: TimeInterval, context: StateContext)
     func exit()
 }
 
 extension StateHandler {
     var loopsClip: Bool { false }
     func enter() {}
-    func update(dt: TimeInterval) {}
+    func update(dt: TimeInterval, context: StateContext) {}
     func exit() {}
 }

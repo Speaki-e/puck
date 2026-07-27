@@ -12,13 +12,22 @@
 //  instance per event here would break CharacterController's same-state no-op
 //  check and reset per-state timers/data on every repeated event.
 
-/// A subset of FSM states EventRouter can request a transition into. Kept
-/// separate from concrete StateHandler instances for testability.
-enum StateKind: Equatable {
+/// The FSM's states, named without reference to their concrete StateHandler
+/// instances so EventRouter and the states themselves can request a
+/// transition without holding one.
+enum StateKind: Equatable, CaseIterable {
     case idle
-    case type
+    case walk
+    case climb
+    case walkOnTop
+    case fall
+    case land
+    case moveTo
     case point
+    case type
+    case listen
     case reactClick
+    case reactDrag
 }
 
 /// The result of routing one BridgeEvent: an optional state transition, an

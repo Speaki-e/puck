@@ -23,6 +23,11 @@ struct StateContext {
     /// The area the pet may roam, normally the union of every display.
     let roamableArea: CGRect
 
+    /// Layer-0 windows in front-to-back Z order, already converted into the
+    /// pet's coordinate space (F4 reports global Quartz frames; AppDelegate
+    /// rebases them onto the overlay window before they get here).
+    let windows: [WindowInfo]
+
     /// The surface the pet would land on if it fell straight down from `point`
     /// — a window top edge (F4) or the bottom of the screen. Injected as a
     /// closure so states stay independent of WindowListWatcher.

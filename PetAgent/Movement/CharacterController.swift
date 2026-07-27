@@ -38,6 +38,8 @@ final class CharacterController {
     /// refreshed when the display configuration or window list changes.
     var roamableArea: CGRect = .zero
     var landingY: (CGPoint) -> CGFloat = { _ in .zero }
+    /// Refreshed from F4 every frame by the bootstrap wiring.
+    var windows: () -> [WindowInfo] = { [] }
 
     /// A state asking to be replaced. Applied after update() returns so a
     /// state never swaps itself out mid-frame.
@@ -74,6 +76,7 @@ final class CharacterController {
         let context = StateContext(
             body: body,
             roamableArea: roamableArea,
+            windows: windows(),
             landingY: landingY,
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }
         )

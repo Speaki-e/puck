@@ -490,7 +490,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         executor.register(RunAppleScriptHandler())
         executor.register(PointAtHandler(coordinator: self))
         executor.register(ClickElementHandler())
-        // FindUIElementHandler still needs F4 level 2 (UIElementInspector) — not registered yet.
+        executor.register(FindUIElementHandler())
         toolExecutor = executor
     }
 

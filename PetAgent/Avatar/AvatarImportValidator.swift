@@ -15,8 +15,11 @@
 import Foundation
 
 enum AvatarImportValidator {
-    /// Per-clip usdz size budget from docs/avatar-spec.md (~2MB/file, ~20MB total across ~10 clips).
-    static let maxClipFileSizeBytes = 2 * 1024 * 1024
+    /// Per-clip usdz size budget. Only the mesh-carrying clip holds geometry
+    /// and textures (USDZAvatar plays every other clip's animation on that one
+    /// mesh), so the rest are animation-only and tiny — a real package lands
+    /// near 3MB total rather than the ~20MB ten copies of a mesh would cost.
+    static let maxClipFileSizeBytes = 4 * 1024 * 1024
 
     struct Report: Equatable {
         let manifest: AvatarManifest

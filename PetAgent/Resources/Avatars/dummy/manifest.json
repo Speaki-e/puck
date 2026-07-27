@@ -2,13 +2,17 @@
   "schema_version": 1,
   "name": "dummy",
   "type": "usdz",
-  "scale": 1.0,
-  "hitbox": { "width": 120, "height": 140 },
+  "scale": 0.005527,
+  "hitbox": {
+    "width": 120,
+    "height": 140
+  },
   "clips": {
-    "idle": "idle", "walk": "walk", "climb": "climb",
-    "fall": "fall", "land": "land", "point": "point",
-    "type": "type", "listen": "listen",
-    "react_click": "react_click", "react_drag": "react_drag"
+    "idle": "idle",
+    "walk": "walk",
+    "fall": "fall",
+    "land": "land",
+    "react_click": "react_click"
   },
   "sounds": {
     "walk": "sounds/footstep.wav",

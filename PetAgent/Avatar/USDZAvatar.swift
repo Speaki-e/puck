@@ -6,8 +6,16 @@
 //  First-pass implementation: RealityKit Entity.load + playAnimation crossfade
 //
 //  One usdz per clip (see docs/avatar-spec.md for why) — resolvedClipName
-//  gives a file stem, this loads {avatarDirectory}/{stem}.usdz and plays its
-//  one animation.
+//  gives a file stem and this loads {avatarDirectory}/{stem}.usdz.
+//
+//  Only the clip named by `meshClip` needs to carry the skinned mesh; every
+//  other file may be an animation-only export sharing the same skeleton,
+//  which is what Mixamo produces when you download a clip "without skin".
+//  Those files have no geometry at all, so swapping the displayed entity per
+//  clip made the pet vanish the moment it walked. One mesh stays parented for
+//  the whole session and clips only supply the animation played on it — which
+//  also lets playAnimation crossfade instead of popping, and keeps a ten-clip
+//  package near 3MB instead of shipping the same mesh ten times.
 
 import RealityKit
 import CoreGraphics
@@ -20,7 +28,8 @@ final class USDZAvatar: AvatarPlayable {
     private var screenSpaceMapper: ScreenSpaceMapper
     private let rootEntity: Entity
     private var loadedEntities: [String: Entity] = [:]
-    private var currentEntity: Entity?
+    /// The one entity that is actually rendered.
+    private var meshEntity: Entity?
 
     init(avatarDirectory: URL, loadResult: AvatarLoadResult, parent: Entity, screenSpaceMapper: ScreenSpaceMapper) {
         self.avatarDirectory = avatarDirectory
@@ -33,25 +42,36 @@ final class USDZAvatar: AvatarPlayable {
         let scale = Float(loadResult.manifest.scale)
         rootEntity.scale = SIMD3(repeating: scale)
         parent.addChild(rootEntity)
+
+        // The mesh is loaded once and stays for the session; clips only drive
+        // the animation played on it.
+        if let meshClipName = AvatarLoader.resolvedClipName(for: Self.meshClip, in: loadResult) {
+            let entity = loadedEntity(named: meshClipName)
+            rootEntity.addChild(entity)
+            meshEntity = entity
+        }
     }
 
+    /// Which clip's file carries the skinned mesh. idle is required by the
+    /// manifest schema, so it is the one file guaranteed to be present.
+    static let meshClip = "idle"
+
     func play(clip: String, loop: Bool) {
+        guard let target = meshEntity else { return }
         guard let fileName = AvatarLoader.resolvedClipName(for: clip, in: loadResult) else { return }
-        let entity = loadedEntity(named: fileName)
 
-        if currentEntity !== entity {
-            currentEntity?.removeFromParent()
-            rootEntity.addChild(entity)
-            currentEntity = entity
+        guard let animation = loadedEntity(named: fileName).availableAnimations.first else {
+            // An animation-less file leaves the current clip running rather
+            // than freezing the pet mid-pose.
+            AppLogger.shared.log(.warning, "Avatar clip '\(clip)' (\(fileName).usdz) contains no animation")
+            return
         }
-
-        guard let animation = entity.availableAnimations.first else { return }
         let playback = loop ? animation.repeat() : animation
-        entity.playAnimation(playback, transitionDuration: 0.2, startsPaused: false)
+        target.playAnimation(playback, transitionDuration: 0.2, startsPaused: false)
     }
 
     func stop() {
-        currentEntity?.stopAllAnimations()
+        meshEntity?.stopAllAnimations()
     }
 
     func setScreenPosition(_ position: CGPoint) {

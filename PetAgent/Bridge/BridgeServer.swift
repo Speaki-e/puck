@@ -85,6 +85,12 @@ final class BridgeServer {
             connections.forEach { $0.cancel() }
             connections.removeAll()
         }
+        // NWListener.cancel() does not unlink the bound path, so the socket
+        // file outlives the process unless removed here. start() also clears a
+        // stale one, but only the *next* launch gets there — without this a
+        // dead endpoint sits in Application Support after every quit, and a
+        // client can connect to a path nothing is listening on.
+        try? FileManager.default.removeItem(at: socketURL)
         try? FileManager.default.removeItem(at: lockFileURL)
     }
 

@@ -32,9 +32,27 @@ final class RunShellHandler: ToolHandler {
         DispatchQueue.global().async {
             do {
                 try process.run()
+
+                // Both pipes must be drained *while* the child runs, not after
+                // it exits. A child writing past the OS pipe buffer (64KB on
+                // macOS) blocks in write() until someone reads, so waiting for
+                // exit first deadlocks — and stderr fills independently, so
+                // draining only stdout deadlocks a stderr-noisy command just
+                // the same. readDataToEndOfFile returns at EOF (child exit),
+                // so reading both concurrently also serves as the wait.
+                let stdoutHandle = stdoutPipe.fileHandleForReading
+                let stderrHandle = stderrPipe.fileHandleForReading
+
+                let stderrQueue = DispatchQueue(label: "PetAgent.RunShellHandler.stderr")
+                var stderrData = Data()
+                stderrQueue.async { stderrData = stderrHandle.readDataToEndOfFile() }
+
+                let stdoutData = stdoutHandle.readDataToEndOfFile()
+                stderrQueue.sync {} // barrier: stderrData is fully written past this point
+
                 process.waitUntilExit()
-                let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-                let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+                let stderr = String(data: stderrData, encoding: .utf8) ?? ""
                 completion(
                     .success(
                         .object([

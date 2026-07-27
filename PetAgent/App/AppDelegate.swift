@@ -36,6 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let reactClickState = ReactClickState()
     private let listenState = ListenState()
 
+    private let frameClock = FrameClock()
+    // Shared: PointAtHandler starts a pointing session on it, and the frame
+    // clock ticks the same instance so the release timeout can elapse.
+    private let pointingController = PointingController()
+
     private var windowListWatcher: WindowListWatcher?
     private var toolExecutor: ToolExecutor?
 
@@ -62,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpToolExecutor()
         setUpBridgeServer()
         setUpGlobalHotkeys()
+        setUpFrameLoop()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -72,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A dead PID is currently recovered from at next launch, but if the OS
         // recycles that PID onto any live process, start() refuses forever with
         // .alreadyRunning and nothing tells the user which file to delete.
+        frameClock.stop()
         hotkeyManager?.stop()
         voiceInputController?.pushToTalkUp()
         bridgeServer?.stop()
@@ -221,6 +228,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clickThroughController = clickThrough
     }
 
+    // MARK: - Frame loop (F3)
+
+    /// Nothing drove CharacterController.update(dt:) before this, so every
+    /// time-based behavior was inert: IdleState's WanderScheduler never fired
+    /// (the pet stood still forever) and PointingController's release timeout
+    /// never elapsed. One clock ticks both.
+    private func setUpFrameLoop() {
+        frameClock.onTick = { [weak self] dt in
+            guard let self else { return }
+            self.characterController?.update(dt: dt)
+            self.pointingController.tick(dt: dt)
+        }
+        frameClock.start()
+    }
+
     // MARK: - Window sensing (F4 level 1)
 
     private func setUpWindowSensing() {
@@ -240,7 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         executor.register(GetFrontmostWindowHandler(watcher: windowListWatcher))
         executor.register(RunShellHandler())
         executor.register(RunAppleScriptHandler())
-        executor.register(PointAtHandler(pointingController: PointingController()))
+        executor.register(PointAtHandler(pointingController: pointingController))
         executor.register(ClickElementHandler())
         // FindUIElementHandler still needs F4 level 2 (UIElementInspector) — not registered yet.
         toolExecutor = executor

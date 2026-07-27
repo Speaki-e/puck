@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private let reactDragState = ReactDragState()
 
     private let frameClock = FrameClock()
+    private var idleFrameRate = IdleFrameRatePolicy()
     // Shared: PointAtHandler starts a pointing session on it, and the frame
     // clock ticks the same instance so the release timeout can elapse.
     private let pointingController = PointingController()
@@ -380,6 +381,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             guard let self else { return }
             self.characterController?.update(dt: dt)
             self.pointingController.tick(dt: dt)
+            // F1's idle downshift: a resting pet doesn't need 60fps.
+            let isResting = self.characterController?.currentState === self.idleState
+            self.frameClock.setFramesPerSecond(self.idleFrameRate.framesPerSecond(idle: isResting, dt: dt))
+
             // The hitbox has to follow the pet, or clicks only work where it
             // first appeared.
             if let body = self.characterBody, let window = self.overlayController?.windows.first {

@@ -28,9 +28,19 @@ enum ToolExecutionError: Error, Equatable {
 
 /// One entry in the tool registry (protocol repo section 4). `toolName` must
 /// match the registry's tool name exactly.
-protocol ToolHandler {
+protocol ToolHandler: AnyObject {
     var toolName: String { get }
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void)
+
+    /// Abandon whatever `execute` started. Called when the call times out —
+    /// without it a timed-out run_shell leaves its process running forever
+    /// with nobody to collect it.
+    func cancel()
+}
+
+extension ToolHandler {
+    /// Most tools finish promptly and have nothing to tear down.
+    func cancel() {}
 }
 
 /// Routes an incoming tool_dispatch to its registered ToolHandler and enforces
@@ -77,11 +87,17 @@ final class ToolExecutor {
             return
         }
 
-        DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+        // A DispatchWorkItem rather than a bare asyncAfter closure so a fast
+        // success can cancel it. Left uncancelled, every call held a queued
+        // block for its full timeout — 600s in code_editor's case.
+        let timeoutWork = DispatchWorkItem { [weak handler] in
+            handler?.cancel()
             completeOnce(false, nil, ToolExecutionError.timeout.protocolErrorCode)
         }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
 
         handler.execute(args: request.args) { result in
+            timeoutWork.cancel()
             switch result {
             case .success(let data):
                 completeOnce(true, data, nil)

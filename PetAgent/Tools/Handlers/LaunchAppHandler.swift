@@ -5,14 +5,20 @@
 //  F11 · owner: Haeyoung Park
 //  NSWorkspace.openApplication -> returns pid, triggers the pet's MoveTo
 //
-//  TODO(P8+): trigger the pet's MoveTo toward the launched app's window once
-//  it appears (needs F4 window tracking wired to this handler's completion).
+//  After a successful launch the pet walks over to greet the new window —
+//  the M-1 milestone's visible half ("펫이 해당 창으로 이동"). Finding that
+//  window means waiting for it to appear in F4's list, which is bootstrap
+//  knowledge, so it is delegated through `onAppLaunched`.
 
 import AppKit
 
 /// args: `{"app_name": "Safari"}` or `{"bundle_id": "com.apple.Safari"}`.
 final class LaunchAppHandler: ToolHandler {
     let toolName = "launch_app"
+
+    /// Called with the pid of a successfully launched app. The tool_result is
+    /// sent independently of this — the agent shouldn't wait on the pet's walk.
+    var onAppLaunched: ((pid_t) -> Void)?
 
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard case .object(let fields) = args else {
@@ -39,6 +45,7 @@ final class LaunchAppHandler: ToolHandler {
         NSWorkspace.shared.openApplication(at: appURL, configuration: NSWorkspace.OpenConfiguration()) { app, error in
             if let app {
                 completion(.success(.object(["pid": .number(Double(app.processIdentifier))])))
+                self.onAppLaunched?(app.processIdentifier)
             } else {
                 completion(.failure(.executionFailed(error?.localizedDescription ?? "launch failed")))
             }

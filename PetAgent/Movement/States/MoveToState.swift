@@ -5,14 +5,61 @@
 //  F3 · owner: Haeyoung Park
 //  MoveTo state's StateHandler implementation
 //
-//  Reuses "walk" since the manifest has no dedicated clip. Entered whenever a
-//  tool/event target coordinate arrives, from any current state (transition
-//  table's "any state" row).
-//  TODO(P7/P8): constant-velocity movement toward a target + arrival radius,
-//  then transition to Point or Idle depending on why it was triggered.
+//  A directed move ordered by a tool or a socket event ("임의 | 도구/이벤트
+//  목표좌표 | MoveTo → Point 또는 Idle", plan/02_pet-app.md section 3).
+//
+//  Unlike Walk it deliberately ignores windows in the way: the pet was sent
+//  somewhere specific, and stopping to climb something on the route would
+//  abandon the order. Reuses the "walk" clip; the manifest has no dedicated one.
+
+import CoreGraphics
+import Foundation
 
 final class MoveToState: StateHandler {
     let name = "MoveTo"
     let clipKey = "walk"
     let loopsClip = true
+
+    /// Where to go, in the pet's coordinate space.
+    var target: CGPoint?
+    /// What to do on arrival. point_at sets this to `.point`; a plain
+    /// relocation leaves it at `.idle`.
+    var nextState: StateKind = .idle
+
+    private var hasHandedOver = false
+
+    func enter() {
+        hasHandedOver = false
+    }
+
+    func exit() {
+        // Clear both so a stale order can't be replayed on the next entry.
+        target = nil
+        nextState = .idle
+    }
+
+    func update(dt: TimeInterval, context: StateContext) {
+        guard !hasHandedOver else { return }
+
+        guard let target else {
+            handOver(.idle, context)
+            return
+        }
+
+        if let facing = MovementSolver.facing(from: context.body.position, toward: target) {
+            context.body.facing = facing
+        }
+
+        let step = MovementSolver.step(from: context.body.position, toward: target, dt: dt)
+        context.body.position = step.position
+
+        if step.hasArrived {
+            handOver(nextState, context)
+        }
+    }
+
+    private func handOver(_ kind: StateKind, _ context: StateContext) {
+        hasHandedOver = true
+        context.requestTransition(kind)
+    }
 }

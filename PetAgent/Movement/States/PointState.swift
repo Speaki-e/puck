@@ -2,14 +2,27 @@
 //  PointState.swift
 //  PetAgent
 //
-//  F3 · owner: Haeyoung Park
+//  F3/F10 · owner: Haeyoung Park
 //  Point state's StateHandler implementation
 //
-//  TODO(P8): loop the point clip + point SFX; release after ~8s or once a
-//  click on the target is detected (F10 PointingController).
+//  Holds the point clip while F10's PointingController runs the release
+//  timer (8s, or sooner if the target gets clicked). This state deliberately
+//  owns neither the timer nor the target: the tool call that started the
+//  pointing needs to be told the moment Point begins (protocol section 4),
+//  and that wiring lives at bootstrap alongside PointingController.
+//
+
+import Foundation
 
 final class PointState: StateHandler {
     let name = "Point"
     let clipKey = "point"
     let loopsClip = true
+
+    /// Fired when the pet actually starts pointing.
+    var onEnter: (() -> Void)?
+
+    func enter() {
+        onEnter?()
+    }
 }

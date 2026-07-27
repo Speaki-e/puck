@@ -2,50 +2,43 @@
 //  PointAtHandlerTests.swift
 //  PetAgent
 //
-//  F11 test · owner: 박해영 (Haeyoung Park)
-//  tool_result(ok) must fire at Point *start*, per protocol section 4
-//  ("Point 시작 시점에 tool_result(ok) 반환") — verified against a real
-//  PointingController wired to a fake ClickDetectorProviding (no real
-//  global event monitor).
+//  F10/F11 test · owner: 박해영 (Haeyoung Park)
+//  protocol section 4: point_at means "펫이 좌표로 이동해 가리킴", and
+//  tool_result(ok) comes back the moment Point *starts* — not when the
+//  command is received, and not when pointing ends.
 //
 
 import XCTest
 import CoreGraphics
 @testable import PetAgent
 
-private final class FakeClickDetector: ClickDetectorProviding {
-    var onClickInsideTarget: (() -> Void)?
-    func startMonitoring(targetFrame: CGRect) {}
-    func stopMonitoring() {}
+private final class SpyPointingCoordinator: PetPointingCoordinating {
+    private(set) var requestedFrames: [CGRect] = []
+    private var pending: (() -> Void)?
+
+    func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void) {
+        requestedFrames.append(frame)
+        pending = onPointingStarted
+    }
+
+    /// Simulates the pet finishing its walk and entering Point.
+    func completeArrival() {
+        pending?()
+        pending = nil
+    }
 }
 
 final class PointAtHandlerTests: XCTestCase {
-    func test_validFrame_repliesOkAsSoonAsPointingStarts() {
-        let handler = PointAtHandler(pointingController: PointingController(clickDetector: FakeClickDetector()))
-        let args = JSONValue.object([
-            "frame": .object([
-                "x": .number(10), "y": .number(20), "width": .number(30), "height": .number(40),
-            ]),
-        ])
-
-        let expectation = expectation(description: "completion called")
-        handler.execute(args: args) { result in
-            switch result {
-            case .success:
-                break
-            case .failure(let error):
-                XCTFail("expected success, got \(error)")
-            }
-            expectation.fulfill()
-        }
-
-        wait(for: [expectation], timeout: 1)
-    }
+    private let frameArgs = JSONValue.object([
+        "frame": .object([
+            "x": .number(100), "y": .number(200), "width": .number(50), "height": .number(20),
+        ]),
+    ])
 
     func test_missingFrame_failsWithExecutionFailed() {
-        let handler = PointAtHandler(pointingController: PointingController(clickDetector: FakeClickDetector()))
+        let handler = PointAtHandler(coordinator: SpyPointingCoordinator())
 
-        let expectation = expectation(description: "completion called")
+        let done = expectation(description: "completion called")
         handler.execute(args: .object([:])) { result in
             switch result {
             case .success:
@@ -53,9 +46,45 @@ final class PointAtHandlerTests: XCTestCase {
             case .failure(let error):
                 XCTAssertEqual(error, .executionFailed("point_at requires a frame {x,y,width,height}"))
             }
-            expectation.fulfill()
+            done.fulfill()
         }
+        wait(for: [done], timeout: 1)
+    }
 
-        wait(for: [expectation], timeout: 1)
+    func test_sendsThePetToTheTargetFrame() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+
+        handler.execute(args: frameArgs) { _ in }
+
+        XCTAssertEqual(coordinator.requestedFrames, [CGRect(x: 100, y: 200, width: 50, height: 20)])
+    }
+
+    /// The old handler replied the instant it was called, before the pet had
+    /// gone anywhere — the agent would tell the user it had been shown
+    /// something it had not yet been shown.
+    func test_doesNotReplyUntilPointingActuallyStarts() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+
+        var replied = false
+        handler.execute(args: frameArgs) { _ in replied = true }
+        XCTAssertFalse(replied, "the pet is still walking there")
+
+        coordinator.completeArrival()
+        XCTAssertTrue(replied)
+    }
+
+    func test_repliesSuccessOncePointingStarts() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+
+        var ok: Bool?
+        handler.execute(args: frameArgs) { result in
+            if case .success = result { ok = true } else { ok = false }
+        }
+        coordinator.completeArrival()
+
+        XCTAssertEqual(ok, true)
     }
 }

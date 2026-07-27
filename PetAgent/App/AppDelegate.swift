@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var bridgeServer: BridgeServer?
     private var bridgeMessageRouter: BridgeMessageRouter?
-    private var activeConnection: BridgeConnection?
+    private lazy var userInputSender = UserInputSender { [weak self] in self?.bridgeServer }
 
     private var hotkeyManager: GlobalHotkeyManager?
     private var voiceInputController: VoiceInputController?
@@ -139,10 +139,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let avatarDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PetAgent/Avatars/dummy")
-        guard let loadResult = try? AvatarLoader.load(avatarDirectory: avatarDirectory) else {
-            AppLogger.shared.log(.error, "Failed to load dummy avatar at \(avatarDirectory.path)")
+        let avatarsDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PetAgent/Avatars", isDirectory: true)
+        let avatarDirectory = avatarsDirectory.appendingPathComponent("dummy", isDirectory: true)
+
+        // First run has nothing in Application Support yet; seed the bundled
+        // package so a fresh clone shows a pet instead of an empty screen.
+        if let bundled = Bundle.main.url(forResource: "Avatars/dummy", withExtension: nil) {
+            let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: avatarsDirectory)
+            AppLogger.shared.log(.info, "Bundled avatar install: \(outcome)")
+        } else {
+            AppLogger.shared.log(.warning, "No bundled avatar package in the app bundle")
+        }
+
+        let loadResult: AvatarLoadResult
+        do {
+            loadResult = try AvatarLoader.load(avatarDirectory: avatarDirectory)
+        } catch {
+            // Keep the specific reason (missing required clips, unsupported
+            // schema version, undecodable manifest) — `try?` threw away the
+            // distinction AvatarLoaderError exists to make.
+            AppLogger.shared.log(.error, "Failed to load dummy avatar at \(avatarDirectory.path): \(error)")
             return
         }
 
@@ -281,11 +298,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         server.onFailure = { error in
             AppLogger.shared.log(.error, "BridgeServer failed: \(error)")
         }
-        server.onMessage = { [weak self] message, connection in
+        server.onMessage = { message, connection in
             // Delivered on BridgeServer's background queue. The router hops to
             // main before touching anything (RealityKit, NSWorkspace,
             // WindowListWatcher) — do not add main-thread work here.
-            self?.activeConnection = connection
             router.handle(message) { reply in connection.send(reply) }
         }
 
@@ -354,17 +370,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func sendUserInput(text: String, source: UserInput.Source) {
-        guard let activeConnection else {
-            // protocol section 2: pet-app has no way to send when nothing is
-            // connected; surface that instead of silently dropping the input.
-            showTextInputBubble()
-            return
+        switch userInputSender.send(text: text, source: source) {
+        case .sent:
+            break
+        case .workspaceDisconnected:
+            // F6: tell the user why nothing happened. Re-opening the input
+            // bubble here (what this used to do) just looped — typing again
+            // reopened it again, and the input was never delivered.
+            showWorkspaceOfflineBubble()
         }
-        activeConnection.send(.userInput(UserInput(text: text, source: source)))
     }
 
     private func showTextInputBubble() {
-        guard let window = overlayController?.windows.first else { return }
+        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
+
+        bubbleView.onSubmit = { [weak self] text in
+            bubbleWindow.closeAndRestoreFocus()
+            self?.sendUserInput(text: text, source: .text)
+        }
+        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleView.showInput()
+        bubbleWindow.showAndActivate()
+    }
+
+    /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선".
+    private func showWorkspaceOfflineBubble() {
+        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
+
+        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleView.showMessage("워크스페이스가 꺼져 있어요")
+        bubbleWindow.showAndActivate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak bubbleWindow] in
+            bubbleWindow?.closeAndRestoreFocus()
+        }
+    }
+
+    private func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
+        guard let window = overlayController?.windows.first else { return nil }
 
         let bubbleWindow = textInputBubbleWindow ?? {
             let newWindow = TextInputBubbleWindow(contentRect: CGRect(x: 0, y: 0, width: 240, height: 40))
@@ -373,18 +415,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }()
 
         let bubbleView = TextInputBubbleView(frame: CGRect(x: 0, y: 0, width: 240, height: 40))
-        bubbleView.onSubmit = { [weak self] text in
-            self?.sendUserInput(text: text, source: .text)
-            bubbleWindow.closeAndRestoreFocus()
-        }
-        bubbleView.onCancel = {
-            bubbleWindow.closeAndRestoreFocus()
-        }
         bubbleWindow.contentView = bubbleView
 
         let center = CGPoint(x: window.frame.midX, y: window.frame.midY)
         bubbleWindow.setFrameOrigin(NSPoint(x: center.x - 120, y: center.y))
-        bubbleWindow.showAndActivate()
+        return (bubbleWindow, bubbleView)
     }
 
     private func summonCharacter() {

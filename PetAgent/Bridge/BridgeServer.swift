@@ -95,6 +95,9 @@ final class BridgeServer {
     }
 
     /// Thread-safe snapshot of currently-open connections.
+    ///
+    /// Uses `queue.sync`, so it must not be called from `queue` itself — i.e.
+    /// never from inside an `onMessage` handler, which is delivered there.
     func currentConnections() -> [BridgeConnection] {
         queue.sync { connections }
     }
@@ -144,5 +147,23 @@ final class BridgeServer {
 
     private static func writeLockFile(at url: URL, pid: Int32) {
         try? Data(String(pid).utf8).write(to: url)
+    }
+}
+
+// MARK: - UserInputTransport
+
+extension BridgeServer: UserInputTransport {
+    /// Read live rather than remembered: BridgeConnection.onClose removes a
+    /// connection as soon as the transport reports it gone, so this flips to
+    /// false the moment workspace disconnects.
+    var hasConnectedClients: Bool {
+        !currentConnections().isEmpty
+    }
+
+    /// protocol section 2 expects a single workspace client, but sending to
+    /// every open connection keeps this correct if a second one ever attaches
+    /// (and costs nothing when there is one).
+    func broadcast(_ message: BridgeMessage) {
+        currentConnections().forEach { $0.send(message) }
     }
 }

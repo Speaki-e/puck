@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private let listenState = ListenState()
     private let reactClickState = ReactClickState()
     private let reactDragState = ReactDragState()
+    // F3 ceiling-crawling (2026-07-29): WanderScheduler's .climbToCeiling outcome.
+    private let climbToCeilingState = ClimbToCeilingState()
+    private let ceilingState = CeilingState()
     // F12 (optional, lowest priority): ball-toy interaction.
     private let chaseBallState = ChaseBallState()
     private let kickBallState = KickBallState()
@@ -255,6 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             (.point, pointState), (.type, typeState), (.listen, listenState),
             (.reactClick, reactClickState), (.reactDrag, reactDragState),
             (.chaseBall, chaseBallState), (.kickBall, kickBallState),
+            (.climbToCeiling, climbToCeilingState), (.ceiling, ceilingState),
         ] {
             controller.register(state, as: kind)
         }
@@ -424,6 +428,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             // to it, roam instead of standing still.
             walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
             controller.transition(to: .walk)
+        case .climbToCeiling:
+            controller.transition(to: .climbToCeiling)
         case .stay:
             break
         }

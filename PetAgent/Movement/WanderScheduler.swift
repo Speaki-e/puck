@@ -17,6 +17,8 @@ final class WanderScheduler {
         case walkToRandomPoint
         /// Move to and climb the nearest window (Climb)
         case climbNearestWindow
+        /// Climb straight up to the ceiling and crawl there (F3 ceiling-crawling, 2026-07-29)
+        case climbToCeiling
         /// Stay idle this round
         case stay
     }
@@ -46,12 +48,13 @@ final class WanderScheduler {
         return outcomeProvider()
     }
 
-    /// Default weights: 50% random move, 30% climb nearest window, 20% stay
-    /// (first-pass values, tunable later).
+    /// Default weights: 45% random move, 25% climb nearest window, 15%
+    /// climb to the ceiling, 15% stay (first-pass values, tunable later).
     static func weightedRandomOutcome() -> Outcome {
         switch Double.random(in: 0..<1) {
-        case ..<0.5: return .walkToRandomPoint
-        case ..<0.8: return .climbNearestWindow
+        case ..<0.45: return .walkToRandomPoint
+        case ..<0.70: return .climbNearestWindow
+        case ..<0.85: return .climbToCeiling
         default: return .stay
         }
     }

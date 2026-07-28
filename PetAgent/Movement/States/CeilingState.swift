@@ -1,0 +1,68 @@
+//
+//  CeilingState.swift
+//  PetAgent
+//
+//  F3 · owner: 박해영 (Haeyoung Park)
+//  Ceiling state's StateHandler implementation.
+//
+//  F3 ceiling-crawling (2026-07-29): crawls upside-down along the roamable
+//  area's top edge, reversing direction at its horizontal bounds instead of
+//  falling off the end (unlike WalkOnTopState, which does fall off a
+//  window's edge -- there is no "edge of the ceiling" to walk off of, only
+//  the screen's own bounds). Reuses the "walk" clip, same as WalkOnTop.
+//
+//  isUpsideDown is set every frame rather than once on entry: enter() has no
+//  StateContext/body access (see StateHandler.swift), so a per-frame set-if-
+//  changed guarded by CharacterBody itself is simpler than tracking a
+//  separate "have I flipped yet" flag here.
+//
+
+import CoreGraphics
+import Foundation
+
+final class CeilingState: StateHandler {
+    let name = "Ceiling"
+    let clipKey = "walk"
+    let loopsClip = true
+
+    private let durationProvider: () -> TimeInterval
+    private var direction: CGFloat = 1
+    private var elapsed: TimeInterval = 0
+    private var duration: TimeInterval = 0
+    private var hasRequestedFall = false
+
+    init(durationProvider: @escaping () -> TimeInterval = { TimeInterval.random(in: 3...8) }) {
+        self.durationProvider = durationProvider
+    }
+
+    func enter() {
+        hasRequestedFall = false
+        elapsed = 0
+        duration = durationProvider()
+        direction = 1
+    }
+
+    func update(dt: TimeInterval, context: StateContext) {
+        guard !hasRequestedFall else { return }
+
+        context.body.isUpsideDown = true
+
+        elapsed += dt
+        guard elapsed < duration else {
+            hasRequestedFall = true
+            context.requestTransition(.fall)
+            return
+        }
+
+        var nextX = context.body.position.x + direction * MovementSolver.walkSpeed * CGFloat(dt)
+        if nextX >= context.roamableArea.maxX {
+            nextX = context.roamableArea.maxX
+            direction = -1
+        } else if nextX <= context.roamableArea.minX {
+            nextX = context.roamableArea.minX
+            direction = 1
+        }
+        context.body.facing = direction > 0 ? .right : .left
+        context.body.position = CGPoint(x: nextX, y: context.roamableArea.minY)
+    }
+}

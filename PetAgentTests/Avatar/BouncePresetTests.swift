@@ -70,6 +70,18 @@ final class BouncePresetTests: XCTestCase {
         XCTAssertEqual(transform.scaleY, 1.0, accuracy: 0.0001)
     }
 
+    /// The horizontal squeeze used to fold on abs(sin), which has a
+    /// derivative kink at every zero-crossing (footfall) -- the motion
+    /// visibly "caught" there. sin^2 keeps the same range (0 at rest, full
+    /// squeeze at the peak) but eases through zero instead of folding.
+    func test_walk_squeezeUsesASmoothQuadraticFalloff_notALinearFold() {
+        let period = 0.35
+        let elapsed = period / 12 // sin(2*pi*elapsed/period) == sin(pi/6) == 0.5
+        let transform = BouncePreset.walk.transform(elapsed: elapsed, intensity: 1.0)
+
+        XCTAssertEqual(transform.scaleX, 1 - 0.08 * 0.3 * 0.25, accuracy: 0.0005)
+    }
+
     // MARK: - land: squash on impact, springs back
 
     func test_land_atZeroElapsed_squashesAtFullIntensity() {
@@ -117,5 +129,25 @@ final class BouncePresetTests: XCTestCase {
         let transform = BouncePreset.kick.transform(elapsed: 0.3, intensity: 1.0) // past the 0.16s anticipation threshold
         XCTAssertLessThan(transform.scaleX, 1.0)
         XCTAssertGreaterThan(transform.scaleY, 1.0)
+    }
+
+    /// The old two-phase linear ramp jumped from its anticipation peak
+    /// straight to its impact peak at the phase boundary instead of passing
+    /// through identity -- a visible "snap" mid-kick. Both phases must meet
+    /// at identity so the curve reads as one continuous motion.
+    func test_kick_isContinuousAcrossThePhaseBoundary() {
+        let boundary = 0.4 * 0.4 // anticipation window (duration * its fraction)
+        let justBefore = BouncePreset.kick.transform(elapsed: boundary - 0.001, intensity: 1.0)
+        let justAfter = BouncePreset.kick.transform(elapsed: boundary + 0.001, intensity: 1.0)
+
+        XCTAssertEqual(justBefore.scaleX, justAfter.scaleX, accuracy: 0.01)
+        XCTAssertEqual(justBefore.scaleY, justAfter.scaleY, accuracy: 0.01)
+    }
+
+    func test_kick_atPhaseBoundary_passesThroughIdentity() {
+        let boundary = 0.4 * 0.4
+        let transform = BouncePreset.kick.transform(elapsed: boundary, intensity: 1.0)
+        XCTAssertEqual(transform.scaleX, 1.0, accuracy: 0.001)
+        XCTAssertEqual(transform.scaleY, 1.0, accuracy: 0.001)
     }
 }

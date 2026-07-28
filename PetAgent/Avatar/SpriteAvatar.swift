@@ -27,6 +27,7 @@ final class SpriteAvatar: AvatarPlayable {
     private var loadedImages: [String: CGImage] = [:]
     private var facing: AvatarFacing = .right
     private var currentBounce = BounceTransform.identity
+    private var isUpsideDown = false
 
     init(avatarDirectory: URL, loadResult: AvatarLoadResult, parent: CALayer) {
         self.avatarDirectory = avatarDirectory
@@ -79,6 +80,15 @@ final class SpriteAvatar: AvatarPlayable {
         applyTransform()
     }
 
+    /// F3 ceiling-crawling. A Y-only flip (not a 180deg rotation) so the
+    /// walking-direction/facing semantics stay correct while upside-down --
+    /// a full rotation would also reverse the apparent direction of motion.
+    func setUpsideDown(_ isUpsideDown: Bool) {
+        guard isUpsideDown != self.isUpsideDown else { return }
+        self.isUpsideDown = isUpsideDown
+        applyTransform()
+    }
+
     /// Settings' size slider. Recomputes from the original manifest hitbox
     /// (not the layer's current bounds) so this stays idempotent under
     /// repeated calls -- the caller is expected to re-push the character's
@@ -112,8 +122,9 @@ final class SpriteAvatar: AvatarPlayable {
 
     private func applyTransform() {
         let flipX: CGFloat = facing == .left ? -1 : 1
+        let flipY: CGFloat = isUpsideDown ? -1 : 1
         spriteLayer.setAffineTransform(
-            CGAffineTransform(scaleX: CGFloat(currentBounce.scaleX) * flipX, y: CGFloat(currentBounce.scaleY))
+            CGAffineTransform(scaleX: CGFloat(currentBounce.scaleX) * flipX, y: CGFloat(currentBounce.scaleY) * flipY)
         )
     }
 

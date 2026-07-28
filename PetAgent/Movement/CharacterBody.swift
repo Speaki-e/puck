@@ -39,6 +39,15 @@ final class CharacterBody {
         }
     }
 
+    /// F3 ceiling-crawling (2026-07-29): true while CeilingState/ClimbToCeilingState
+    /// own the character. Same no-op-on-unchanged guard as facing.
+    var isUpsideDown: Bool = false {
+        didSet {
+            guard isUpsideDown != oldValue else { return }
+            avatar.setUpsideDown(isUpsideDown)
+        }
+    }
+
     func play(clip: String, loop: Bool) {
         avatar.play(clip: clip, loop: loop)
     }

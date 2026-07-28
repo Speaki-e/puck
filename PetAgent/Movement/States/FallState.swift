@@ -31,6 +31,12 @@ final class FallState: StateHandler {
     func update(dt: TimeInterval, context: StateContext) {
         guard !hasLanded else { return }
 
+        // A fall off the ceiling must land right-side up regardless of which
+        // state preceded it (CeilingState is the only one that sets this, but
+        // Fall shouldn't need to know that -- it just always restores normal
+        // orientation before landing).
+        context.body.isUpsideDown = false
+
         let step = MovementSolver.fallStep(
             position: context.body.position,
             velocity: velocity,

@@ -64,11 +64,15 @@ enum BouncePreset: Equatable {
         case .walk:
             // Faster bounce synced to a nominal step cadence, with a slight
             // horizontal squeeze at the peak so it doesn't just look like
-            // pure vertical scaling.
+            // pure vertical scaling. The squeeze uses phase^2 rather than
+            // abs(phase) -- abs() folds sharply (a derivative kink) at every
+            // zero-crossing, which reads as the motion "catching" at each
+            // footfall; squaring keeps the same 0-at-rest/full-at-peak shape
+            // but eases through zero instead.
             let period = 0.35
             let phase = sin(2 * .pi * elapsed / period)
             let amplitude = 0.08 * intensity
-            return BounceTransform(scaleX: 1 - amplitude * 0.3 * abs(phase), scaleY: 1 + amplitude * phase)
+            return BounceTransform(scaleX: 1 - amplitude * 0.3 * phase * phase, scaleY: 1 + amplitude * phase)
 
         case .land:
             // Decaying spring: squashed flat on impact, oscillates back to
@@ -88,15 +92,22 @@ enum BouncePreset: Equatable {
             return BounceTransform(scaleX: 1 + pop * 0.15, scaleY: 1 + pop * 0.15)
 
         case .kick:
-            // Two phases: anticipation squash (first 40% of the window),
-            // then an impact stretch the opposite way.
+            // Two phases: anticipation squash (first 40% of the window), then
+            // an impact stretch the opposite way. Each phase is its own
+            // sine bump (0 -> peak -> 0) rather than a linear ramp, so both
+            // ease in/out AND meet at identity at the phase boundary --
+            // linear ramps peak right at the boundary and jump straight to
+            // the other phase's peak, a visible snap mid-kick.
             let duration = 0.4
             let t = min(elapsed / duration, 1)
-            if t < 0.4 {
-                let s = intensity * (t / 0.4)
+            let anticipationWindow = 0.4
+            if t < anticipationWindow {
+                let localT = t / anticipationWindow
+                let s = intensity * sin(localT * .pi)
                 return BounceTransform(scaleX: 1 + s * 0.2, scaleY: 1 - s * 0.2)
             } else {
-                let s = intensity * ((t - 0.4) / 0.6)
+                let localT = (t - anticipationWindow) / (1 - anticipationWindow)
+                let s = intensity * sin(localT * .pi)
                 return BounceTransform(scaleX: 1 - s * 0.2, scaleY: 1 + s * 0.3)
             }
         }

@@ -215,6 +215,47 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertTrue((avatar.spriteLayer.contents as! CGImage) === (idleContents as! CGImage))
     }
 
+    // MARK: - setUpsideDown (F3 ceiling-crawling, 2026-07-29)
+
+    /// A Y-only flip, not a 180deg rotation -- rotation would also reverse
+    /// the apparent left/right walking direction while upside-down.
+    func test_setUpsideDownTrue_flipsLayerVertically() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.setUpsideDown(true)
+
+        let transform = avatar.spriteLayer.affineTransform()
+        XCTAssertEqual(transform.a, 1, accuracy: 0.0001)
+        XCTAssertEqual(transform.d, -1, accuracy: 0.0001)
+    }
+
+    func test_setUpsideDownFalse_afterTrue_restoresIdentity() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.setUpsideDown(true)
+        avatar.setUpsideDown(false)
+
+        let transform = avatar.spriteLayer.affineTransform()
+        XCTAssertEqual(transform.d, 1, accuracy: 0.0001)
+    }
+
+    func test_setUpsideDown_combinesWithFacingLeft() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.setFacing(.left)
+        avatar.setUpsideDown(true)
+
+        let transform = avatar.spriteLayer.affineTransform()
+        XCTAssertEqual(transform.a, -1, accuracy: 0.0001)
+        XCTAssertEqual(transform.d, -1, accuracy: 0.0001)
+    }
+
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
     /// on a real display change -- mirrors USDZAvatar.reparent's precedent.
     func test_reparent_movesTheSpriteLayerToTheNewParent() throws {

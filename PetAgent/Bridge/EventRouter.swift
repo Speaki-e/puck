@@ -33,6 +33,11 @@ enum StateKind: Equatable, CaseIterable {
     /// EventRouter.reaction(for:), which has no case producing these.
     case chaseBall
     case kickBall
+    /// F3 ceiling-crawling (2026-07-29): climb straight up to the ceiling,
+    /// then crawl there upside-down. Reached only from WanderScheduler's
+    /// idle roll, never from a socket event.
+    case climbToCeiling
+    case ceiling
 }
 
 /// The result of routing one BridgeEvent: an optional state transition, an

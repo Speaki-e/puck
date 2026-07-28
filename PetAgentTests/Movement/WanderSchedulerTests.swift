@@ -25,6 +25,14 @@ final class WanderSchedulerTests: XCTestCase {
         XCTAssertEqual(scheduler.tick(dt: 1), .climbNearestWindow)
     }
 
+    /// F3 ceiling-crawling (2026-07-29): a fourth Outcome case alongside walk/climb/stay.
+    func test_tick_firesClimbToCeilingOutcome_onceIntervalElapses() {
+        let scheduler = WanderScheduler(nextIntervalProvider: { 10 }, outcomeProvider: { .climbToCeiling })
+
+        XCTAssertNil(scheduler.tick(dt: 9))
+        XCTAssertEqual(scheduler.tick(dt: 1), .climbToCeiling)
+    }
+
     func test_tick_resetsElapsedAndPicksNextInterval() {
         var intervals: [TimeInterval] = [10, 3]
         let scheduler = WanderScheduler(

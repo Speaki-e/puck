@@ -39,10 +39,16 @@ protocol AvatarPlayable: AnyObject {
     /// policy as the sounds table. Default is a no-op: usdz/video avatars
     /// don't support emotion images.
     func showEmotion(_ emotion: String)
+
+    /// F3 ceiling-crawling (2026-07-29): flips the sprite vertically while
+    /// CeilingState owns the character. Default is a no-op -- usdz/video
+    /// avatars have no use for this, only SpriteAvatar acts on it.
+    func setUpsideDown(_ isUpsideDown: Bool)
 }
 
 extension AvatarPlayable {
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {}
     func updateScale(_ scale: Double) {}
     func showEmotion(_ emotion: String) {}
+    func setUpsideDown(_ isUpsideDown: Bool) {}
 }

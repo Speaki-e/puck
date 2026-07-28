@@ -16,11 +16,13 @@ private final class SpyAvatar: AvatarPlayable {
     private(set) var positions: [CGPoint] = []
     private(set) var facings: [AvatarFacing] = []
     private(set) var playedClips: [String] = []
+    private(set) var upsideDownCalls: [Bool] = []
 
     func play(clip: String, loop: Bool) { playedClips.append(clip) }
     func stop() {}
     func setScreenPosition(_ position: CGPoint) { positions.append(position) }
     func setFacing(_ facing: AvatarFacing) { facings.append(facing) }
+    func setUpsideDown(_ isUpsideDown: Bool) { upsideDownCalls.append(isUpsideDown) }
 }
 
 final class CharacterBodyTests: XCTestCase {
@@ -60,6 +62,27 @@ final class CharacterBodyTests: XCTestCase {
         body.facing = .left
 
         XCTAssertEqual(avatar.facings, [.left])
+    }
+
+    // MARK: - Upside-down (F3 ceiling-crawling, 2026-07-29)
+
+    func test_settingUpsideDown_pushesToTheAvatar() {
+        let avatar = SpyAvatar()
+        let body = CharacterBody(avatar: avatar, position: .zero)
+
+        body.isUpsideDown = true
+
+        XCTAssertEqual(avatar.upsideDownCalls, [true])
+    }
+
+    func test_settingTheSameUpsideDownTwice_onlyPushesOnce() {
+        let avatar = SpyAvatar()
+        let body = CharacterBody(avatar: avatar, position: .zero)
+
+        body.isUpsideDown = true
+        body.isUpsideDown = true
+
+        XCTAssertEqual(avatar.upsideDownCalls, [true])
     }
 
     // MARK: - Clip playback

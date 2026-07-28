@@ -53,6 +53,21 @@ final class FallStateTests: XCTestCase {
         XCTAssertEqual(world.requestedTransitions, [.land])
     }
 
+    /// A fall off the ceiling (CeilingState) must land right-side up
+    /// regardless of which state preceded it -- this resets it unconditionally
+    /// rather than only when Fall was entered from Ceiling specifically.
+    func test_landingResetsUpsideDown() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.landingY = 10_000
+        world.body.isUpsideDown = true
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.1)
+
+        XCTAssertFalse(world.body.isUpsideDown)
+    }
+
     /// Velocity must not carry over from a previous fall, or the second one
     /// starts at whatever speed the first ended with.
     func test_velocityResetsOnReentry() {

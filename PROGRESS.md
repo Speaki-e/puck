@@ -75,13 +75,17 @@ Ordered by what actually blocks progress.
   already implemented the contract in Swift out of necessity
   (`Bridge/BridgeMessages.swift`, `Avatar/AvatarManifest.swift`,
   `Tools/ToolExecutor.swift` error codes), so the TS types should be written
-  to match the shipped Swift unless a divergence is deliberate. Seven open
-  questions are listed in `protocol/CLAUDE.md`, including: `frame` has no
-  defined coordinate space; `sounds` has no `await_approval` key; there is no
-  error code for an unknown tool; `tool_result.error` carries only a code so
-  failure detail reaches neither the wire nor the log; the manifest `clips`
-  shape as written is not implementable (USD has one animation timeline);
-  and nothing declares an asset's real height, so `scale` is a per-asset
+  to match the shipped Swift unless a divergence is deliberate. Of the seven
+  open questions listed in `protocol/CLAUDE.md`, two were resolved on
+  2026-07-28 at the normative source (`plan/01_protocol.md`, commits
+  `8957026`/`2509674`): `sounds` now defines the `await_approval` key
+  (dummy manifest + `ManifestSFXKeyCoverageTests` updated to match — the
+  known-gap list there is empty again), and the schema now states that
+  `clips` values are file stems (one usdz per clip), which was pet-app's
+  implemented reality all along. Still open: `frame` has no defined
+  coordinate space; no error code for an unknown tool; `tool_result.error`
+  carries only a code so failure detail reaches neither the wire nor the
+  log; nothing declares an asset's real height, so `scale` is a per-asset
   magic number.
 - **CPU while idle is ~31%, and the plan's fix does not address it.**
   `sample` puts essentially all of it in `ARView.commonRenderCallback()` —

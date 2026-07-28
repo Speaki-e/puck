@@ -3,24 +3,24 @@
 //  PetAgent
 //
 //  Socket test · owner: 박해영 (Haeyoung Park)
-//  Code review finding on commit 57615a8, item #7: EventRouter.reaction(for:)
-//  can produce an sfxKey ("await_approval") that has no matching entry in the
-//  manifest's sounds table (protocol/01_protocol.md section 6), so the
-//  "대기 SFX" the spec calls for never actually plays — F5's rule is that an
-//  unmapped key is silent. Adding the key to the canonical schema is a
-//  protocol-repo change requiring cross-team sign-off (프로젝트_개요.md
-//  section 4), so instead of silently patching the manifest here, this test
-//  tracks the gap explicitly: it fails if EventRouter starts producing an
-//  SFX key that's neither in the manifest nor in this known-gap list, and it
-//  fails if the known-gap list goes stale (a key gets added to the manifest
-//  but nobody removes it from here).
+//  Every SFX key EventRouter.reaction(for:) can produce must have a matching
+//  entry in the manifest's sounds table (plan/01_protocol.md section 6) —
+//  F5's rule is that an unmapped key is silent, so a schema gap means a
+//  spec-required sound silently never plays. The original review finding
+//  here (commit 57615a8 item #7) was exactly that: "await_approval" was
+//  emitted but undefined in the schema; the schema has since been fixed at
+//  the source (plan repo commit 8957026), closing the gap this test tracked.
+//  knownMissingSFXKeys stays as the mechanism for any future gap that's
+//  blocked on a cross-team schema change (01_protocol.md section 8): the
+//  first test fails on an unexplained gap, the second fails if an entry in
+//  the list goes stale.
 //
 
 import XCTest
 @testable import PetAgent
 
 final class ManifestSFXKeyCoverageTests: XCTestCase {
-    private static let knownMissingSFXKeys: Set<String> = ["await_approval"]
+    private static let knownMissingSFXKeys: Set<String> = []
 
     // Mirrors PetAgent/Resources/Avatars/dummy/manifest.json (same fixture
     // AvatarManifestParsingTests.swift uses) — keep in sync if that file changes.
@@ -44,6 +44,7 @@ final class ManifestSFXKeyCoverageTests: XCTestCase {
         "app_launch": "sounds/launch.wav",
         "task_success": "sounds/ding.wav",
         "task_fail": "sounds/buzz.wav",
+        "await_approval": "sounds/awaiting.wav",
         "listen_start": "sounds/listen.wav"
       }
     }

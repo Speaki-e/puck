@@ -572,6 +572,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             guard let self, let characterController = self.characterController else { return }
             self.stateBeforeListen = characterController.currentState
             characterController.transition(to: self.listenState)
+            // F7: listen_start is an event-name sound key (plan/01_protocol.md
+            // section 6), separate from the state's own "listen" clip key that
+            // the shared enter() path triggers.
+            self.sfxPlayer?.trigger("listen_start", loop: false)
         }
         voiceController.onListenEnd = { [weak self] in
             guard let self, let characterController = self.characterController else { return }

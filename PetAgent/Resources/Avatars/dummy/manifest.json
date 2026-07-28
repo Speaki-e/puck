@@ -21,6 +21,7 @@
     "app_launch": "sounds/launch.wav",
     "task_success": "sounds/ding.wav",
     "task_fail": "sounds/buzz.wav",
+    "await_approval": "sounds/awaiting.wav",
     "listen_start": "sounds/listen.wav"
   }
 }

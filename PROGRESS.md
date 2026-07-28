@@ -5,7 +5,7 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-29 · **Tests:** 376 passing (`xcodebuild test`) · **`main`:** `2535a8d`
+**Last updated:** 2026-07-29 · **Tests:** 383 passing (`xcodebuild test`) · **`main`:** `b1ee9df`
 
 **M-A is closed.** The pet renders from committed assets, wanders on its own, walks up and along windows, falls when they go away, and reacts to being clicked and dragged. All PRs including #9 (`feat/pet-interaction`) are merged into `main`.
 
@@ -366,3 +366,5 @@ code-level follow-through, plus the matching change in the `protocol` repo
   built `.app` after clearing Application Support (forces a fresh dummy-avatar
   reinstall from the new bundle) and confirmed via `pgrep` it started and kept
   running without crashing.
+
+**2026-07-29: fixed two regressions from the ground-point/2D-switch fix, both reported by byeolki after using the app with real art.** `ClickThroughController.shouldAllowClicks` still built its hitbox AABB symmetric around `characterScreenPosition` -- correct when that meant "center," wrong now that it unambiguously means the ground/feet point (the previous commit's fix). The hitbox extended half its height *below* the character into empty ground and only covered the lower half above, so clicks/drags on the pet's upper body silently fell outside it -- almost certainly what looked like "can't grab it again" and drag feeling "caught on something" (mouse-moved hit-testing toggles `ignoresMouseEvents`, so a cursor over the pet's own head was being treated as click-through mid-drag). Fixed to anchor the hitbox at the ground point and extend upward, matching the same convention. Separately, `roamableArea`'s bottom edge was the literal screen bottom -- exactly where the Dock sits, and since the Dock's window level is higher than our overlay's, the pet's lower portion rendered underneath it instead of in front, looking "buried" (byeolki's "박혀있음"). Added `DockInset` (screen `frame` vs `visibleFrame` difference) and trimmed it off `roamableArea`/spawn positions, deliberately without touching `GlobalScreenSpace`'s own screen-space model (other subsystems depend on its "primary screen frame starts at (0,0)" invariant, which `visibleFrame` doesn't preserve). 383 tests passing; verified on-device via screenshot that the pet now stands fully clear of the Dock.

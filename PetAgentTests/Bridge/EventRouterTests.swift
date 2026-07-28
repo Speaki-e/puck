@@ -13,7 +13,7 @@ import XCTest
 final class EventRouterTests: XCTestCase {
     func test_agentThinking_transitionsToIdle() {
         let reaction = EventRouter.reaction(for: .agentThinking)
-        XCTAssertEqual(reaction, EventReaction(stateTransition: .idle))
+        XCTAssertEqual(reaction, EventReaction(stateTransition: .idle, emotion: "thinking"))
     }
 
     func test_toolCall_codeEditor_transitionsToType() {
@@ -33,7 +33,7 @@ final class EventRouterTests: XCTestCase {
 
     func test_toolResult_failure_reactsWithTaskFailSFX() {
         let reaction = EventRouter.reaction(for: .toolResult(ok: false))
-        XCTAssertEqual(reaction, EventReaction(stateTransition: .reactClick, sfxKey: "task_fail"))
+        XCTAssertEqual(reaction, EventReaction(stateTransition: .reactClick, sfxKey: "task_fail", emotion: "sad"))
     }
 
     func test_toolResult_success_isNoOp() {
@@ -43,14 +43,14 @@ final class EventRouterTests: XCTestCase {
 
     func test_awaitApproval_transitionsToPointWithWaitingSFX() {
         let reaction = EventRouter.reaction(for: .awaitApproval(summary: "rm -rf ./dist"))
-        XCTAssertEqual(reaction, EventReaction(stateTransition: .point, sfxKey: "await_approval"))
+        XCTAssertEqual(reaction, EventReaction(stateTransition: .point, sfxKey: "await_approval", emotion: "thinking"))
     }
 
     func test_agentDone_success_triggersSuccessSFXJumpAndBubble() {
         let reaction = EventRouter.reaction(for: .agentDone(ok: true, summary: "3 tests passed"))
         XCTAssertEqual(
             reaction,
-            EventReaction(sfxKey: "task_success", jump: true, bubbleText: "3 tests passed")
+            EventReaction(sfxKey: "task_success", jump: true, bubbleText: "3 tests passed", emotion: "happy")
         )
     }
 

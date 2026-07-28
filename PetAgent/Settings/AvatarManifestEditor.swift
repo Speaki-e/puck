@@ -1,0 +1,91 @@
+//
+//  AvatarManifestEditor.swift
+//  PetAgent
+//
+//  Settings · owner: 박해영 (Haeyoung Park)
+//  Reads/writes the *currently installed* avatar's manifest.json -- backs
+//  Settings' size slider and per-emotion image mapping (2026-07-29).
+//
+//  Deliberately separate from AvatarLoader: AvatarLoader's job is validating
+//  a package is loadable at boot (required-clip enforcement); this only
+//  needs to read/patch/write the manifest a Settings screen already trusts
+//  to exist (the app is running against it right now).
+
+import Foundation
+
+enum AvatarManifestEditorError: Error {
+    case manifestNotFound
+}
+
+enum AvatarManifestEditor {
+    /// Where AppDelegate loads the active avatar from. Hardcoded to "dummy"
+    /// because pet-app has no live avatar-switching yet -- "Switch Avatar…"
+    /// only imports packages into the Avatars folder, it doesn't change
+    /// which one is active. Settings edits this same directory pet-app is
+    /// actually running against.
+    static var currentAvatarDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PetAgent/Avatars/dummy", isDirectory: true)
+    }
+
+    static func loadManifest(directory: URL) throws -> AvatarManifest {
+        let url = directory.appendingPathComponent("manifest.json")
+        guard let data = try? Data(contentsOf: url) else {
+            throw AvatarManifestEditorError.manifestNotFound
+        }
+        return try JSONDecoder().decode(AvatarManifest.self, from: data)
+    }
+
+    private static func save(_ manifest: AvatarManifest, directory: URL) throws {
+        let data = try JSONEncoder().encode(manifest)
+        try data.write(to: directory.appendingPathComponent("manifest.json"), options: .atomic)
+    }
+
+    /// Settings' size slider.
+    @discardableResult
+    static func updateScale(_ scale: Double, directory: URL) throws -> AvatarManifest {
+        let existing = try loadManifest(directory: directory)
+        let updated = AvatarManifest(
+            schemaVersion: existing.schemaVersion,
+            name: existing.name,
+            type: existing.type,
+            scale: scale,
+            bounceIntensity: existing.bounceIntensity,
+            hitbox: existing.hitbox,
+            clips: existing.clips,
+            emotions: existing.emotions,
+            sounds: existing.sounds
+        )
+        try save(updated, directory: directory)
+        return updated
+    }
+
+    /// Settings' emotion mapping: copies `sourceFile` in as `{emotion}.png`
+    /// (overwriting any previous image for that key) and points
+    /// manifest.emotions[emotion] at it.
+    @discardableResult
+    static func setEmotionImage(named emotion: String, sourceFile: URL, directory: URL) throws -> AvatarManifest {
+        let existing = try loadManifest(directory: directory)
+
+        let destination = directory.appendingPathComponent("\(emotion).png")
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.copyItem(at: sourceFile, to: destination)
+
+        var emotions = existing.emotions ?? [:]
+        emotions[emotion] = .name(emotion)
+
+        let updated = AvatarManifest(
+            schemaVersion: existing.schemaVersion,
+            name: existing.name,
+            type: existing.type,
+            scale: existing.scale,
+            bounceIntensity: existing.bounceIntensity,
+            hitbox: existing.hitbox,
+            clips: existing.clips,
+            emotions: emotions,
+            sounds: existing.sounds
+        )
+        try save(updated, directory: directory)
+        return updated
+    }
+}

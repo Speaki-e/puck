@@ -213,7 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             loadResult: loadResult,
             parent: spriteView.contentLayer
         )
-        let initialPosition = GroundedSpawnPosition.position(in: window.frame.size)
+        let initialPosition = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
         avatar.setScreenPosition(initialPosition)
         self.avatar = avatar
 
@@ -254,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         ] {
             controller.register(state, as: kind)
         }
-        controller.roamableArea = CGRect(origin: .zero, size: window.frame.size)
+        controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
         // F4 reports global Quartz frames; the pet lives in overlay-local
         // pixels. Rebase once here so no state has to know both spaces.
         controller.windows = { [weak self, weak window] in
@@ -317,6 +317,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         CGPoint(x: window.frame.origin.x + point.x, y: window.frame.origin.y + (window.frame.height - point.y))
     }
 
+    /// `window`'s size with the Dock's strip trimmed off the bottom (see
+    /// DockInset's doc comment) -- what roamableArea/GroundedSpawnPosition
+    /// should treat as "the ground," so the pet stands in front of the Dock
+    /// instead of being drawn underneath it.
+    private func groundAwareSize(of window: NSWindow) -> CGSize {
+        let dockInset = NSScreen.screens.first
+            .map { DockInset.bottomInset(screenFrame: $0.frame, visibleFrame: $0.visibleFrame) } ?? 0
+        return CGSize(width: window.frame.width, height: window.frame.height - dockInset)
+    }
+
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
     /// on a real display change (monitor plug/unplug, resolution change).
     /// Without this, the avatar/click-through stayed parented to the now-gone
@@ -332,7 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             return
         }
 
-        let position = GroundedSpawnPosition.position(in: window.frame.size)
+        let position = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
         avatar.reparent(to: spriteView.contentLayer)
         ballController?.reparent(to: spriteView.contentLayer)
         // Through characterBody, not avatar directly -- its didSet is the
@@ -710,7 +720,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // isn't wired up here yet. For now this just re-centers the pet on
         // the primary display, standing on the ground.
         guard let window = overlayController?.windows.first else { return }
-        let position = GroundedSpawnPosition.position(in: window.frame.size)
+        let position = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
         // Through characterBody (see handleWindowsRebuilt's comment) so the
         // frame-loop's hitbox tracking and any in-flight movement state stay
         // consistent with where the pet actually renders.

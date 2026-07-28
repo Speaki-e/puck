@@ -85,7 +85,14 @@ Ordered by what actually blocks progress.
   `execution_failed`; `tool_result` has an optional `detail` field for
   human-readable failure specifics; and `scale` semantics are defined as
   raw-height × scale ≈ 1 unit. pet-app implements all of it (`unknown_tool`
-  + `detail` landed with tests in the same pass). What remains is purely
+  + `detail` landed with tests in the same pass). A full plan-suite
+  evaluation then settled two more contract pieces, implemented here as
+  the reference (`85f9282`, 314 tests): the `tool_cancel` wire message +
+  `cancelled` standard code (abort path for in-flight tools — previously
+  nothing could stop a running 600s `code_editor` call), and defined
+  disconnect semantics (workspace rejects pending dispatches on drop;
+  pet-app finishes in-flight work and drops the unsendable reply with a
+  log — matching what it already did). What remains is purely
   transcription: write `types/` + `swift/` in the protocol repo from
   `plan/01_protocol.md` and the shipped Swift.
 - **CPU while idle is ~31%, and the plan's fix does not address it.**

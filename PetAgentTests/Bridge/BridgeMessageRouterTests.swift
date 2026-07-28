@@ -86,6 +86,36 @@ final class BridgeMessageRouterTests: XCTestCase {
         XCTAssertEqual(received, EventRouter.reaction(for: .agentDone(ok: true, summary: "done")))
     }
 
+    /// protocol 3.1: a tool_cancel from workspace reaches the executor and the
+    /// original dispatch's reply comes back as error="cancelled".
+    func test_toolCancel_cancelsTheInFlightDispatch() {
+        final class NeverCompletingHandler: ToolHandler {
+            let toolName = "slow"
+            func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {}
+        }
+        let executor = ToolExecutor()
+        executor.register(NeverCompletingHandler())
+        let router = BridgeMessageRouter(toolExecutor: executor)
+
+        let replied = expectation(description: "cancelled tool_result replied")
+        router.handle(
+            .toolDispatch(ToolDispatch(id: "t7", tool: "slow", args: .object([:]))),
+            reply: { message in
+                guard case .toolResult(let result) = message else {
+                    XCTFail("expected tool_result, got \(message)")
+                    return
+                }
+                XCTAssertEqual(result.id, "t7")
+                XCTAssertFalse(result.ok)
+                XCTAssertEqual(result.error, "cancelled")
+                replied.fulfill()
+            }
+        )
+        router.handle(.toolCancel(id: "t7"), reply: { _ in XCTFail("tool_cancel itself gets no reply") })
+
+        wait(for: [replied], timeout: 2)
+    }
+
     func test_messagesPetAppOnlySends_areIgnored() {
         let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
         router.onEventReaction = { _ in XCTFail("should not react to a message pet-app only sends") }

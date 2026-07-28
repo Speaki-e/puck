@@ -11,6 +11,7 @@ import XCTest
 
 private final class StubHandler: ToolHandler {
     let toolName: String
+    private(set) var cancelCallCount = 0
     private let behavior: (JSONValue, @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) -> Void
 
     init(toolName: String, behavior: @escaping (JSONValue, @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) -> Void) {
@@ -20,6 +21,10 @@ private final class StubHandler: ToolHandler {
 
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         behavior(args, completion)
+    }
+
+    func cancel() {
+        cancelCallCount += 1
     }
 }
 
@@ -76,6 +81,51 @@ final class ToolExecutorTests: XCTestCase {
         }
 
         wait(for: [expectation], timeout: 1)
+    }
+
+    // MARK: - tool_cancel (protocol 3.1)
+
+    func test_cancel_ofInFlightCall_producesCancelledResultAndCancelsHandler() {
+        let executor = ToolExecutor()
+        let handler = StubHandler(toolName: "slow") { _, _ in
+            // never calls completion -- stays in flight until cancelled
+        }
+        executor.register(handler)
+
+        let expectation = expectation(description: "completion called")
+        executor.dispatch(ToolDispatch(id: "t9", tool: "slow", args: .object([:]))) { result in
+            XCTAssertFalse(result.ok)
+            XCTAssertEqual(result.error, "cancelled")
+            expectation.fulfill()
+        }
+
+        executor.cancel(id: "t9")
+
+        wait(for: [expectation], timeout: 1)
+        XCTAssertEqual(handler.cancelCallCount, 1)
+    }
+
+    func test_cancel_ofUnknownId_isANoOp() {
+        let executor = ToolExecutor()
+        executor.cancel(id: "never_dispatched") // must not crash or complete anything
+    }
+
+    func test_cancel_afterCompletion_doesNotDoubleCompleteOrCancelHandler() {
+        let executor = ToolExecutor()
+        let handler = StubHandler(toolName: "fast") { _, completion in
+            completion(.success(nil))
+        }
+        executor.register(handler)
+
+        var completionCount = 0
+        executor.dispatch(ToolDispatch(id: "t10", tool: "fast", args: .object([:]))) { _ in
+            completionCount += 1
+        }
+
+        executor.cancel(id: "t10") // already finished -- must be ignored
+
+        XCTAssertEqual(completionCount, 1)
+        XCTAssertEqual(handler.cancelCallCount, 0)
     }
 
     func test_handlerExceedingTimeout_producesTimeoutError() {

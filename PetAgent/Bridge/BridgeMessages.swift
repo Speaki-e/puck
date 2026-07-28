@@ -59,6 +59,10 @@ struct UserInput: Equatable {
 /// Top-level type for every JSON Lines message on the socket, discriminated by "type".
 enum BridgeMessage: Equatable {
     case toolDispatch(ToolDispatch)
+    /// workspace -> pet-app: abandon an in-flight dispatch (protocol 3.1) --
+    /// the handler is cancelled and the original id replies error="cancelled".
+    /// Unknown/already-completed ids are ignored (idempotent).
+    case toolCancel(id: String)
     case toolResult(ToolResult)
     case event(BridgeEvent)
     case userInput(UserInput)
@@ -67,6 +71,7 @@ enum BridgeMessage: Equatable {
 extension BridgeMessage: Codable {
     private enum TypeKey: String, Codable {
         case toolDispatch = "tool_dispatch"
+        case toolCancel = "tool_cancel"
         case toolResult = "tool_result"
         case event = "event"
         case userInput = "user_input"
@@ -96,6 +101,9 @@ extension BridgeMessage: Codable {
                     args: try container.decodeIfPresent(JSONValue.self, forKey: .args) ?? .object([:])
                 )
             )
+
+        case .toolCancel:
+            self = .toolCancel(id: try container.decode(String.self, forKey: .id))
 
         case .toolResult:
             self = .toolResult(
@@ -151,6 +159,10 @@ extension BridgeMessage: Codable {
             try container.encode(dispatch.id, forKey: .id)
             try container.encode(dispatch.tool, forKey: .tool)
             try container.encode(dispatch.args, forKey: .args)
+
+        case .toolCancel(let id):
+            try container.encode(TypeKey.toolCancel, forKey: .type)
+            try container.encode(id, forKey: .id)
 
         case .toolResult(let result):
             try container.encode(TypeKey.toolResult, forKey: .type)

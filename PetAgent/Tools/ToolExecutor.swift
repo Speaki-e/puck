@@ -15,6 +15,9 @@ enum ToolExecutionError: Error, Equatable {
     /// The dispatched tool isn't in the registry at all -- a registry/agent
     /// mismatch, distinguishable from a tool that exists but failed.
     case unknownTool(String)
+    /// The caller abandoned the call via tool_cancel (protocol 3.1) -- e.g.
+    /// the user pressed stop, or the agent run was aborted.
+    case cancelled
     case notSupportedTarget
     case permissionDenied
     case executionFailed(String)
@@ -23,6 +26,7 @@ enum ToolExecutionError: Error, Equatable {
         switch self {
         case .timeout: return "timeout"
         case .unknownTool: return "unknown_tool"
+        case .cancelled: return "cancelled"
         case .notSupportedTarget: return "not_supported_target"
         case .permissionDenied: return "permission_denied"
         case .executionFailed: return "execution_failed"
@@ -33,7 +37,7 @@ enum ToolExecutionError: Error, Equatable {
     /// alone reaches the wire otherwise and the actual failure reason is lost.
     var detail: String? {
         switch self {
-        case .timeout, .notSupportedTarget, .permissionDenied:
+        case .timeout, .cancelled, .notSupportedTarget, .permissionDenied:
             return nil
         case .unknownTool(let tool):
             return "unknown tool: \(tool)"
@@ -72,9 +76,27 @@ final class ToolExecutor {
     // from a background queue, e.g. RunShellHandler/RunAppleScriptHandler)
     // can race on the same request's didComplete flag without this.
     private let completionQueue = DispatchQueue(label: "PetAgent.ToolExecutor.completion")
+    /// In-flight dispatch id -> the action that abandons it. Guarded by
+    /// `completionQueue`; entries are removed on any completion, so a cancel
+    /// for an already-finished (or never-seen) id is a no-op.
+    private var inFlightCancels: [String: () -> Void] = [:]
 
     init(logger: ToolExecutionLogging? = nil) {
         self.logger = logger
+    }
+
+    /// tool_cancel (protocol 3.1): abandon an in-flight dispatch -- the
+    /// handler's cancel() runs and the original id replies error="cancelled".
+    /// Idempotent for unknown/completed ids.
+    func cancel(id: String) {
+        // Pop inside the queue, invoke outside it -- the action itself calls
+        // completeOnce, which syncs on the same serial queue.
+        let cancelAction: (() -> Void)? = completionQueue.sync {
+            let action = inFlightCancels[id]
+            inFlightCancels[id] = nil
+            return action
+        }
+        cancelAction?()
     }
 
     func register(_ handler: ToolHandler) {
@@ -88,10 +110,11 @@ final class ToolExecutor {
         logger?.log(.execStart(id: request.id))
 
         var didComplete = false
-        let completeOnce: (Bool, JSONValue?, ToolExecutionError?) -> Void = { [logger, completionQueue] ok, data, error in
+        let completeOnce: (Bool, JSONValue?, ToolExecutionError?) -> Void = { [logger, completionQueue, weak self] ok, data, error in
             let shouldComplete: Bool = completionQueue.sync {
                 guard !didComplete else { return false }
                 didComplete = true
+                self?.inFlightCancels[request.id] = nil
                 return true
             }
             guard shouldComplete else { return }
@@ -110,6 +133,13 @@ final class ToolExecutor {
         let timeoutWork = DispatchWorkItem { [weak handler] in
             handler?.cancel()
             completeOnce(false, nil, .timeout)
+        }
+        completionQueue.sync {
+            inFlightCancels[request.id] = { [weak handler] in
+                timeoutWork.cancel()
+                handler?.cancel()
+                completeOnce(false, nil, .cancelled)
+            }
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
 

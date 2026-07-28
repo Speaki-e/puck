@@ -65,8 +65,8 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     approval: not_required,
     timeoutSec: 15,
     params: [
-      { name: "app_name", type: "string", required: false, description: "App display name. Exactly one of app_name/bundle_id must be present." },
-      { name: "bundle_id", type: "string", required: false, description: "App bundle identifier. Exactly one of app_name/bundle_id must be present." },
+      { name: "app_name", type: "string", required: false, description: "App display name. At least one of app_name/bundle_id must be present; if both are given, bundle_id takes priority." },
+      { name: "bundle_id", type: "string", required: false, description: "App bundle identifier. At least one of app_name/bundle_id must be present; if both are given, bundle_id takes priority." },
     ],
     description: "Launch an app and return its pid.",
     responseNote: "{ pid: number }",
@@ -122,7 +122,11 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
       { name: "frame", type: "object", required: true, description: "Frame whose center point receives a synthesized CGEvent click." },
     ],
     description: "Synthesize a click at frame's center. System dialogs are not supported -- see not_supported_target.",
-    responseNote: "null. Returns error not_supported_target for system dialog targets; fall back to point_at plus user guidance in that case.",
+    responseNote:
+      "null. Spec: returns error not_supported_target for system dialog targets, falling back to point_at plus user " +
+      "guidance in that case. NOT YET IMPLEMENTED in pet-app as of this writing -- classifying \"is this a system " +
+      "security dialog\" needs AX role/owner inspection pet-app doesn't have yet, so it currently always attempts " +
+      "the click regardless of target. Update this note once pet-app ships the classification.",
   },
   {
     name: "run_shell",

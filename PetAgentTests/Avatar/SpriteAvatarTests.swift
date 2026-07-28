@@ -44,13 +44,18 @@ final class SpriteAvatarTests: XCTestCase {
         try png.write(to: packageDirectory.appendingPathComponent("\(name).png"))
     }
 
-    private func makeLoadResult(clips: [String: String] = ["idle": "idle"]) throws -> AvatarLoadResult {
+    private func makeLoadResult(
+        clips: [String: String] = ["idle": "idle"],
+        emotions: [String: String] = [:]
+    ) throws -> AvatarLoadResult {
         let clipsJSON = clips.map { "\"\($0.key)\": \"\($0.value)\"" }.joined(separator: ", ")
+        let emotionsJSON = emotions.map { "\"\($0.key)\": \"\($0.value)\"" }.joined(separator: ", ")
         let json = """
         {
           "schema_version": 1, "name": "test", "type": "sprites", "scale": 1.0,
           "hitbox": { "width": 120, "height": 140 },
           "clips": { \(clipsJSON) },
+          "emotions": { \(emotionsJSON) },
           "sounds": {}
         }
         """
@@ -155,6 +160,59 @@ final class SpriteAvatarTests: XCTestCase {
         let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
 
         XCTAssertEqual(avatar.spriteLayer.bounds.size, CGSize(width: 120, height: 140))
+    }
+
+    // MARK: - updateScale (Settings size slider, 2026-07-29)
+
+    func test_updateScale_resizesTheLayerFromTheOriginalHitbox() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult() // hitbox 120x140
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.updateScale(0.5)
+
+        XCTAssertEqual(avatar.spriteLayer.bounds.size, CGSize(width: 60, height: 70))
+    }
+
+    func test_updateScale_appliedTwice_isNotCumulative() throws {
+        // Each call recomputes from the original hitbox, not the layer's
+        // current (already-scaled) bounds -- otherwise repeated slider
+        // changes would compound instead of just reflecting the latest value.
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.updateScale(0.5)
+        avatar.updateScale(2.0)
+
+        XCTAssertEqual(avatar.spriteLayer.bounds.size, CGSize(width: 240, height: 280))
+    }
+
+    // MARK: - showEmotion (Settings emotion mapping, 2026-07-29)
+
+    func test_showEmotion_setsLayerContentsFromTheMappedPNG() throws {
+        try writePNG(named: "idle", color: .red)
+        try writePNG(named: "happy", color: .green)
+        let loadResult = try makeLoadResult(emotions: ["happy": "happy"])
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+        avatar.play(clip: "idle", loop: true)
+        let idleContents = avatar.spriteLayer.contents
+
+        avatar.showEmotion("happy")
+
+        XCTAssertFalse((avatar.spriteLayer.contents as! CGImage) === (idleContents as! CGImage))
+    }
+
+    func test_showEmotion_unmappedKey_isSilentNoOp() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult() // no emotions at all
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+        avatar.play(clip: "idle", loop: true)
+        let idleContents = avatar.spriteLayer.contents
+
+        avatar.showEmotion("thinking") // not in the (empty) emotions table
+
+        XCTAssertTrue((avatar.spriteLayer.contents as! CGImage) === (idleContents as! CGImage))
     }
 
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView

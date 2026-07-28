@@ -37,12 +37,14 @@ enum StateKind: Equatable, CaseIterable {
 
 /// The result of routing one BridgeEvent: an optional state transition, an
 /// optional extra SFX key (beyond whatever the target state's own name would
-/// trigger), and optional jump/speech-bubble flourishes.
+/// trigger), optional jump/speech-bubble flourishes, and an optional emotion
+/// key (Settings' emotion mapping, 2026-07-29 -- AvatarPlayable.showEmotion).
 struct EventReaction: Equatable {
     var stateTransition: StateKind?
     var sfxKey: String?
     var jump: Bool = false
     var bubbleText: String?
+    var emotion: String?
 }
 
 enum EventRouter {
@@ -51,7 +53,7 @@ enum EventRouter {
     static func reaction(for event: BridgeEvent) -> EventReaction {
         switch event {
         case .agentThinking:
-            return EventReaction(stateTransition: .idle)
+            return EventReaction(stateTransition: .idle, emotion: "thinking")
 
         case .toolCall(let tool, _):
             // code_editor gets a dedicated typing reaction; every other tool
@@ -60,15 +62,19 @@ enum EventRouter {
             return EventReaction(stateTransition: tool == "code_editor" ? .type : .point)
 
         case .toolResult(let ok):
-            return ok ? EventReaction() : EventReaction(stateTransition: .reactClick, sfxKey: "task_fail")
+            return ok
+                ? EventReaction()
+                : EventReaction(stateTransition: .reactClick, sfxKey: "task_fail", emotion: "sad")
 
         case .awaitApproval:
-            return EventReaction(stateTransition: .point, sfxKey: "await_approval")
+            return EventReaction(stateTransition: .point, sfxKey: "await_approval", emotion: "thinking")
 
         case .agentDone(let ok, let summary):
             // Only agent_done(ok=true) is specified; a failed run is already
             // signaled via toolResult(ok=false).
-            return ok ? EventReaction(sfxKey: "task_success", jump: true, bubbleText: summary) : EventReaction()
+            return ok
+                ? EventReaction(sfxKey: "task_success", jump: true, bubbleText: summary, emotion: "happy")
+                : EventReaction()
         }
     }
 }

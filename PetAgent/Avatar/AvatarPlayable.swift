@@ -28,8 +28,21 @@ protocol AvatarPlayable: AnyObject {
     /// playing, `intensity` is the manifest's bounce_intensity. Default is a
     /// no-op: usdz/video avatars have no use for this, only SpriteAvatar acts on it.
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double)
+
+    /// Live-applies a new `manifest.scale` (Settings' size slider). Default
+    /// is a no-op -- usdz/video avatars don't support live resizing.
+    func updateScale(_ scale: Double)
+
+    /// Swaps to the manifest's `emotions[emotion]` image, if one is mapped
+    /// (Settings' emotion mapping, driven by EventRouter's emotion field).
+    /// Silent no-op if the key isn't mapped -- same "unmapped = do nothing"
+    /// policy as the sounds table. Default is a no-op: usdz/video avatars
+    /// don't support emotion images.
+    func showEmotion(_ emotion: String)
 }
 
 extension AvatarPlayable {
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {}
+    func updateScale(_ scale: Double) {}
+    func showEmotion(_ emotion: String) {}
 }

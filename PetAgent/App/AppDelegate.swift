@@ -22,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var sfxPlayer: SFXPlayer?
     private var clickThroughController: ClickThroughController?
     private var avatarHitboxSize: CGSize = .zero
+    /// Unscaled manifest.hitbox -- recomputes avatarHitboxSize when Settings'
+    /// size slider live-applies a new scale (applyLiveAvatarScale).
+    private var baseHitboxSize: CGSize = .zero
     private var characterBody: CharacterBody?
     private let pendingPointTracker = PendingPointTracker()
     private var focusModeObserver: FocusModeObserver?
@@ -156,7 +159,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     private func showAvatarManagementWindow() {
         let window = avatarManagementWindow ?? {
-            let hostingController = NSHostingController(rootView: AvatarManagementView())
+            let view = AvatarManagementView(onScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) })
+            let hostingController = NSHostingController(rootView: view)
             let newWindow = NSWindow(contentViewController: hostingController)
             newWindow.title = "Switch Avatar"
             avatarManagementWindow = newWindow
@@ -299,7 +303,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // actual rendered layer size (hitbox * scale) or click-through/grounding
         // math drifts from where the sprite visually is whenever scale != 1.
         let scale = loadResult.manifest.scale
-        avatarHitboxSize = CGSize(width: loadResult.manifest.hitbox.width * scale, height: loadResult.manifest.hitbox.height * scale)
+        baseHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
+        avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
         let clickThrough = ClickThroughController(window: window)
         clickThrough.updateCharacter(
             screenPosition: globalAppKitPoint(fromWindowLocal: initialPosition, window: window),
@@ -617,8 +622,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         if let sfxKey = reaction.sfxKey {
             sfxPlayer?.trigger(sfxKey, loop: false)
         }
+        if let emotion = reaction.emotion {
+            avatar?.showEmotion(emotion)
+        }
         // TODO: reaction.jump (Overlay hop animation) and reaction.bubbleText
         // (F6 text bubble, read-only display mode) aren't wired up yet.
+    }
+
+    // MARK: - Avatar appearance (Settings size slider, 2026-07-29)
+
+    /// Called from AvatarManagementView when the size slider changes.
+    /// `avatarHitboxSize` must be recomputed too (its click-through geometry
+    /// has to track what's actually rendered), and the character's position
+    /// has to be re-pushed through CharacterBody so the ground-point offset
+    /// (which depends on the sprite's height) picks up the new size --
+    /// otherwise the pet stays at its old screen position until the next
+    /// state transition happens to move it.
+    private func applyLiveAvatarScale(_ scale: Double) {
+        avatar?.updateScale(scale)
+        avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
+        // Not `body.position = body.position` -- Swift rejects that as a
+        // self-assignment, and CharacterBody's didSet wouldn't fire anyway.
+        // Push straight to the avatar instead, at the position it already has.
+        if let body = characterBody {
+            avatar?.setScreenPosition(body.position)
+        }
     }
 
     // MARK: - Global hotkeys + voice (F6/F7)

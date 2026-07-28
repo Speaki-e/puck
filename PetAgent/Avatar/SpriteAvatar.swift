@@ -19,6 +19,10 @@ import QuartzCore
 final class SpriteAvatar: AvatarPlayable {
     private let avatarDirectory: URL
     private let loadResult: AvatarLoadResult
+    /// Unscaled manifest.hitbox -- updateScale recomputes bounds from this
+    /// every time rather than the layer's current (already-scaled) bounds,
+    /// so repeated Settings slider changes don't compound.
+    private let hitbox: AvatarManifest.Hitbox
     let spriteLayer = CALayer()
     private var loadedImages: [String: CGImage] = [:]
     private var facing: AvatarFacing = .right
@@ -27,8 +31,8 @@ final class SpriteAvatar: AvatarPlayable {
     init(avatarDirectory: URL, loadResult: AvatarLoadResult, parent: CALayer) {
         self.avatarDirectory = avatarDirectory
         self.loadResult = loadResult
+        self.hitbox = loadResult.manifest.hitbox
 
-        let hitbox = loadResult.manifest.hitbox
         let scale = loadResult.manifest.scale
         spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
         spriteLayer.contentsGravity = .resizeAspect
@@ -73,6 +77,28 @@ final class SpriteAvatar: AvatarPlayable {
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {
         currentBounce = BouncePreset.preset(for: clip).transform(elapsed: elapsed, intensity: intensity)
         applyTransform()
+    }
+
+    /// Settings' size slider. Recomputes from the original manifest hitbox
+    /// (not the layer's current bounds) so this stays idempotent under
+    /// repeated calls -- the caller is expected to re-push the character's
+    /// position afterward (via CharacterBody), since the ground-point offset
+    /// in setScreenPosition depends on this height.
+    func updateScale(_ scale: Double) {
+        spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
+    }
+
+    /// Settings' emotion mapping / EventRouter-driven mood swap. Silent
+    /// no-op for an unmapped key or a missing file -- same policy as clips'
+    /// idle fallback and the sounds table's "unmapped = silence."
+    func showEmotion(_ emotion: String) {
+        guard
+            case .name(let fileName)? = loadResult.manifest.emotions?[emotion],
+            let image = loadedImage(named: fileName)
+        else {
+            return
+        }
+        spriteLayer.contents = image
     }
 
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView

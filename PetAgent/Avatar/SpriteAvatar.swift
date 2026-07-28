@@ -52,7 +52,16 @@ final class SpriteAvatar: AvatarPlayable {
         // SpriteLayerView is isFlipped (top-left origin, Y down), the same
         // convention GlobalScreenSpace/StateContext already use -- unlike
         // USDZAvatar/ScreenSpaceMapper, no world<->screen conversion needed.
-        spriteLayer.position = position
+        //
+        // `position` is the character's ground/feet point -- the one
+        // convention every other piece of the FSM already assumes (WalkState's
+        // targets sit at roamableArea.maxY, LandingSurfaceResolver returns a
+        // surface's top edge, USDZAvatar's rig has its root bone at the feet).
+        // CALayer's own `position` is its *center*, so without this offset the
+        // sprite floats half its height above wherever the FSM thinks it's
+        // standing -- visible as the pet hanging in empty space instead of
+        // standing on the Dock/window edge it just "landed" on.
+        spriteLayer.position = CGPoint(x: position.x, y: position.y - spriteLayer.bounds.height / 2)
     }
 
     func setFacing(_ facing: AvatarFacing) {

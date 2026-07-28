@@ -213,7 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             loadResult: loadResult,
             parent: spriteView.contentLayer
         )
-        let initialPosition = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+        let initialPosition = GroundedSpawnPosition.position(in: window.frame.size)
         avatar.setScreenPosition(initialPosition)
         self.avatar = avatar
 
@@ -295,7 +295,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
         // is the piece that uses it (click-through everywhere except over the
         // character), just never instantiated here.
-        avatarHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
+        // Scaled, not just the raw manifest values -- this must match SpriteAvatar's
+        // actual rendered layer size (hitbox * scale) or click-through/grounding
+        // math drifts from where the sprite visually is whenever scale != 1.
+        let scale = loadResult.manifest.scale
+        avatarHitboxSize = CGSize(width: loadResult.manifest.hitbox.width * scale, height: loadResult.manifest.hitbox.height * scale)
         let clickThrough = ClickThroughController(window: window)
         clickThrough.updateCharacter(
             screenPosition: globalAppKitPoint(fromWindowLocal: initialPosition, window: window),
@@ -328,7 +332,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             return
         }
 
-        let position = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+        let position = GroundedSpawnPosition.position(in: window.frame.size)
         avatar.reparent(to: spriteView.contentLayer)
         ballController?.reparent(to: spriteView.contentLayer)
         // Through characterBody, not avatar directly -- its didSet is the
@@ -704,9 +708,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // TODO(F3): a real "summon" (walk to the cursor/frontmost window,
         // now that MoveToState exists and is used by point_at/launch_app)
         // isn't wired up here yet. For now this just re-centers the pet on
-        // the primary display.
+        // the primary display, standing on the ground.
         guard let window = overlayController?.windows.first else { return }
-        let position = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+        let position = GroundedSpawnPosition.position(in: window.frame.size)
         // Through characterBody (see handleWindowsRebuilt's comment) so the
         // frame-loop's hitbox tracking and any in-flight movement state stay
         // consistent with where the pet actually renders.

@@ -64,6 +64,24 @@ final class BridgeMessageCodableTests: XCTestCase {
         XCTAssertFalse(result.ok)
         XCTAssertEqual(result.error, "timeout")
         XCTAssertNil(result.data)
+        XCTAssertNil(result.detail)
+    }
+
+    /// protocol 3.1: `error` is the standard code, `detail` (optional) carries
+    /// the human-readable specifics for logs/debugging.
+    func test_toolResultDetail_roundTrips() throws {
+        let original = BridgeMessage.toolResult(
+            ToolResult(id: "t1", ok: false, data: nil, error: "execution_failed", detail: "zsh exited 127")
+        )
+
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try decoder.decode(BridgeMessage.self, from: encoded)
+
+        XCTAssertEqual(decoded, original)
+        guard case .toolResult(let result) = decoded else {
+            return XCTFail("expected .toolResult, got \(decoded)")
+        }
+        XCTAssertEqual(result.detail, "zsh exited 127")
     }
 
     // MARK: - event (workspace -> pet-app, drives the pet's reactions)

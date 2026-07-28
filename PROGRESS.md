@@ -74,19 +74,20 @@ Ordered by what actually blocks progress.
   workspace's W5 and ai-module's A2 both wait on `types/`. pet-app has
   already implemented the contract in Swift out of necessity
   (`Bridge/BridgeMessages.swift`, `Avatar/AvatarManifest.swift`,
-  `Tools/ToolExecutor.swift` error codes), so the TS types should be written
-  to match the shipped Swift unless a divergence is deliberate. Of the seven
-  open questions listed in `protocol/CLAUDE.md`, two were resolved on
-  2026-07-28 at the normative source (`plan/01_protocol.md`, commits
-  `8957026`/`2509674`): `sounds` now defines the `await_approval` key
-  (dummy manifest + `ManifestSFXKeyCoverageTests` updated to match — the
-  known-gap list there is empty again), and the schema now states that
-  `clips` values are file stems (one usdz per clip), which was pet-app's
-  implemented reality all along. Still open: `frame` has no defined
-  coordinate space; no error code for an unknown tool; `tool_result.error`
-  carries only a code so failure detail reaches neither the wire nor the
-  log; nothing declares an asset's real height, so `scale` is a per-asset
-  magic number.
+  `Tools/ToolExecutor.swift` error codes), so the TS types should be
+  written to match the shipped Swift. **All of `protocol/CLAUDE.md`'s open
+  questions are now resolved at the normative source** (`plan/01_protocol.md`,
+  commits `8957026`/`2509674`/`d86ee6a`, byeolki's call since nothing
+  outside pet-app is implemented yet): `sounds` defines `await_approval`;
+  `clips` values are documented as file stems (one usdz per clip); `frame`
+  is defined as global Quartz coordinates (top-left origin, Y down,
+  points); `unknown_tool` is a standard error code distinct from
+  `execution_failed`; `tool_result` has an optional `detail` field for
+  human-readable failure specifics; and `scale` semantics are defined as
+  raw-height × scale ≈ 1 unit. pet-app implements all of it (`unknown_tool`
+  + `detail` landed with tests in the same pass). What remains is purely
+  transcription: write `types/` + `swift/` in the protocol repo from
+  `plan/01_protocol.md` and the shipped Swift.
 - **CPU while idle is ~31%, and the plan's fix does not address it.**
   `sample` puts essentially all of it in `ARView.commonRenderCallback()` —
   RealityKit renders on its own display-linked loop regardless of FSM tick

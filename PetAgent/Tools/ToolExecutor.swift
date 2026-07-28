@@ -8,10 +8,13 @@
 
 import Foundation
 
-/// protocol repo section 3.1's standard tool_result error codes that pet-app
-/// itself can produce (pet_app_disconnected is workspace-side, not ours).
+/// protocol 3.1's standard tool_result error codes that pet-app itself can
+/// produce (pet_app_disconnected is workspace-side, not ours).
 enum ToolExecutionError: Error, Equatable {
     case timeout
+    /// The dispatched tool isn't in the registry at all -- a registry/agent
+    /// mismatch, distinguishable from a tool that exists but failed.
+    case unknownTool(String)
     case notSupportedTarget
     case permissionDenied
     case executionFailed(String)
@@ -19,9 +22,23 @@ enum ToolExecutionError: Error, Equatable {
     var protocolErrorCode: String {
         switch self {
         case .timeout: return "timeout"
+        case .unknownTool: return "unknown_tool"
         case .notSupportedTarget: return "not_supported_target"
         case .permissionDenied: return "permission_denied"
         case .executionFailed: return "execution_failed"
+        }
+    }
+
+    /// Human-readable specifics for tool_result's `detail` field -- the code
+    /// alone reaches the wire otherwise and the actual failure reason is lost.
+    var detail: String? {
+        switch self {
+        case .timeout, .notSupportedTarget, .permissionDenied:
+            return nil
+        case .unknownTool(let tool):
+            return "unknown tool: \(tool)"
+        case .executionFailed(let message):
+            return message
         }
     }
 }
@@ -71,7 +88,7 @@ final class ToolExecutor {
         logger?.log(.execStart(id: request.id))
 
         var didComplete = false
-        let completeOnce: (Bool, JSONValue?, String?) -> Void = { [logger, completionQueue] ok, data, error in
+        let completeOnce: (Bool, JSONValue?, ToolExecutionError?) -> Void = { [logger, completionQueue] ok, data, error in
             let shouldComplete: Bool = completionQueue.sync {
                 guard !didComplete else { return false }
                 didComplete = true
@@ -79,11 +96,11 @@ final class ToolExecutor {
             }
             guard shouldComplete else { return }
             logger?.log(.execEnd(id: request.id, ok: ok))
-            completion(ToolResult(id: request.id, ok: ok, data: data, error: error))
+            completion(ToolResult(id: request.id, ok: ok, data: data, error: error?.protocolErrorCode, detail: error?.detail))
         }
 
         guard let handler = handlers[request.tool] else {
-            completeOnce(false, nil, ToolExecutionError.executionFailed("unknown tool: \(request.tool)").protocolErrorCode)
+            completeOnce(false, nil, .unknownTool(request.tool))
             return
         }
 
@@ -92,7 +109,7 @@ final class ToolExecutor {
         // block for its full timeout — 600s in code_editor's case.
         let timeoutWork = DispatchWorkItem { [weak handler] in
             handler?.cancel()
-            completeOnce(false, nil, ToolExecutionError.timeout.protocolErrorCode)
+            completeOnce(false, nil, .timeout)
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
 
@@ -102,7 +119,7 @@ final class ToolExecutor {
             case .success(let data):
                 completeOnce(true, data, nil)
             case .failure(let error):
-                completeOnce(false, nil, error.protocolErrorCode)
+                completeOnce(false, nil, error)
             }
         }
     }

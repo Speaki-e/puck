@@ -107,9 +107,11 @@ final class WalkOnTopStateTests: XCTestCase {
     }
 
     /// Walking off the end of a window top is the same situation as the
-    /// window vanishing: nothing underfoot.
+    /// window vanishing: nothing underfoot. Starts near the left edge, so it
+    /// resolves to walk right (see the two direction tests below) and
+    /// eventually crosses the whole window with nothing underfoot.
     func test_walkingPastTheWindowEdge_falls() {
-        let world = TestStateWorld(position: CGPoint(x: 690, y: 200))
+        let world = TestStateWorld(position: CGPoint(x: 310, y: 200))
         world.windows = [window(x: 300, y: 200, width: 400, height: 300)] // right edge at 700
         let state = WalkOnTopState()
         state.enter()
@@ -117,5 +119,35 @@ final class WalkOnTopStateTests: XCTestCase {
         world.run(state, seconds: 5)
 
         XCTAssertEqual(world.requestedTransitions.first, .fall)
+    }
+
+    /// Climb arrives at whichever edge is nearer the approach direction
+    /// (WalkState.swift walks up to minX when approaching from the left).
+    func test_climbingTheLeftEdge_walksRightIntoTheWindow() {
+        let world = TestStateWorld(position: CGPoint(x: 305, y: 200))
+        world.windows = [window(x: 300, y: 200, width: 400, height: 300)]
+        let state = WalkOnTopState()
+        state.enter()
+
+        world.run(state, seconds: 0.5)
+
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "should walk into the window, not fall off the edge just climbed")
+        XCTAssertGreaterThan(world.body.position.x, 305, "should be walking right, into the window")
+    }
+
+    /// A pet that climbed the window's RIGHT edge (approaching from the
+    /// right -- WalkState.swift walks up to maxX in that case) arrives at
+    /// WalkOnTop near maxX. It must walk left, into the window, rather than
+    /// immediately falling off the very edge it just climbed.
+    func test_climbingTheRightEdge_walksLeftIntoTheWindow() {
+        let world = TestStateWorld(position: CGPoint(x: 695, y: 200))
+        world.windows = [window(x: 300, y: 200, width: 400, height: 300)] // right edge at 700
+        let state = WalkOnTopState()
+        state.enter()
+
+        world.run(state, seconds: 0.5)
+
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "should walk into the window, not fall off the edge just climbed")
+        XCTAssertLessThan(world.body.position.x, 695, "should be walking left, into the window")
     }
 }

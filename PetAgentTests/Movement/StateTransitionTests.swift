@@ -36,14 +36,16 @@ private final class SpyState: StateHandler {
     let name: String
     let clipKey: String
     let loopsClip: Bool
+    let restartsOnReentry: Bool
     private(set) var enterCallCount = 0
     private(set) var exitCallCount = 0
     private(set) var lastUpdateDt: TimeInterval?
 
-    init(name: String, clipKey: String, loopsClip: Bool = false) {
+    init(name: String, clipKey: String, loopsClip: Bool = false, restartsOnReentry: Bool = false) {
         self.name = name
         self.clipKey = clipKey
         self.loopsClip = loopsClip
+        self.restartsOnReentry = restartsOnReentry
     }
 
     func enter() { enterCallCount += 1 }
@@ -103,6 +105,22 @@ final class StateTransitionTests: XCTestCase {
         XCTAssertEqual(idle.exitCallCount, 0)
         XCTAssertEqual(idle.enterCallCount, 1) // only the initial enter
         XCTAssertEqual(avatar.playedClips.count, 1)
+    }
+
+    /// ReactClickState's own doc comment says clicking the pet again while
+    /// already reacting replays the reaction rather than being ignored --
+    /// the same-state no-op guard above must not swallow this case.
+    func test_transition_toSameState_restartsWhenStateOptsIn() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let reactClick = SpyState(name: "ReactClick", clipKey: "react_click", restartsOnReentry: true)
+        let controller = CharacterController(initialState: reactClick, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
+
+        controller.transition(to: reactClick)
+
+        XCTAssertEqual(reactClick.exitCallCount, 1)
+        XCTAssertEqual(reactClick.enterCallCount, 2) // initial + restart
+        XCTAssertEqual(avatar.playedClips.count, 2, "should replay the clip too")
     }
 
     func test_update_forwardsDtToCurrentState() {

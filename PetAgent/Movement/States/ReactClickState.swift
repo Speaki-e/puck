@@ -17,6 +17,10 @@ final class ReactClickState: StateHandler {
     let name = "ReactClick"
     let clipKey = "react_click"
     let loopsClip = false
+    // Clicking the pet again while it's still reacting should replay the
+    // reaction (see enter()'s comment) -- without this, CharacterController's
+    // same-state no-op guard silently swallowed the repeated transition.
+    let restartsOnReentry = true
 
     /// Long enough for the non-looping clip to read.
     static let duration: TimeInterval = 0.6

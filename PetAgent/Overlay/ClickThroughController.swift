@@ -108,10 +108,17 @@ final class ClickThroughController {
 
     /// Pure hit test. Both points must already be in the same coordinate
     /// space (the caller is responsible for that consistency).
+    ///
+    /// `characterScreenPosition` is the character's ground/feet point (the
+    /// same convention CharacterBody.position uses everywhere), in AppKit
+    /// global space (bottom-left origin, Y increases upward) -- so the
+    /// hitbox extends *upward* from it, not symmetrically around it. Building
+    /// it symmetric around the feet left the character's upper half outside
+    /// its own hitbox.
     static func shouldAllowClicks(cursorPosition: CGPoint, characterScreenPosition: CGPoint, hitboxSize: CGSize) -> Bool {
         let rect = CGRect(
             x: characterScreenPosition.x - hitboxSize.width / 2,
-            y: characterScreenPosition.y - hitboxSize.height / 2,
+            y: characterScreenPosition.y,
             width: hitboxSize.width,
             height: hitboxSize.height
         )

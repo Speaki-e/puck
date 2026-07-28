@@ -20,7 +20,20 @@ struct ToolResult: Equatable {
     let id: String
     let ok: Bool
     let data: JSONValue?
+    /// Standard error code (timeout, unknown_tool, execution_failed, ...).
     let error: String?
+    /// Human-readable failure specifics (optional) -- the code alone says
+    /// *what kind* of failure; this says *what actually happened*, so the
+    /// real reason reaches the wire and the logs (protocol 3.1).
+    let detail: String?
+
+    init(id: String, ok: Bool, data: JSONValue?, error: String?, detail: String? = nil) {
+        self.id = id
+        self.ok = ok
+        self.data = data
+        self.error = error
+        self.detail = detail
+    }
 }
 
 /// workspace -> pet-app: state events driving the pet's reactions (protocol 3.2)
@@ -90,7 +103,8 @@ extension BridgeMessage: Codable {
                     id: try container.decode(String.self, forKey: .id),
                     ok: try container.decode(Bool.self, forKey: .ok),
                     data: try container.decodeIfPresent(JSONValue.self, forKey: .data),
-                    error: try container.decodeIfPresent(String.self, forKey: .error)
+                    error: try container.decodeIfPresent(String.self, forKey: .error),
+                    detail: try container.decodeIfPresent(String.self, forKey: .detail)
                 )
             )
 
@@ -144,6 +158,7 @@ extension BridgeMessage: Codable {
             try container.encode(result.ok, forKey: .ok)
             try container.encodeIfPresent(result.data, forKey: .data)
             try container.encodeIfPresent(result.error, forKey: .error)
+            try container.encodeIfPresent(result.detail, forKey: .detail)
 
         case .event(let event):
             try container.encode(TypeKey.event, forKey: .type)

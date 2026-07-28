@@ -41,29 +41,37 @@ final class ToolExecutorTests: XCTestCase {
         wait(for: [expectation], timeout: 1)
     }
 
-    func test_handlerFailure_producesErrorResult() {
+    func test_handlerFailure_producesErrorCodeAndDetail() {
         let executor = ToolExecutor()
         executor.register(StubHandler(toolName: "run_shell") { _, completion in
-            completion(.failure(.executionFailed("boom")))
+            completion(.failure(.executionFailed("zsh exited 127")))
         })
 
         let expectation = expectation(description: "completion called")
         executor.dispatch(ToolDispatch(id: "t2", tool: "run_shell", args: .object([:]))) { result in
             XCTAssertFalse(result.ok)
             XCTAssertEqual(result.error, "execution_failed")
+            // protocol 3.1: error carries only the standard code; detail is
+            // the human-readable specifics, without which the actual failure
+            // reason reaches neither the wire nor the logs.
+            XCTAssertEqual(result.detail, "zsh exited 127")
             expectation.fulfill()
         }
 
         wait(for: [expectation], timeout: 1)
     }
 
-    func test_unregisteredTool_producesExecutionFailedError() {
+    func test_unregisteredTool_producesUnknownToolError() {
         let executor = ToolExecutor()
 
         let expectation = expectation(description: "completion called")
         executor.dispatch(ToolDispatch(id: "t3", tool: "does_not_exist", args: .object([:]))) { result in
             XCTAssertFalse(result.ok)
-            XCTAssertEqual(result.error, "execution_failed")
+            // A tool that doesn't exist is a registry/agent mismatch, not an
+            // execution failure -- the codes must be distinguishable so
+            // ai-module can react differently (protocol 3.1).
+            XCTAssertEqual(result.error, "unknown_tool")
+            XCTAssertEqual(result.detail, "unknown tool: does_not_exist")
             expectation.fulfill()
         }
 

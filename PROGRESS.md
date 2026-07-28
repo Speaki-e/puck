@@ -5,9 +5,11 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-27 · **Tests:** 295 passing (`xcodebuild test`) · **`main`:** `a57c254` · **open PR:** #9 (`feat/pet-interaction`)
+**Last updated:** 2026-07-28 · **Tests:** 307 passing (`xcodebuild test`) · **`main`:** `c4e0df1`
 
-**M-A is closed.** The pet renders from committed assets, wanders on its own, walks up and along windows, falls when they go away, and reacts to being clicked and dragged. Seven PRs (#1, #8, #3, #4, #5, #6, #7) were reviewed and squash-merged to `main`; #9 is open with the interaction/MoveTo/F4-level-2/cleanup work.
+**M-A is closed.** The pet renders from committed assets, wanders on its own, walks up and along windows, falls when they go away, and reacts to being clicked and dragged. All PRs including #9 (`feat/pet-interaction`) are merged into `main`.
+
+**2026-07-28: pulled + merged #9, ran a second self-review pass, fixed what it found.** `git pull` initially failed (`git-lfs` wasn't installed on this machine, which is now required — the real usdz/wav assets are committed via LFS as of #7); installed it, redid the pull, fast-forward-merged `feat/pet-interaction` on top. 6 parallel review agents covered every new/changed subsystem from the just-merged commits; the following were confirmed (independently, by 2+ reviewers in most cases) and fixed, see the "2026-07-28 review pass" entry under Review history for detail: a crash on malformed `find_ui_element` pid JSON, a dropped `tool_result` on overlapping `point_at` calls, `CharacterBody.position` desyncing from the rendered avatar on display-rebuild/summon, `ReactDragState` losing its drag-start position to `enter()`'s reset, `WalkOnTopState` walking pets off the very window edge they'd just climbed, and `ReactClickState` not restarting on rapid re-click. Also manually verified on-device (real committed asset pack, not a placeholder) that the redesigned mesh-sharing `USDZAvatar` genuinely plays distinct, moving animation for `walk` (position change + visibly different leg pose across frames) — `fall`/`land`/`react_click` share the identical code path but weren't each individually screenshotted.
 
 **Every planned feature now exists.** F1-F7, F10, F11 are implemented and wired; all 8 pet-app tools are registered in `ToolExecutor`. What remains is cleanup and the cross-repo `protocol` contract, not missing features.
 
@@ -212,3 +214,65 @@ Ordered by what actually blocks progress.
     reasons (cosmetic); `AppLogger`'s `ts`-vs-filename `Date()` mismatch
     across UTC midnight (cosmetic edge case); deduping
     `showSettingsWindow`/`showAvatarManagementWindow` (only 2 call sites).
+- **2026-07-28 review pass** (after pulling + merging #9): 6 parallel
+  reviews across every subsystem touched by the just-merged commits, ~20
+  findings, fixed the ones confirmed independently by multiple reviewers
+  plus a crash, in commit `c4e0df1`:
+  - `JSONValue.extractPID` did `pid_t(value)` on an arbitrary JSON
+    `Double` — `Int32(Double)` **traps** outside `Int32` range or on a
+    non-finite value, so a single malformed `find_ui_element` dispatch
+    crashed the whole process. Now degrades to `nil`.
+  - `AppDelegate.pointAt()` overwrote its single pending-point ivars if a
+    second `point_at` arrived before the first started walking, silently
+    dropping the first dispatch's `tool_result` until `ToolExecutor`'s 15s
+    timeout. Extracted a small, unit-tested `PendingPointTracker` that
+    fires the superseded request's callback immediately instead.
+  - `handleWindowsRebuilt()`/`summonCharacter()` set the avatar's position
+    directly instead of through `CharacterBody`, leaving
+    `CharacterBody.position` (what the frame loop's hitbox tracking and
+    movement states read) stale — desynced hitbox, visible teleport on the
+    next movement tick.
+  - `ReactDragState.cursorPosition` was set *before*
+    `transition(to: .reactDrag)`, which calls `enter()` and resets it to
+    `nil` — the pet didn't snap to the drag-start point until the next
+    `dragMoved`. Reordered the two calls at the call site.
+  - `WalkOnTopState` hardcoded its walk direction to always-right
+    regardless of which window edge `Climb` arrived from — climbing a
+    window's right edge immediately walked the pet off the very edge it
+    just climbed. Direction now resolves once, toward whichever edge is
+    farther, on first entry.
+  - `CharacterController`'s same-state no-op guard (added in the previous
+    review pass to fix `IdleState`'s timer reset) also silently blocked
+    `ReactClickState`'s own documented "replay on repeated click"
+    behavior. Added an opt-in `StateHandler.restartsOnReentry` so reactive
+    one-shot states can restart while ambient states like `Idle` still
+    can't.
+  - Manually verified on-device: the redesigned mesh-sharing `USDZAvatar`
+    (one persistent mesh entity, animations extracted from other clips'
+    usdz files and played on it) genuinely produces distinct, moving
+    `walk` animation against the real committed asset pack — confirmed via
+    `launch_app` dispatched over the real bridge socket, screenshots
+    showing both continuous position change and a visibly different leg
+    pose between frames. `fall`/`land`/`react_click` use the identical
+    mechanism but a synthetic click aimed at the (very small, ~30px) pet
+    missed its hitbox, so those weren't each individually confirmed.
+  - **Left for byeolki's judgment, not fixed** (lower priority / needs a
+    product decision or more invasive change): `UserInputSender`'s
+    TOCTOU race between checking `hasConnectedClients` and `broadcast()`
+    (could report `.sent` when nothing was actually delivered);
+    `BridgeConnection`'s shared `JSONEncoder` used across concurrent
+    completions from different background queues (needs a per-call
+    encoder); `RunShellHandler.cancel()` only terminates the direct child
+    (a backgrounded grandchild keeps the pipes open forever) and
+    `runningProcess` is written/read from two queues with no lock;
+    `UIElementSearch`'s deadline budget doesn't bound individual AX IPC
+    calls, which can themselves hang past it
+    (`AXUIElementSetMessagingTimeout` isn't set); `AvatarInstaller` treats
+    "the destination directory exists" as "already installed," so a
+    partial/corrupt previous copy is never repaired, and doesn't detect an
+    un-pulled LFS pointer file masquerading as a real usdz;
+    `overlayLocalWindows` rebases window frames by subtracting AppKit
+    coordinates without `GlobalScreenSpace`'s Y-flip, currently masked
+    because the overlay window is always the primary display's (origin
+    `(0,0)`); `CharacterController.transition(to kind:)` silently no-ops
+    on an unregistered `StateKind` with no log.

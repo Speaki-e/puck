@@ -1,0 +1,84 @@
+/**
+ * Runtime validation for BridgeMessage. The types in events.ts are compile-time
+ * only; a line read off the socket is `unknown` until something actually checks
+ * its shape. workspace/pet-app should run parsed JSON through isBridgeMessage
+ * before trusting it as a BridgeMessage.
+ */
+
+import type { BridgeMessage, ToolErrorCode } from "./types/events.js";
+
+const TOOL_ERROR_CODES: ReadonlySet<ToolErrorCode> = new Set([
+  "timeout",
+  "pet_app_disconnected",
+  "permission_denied",
+  "not_supported_target",
+  "execution_failed",
+  "unknown_tool",
+  "cancelled",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJSONValue(value: unknown): boolean {
+  if (value === null) return true;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.every(isJSONValue);
+  if (isRecord(value)) return Object.values(value).every(isJSONValue);
+  return false;
+}
+
+export function isBridgeMessage(value: unknown): value is BridgeMessage {
+  if (!isRecord(value)) return false;
+
+  switch (value.type) {
+    case "tool_dispatch":
+      return (
+        typeof value.id === "string" &&
+        typeof value.tool === "string" &&
+        "args" in value &&
+        isJSONValue(value.args)
+      );
+
+    case "tool_cancel":
+      return typeof value.id === "string";
+
+    case "tool_result":
+      return (
+        typeof value.id === "string" &&
+        typeof value.ok === "boolean" &&
+        (value.data === undefined || isJSONValue(value.data)) &&
+        (value.error === undefined || TOOL_ERROR_CODES.has(value.error as ToolErrorCode)) &&
+        (value.detail === undefined || typeof value.detail === "string")
+      );
+
+    case "event":
+      switch (value.event) {
+        case "agent_thinking":
+          return true;
+        case "tool_call":
+          return (
+            typeof value.tool === "string" &&
+            (value.detail === undefined || isJSONValue(value.detail))
+          );
+        case "tool_result":
+          return typeof value.ok === "boolean";
+        case "await_approval":
+          return typeof value.summary === "string";
+        case "agent_done":
+          return typeof value.ok === "boolean" && typeof value.summary === "string";
+        default:
+          return false;
+      }
+
+    case "user_input":
+      return (
+        typeof value.text === "string" &&
+        (value.source === "voice" || value.source === "text")
+      );
+
+    default:
+      return false;
+  }
+}

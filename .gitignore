@@ -3,3 +3,7 @@ dist/
 dist-test/
 *.log
 .DS_Store
+.env
+
+# Local AI agent working brief (generated from ../plans/, not shared)
+CLAUDE.md

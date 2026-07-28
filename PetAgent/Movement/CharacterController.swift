@@ -66,7 +66,7 @@ final class CharacterController {
     /// Allows transitioning from any state to any state (tools/events/PTT/click
     /// can all interrupt at any time — see the section 3 transition table).
     func transition(to newState: StateHandler) {
-        guard newState !== currentState else { return }
+        guard newState !== currentState || newState.restartsOnReentry else { return }
         currentState.exit()
         currentState = newState
         enterCurrentState()

@@ -21,6 +21,12 @@ protocol StateHandler: AnyObject {
     var clipKey: String { get }
     /// Whether the clip can loop (start/end pose match) — idle/walk/climb/type/listen/point etc.
     var loopsClip: Bool { get }
+    /// Whether transitioning into this state while it's already the current
+    /// one should restart it (exit()+enter() again) rather than being a
+    /// no-op. Reactive one-shot states (e.g. ReactClick) want a repeated
+    /// trigger to replay from the start; ambient states like Idle must NOT
+    /// restart, or repeated same-kind events would reset their timers.
+    var restartsOnReentry: Bool { get }
 
     func enter()
     func update(dt: TimeInterval, context: StateContext)
@@ -29,6 +35,7 @@ protocol StateHandler: AnyObject {
 
 extension StateHandler {
     var loopsClip: Bool { false }
+    var restartsOnReentry: Bool { false }
     func enter() {}
     func update(dt: TimeInterval, context: StateContext) {}
     func exit() {}

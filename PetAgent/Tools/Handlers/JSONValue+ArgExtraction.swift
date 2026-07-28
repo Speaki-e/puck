@@ -38,6 +38,10 @@ extension JSONValue {
     /// pids arrive as JSON numbers (protocol section 4's find_ui_element).
     func extractPID(key: String = "pid") -> pid_t? {
         guard case .object(let fields) = self, case .number(let value)? = fields[key] else { return nil }
-        return pid_t(value)
+        // pid_t is Int32 on Darwin -- Int32(Double) traps (crashes the whole
+        // process) for non-finite or out-of-range values, and an arbitrary
+        // tool_dispatch can send any JSON number here.
+        guard value.isFinite, let pid = Int32(exactly: value.rounded()) else { return nil }
+        return pid
     }
 }

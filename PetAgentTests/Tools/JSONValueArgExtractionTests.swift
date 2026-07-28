@@ -37,4 +37,32 @@ final class JSONValueArgExtractionTests: XCTestCase {
         ])
         XCTAssertEqual(args.extractFrame(), CGRect(x: 1, y: 2, width: 3, height: 4))
     }
+
+    func test_extractPID_returnsValue_whenKeyIsANumber() {
+        let args = JSONValue.object(["pid": .number(501)])
+        XCTAssertEqual(args.extractPID(), 501)
+    }
+
+    func test_extractPID_returnsNil_whenKeyMissing() {
+        XCTAssertNil(JSONValue.object([:]).extractPID())
+    }
+
+    // pid_t is Int32 on Darwin -- Int32(Double) traps (crashes the whole
+    // process) for non-finite or out-of-Int32-range values. An arbitrary
+    // find_ui_element dispatch can send any JSON number here, so this must
+    // degrade to nil rather than crash the agent.
+    func test_extractPID_returnsNil_ratherThanCrashing_whenValueExceedsInt32Range() {
+        let args = JSONValue.object(["pid": .number(1e20)])
+        XCTAssertNil(args.extractPID())
+    }
+
+    func test_extractPID_returnsNil_ratherThanCrashing_whenValueIsNegativeAndOutOfRange() {
+        let args = JSONValue.object(["pid": .number(-1e20)])
+        XCTAssertNil(args.extractPID())
+    }
+
+    func test_extractPID_returnsNil_ratherThanCrashing_whenValueIsNotFinite() {
+        let args = JSONValue.object(["pid": .number(Double.infinity)])
+        XCTAssertNil(args.extractPID())
+    }
 }

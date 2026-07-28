@@ -23,8 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var clickThroughController: ClickThroughController?
     private var avatarHitboxSize: CGSize = .zero
     private var characterBody: CharacterBody?
-    private var pendingPointFrame: CGRect?
-    private var pendingPointStarted: (() -> Void)?
+    private let pendingPointTracker = PendingPointTracker()
     private var focusModeObserver: FocusModeObserver?
 
     // One shared instance per FSM state, reused for every transition into it.
@@ -306,7 +305,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         let position = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
         avatar.reparent(to: arView.contentAnchor, screenSpaceMapper: ScreenSpaceMapper(viewportSize: window.frame.size))
-        avatar.setScreenPosition(position)
+        // Through characterBody, not avatar directly -- its didSet is the
+        // only path that's supposed to push position to the avatar. Setting
+        // avatar.setScreenPosition() here left characterBody.position stale,
+        // desyncing the frame-loop's hitbox tracking (which reads
+        // body.position) from where the pet is actually rendered, and
+        // causing a visible teleport next time a movement state computed
+        // from the stale position.
+        characterBody?.position = position
 
         clickThroughController?.stopMonitoring()
         let clickThrough = ClickThroughController(window: window)
@@ -426,29 +432,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
                 return
             }
 
+            // A still-pending point_at (pet hasn't arrived yet) redirects the
+            // walk, same as MoveTo's target being overwritten -- but its
+            // caller was still waiting on onPointingStarted, which would
+            // otherwise be silently dropped and hang until ToolExecutor's
+            // 15s timeout instead of getting a reply now.
+            if let superseded = self.pendingPointTracker.replace(frame: frame, onStarted: onPointingStarted) {
+                superseded()
+            }
+
             // Stand beside the target rather than on top of it, so the
             // character isn't covering what it is trying to show.
             let standOffset: CGFloat = 60
             self.moveToState.target = CGPoint(x: frame.midX - standOffset, y: frame.maxY)
             self.moveToState.nextState = .point
-
-            self.pendingPointFrame = frame
-            self.pendingPointStarted = onPointingStarted
             controller.transition(to: .moveTo)
         }
     }
 
     /// Called by PointState once the pet is in place and the point clip is up.
     private func beginPointingTimer() {
-        guard let frame = pendingPointFrame else { return }
-        pendingPointFrame = nil
+        guard let (frame, onStarted) = pendingPointTracker.consumeIfPending() else { return }
 
         pointingController.onPointingReleased = { [weak self] in
             self?.characterController?.transition(to: .idle)
         }
         pointingController.beginPointing(targetFrame: frame)
-        pendingPointStarted?()
-        pendingPointStarted = nil
+        onStarted()
     }
 
     // MARK: - Pet interaction (F1/F3)
@@ -463,8 +473,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         case .tapped:
             controller.transition(to: .reactClick)
         case .dragBegan(let point):
-            reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
+            // Order matters: transition(to:) calls ReactDragState.enter(),
+            // which resets cursorPosition to nil (so a stale drag can't
+            // resume mid-grab on re-entry) -- setting it before the
+            // transition let enter() immediately wipe it out, so the pet
+            // didn't snap to the grab point until the next dragMoved.
             controller.transition(to: .reactDrag)
+            reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
         case .dragMoved(let point):
             reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
         case .dragEnded:
@@ -636,12 +651,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     }
 
     private func summonCharacter() {
-        // TODO(F3): a real "summon" (walk to the cursor/frontmost window)
-        // needs MoveTo's real movement math, which isn't implemented yet.
-        // For now this just re-centers the avatar on the primary display.
+        // TODO(F3): a real "summon" (walk to the cursor/frontmost window,
+        // now that MoveToState exists and is used by point_at/launch_app)
+        // isn't wired up here yet. For now this just re-centers the pet on
+        // the primary display.
         guard let window = overlayController?.windows.first else { return }
         let position = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
-        avatar?.setScreenPosition(position)
+        // Through characterBody (see handleWindowsRebuilt's comment) so the
+        // frame-loop's hitbox tracking and any in-flight movement state stay
+        // consistent with where the pet actually renders.
+        characterBody?.position = position
         clickThroughController?.updateCharacter(
             screenPosition: globalAppKitPoint(fromWindowLocal: position, window: window),
             hitboxSize: avatarHitboxSize

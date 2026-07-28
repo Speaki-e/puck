@@ -78,4 +78,40 @@ final class AvatarInstallerTests: XCTestCase {
 
         XCTAssertEqual(outcome, .noBundledPackage)
     }
+
+    /// A prior copy that died partway through (e.g. disk full, app killed
+    /// mid-copy) leaves the destination directory present but without a
+    /// manifest.json -- fileExists-on-the-directory alone treated this as
+    /// "already installed" forever, permanently leaving a broken, invisible
+    /// pet with no way to self-repair.
+    func test_repairsAPartialPreviousInstall() throws {
+        let partial = destinationRoot.appendingPathComponent("dummy", isDirectory: true)
+        try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
+        // No manifest.json written -- simulates a copy that never finished.
+
+        let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: destinationRoot)
+
+        XCTAssertEqual(outcome, .installed)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: partial.appendingPathComponent("manifest.json").path))
+    }
+
+    /// A contributor who cloned without `git lfs pull` gets ~130-byte LFS
+    /// pointer text files named e.g. idle.usdz instead of the real usdz
+    /// binary. Every layer above (AvatarLoader, USDZAvatar) would otherwise
+    /// silently accept this and load a permanently invisible pet with no
+    /// diagnostic pointing at the real cause.
+    func test_detectsUnpulledLFSPointerFiles_andReportsFailedRatherThanInstalling() throws {
+        let pointerText = "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 12345\n"
+        try Data(pointerText.utf8).write(to: bundled.appendingPathComponent("idle.usdz"))
+
+        let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: destinationRoot)
+
+        guard case .failed = outcome else {
+            return XCTFail("expected .failed for un-pulled LFS pointers, got \(outcome)")
+        }
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: destinationRoot.appendingPathComponent("dummy").path),
+            "must not install a package containing unpulled LFS pointers"
+        )
+    }
 }

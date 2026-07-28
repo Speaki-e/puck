@@ -87,7 +87,13 @@ enum UIElementInspector {
             throw UIElementInspectorError.accessibilityNotTrusted
         }
 
-        let root = AXUIElementNode(element: AXUIElementCreateApplication(pid))
+        let rootElement = AXUIElementCreateApplication(pid)
+        // The deadline `budget` passed to UIElementSearch is only checked
+        // between node visits -- a single AX IPC call against an unresponsive
+        // target app can itself hang indefinitely and defeat it entirely.
+        // This caps each individual call at the same budget.
+        AXUIElementSetMessagingTimeout(rootElement, Float(searchBudget))
+        let root = AXUIElementNode(element: rootElement)
         return UIElementSearch.firstMatch(
             in: root,
             query: .init(role: role, titleContains: titleContains),

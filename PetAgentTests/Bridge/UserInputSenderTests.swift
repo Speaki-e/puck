@@ -15,14 +15,19 @@ import XCTest
 
 private final class StubTransport: UserInputTransport {
     var hasConnectedClients: Bool
+    /// Simulates a client disconnecting between the hasConnectedClients check
+    /// and the broadcast() call actually reaching a live connection.
+    var broadcastSucceeds = true
     private(set) var broadcasted: [BridgeMessage] = []
 
     init(hasConnectedClients: Bool) {
         self.hasConnectedClients = hasConnectedClients
     }
 
-    func broadcast(_ message: BridgeMessage) {
+    @discardableResult
+    func broadcast(_ message: BridgeMessage) -> Bool {
         broadcasted.append(message)
+        return broadcastSucceeds
     }
 }
 
@@ -57,6 +62,20 @@ final class UserInputSenderTests: XCTestCase {
         let sender = UserInputSender { nil }
 
         XCTAssertEqual(sender.send(text: "안녕", source: .text), .workspaceDisconnected)
+    }
+
+    /// TOCTOU: hasConnectedClients can be true at the check but the client
+    /// can vanish (BridgeConnection.onClose racing in on BridgeServer's own
+    /// queue) before broadcast() actually reaches it. Delivery must reflect
+    /// what broadcast() itself reports, not the earlier snapshot.
+    func test_whenClientDisconnectsBetweenCheckAndBroadcast_reportsDisconnected() {
+        let transport = StubTransport(hasConnectedClients: true)
+        transport.broadcastSucceeds = false
+        let sender = UserInputSender { transport }
+
+        let delivery = sender.send(text: "테스트 돌려줘", source: .voice)
+
+        XCTAssertEqual(delivery, .workspaceDisconnected)
     }
 
     /// The transport is consulted per send, not captured once — a client that

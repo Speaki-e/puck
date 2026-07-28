@@ -163,7 +163,15 @@ extension BridgeServer: UserInputTransport {
     /// protocol section 2 expects a single workspace client, but sending to
     /// every open connection keeps this correct if a second one ever attaches
     /// (and costs nothing when there is one).
-    func broadcast(_ message: BridgeMessage) {
-        currentConnections().forEach { $0.send(message) }
+    ///
+    /// Returns whether there was anyone to send to, queried fresh at this
+    /// exact call -- a caller that pre-checked `hasConnectedClients` earlier
+    /// can still race a disconnect landing in between (BridgeConnection.onClose
+    /// runs on this same queue), so the true answer is decided here, not there.
+    @discardableResult
+    func broadcast(_ message: BridgeMessage) -> Bool {
+        let connections = currentConnections()
+        connections.forEach { $0.send(message) }
+        return !connections.isEmpty
     }
 }

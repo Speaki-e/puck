@@ -5,16 +5,11 @@
   "scale": 1.0,
   "bounce_intensity": 0.6,
   "hitbox": {
-    "width": 120,
-    "height": 140
+    "width": 130,
+    "height": 133
   },
   "clips": {
-    "idle": "idle",
-    "walk": "walk",
-    "fall": "fall",
-    "land": "land",
-    "react_click": "react_click",
-    "kick": "kick"
+    "idle": "idle"
   },
   "sounds": {
     "walk": "sounds/footstep.wav",

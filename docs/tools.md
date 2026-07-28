@@ -6,7 +6,7 @@ than hardcoding a copy.
 
 | Tool | Params | Executor | Approval | timeout_sec | Summary |
 |---|---|---|---|---|---|
-| launch_app | `app_name` or `bundle_id` | pet-app | not required | 15 | Launch an app, return its pid |
+| launch_app | `app_name` or `bundle_id` (`bundle_id` wins if both given) | pet-app | not required | 15 | Launch an app, return its pid |
 | list_running_apps | – | pet-app | not required | 5 | List running apps |
 | get_frontmost_window | – | pet-app | not required | 5 | Info about the frontmost window |
 | find_ui_element | `pid` + (`role` or `title_contains`) | pet-app | not required | 15 | Query Accessibility, returns `{role,title,frame,enabled}` (not found is `ok=true data=null`, not a failure) |
@@ -38,7 +38,7 @@ like. Most tools return an object or `null`. One does not:
 | get_frontmost_window | `null` if none, else `{ owner_name, title, frame }` |
 | find_ui_element | `null` if not found, else `{ role, title, frame?, enabled? }` |
 | point_at | `null` |
-| click_element | `null` |
+| click_element | `null`. Spec: returns `not_supported_target` for system dialog targets, falling back to `point_at` plus user guidance. **Not yet implemented in pet-app** as of this writing — classifying "is this a system security dialog" needs AX role/owner inspection pet-app doesn't have yet, so it currently always attempts the click regardless of target. |
 | run_shell | `{ stdout, stderr, exit_code }` |
 | **run_applescript** | **a bare string** — the script's result, e.g. `"data":"some result"`. This is the one tool whose payload is not an object; consumers must not assume `tool_result.data` is always an object or null. |
 | code_editor | TBD — workspace hasn't shipped this yet |

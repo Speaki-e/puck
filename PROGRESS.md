@@ -95,14 +95,26 @@ Ordered by what actually blocks progress.
   log — matching what it already did). What remains is purely
   transcription: write `types/` + `swift/` in the protocol repo from
   `plan/01_protocol.md` and the shipped Swift.
-- **CPU while idle is ~31%, and the plan's fix does not address it.**
+- **CPU while idle is ~25-33%, and no clean fix exists via ARView's own API.**
   `sample` puts essentially all of it in `ARView.commonRenderCallback()` —
-  RealityKit renders on its own display-linked loop regardless of FSM tick
-  rate, so `IdleFrameRatePolicy` (F1's 60→15 downshift) changes nothing
+  RealityKit renders on its own `CVDisplayLink`-driven loop regardless of FSM
+  tick rate, so `IdleFrameRatePolicy` (F1's 60→15 downshift) changes nothing
   measurable. It also barely engages: F3's wander timer fires every 8-30s, so
   the pet almost never stays idle for the required 30 consecutive seconds.
-  Needs a plan decision — throttle/park the ARView, lower the threshold, or
-  wander less.
+  **Investigated 2026-07-28**: macOS's `ARView` exposes two double-underscore
+  (undocumented Swift-interface, not officially public API) properties —
+  `__enableAutomaticFrameRate: Bool` and `__preferredFrameRate: Float` — that
+  looked like exactly the right lever. Tried setting
+  `__enableAutomaticFrameRate = false; __preferredFrameRate = 5` at init;
+  measured with `ps`/`sample` before and after — **no measurable change**
+  (`commonRenderCallback` was still ~95%+ of samples, CPU still 27-33%). These
+  properties are very likely ARKit-session-driven frame-pacing hooks that are
+  no-ops without a real AR session, which macOS's `ARView` never has (see F1's
+  own `cameraMode` finding). Reverted the experiment — not worth carrying
+  fragile, non-functional SPI. Needs a plan decision instead: throttle/park
+  the whole overlay window (not just its render rate) during long idle,
+  accept the cost, or evaluate a SceneKit fallback (already the plan's F1
+  alpha-halo escape hatch) if this remains a real ship-blocker.
 - **Multi-display is single-window.** The avatar is parented to
   `overlayController.windows.first`, and F4 frames are rebased against that
   one window's origin. Roaming across displays is not implemented.

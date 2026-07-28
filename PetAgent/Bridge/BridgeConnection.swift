@@ -66,7 +66,6 @@ enum BridgeConnectionError: Error, Equatable {
 final class BridgeConnection {
     private let connection: NWConnection
     private var linesDecoder = JSONLinesDecoder()
-    private let encoder = JSONEncoder()
     private var hasClosed = false
 
     var onMessage: ((BridgeMessage) -> Void)?
@@ -96,7 +95,11 @@ final class BridgeConnection {
     }
 
     func send(_ message: BridgeMessage) {
-        guard var data = try? encoder.encode(message) else {
+        // A local encoder, not a shared stored property: send() is called
+        // from whatever queue each ToolHandler completes on (several hop to
+        // their own background queue), so two in-flight tool_results on the
+        // same connection could call encode() concurrently on one instance.
+        guard var data = try? JSONEncoder().encode(message) else {
             onSendError?(BridgeConnectionError.encodingFailed)
             return
         }

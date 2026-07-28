@@ -104,4 +104,58 @@ final class RunShellHandlerTests: XCTestCase {
 
         wait(for: [expectation], timeout: 10)
     }
+
+    /// A code review raised the concern that cancel() only terminates the
+    /// direct zsh child, so a command that backgrounds a job (`sleep 30 &`)
+    /// would survive as an orphan reparented to launchd. Verified false:
+    /// Foundation's Process places its child in its own new process group,
+    /// so terminate() (which signals that whole group, not just the one pid)
+    /// already reaches jobs zsh backgrounded. This test is the regression
+    /// guard for that verified behavior, not evidence of a bug that was fixed.
+    func test_cancel_killsBackgroundedGrandchildProcesses() {
+        let handler = RunShellHandler()
+        let pidFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("petagent_test_bgpid_\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+
+        handler.execute(
+            args: .object(["command": .string("sleep 30 & echo $! > \(pidFile.path); sleep 30")])
+        ) { _ in
+            // Not expected to complete in this test -- cancelled instead.
+        }
+
+        guard let backgroundPID = Self.waitForPID(at: pidFile, timeout: 2) else {
+            XCTFail("background job never reported its pid")
+            return
+        }
+        XCTAssertEqual(kill(backgroundPID, 0), 0, "background job should still be alive before cancel")
+
+        handler.cancel()
+
+        XCTAssertTrue(
+            Self.waitUntilProcessDies(backgroundPID, timeout: 3),
+            "cancel() must kill backgrounded child processes too, not just the direct zsh child"
+        )
+    }
+
+    private static func waitForPID(at file: URL, timeout: TimeInterval) -> pid_t? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let contents = try? String(contentsOf: file, encoding: .utf8),
+               let pid = pid_t(contents.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                return pid
+            }
+            usleep(20_000)
+        }
+        return nil
+    }
+
+    private static func waitUntilProcessDies(_ pid: pid_t, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if kill(pid, 0) != 0 { return true }
+            usleep(50_000)
+        }
+        return false
+    }
 }

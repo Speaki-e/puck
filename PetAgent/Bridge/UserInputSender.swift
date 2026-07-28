@@ -21,7 +21,13 @@ protocol UserInputTransport: AnyObject {
     /// Live state, not a remembered one — a client that disconnected must
     /// stop counting immediately.
     var hasConnectedClients: Bool { get }
-    func broadcast(_ message: BridgeMessage)
+    /// - Returns: whether the message actually reached >=1 live connection.
+    ///   `hasConnectedClients` is only a pre-flight check; a client can
+    ///   disconnect between that check and this call (BridgeConnection.onClose
+    ///   races in on BridgeServer's own queue), so delivery is decided from
+    ///   this return value, not the earlier snapshot.
+    @discardableResult
+    func broadcast(_ message: BridgeMessage) -> Bool
 }
 
 enum UserInputDelivery: Equatable {
@@ -45,7 +51,7 @@ final class UserInputSender {
         guard let transport = transport(), transport.hasConnectedClients else {
             return .workspaceDisconnected
         }
-        transport.broadcast(.userInput(UserInput(text: text, source: source)))
-        return .sent
+        let delivered = transport.broadcast(.userInput(UserInput(text: text, source: source)))
+        return delivered ? .sent : .workspaceDisconnected
     }
 }

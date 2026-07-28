@@ -16,11 +16,16 @@ final class RunShellHandler: ToolHandler {
 
     /// The in-flight process, so a timed-out call can actually kill it
     /// instead of leaving it running with nobody reading its pipes.
+    /// `execute` sets this on whatever queue the caller runs on, the
+    /// background block clears it on completion, and `cancel()` can arrive
+    /// from ToolExecutor's own queue -- three different execution contexts,
+    /// so access is guarded rather than a bare stored property.
+    private let stateQueue = DispatchQueue(label: "PetAgent.RunShellHandler.state")
     private var runningProcess: Process?
 
     func cancel() {
-        runningProcess?.terminate()
-        runningProcess = nil
+        stateQueue.sync { runningProcess }?.terminate()
+        stateQueue.sync { runningProcess = nil }
     }
 
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
@@ -30,7 +35,7 @@ final class RunShellHandler: ToolHandler {
         }
 
         let process = Process()
-        runningProcess = process
+        stateQueue.sync { runningProcess = process }
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = ["-lc", command]
 
@@ -61,7 +66,7 @@ final class RunShellHandler: ToolHandler {
                 stderrQueue.sync {} // barrier: stderrData is fully written past this point
 
                 process.waitUntilExit()
-                self.runningProcess = nil
+                self.stateQueue.sync { self.runningProcess = nil }
                 let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
                 let stderr = String(data: stderrData, encoding: .utf8) ?? ""
                 completion(

@@ -67,6 +67,25 @@ final class BridgeMessageCodableTests: XCTestCase {
         XCTAssertNil(result.detail)
     }
 
+    /// protocol 3.1: workspace can abandon an in-flight dispatch (user pressed
+    /// stop, or the 600s code_editor budget was pulled) -- pet-app cancels the
+    /// handler and replies error="cancelled".
+    func test_decodesToolCancel() throws {
+        let json = #"{"type":"tool_cancel","id":"t1"}"#
+        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message, .toolCancel(id: "t1"))
+    }
+
+    func test_toolCancel_roundTrips() throws {
+        let original = BridgeMessage.toolCancel(id: "t42")
+
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try decoder.decode(BridgeMessage.self, from: encoded)
+
+        XCTAssertEqual(decoded, original)
+    }
+
     /// protocol 3.1: `error` is the standard code, `detail` (optional) carries
     /// the human-readable specifics for logs/debugging.
     func test_toolResultDetail_roundTrips() throws {

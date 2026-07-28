@@ -51,6 +51,13 @@ final class BridgeMessageRouter {
                 }
             }
 
+        case .toolCancel(let id):
+            // No reply of its own -- the cancelled dispatch's original id
+            // replies error="cancelled" through its own completion.
+            dispatchToMain { [toolExecutor] in
+                toolExecutor.cancel(id: id)
+            }
+
         case .event(let event):
             let reaction = EventRouter.reaction(for: event)
             dispatchToMain { [weak self] in

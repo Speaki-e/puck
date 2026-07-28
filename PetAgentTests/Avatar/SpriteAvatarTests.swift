@@ -96,14 +96,23 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertTrue((avatar.spriteLayer.contents as! CGImage) === (beforeMissingPlay as! CGImage))
     }
 
-    func test_setScreenPosition_setsLayerPositionDirectly_noConversion() throws {
+    /// The FSM's `position` is the character's ground/feet point everywhere
+    /// else in the codebase (WalkState's targets, LandingSurfaceResolver,
+    /// USDZAvatar's root-at-feet rig convention) -- CALayer's own `position`
+    /// is its *center* by default, so SpriteAvatar has to convert, or the
+    /// pet floats half its height above wherever the FSM thinks it's
+    /// standing (this is the bug byeolki reported: the pet hanging in empty
+    /// space instead of standing on the Dock).
+    func test_setScreenPosition_treatsInputAsGroundPoint_notLayerCenter() throws {
         try writePNG(named: "idle", color: .red)
-        let loadResult = try makeLoadResult()
+        let loadResult = try makeLoadResult() // hitbox height 140, scale 1.0
         let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
 
         avatar.setScreenPosition(CGPoint(x: 42, y: 99))
 
-        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 99))
+        // Center = ground point minus half the rendered height, so the
+        // sprite's bottom edge lands exactly on the ground point.
+        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 99 - 70))
     }
 
     func test_setFacingLeft_flipsLayerHorizontally() throws {

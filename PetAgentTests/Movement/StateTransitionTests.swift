@@ -16,11 +16,15 @@ import CoreGraphics
 final class SpyAvatarPlayable: AvatarPlayable {
     private(set) var playedClips: [(clip: String, loop: Bool)] = []
     private(set) var stopCallCount = 0
+    private(set) var bounceCalls: [(clip: String, elapsed: TimeInterval)] = []
 
     func play(clip: String, loop: Bool) { playedClips.append((clip, loop)) }
     func stop() { stopCallCount += 1 }
     func setScreenPosition(_ position: CGPoint) {}
     func setFacing(_ facing: AvatarFacing) {}
+    func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {
+        bounceCalls.append((clip, elapsed))
+    }
 }
 
 final class SpySFXTriggering: SFXTriggering {
@@ -147,5 +151,46 @@ final class StateTransitionTests: XCTestCase {
         controller.update(dt: 0.016)
 
         XCTAssertEqual(idle.lastUpdateDt, 0.016)
+    }
+
+    // MARK: - Bounce motion (2026-07-29 2D switch)
+
+    func test_update_callsUpdateBounce_withCurrentClipAndElapsedTime() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let idle = SpyState(name: "Idle", clipKey: "idle")
+        let controller = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
+
+        controller.update(dt: 0.1)
+
+        XCTAssertEqual(avatar.bounceCalls.map(\.clip), ["idle"])
+        XCTAssertEqual(avatar.bounceCalls.map(\.elapsed), [0.1])
+    }
+
+    func test_update_accumulatesElapsedTimeAcrossMultipleFrames() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let idle = SpyState(name: "Idle", clipKey: "idle")
+        let controller = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
+
+        controller.update(dt: 0.1)
+        controller.update(dt: 0.1)
+
+        XCTAssertEqual(avatar.bounceCalls.map(\.elapsed), [0.1, 0.2])
+    }
+
+    func test_transition_resetsElapsedTimeForTheNewState() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let idle = SpyState(name: "Idle", clipKey: "idle")
+        let walk = SpyState(name: "Walk", clipKey: "walk")
+        let controller = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
+
+        controller.update(dt: 0.5) // elapsed builds up in Idle
+        controller.transition(to: walk)
+        controller.update(dt: 0.1) // should start fresh in Walk, not carry 0.5 over
+
+        XCTAssertEqual(avatar.bounceCalls.map(\.clip), ["idle", "walk"])
+        XCTAssertEqual(avatar.bounceCalls.map(\.elapsed), [0.5, 0.1])
     }
 }

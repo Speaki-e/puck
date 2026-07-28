@@ -6,19 +6,18 @@
 //  Import-menu validator: checks manifest schema + clip existence, reports missing items
 //
 //  Checks manifest schema/required-clip-keys (via AvatarLoader) plus the
-//  file-per-clip layout from docs/avatar-spec.md: each clip's {name}.usdz
-//  must actually exist in the package directory and fit the size budget.
-//  Does NOT check mesh height/scale or loop pose-matching — that needs
-//  RealityKit/ModelIO plus a real usdz fixture to verify against, neither of
-//  which exist yet (see docs/avatar-spec.md).
+//  file-per-clip layout from docs/avatar-spec.md: each clip's {name}.png
+//  (sprites, 2026-07-29's primary type) or {name}.usdz (legacy) must actually
+//  exist in the package directory and fit the size budget. Does NOT check
+//  image dimensions or usdz mesh height/scale/loop pose-matching — that needs
+//  a real fixture to verify against, and isn't wired up yet (see docs/avatar-spec.md).
 
 import Foundation
 
 enum AvatarImportValidator {
-    /// Per-clip usdz size budget. Only the mesh-carrying clip holds geometry
-    /// and textures (USDZAvatar plays every other clip's animation on that one
-    /// mesh), so the rest are animation-only and tiny — a real package lands
-    /// near 3MB total rather than the ~20MB ten copies of a mesh would cost.
+    /// Per-clip file size budget. Generous for both PNG sprites (each just a
+    /// static image, typically well under this) and the legacy usdz path
+    /// (only the mesh-carrying clip holds real geometry/textures there).
     static let maxClipFileSizeBytes = 4 * 1024 * 1024
 
     struct Report: Equatable {
@@ -54,7 +53,9 @@ enum AvatarImportValidator {
             guard case .name(let fileName) = manifest.clips[clip] else {
                 return .missing
             }
-            let url = packageDirectory.appendingPathComponent("\(fileName).usdz")
+            // 2026-07-29 2D switch: sprites clips are PNG files, not usdz.
+            let fileExtension = manifest.type == .sprites ? "png" : "usdz"
+            let url = packageDirectory.appendingPathComponent("\(fileName).\(fileExtension)")
             guard
                 let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
                 let size = attributes[.size] as? Int

@@ -45,6 +45,11 @@ final class CharacterController {
     /// state never swaps itself out mid-frame.
     private var pendingTransition: StateKind?
 
+    /// Seconds since the current state was entered -- reset on every
+    /// transition, fed to AvatarPlayable.updateBounce so the 2D bounce
+    /// motion (BouncePreset) knows where in its cycle to be (02_pet-app.md F2).
+    private var stateElapsedTime: TimeInterval = 0
+
     init(initialState: StateHandler, body: CharacterBody, sfxPlayer: SFXTriggering) {
         self.currentState = initialState
         self.body = body
@@ -87,6 +92,8 @@ final class CharacterController {
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }
         )
         currentState.update(dt: dt, context: context)
+        stateElapsedTime += dt
+        body.updateBounce(clip: currentState.clipKey, elapsed: stateElapsedTime)
 
         if let kind = pendingTransition {
             pendingTransition = nil
@@ -95,6 +102,7 @@ final class CharacterController {
     }
 
     private func enterCurrentState() {
+        stateElapsedTime = 0
         body.play(clip: currentState.clipKey, loop: currentState.loopsClip)
         // Use clipKey (e.g. "walk"), not name (e.g. "Walk") — the manifest sounds
         // table is keyed by lowercase clip/event names (protocol section 6), so

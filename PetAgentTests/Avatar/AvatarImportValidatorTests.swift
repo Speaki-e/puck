@@ -25,11 +25,11 @@ final class AvatarImportValidatorTests: XCTestCase {
         try? FileManager.default.removeItem(at: packageDirectory)
     }
 
-    private func writeManifest(clips: [String: String]) throws {
+    private func writeManifest(clips: [String: String], type: String = "usdz") throws {
         let clipsJSON = clips.map { "\"\($0.key)\": \"\($0.value)\"" }.joined(separator: ", ")
         let json = """
         {
-          "schema_version": 1, "name": "test", "type": "usdz", "scale": 1.0,
+          "schema_version": 1, "name": "test", "type": "\(type)", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
           "clips": { \(clipsJSON) },
           "sounds": {}
@@ -42,9 +42,9 @@ final class AvatarImportValidatorTests: XCTestCase {
         )
     }
 
-    private func writeClipFile(_ fileName: String, sizeInBytes: Int = 1024) throws {
+    private func writeClipFile(_ fileName: String, sizeInBytes: Int = 1024, extension fileExtension: String = "usdz") throws {
         let data = Data(repeating: 0, count: sizeInBytes)
-        try data.write(to: packageDirectory.appendingPathComponent("\(fileName).usdz"))
+        try data.write(to: packageDirectory.appendingPathComponent("\(fileName).\(fileExtension)"))
     }
 
     func test_allClipFilesPresentAndUnderBudget_isValid() throws {
@@ -63,26 +63,37 @@ final class AvatarImportValidatorTests: XCTestCase {
     }
 
     func test_missingRequiredClipFile_isInvalid() throws {
-        try writeManifest(clips: ["idle": "idle", "walk": "walk"])
-        try writeClipFile("idle")
-        // walk.usdz intentionally not written, even though the manifest key exists
+        // idle is the sole required clip as of the 2026-07-29 2D switch.
+        try writeManifest(clips: ["idle": "idle"])
+        // idle.usdz intentionally not written, even though the manifest key exists
 
         let report = try AvatarImportValidator.validate(packageDirectory: packageDirectory)
 
         XCTAssertFalse(report.isValid)
-        XCTAssertEqual(report.missingRequiredClipFiles, ["walk"])
+        XCTAssertEqual(report.missingRequiredClipFiles, ["idle"])
     }
 
     func test_missingRecommendedClipFile_isStillValid() throws {
-        try writeManifest(clips: ["idle": "idle", "walk": "walk"])
+        try writeManifest(clips: ["idle": "idle"])
         try writeClipFile("idle")
-        try writeClipFile("walk")
-        // climb/fall/etc. not written at all -- recommended, non-fatal
+        // walk/climb/fall/etc. not written at all -- recommended, non-fatal
 
         let report = try AvatarImportValidator.validate(packageDirectory: packageDirectory)
 
         XCTAssertTrue(report.isValid)
         XCTAssertEqual(Set(report.missingRecommendedClipFiles), Set(AvatarLoader.recommendedClips))
+    }
+
+    func test_sprites_checksPngFilesNotUsdz() throws {
+        try writeManifest(clips: ["idle": "idle", "walk": "walk"], type: "sprites")
+        try writeClipFile("idle", extension: "png")
+        // walk.png intentionally not written, even though the manifest key exists
+
+        let report = try AvatarImportValidator.validate(packageDirectory: packageDirectory)
+
+        XCTAssertTrue(report.isValid)
+        XCTAssertTrue(report.missingRequiredClipFiles.isEmpty)
+        XCTAssertTrue(report.missingRecommendedClipFiles.contains("walk"))
     }
 
     func test_oversizedClipFile_isReported() throws {

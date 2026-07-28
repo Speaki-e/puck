@@ -12,7 +12,7 @@
 
 import AppKit
 
-/// Creates and positions one OverlayWindow (hosting a PetARView) per
+/// Creates and positions one OverlayWindow (hosting a SpriteLayerView) per
 /// display, rebuilding whenever ScreenManager reports a display change.
 /// Window frames use ScreenManager's `appKitFrames` (real AppKit screen
 /// coordinates), NOT `normalizedScreenFrames` — the normalized, Y-down space
@@ -25,7 +25,7 @@ final class OverlayWindowController {
 
     /// Fires every time `windows` is torn down and recreated (initial start()
     /// and every real display change) -- consumers holding a reference into a
-    /// specific window/PetARView (e.g. the avatar's RealityKit parent entity)
+    /// specific window/SpriteLayerView (e.g. the avatar's sprite layer parent)
     /// must re-fetch it here or they're left pointing at an orphaned window.
     var onWindowsRebuilt: (() -> Void)?
 
@@ -51,9 +51,9 @@ final class OverlayWindowController {
         windows.forEach { $0.orderOut(nil) }
         windows = space.appKitFrames.map { frame in
             let window = OverlayWindow(screenFrame: frame)
-            let arView = PetARView(frame: NSRect(origin: .zero, size: frame.size))
-            arView.autoresizingMask = [.width, .height]
-            window.contentView = arView
+            let spriteView = SpriteLayerView(frame: NSRect(origin: .zero, size: frame.size))
+            spriteView.autoresizingMask = [.width, .height]
+            window.contentView = spriteView
             window.orderFrontRegardless()
             return window
         }

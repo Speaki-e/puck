@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
   "name": "dummy",
-  "type": "usdz",
-  "scale": 0.005527,
+  "type": "sprites",
+  "scale": 1.0,
+  "bounce_intensity": 0.6,
   "hitbox": {
     "width": 120,
     "height": 140
@@ -12,12 +13,14 @@
     "walk": "walk",
     "fall": "fall",
     "land": "land",
-    "react_click": "react_click"
+    "react_click": "react_click",
+    "kick": "kick"
   },
   "sounds": {
     "walk": "sounds/footstep.wav",
     "point": "sounds/point.wav",
     "react_click": "sounds/boop.wav",
+    "kick": "sounds/kick.wav",
     "app_launch": "sounds/launch.wav",
     "task_success": "sounds/ding.wav",
     "task_fail": "sounds/buzz.wav",

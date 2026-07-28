@@ -23,5 +23,7 @@ final class StateMetadataTests: XCTestCase {
         XCTAssertEqual(ListenState().clipKey, "listen")
         XCTAssertEqual(ReactClickState().clipKey, "react_click")
         XCTAssertEqual(ReactDragState().clipKey, "react_drag")
+        XCTAssertEqual(ChaseBallState().clipKey, "walk") // no dedicated clip in the manifest, reuses walk
+        XCTAssertEqual(KickBallState().clipKey, "kick")
     }
 }

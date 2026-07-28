@@ -15,19 +15,24 @@ final class AvatarManifestParsingTests: XCTestCase {
     {
       "schema_version": 1,
       "name": "dummy",
-      "type": "usdz",
+      "type": "sprites",
       "scale": 1.0,
+      "bounce_intensity": 0.6,
       "hitbox": { "width": 120, "height": 140 },
       "clips": {
         "idle": "idle", "walk": "walk", "climb": "climb",
         "fall": "fall", "land": "land", "point": "point",
         "type": "type", "listen": "listen",
-        "react_click": "react_click", "react_drag": "react_drag"
+        "react_click": "react_click", "react_drag": "react_drag", "kick": "kick"
+      },
+      "emotions": {
+        "happy": "happy", "thinking": "thinking"
       },
       "sounds": {
         "walk": "sounds/footstep.wav",
         "point": "sounds/point.wav",
         "react_click": "sounds/boop.wav",
+        "kick": "sounds/kick.wav",
         "app_launch": "sounds/launch.wav",
         "task_success": "sounds/ding.wav",
         "task_fail": "sounds/buzz.wav",
@@ -43,11 +48,28 @@ final class AvatarManifestParsingTests: XCTestCase {
 
         XCTAssertEqual(manifest.schemaVersion, 1)
         XCTAssertEqual(manifest.name, "dummy")
-        XCTAssertEqual(manifest.type, .usdz)
+        XCTAssertEqual(manifest.type, .sprites)
         XCTAssertEqual(manifest.scale, 1.0)
+        XCTAssertEqual(manifest.bounceIntensity, 0.6)
         XCTAssertEqual(manifest.hitbox, AvatarManifest.Hitbox(width: 120, height: 140))
         XCTAssertEqual(manifest.clips["idle"], .name("idle"))
+        XCTAssertEqual(manifest.emotions?["happy"], .name("happy"))
         XCTAssertEqual(manifest.sounds["walk"], "sounds/footstep.wav")
+    }
+
+    func test_decodesManifest_withoutBounceIntensityOrEmotions_defaultsToNil() throws {
+        let json = """
+        {
+          "schema_version": 1, "name": "minimal", "type": "sprites", "scale": 1.0,
+          "hitbox": { "width": 100, "height": 100 },
+          "clips": { "idle": "idle" },
+          "sounds": {}
+        }
+        """
+        let manifest = try JSONDecoder().decode(AvatarManifest.self, from: Data(json.utf8))
+
+        XCTAssertNil(manifest.bounceIntensity)
+        XCTAssertNil(manifest.emotions)
     }
 
     func test_clipReference_decodesPlainStringAsName() throws {
@@ -70,12 +92,14 @@ final class AvatarManifestParsingTests: XCTestCase {
         XCTAssertTrue(result.missingRecommendedClips.isEmpty)
     }
 
-    func test_load_withOnlyRequiredClips_reportsMissingRecommendedClips() throws {
+    func test_load_withOnlyRequiredClip_reportsMissingRecommendedClips() throws {
+        // idle alone is required as of the 2026-07-29 2D switch -- walk is now
+        // one of the recommended-with-fallback clips, same as the rest.
         let json = """
         {
-          "schema_version": 1, "name": "minimal", "type": "usdz", "scale": 1.0,
+          "schema_version": 1, "name": "minimal", "type": "sprites", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
-          "clips": { "idle": "idle", "walk": "walk" },
+          "clips": { "idle": "idle" },
           "sounds": {}
         }
         """
@@ -83,8 +107,20 @@ final class AvatarManifestParsingTests: XCTestCase {
 
         XCTAssertEqual(
             Set(result.missingRecommendedClips),
-            Set(["climb", "fall", "land", "point", "type", "listen", "react_click", "react_drag"])
+            Set(["walk", "climb", "fall", "land", "point", "type", "listen", "react_click", "react_drag", "kick"])
         )
+    }
+
+    func test_load_withMissingWalk_doesNotThrow_walkIsNowRecommendedOnly() throws {
+        let json = """
+        {
+          "schema_version": 1, "name": "no-walk", "type": "sprites", "scale": 1.0,
+          "hitbox": { "width": 100, "height": 100 },
+          "clips": { "idle": "idle" },
+          "sounds": {}
+        }
+        """
+        XCTAssertNoThrow(try AvatarLoader.load(manifestData: Data(json.utf8)))
     }
 
     func test_load_withGarbageJSON_throwsManifestNotDecodable() {
@@ -129,10 +165,12 @@ final class AvatarManifestParsingTests: XCTestCase {
         }
     }
 
-    func test_load_withMissingIdleAndWalk_reportsBothInError() {
+    func test_load_withNoClipsAtAll_reportsOnlyIdleAsMissingRequired() {
+        // walk is no longer required, so an empty clips table's only required-clip
+        // failure is idle -- walk instead shows up in missingRecommendedClips.
         let json = """
         {
-          "schema_version": 1, "name": "no-required-clips", "type": "usdz", "scale": 1.0,
+          "schema_version": 1, "name": "no-required-clips", "type": "sprites", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
           "clips": {},
           "sounds": {}
@@ -142,7 +180,7 @@ final class AvatarManifestParsingTests: XCTestCase {
             guard case AvatarLoaderError.missingRequiredClips(let missing) = error else {
                 return XCTFail("expected .missingRequiredClips, got \(error)")
             }
-            XCTAssertEqual(Set(missing), Set(["idle", "walk"]))
+            XCTAssertEqual(missing, ["idle"])
         }
     }
 

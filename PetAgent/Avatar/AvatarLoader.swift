@@ -4,7 +4,7 @@
 //
 //  F2 · owner: 강상우 (Sangwoo Kang)
 //  Scans the Avatars directory + parses the manifest + validates required
-//  clips (idle, walk).
+//  clips (idle only, as of the 2026-07-29 2D switch).
 //
 
 import Foundation
@@ -12,9 +12,9 @@ import Foundation
 enum AvatarLoaderError: Error, Equatable {
     case avatarNotFound(name: String)
     case manifestNotDecodable(underlying: String)
-    /// idle/walk are required because there's no fallback target for them —
-    /// unlike recommendedClips, a manifest missing these is rejected outright
-    /// rather than "successfully" loaded with a caller left to notice later.
+    /// idle is required because there's no fallback target for it — unlike
+    /// recommendedClips, a manifest missing it is rejected outright rather
+    /// than "successfully" loaded with a caller left to notice later.
     case missingRequiredClips([String])
     /// A manifest can decode successfully under a *future* schema version
     /// while meaning something different (fields reinterpreted, new required
@@ -24,8 +24,8 @@ enum AvatarLoaderError: Error, Equatable {
 
 /// Result of a manifest load: the parsed manifest, plus recommended clips
 /// that are missing (idle-fallback still applies to those, with a startup
-/// warning). Required clips (idle, walk) are guaranteed present — `load`
-/// throws instead of returning a result when they're missing.
+/// warning). Required clips (idle) are guaranteed present — `load` throws
+/// instead of returning a result when they're missing.
 struct AvatarLoadResult: Equatable {
     let manifest: AvatarManifest
     let missingRecommendedClips: [String]
@@ -35,10 +35,13 @@ enum AvatarLoader {
     /// The only manifest schema version (protocol section 6) this loader understands.
     static let supportedSchemaVersion = 1
     /// Clips that must exist — there's no fallback target if these are missing.
-    static let requiredClips = ["idle", "walk"]
+    /// 2026-07-29 2D switch: relaxed from [idle, walk] to idle alone, so a
+    /// single base illustration is enough to run. walk moved to recommendedClips.
+    static let requiredClips = ["idle"]
     /// Clips that fall back to idle if missing, but are still warned about at startup.
     static let recommendedClips = [
-        "climb", "fall", "land", "point", "type", "listen", "react_click", "react_drag",
+        "walk", "climb", "fall", "land", "point", "type", "listen", "react_click", "react_drag",
+        "kick",
     ]
 
     /// Reads and loads ~/Library/Application Support/PetAgent/Avatars/{name}/manifest.json.

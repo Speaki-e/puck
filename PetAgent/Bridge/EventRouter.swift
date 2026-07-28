@@ -28,6 +28,11 @@ enum StateKind: Equatable, CaseIterable {
     case listen
     case reactClick
     case reactDrag
+    /// F12 (2026-07-29, optional ball-toy interaction): chase a thrown ball,
+    /// then kick it away. Never reachable from a socket event -- see
+    /// EventRouter.reaction(for:), which has no case producing these.
+    case chaseBall
+    case kickBall
 }
 
 /// The result of routing one BridgeEvent: an optional state transition, an

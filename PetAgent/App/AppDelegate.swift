@@ -332,9 +332,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// overlay window's local space, with our own overlay filtered out — the
     /// pet must not try to stand on the window it is drawn in.
     private func overlayLocalWindows(excluding overlay: NSWindow?) -> [WindowInfo] {
-        guard let watcher = windowListWatcher, let origin = overlayController?.windows.first?.frame.origin else {
+        guard
+            let watcher = windowListWatcher,
+            let overlayFrame = overlayController?.windows.first?.frame,
+            let screenSpace = GlobalScreenSpace.current()
+        else {
             return []
         }
+        // overlayFrame is AppKit space (bottom-left origin, Y-up); info.frame
+        // (from CGWindowListCopyWindowInfo) is already Quartz space (primary
+        // display top-left origin, Y-down) -- the same convention
+        // GlobalScreenSpace normalizes into. A straight subtraction of
+        // AppKit's origin with no Y-flip only happened to work for the
+        // primary display's overlay window (whose AppKit origin is (0,0));
+        // route through the same conversion GlobalScreenSpace itself uses for
+        // every other screen frame so a non-primary overlay window works too.
+        let origin = screenSpace.normalized(fromAppKit: CGPoint(x: overlayFrame.minX, y: overlayFrame.maxY))
         let overlayNumber = overlay.map { CGWindowID($0.windowNumber) }
         return watcher.windows.compactMap { info in
             guard info.windowID != overlayNumber else { return nil }

@@ -94,6 +94,21 @@ final class StateTransitionTests: XCTestCase {
         XCTAssertTrue(controller.currentState === walk)
     }
 
+    /// A StateKind case added later without updating the registration list
+    /// (AppDelegate's `register(_:as:)` calls) would otherwise silently
+    /// strand the pet with zero diagnostic. Behavior (a harmless no-op) is
+    /// unchanged; this only pins that it stays harmless and documents it.
+    func test_transition_toKind_withNothingRegistered_isANoOp() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let idle = SpyState(name: "Idle", clipKey: "idle")
+        let controller = CharacterController(initialState: idle, body: CharacterBody(avatar: avatar, position: .zero), sfxPlayer: sfx)
+
+        controller.transition(to: .walk) // never registered in this test
+
+        XCTAssertTrue(controller.currentState === idle)
+    }
+
     func test_transition_toSameState_isNoOp() {
         let avatar = SpyAvatarPlayable()
         let sfx = SpySFXTriggering()

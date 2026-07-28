@@ -59,7 +59,13 @@ final class CharacterController {
     /// Transition by kind — how states and EventRouter reactions ask, since
     /// neither holds concrete instances.
     func transition(to kind: StateKind) {
-        guard let state = states[kind] else { return }
+        guard let state = states[kind] else {
+            // Silent otherwise: a StateKind added later without a matching
+            // register(_:as:) call at bootstrap would strand the pet in its
+            // current state with zero diagnostic.
+            AppLogger.shared.log(.error, "transition(to:) requested unregistered StateKind \(kind) -- ignored")
+            return
+        }
         transition(to: state)
     }
 

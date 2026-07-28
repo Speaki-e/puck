@@ -15,9 +15,15 @@
 //
 
 import CoreGraphics
+import Foundation
 
 final class CharacterBody {
+    /// pet-app's own default bounce intensity when manifest.bounce_intensity
+    /// is absent (2026-07-29 2D switch, 02_pet-app.md F2).
+    static let defaultBounceIntensity = 0.6
+
     private let avatar: AvatarPlayable
+    private let bounceIntensity: Double
 
     var position: CGPoint {
         didSet { avatar.setScreenPosition(position) }
@@ -41,10 +47,15 @@ final class CharacterBody {
         avatar.stop()
     }
 
-    init(avatar: AvatarPlayable, position: CGPoint, facing: AvatarFacing = .right) {
+    func updateBounce(clip: String, elapsed: TimeInterval) {
+        avatar.updateBounce(clip: clip, elapsed: elapsed, intensity: bounceIntensity)
+    }
+
+    init(avatar: AvatarPlayable, position: CGPoint, facing: AvatarFacing = .right, bounceIntensity: Double = CharacterBody.defaultBounceIntensity) {
         self.avatar = avatar
         self.position = position
         self.facing = facing
+        self.bounceIntensity = bounceIntensity
         avatar.setScreenPosition(position)
     }
 }

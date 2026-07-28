@@ -68,12 +68,22 @@ struct AvatarManifest: Equatable, Codable {
     let name: String
     let type: AvatarType
     let scale: Double
+    /// 2026-07-29 2D switch, sprites-only: 0.0-1.0 multiplier for the
+    /// procedural squash-and-stretch "bounce" motion pet-app applies on top
+    /// of a static illustration (no animation frames to play). nil means
+    /// pet-app's own default; has no effect for usdz/video avatars.
+    let bounceIntensity: Double?
     let hitbox: Hitbox
     let clips: [String: ClipReference]
+    /// Optional, same stem-dictionary shape as `clips`, keyed by emotion name
+    /// (e.g. "happy"). Swapped to on a matching socket event; absent entirely
+    /// is fine for a base-image-only avatar.
+    let emotions: [String: ClipReference]?
     let sounds: [String: String]
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
-        case name, type, scale, hitbox, clips, sounds
+        case bounceIntensity = "bounce_intensity"
+        case name, type, scale, hitbox, clips, emotions, sounds
     }
 }

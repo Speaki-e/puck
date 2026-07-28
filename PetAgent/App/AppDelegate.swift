@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var screenManager: ScreenManager?
     private var overlayController: OverlayWindowController?
     private var characterController: CharacterController?
-    private var avatar: USDZAvatar?
+    private var avatar: SpriteAvatar?
     private var sfxPlayer: SFXPlayer?
     private var clickThroughController: ClickThroughController?
     private var avatarHitboxSize: CGSize = .zero
@@ -44,6 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private let listenState = ListenState()
     private let reactClickState = ReactClickState()
     private let reactDragState = ReactDragState()
+    // F12 (optional, lowest priority): ball-toy interaction.
+    private let chaseBallState = ChaseBallState()
+    private let kickBallState = KickBallState()
+    private var ballController: BallController?
 
     private let frameClock = FrameClock()
     private var idleFrameRate = IdleFrameRatePolicy()
@@ -133,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         let menuBar = MenuBarController()
         menuBar.onOpenSettings = { [weak self] in self?.showSettingsWindow() }
         menuBar.onSwitchAvatar = { [weak self] in self?.showAvatarManagementWindow() }
+        menuBar.onThrowBall = { [weak self] in self?.throwBall() }
         menuBar.onQuit = { NSApplication.shared.terminate(nil) }
         menuBarController = menuBar
     }
@@ -174,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         guard
             let window = overlayController.windows.first,
-            let arView = window.contentView as? PetARView
+            let spriteView = window.contentView as? SpriteLayerView
         else {
             return
         }
@@ -203,12 +208,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             return
         }
 
-        let mapper = ScreenSpaceMapper(viewportSize: window.frame.size)
-        let avatar = USDZAvatar(
+        let avatar = SpriteAvatar(
             avatarDirectory: avatarDirectory,
             loadResult: loadResult,
-            parent: arView.contentAnchor,
-            screenSpaceMapper: mapper
+            parent: spriteView.contentLayer
         )
         let initialPosition = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
         avatar.setScreenPosition(initialPosition)
@@ -234,7 +237,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         focusObserver.startObserving()
         focusModeObserver = focusObserver
 
-        let body = CharacterBody(avatar: avatar, position: initialPosition)
+        let body = CharacterBody(
+            avatar: avatar,
+            position: initialPosition,
+            bounceIntensity: loadResult.manifest.bounceIntensity ?? CharacterBody.defaultBounceIntensity
+        )
         characterBody = body
         let controller = CharacterController(initialState: idleState, body: body, sfxPlayer: sfxPlayer)
         for (kind, state) in [
@@ -243,6 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             (.fall, fallState), (.land, landState), (.moveTo, moveToState),
             (.point, pointState), (.type, typeState), (.listen, listenState),
             (.reactClick, reactClickState), (.reactDrag, reactDragState),
+            (.chaseBall, chaseBallState), (.kickBall, kickBallState),
         ] {
             controller.register(state, as: kind)
         }
@@ -267,6 +275,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         pointState.onEnter = { [weak self] in self?.beginPointingTimer() }
         characterController = controller
 
+        // F12 (optional, lowest priority): ball-toy interaction. Lives on the
+        // same sprite layer as the avatar so it reparents on display changes
+        // the same way.
+        let ball = BallController(parent: spriteView.contentLayer)
+        ball.onLanded = { [weak self] position in
+            guard let self, let controller = self.characterController else { return }
+            // Idle/Walk-only gate (F3's priority rule): the pet must not
+            // abandon an agent-driven task to go chase a ball.
+            guard controller.currentState === self.idleState || controller.currentState === self.walkState else { return }
+            self.chaseBallState.target = position
+            controller.transition(to: .chaseBall)
+        }
+        kickBallState.onEnter = { [weak self] in
+            self?.ballController?.kick(direction: self?.characterBody?.facing ?? .right)
+        }
+        ballController = ball
+
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
         // is the piece that uses it (click-through everywhere except over the
         // character), just never instantiated here.
@@ -288,7 +313,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         CGPoint(x: window.frame.origin.x + point.x, y: window.frame.origin.y + (window.frame.height - point.y))
     }
 
-    /// OverlayWindowController tears down and recreates every window+PetARView
+    /// OverlayWindowController tears down and recreates every window+SpriteLayerView
     /// on a real display change (monitor plug/unplug, resolution change).
     /// Without this, the avatar/click-through stayed parented to the now-gone
     /// window and silently disappeared. `avatar`/`clickThroughController` are
@@ -297,14 +322,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private func handleWindowsRebuilt() {
         guard
             let window = overlayController?.windows.first,
-            let arView = window.contentView as? PetARView,
+            let spriteView = window.contentView as? SpriteLayerView,
             let avatar
         else {
             return
         }
 
         let position = CGPoint(x: window.frame.width / 2, y: window.frame.height / 2)
-        avatar.reparent(to: arView.contentAnchor, screenSpaceMapper: ScreenSpaceMapper(viewportSize: window.frame.size))
+        avatar.reparent(to: spriteView.contentLayer)
+        ballController?.reparent(to: spriteView.contentLayer)
         // Through characterBody, not avatar directly -- its didSet is the
         // only path that's supposed to push position to the avatar. Setting
         // avatar.setScreenPosition() here left characterBody.position stale,
@@ -400,6 +426,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             guard let self else { return }
             self.characterController?.update(dt: dt)
             self.pointingController.tick(dt: dt)
+            if let controller = self.characterController, let ball = self.ballController, ball.isActive {
+                ball.tick(
+                    dt: dt,
+                    landingY: controller.landingY(ball.state?.position ?? .zero),
+                    roamableArea: controller.roamableArea
+                )
+            }
             // F1's idle downshift: a resting pet doesn't need 60fps.
             let isResting = self.characterController?.currentState === self.idleState
             self.frameClock.setFramesPerSecond(self.idleFrameRate.framesPerSecond(idle: isResting, dt: dt))
@@ -682,5 +715,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             screenPosition: globalAppKitPoint(fromWindowLocal: position, window: window),
             hitboxSize: avatarHitboxSize
         )
+    }
+
+    // MARK: - Ball toy (F12, optional)
+
+    /// Menu bar "Throw Ball" — spawns one ball at the cursor, which drops
+    /// straight down onto whatever's below it (F4's landing-surface logic,
+    /// same as Fall). One at a time: a second throw while one is still in
+    /// play is a no-op rather than piling up balls.
+    private func throwBall() {
+        guard let ball = ballController, !ball.isActive else { return }
+        let spawnPoint = windowLocalPoint(fromGlobalAppKit: NSEvent.mouseLocation)
+        ball.spawn(at: spawnPoint)
     }
 }

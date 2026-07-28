@@ -11,6 +11,9 @@ import AppKit
 final class MenuBarController {
     var onOpenSettings: (() -> Void)?
     var onSwitchAvatar: (() -> Void)?
+    /// F12 (optional): spawns a ball the pet chases and kicks away. Lowest
+    /// priority, purely decorative -- see 02_pet-app.md F12.
+    var onThrowBall: (() -> Void)?
     var onQuit: (() -> Void)?
 
     private let statusItem: NSStatusItem
@@ -22,6 +25,7 @@ final class MenuBarController {
         let menu = NSMenu()
         menu.addItem(withTitle: "Settings…", action: #selector(handleOpenSettings), keyEquivalent: ",").target = self
         menu.addItem(withTitle: "Switch Avatar…", action: #selector(handleSwitchAvatar), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Throw Ball", action: #selector(handleThrowBall), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit PetAgent", action: #selector(handleQuit), keyEquivalent: "q").target = self
         statusItem.menu = menu
@@ -29,5 +33,6 @@ final class MenuBarController {
 
     @objc private func handleOpenSettings() { onOpenSettings?() }
     @objc private func handleSwitchAvatar() { onSwitchAvatar?() }
+    @objc private func handleThrowBall() { onThrowBall?() }
     @objc private func handleQuit() { onQuit?() }
 }

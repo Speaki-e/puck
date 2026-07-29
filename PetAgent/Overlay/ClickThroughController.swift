@@ -145,7 +145,11 @@ final class ClickThroughController {
     /// hitbox is still never clickable -- that's an unconfigured/loading
     /// avatar, not a small one, and padding shouldn't manufacture a
     /// clickable area out of nothing.
-    static let hitTestPadding: CGFloat = 40
+    ///
+    /// Trimmed down slightly (2026-07-29, byeolki: "히트박스 넘모 큰데 아주
+    /// 살짝만 줄여볼까") -- 40 read as too generous once the full expression
+    /// set was in daily use; still forgiving, just less so.
+    static let hitTestPadding: CGFloat = 28
 
     /// The character's full, unpadded body rect: the ground point plus
     /// hitboxSize, flipped by isUpsideDown. `shouldAllowClicks` pads this on

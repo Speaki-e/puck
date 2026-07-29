@@ -27,6 +27,14 @@ enum ScreenBounds {
     /// Below this, a bounce is not worth playing: the pet would jitter
     /// against the edge in ever-smaller hops instead of settling.
     static let minimumBounceSpeed: CGFloat = 60
+    /// Landing loses more energy per bounce than a wall/ceiling hit does — a
+    /// soft flop onto the ground, not a rubber ball off a wall (byeolki:
+    /// "퉁퉁 튕겨서 사악 미끄러지게" wants a couple of quick, decaying
+    /// thumps, not a long bouncy rally).
+    static let landingRestitution: CGFloat = 0.35
+    /// Below this, the pet just rests on the floor rather than playing an
+    /// imperceptible micro-bounce.
+    static let minimumLandingBounceSpeed: CGFloat = 100
 
     struct Bounce: Equatable {
         /// The position with the pet's outline pushed back inside.
@@ -112,13 +120,36 @@ enum ScreenBounds {
         return Bounce(position: CGPoint(x: position.x, y: reflected.coordinate), velocity: reflected.velocity)
     }
 
+    /// One frame of downward travel that bounces off a landing surface
+    /// instead of stopping dead on it — byeolki: "퉁퉁 튕겨서 사악
+    /// 미끄러지게" (a hard landing, e.g. after being thrown and bouncing off
+    /// a wall, should visibly bounce a couple of times before it settles,
+    /// not freeze the instant it touches down). `floorY` is F4's landing
+    /// surface (a window top edge or the screen bottom), not a fixed area
+    /// edge — dynamic the same way ceiling/wall bounces aren't.
+    static func bounceOffFloor(position: CGPoint, velocity: CGFloat, floorY: CGFloat) -> Bounce {
+        guard velocity > 0, position.y >= floorY else {
+            return Bounce(position: position, velocity: velocity)
+        }
+
+        let reflected = reflect(
+            position.y, at: floorY, velocity: velocity,
+            restitution: landingRestitution, minimumBounceSpeed: minimumLandingBounceSpeed
+        )
+        return Bounce(position: CGPoint(x: position.x, y: reflected.coordinate), velocity: reflected.velocity)
+    }
+
     /// The bounce itself, on whichever single axis is hitting an edge — the
     /// arithmetic is one-dimensional, so the callers own the CGPoint and this
-    /// stays free of any left/right/up/down special cases.
+    /// stays free of any left/right/up/down special cases. `restitution`/
+    /// `minimumBounceSpeed` default to the wall/ceiling tuning; bounceOffFloor
+    /// passes its own, lossier pair.
     private static func reflect(
         _ coordinate: CGFloat,
         at limit: CGFloat,
-        velocity: CGFloat
+        velocity: CGFloat,
+        restitution: CGFloat = Self.restitution,
+        minimumBounceSpeed: CGFloat = Self.minimumBounceSpeed
     ) -> (coordinate: CGFloat, velocity: CGFloat) {
         let speed = abs(velocity) * restitution
         guard speed >= minimumBounceSpeed else {

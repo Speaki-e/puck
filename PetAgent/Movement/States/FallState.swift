@@ -28,6 +28,11 @@ final class FallState: StateHandler {
     private var horizontalVelocity: CGFloat = 0
     private var hasLanded = false
     private var hasTakenLaunchVelocity = false
+    /// True once gravity has brought the pet down onto the landing surface
+    /// at least once (a bounce or the final rest) -- byeolki: "퉁퉁 튕겨서
+    /// 사악 미끄러지게". Ground friction only applies from here on, so
+    /// mid-air/wall-bounce speed during the throw itself is unaffected.
+    private var hasTouchedGround = false
 
     func enter() {
         // From rest every time: carrying the previous fall's velocity would
@@ -35,6 +40,7 @@ final class FallState: StateHandler {
         velocity = 0
         horizontalVelocity = 0
         hasLanded = false
+        hasTouchedGround = false
         // enter() has no context, so the throw is picked up on frame one.
         hasTakenLaunchVelocity = false
     }
@@ -48,6 +54,10 @@ final class FallState: StateHandler {
             horizontalVelocity = context.body.launchVelocity.x
             // Consumed, so it can't leak into the next, untossed fall.
             context.body.launchVelocity = .zero
+        }
+
+        if hasTouchedGround {
+            horizontalVelocity = MovementSolver.applyGroundFriction(horizontalVelocity, dt: dt)
         }
 
         // A fall off the ceiling must land right-side up regardless of which
@@ -68,8 +78,12 @@ final class FallState: StateHandler {
             position: carried,
             velocity: velocity,
             dt: dt,
-            landingY: context.landingY(carried)
+            landingY: context.landingY(carried),
+            bounceOnLanding: true
         )
+        if step.touchedFloor {
+            hasTouchedGround = true
+        }
 
         // Thrown upward, the pet has to come off the top of the screen the
         // same way it comes off the sides -- otherwise a hard upward throw

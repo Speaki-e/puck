@@ -40,12 +40,28 @@ enum WindowSupport {
 
     /// The window edge a pet walking from `position` toward `target` runs into
     /// first, if any — the trigger for Walk -> Climb.
-    static func blockingWindow(walkingFrom position: CGPoint, toward target: CGPoint, in windows: [WindowInfo]) -> WindowInfo? {
+    ///
+    /// `roamableTop`/`avatarHeight` (F3, 2026-07-29): a window whose top edge
+    /// doesn't leave a full avatar height of headroom above it (a
+    /// near-fullscreen or maximized window) is excluded rather than climbed --
+    /// climbing it would clip the character's head off the top of the screen,
+    /// the same geometry problem ceiling-crawling had. Defaults keep every
+    /// existing caller's behavior unchanged unless they opt in.
+    static func blockingWindow(
+        walkingFrom position: CGPoint,
+        toward target: CGPoint,
+        in windows: [WindowInfo],
+        roamableTop: CGFloat = -.greatestFiniteMagnitude,
+        avatarHeight: CGFloat = 0
+    ) -> WindowInfo? {
         let goingRight = target.x > position.x
         return windows
             .filter { window in
                 // Must be at the pet's height to be in the way at all.
                 position.y >= window.frame.minY && position.y <= window.frame.maxY
+            }
+            .filter { window in
+                window.frame.minY - roamableTop >= avatarHeight
             }
             .filter { window in
                 let edge = goingRight ? window.frame.minX : window.frame.maxX

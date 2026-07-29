@@ -41,6 +41,27 @@ final class WalkStateWindowTests: XCTestCase {
         XCTAssertEqual(world.body.position.x, 300, accuracy: MovementSolver.arrivalRadius + 1)
     }
 
+    /// A window tall enough to leave no headroom above it (near-fullscreen)
+    /// is skipped rather than climbed -- climbing it would clip the
+    /// character's head off the top of the screen, the same geometry
+    /// problem ceiling-crawling had (byeolki: "화면이 다 차있는 창은 그
+    /// 위로 올라가면 캐릭터가 짤려버리니까 그런 창 위에는 안 올라갔으면
+    /// 좋겠어").
+    func test_windowTooTallToClimbWithoutClipping_isNotTreatedAsBlocking() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 500))
+        world.avatarHeight = 140
+        // roamableArea.minY defaults to 0; the window's top edge is only
+        // 50px below it -- far less than the 140px of headroom needed.
+        world.windows = [window(x: 300, y: 50, width: 400, height: 450)]
+        let state = WalkState()
+        state.target = CGPoint(x: 900, y: 500)
+
+        world.run(state, seconds: 10)
+
+        XCTAssertEqual(world.requestedTransitions, [.idle], "should walk straight past, not climb")
+        XCTAssertEqual(world.body.position.x, 900, accuracy: MovementSolver.arrivalRadius)
+    }
+
     func test_windowOutOfTheWay_doesNotInterruptTheWalk() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 500))
         world.windows = [window(x: 300, y: 20, width: 400, height: 100)] // far above the pet

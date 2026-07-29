@@ -28,6 +28,10 @@ final class SpriteAvatar: AvatarPlayable {
     private var facing: AvatarFacing = .right
     private var currentBounce = BounceTransform.identity
     private var isUpsideDown = false
+    /// The last logical position passed to setScreenPosition, so
+    /// setUpsideDown can immediately recompute the rendered offset for it --
+    /// see setUpsideDown's doc comment.
+    private var lastPosition: CGPoint = .zero
 
     init(avatarDirectory: URL, loadResult: AvatarLoadResult, parent: CALayer) {
         self.avatarDirectory = avatarDirectory
@@ -74,6 +78,7 @@ final class SpriteAvatar: AvatarPlayable {
         // the layer's top edge, that attachment point is the layer's top
         // edge too. Getting this offset's sign wrong doesn't just look
         // wrong, it pushes the whole sprite off the top of the screen.
+        lastPosition = position
         let verticalOffset = isUpsideDown ? spriteLayer.bounds.height / 2 : -spriteLayer.bounds.height / 2
         spriteLayer.position = CGPoint(x: position.x, y: position.y + verticalOffset)
     }
@@ -92,10 +97,18 @@ final class SpriteAvatar: AvatarPlayable {
     /// F3 ceiling-crawling. A Y-only flip (not a 180deg rotation) so the
     /// walking-direction/facing semantics stay correct while upside-down --
     /// a full rotation would also reverse the apparent direction of motion.
+    ///
+    /// Also immediately re-applies setScreenPosition's offset for the cached
+    /// last position, not just the transform -- otherwise there's a one-frame
+    /// window (right when CeilingState hands off to FallState, which resets
+    /// isUpsideDown before its own first position update runs) where the
+    /// flip is already correct but the position is still offset for the OLD
+    /// orientation, a visible pop that reads as a stutter/teleport.
     func setUpsideDown(_ isUpsideDown: Bool) {
         guard isUpsideDown != self.isUpsideDown else { return }
         self.isUpsideDown = isUpsideDown
         applyTransform()
+        setScreenPosition(lastPosition)
     }
 
     /// Settings' size slider. Recomputes from the original manifest hitbox

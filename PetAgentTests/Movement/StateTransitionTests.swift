@@ -98,6 +98,25 @@ final class StateTransitionTests: XCTestCase {
         XCTAssertTrue(controller.currentState === walk)
     }
 
+    /// Any state can be interrupted by any other (a click, a drag, an agent
+    /// command) -- if the pet gets grabbed mid-ceiling-crawl, only
+    /// CeilingState itself asks to stay upside-down; every other state must
+    /// come back right-side-up on entry, not just Fall's own reset (which
+    /// never runs at all when Ceiling is interrupted directly into ReactDrag).
+    func test_transitioningAwayFromCeiling_resetsUpsideDown() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let body = CharacterBody(avatar: avatar, position: .zero)
+        let ceiling = CeilingState(durationProvider: { 100 })
+        let dragState = SpyState(name: "ReactDrag", clipKey: "react_drag", loopsClip: true)
+        let controller = CharacterController(initialState: ceiling, body: body, sfxPlayer: sfx)
+        body.isUpsideDown = true // as if CeilingState.update() had already flipped it
+
+        controller.transition(to: dragState)
+
+        XCTAssertFalse(body.isUpsideDown)
+    }
+
     /// A StateKind case added later without updating the registration list
     /// (AppDelegate's `register(_:as:)` calls) would otherwise silently
     /// strand the pet with zero diagnostic. Behavior (a harmless no-op) is

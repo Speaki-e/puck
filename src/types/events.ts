@@ -63,20 +63,28 @@ export interface ToolResult {
 /**
  * workspace -> pet-app: state events that drive the pet's reactions.
  *
- * await_approval's approval_id/workspace_id/session_id (2026-07-29) exist because
- * the approval UI itself now lives in pet-app's F13 client window rather than
- * workspace's own renderer -- resolving it has to round-trip the socket via
- * ApprovalResponse, so the event needs enough to route that response back to
- * the right pending `resolve` (plan/01_protocol.md 3.6).
+ * await_approval's approval_id (2026-07-29) exists because the approval UI
+ * itself now lives in pet-app's F13 client window rather than workspace's own
+ * renderer -- resolving it has to round-trip the socket via ApprovalResponse,
+ * so the event needs enough to route that response back to the right pending
+ * `resolve` (plan/01_protocol.md 3.6). workspace_id/session_id live on the
+ * wrapper (BridgeEventMessage below), since every event kind needs them once
+ * multiple sessions can be open at once -- not just await_approval.
  */
 export type BridgeEvent =
   | { event: "agent_thinking" }
   | { event: "tool_call"; tool: string; detail?: JSONValue }
   | { event: "tool_result"; ok: boolean }
-  | { event: "await_approval"; summary: string; approval_id: string; workspace_id: string; session_id: string }
+  | { event: "await_approval"; summary: string; approval_id: string }
   | { event: "agent_done"; ok: boolean; summary: string };
 
-export type BridgeEventMessage = { type: "event" } & BridgeEvent;
+/**
+ * workspace_id/session_id (2026-07-29) route the event to the right chat
+ * session in pet-app's F13 client window -- without them, once more than one
+ * session is open, pet-app has no way to tell which session's timeline an
+ * incoming agent_thinking/tool_call/tool_result/agent_done belongs to.
+ */
+export type BridgeEventMessage = { type: "event"; workspace_id: string; session_id: string } & BridgeEvent;
 
 export type UserInputSource = "voice" | "text";
 

@@ -39,16 +39,17 @@ struct ToolResult: Equatable {
 
 /// workspace -> pet-app: state events driving the pet's reactions (protocol 3.2).
 ///
-/// awaitApproval's approvalId/workspaceId/sessionId (2026-07-29) exist because the
-/// approval UI itself now lives in pet-app's F13 client window rather than workspace's
-/// own renderer -- resolving it has to round-trip the socket via ApprovalResponse
-/// (protocol 3.6), so the event needs enough to route that response to the right
-/// pending resolve.
+/// awaitApproval's approvalId (2026-07-29) exists because the approval UI itself now
+/// lives in pet-app's F13 client window rather than workspace's own renderer --
+/// resolving it has to round-trip the socket via ApprovalResponse (protocol 3.6), so
+/// the event needs enough to route that response to the right pending resolve.
+/// workspaceId/sessionId live on BridgeMessage.event's wrapper, not here -- every
+/// event kind needs them once more than one session can be open, not just this one.
 enum BridgeEvent: Equatable {
     case agentThinking
     case toolCall(tool: String, detail: JSONValue?)
     case toolResult(ok: Bool)
-    case awaitApproval(summary: String, approvalId: String, workspaceId: String, sessionId: String)
+    case awaitApproval(summary: String, approvalId: String)
     case agentDone(ok: Bool, summary: String)
 }
 
@@ -125,7 +126,11 @@ enum BridgeMessage: Equatable {
     /// Unknown/already-completed ids are ignored (idempotent).
     case toolCancel(id: String)
     case toolResult(ToolResult)
-    case event(BridgeEvent)
+    /// workspaceId/sessionId (2026-07-29) route the event to the right chat
+    /// session in pet-app's F13 client window -- without them, once more than
+    /// one session is open, pet-app has no way to tell which session's
+    /// timeline an incoming event belongs to.
+    case event(BridgeEvent, workspaceId: String, sessionId: String)
     case userInput(UserInput)
 
     // --- sessions/workspaces (2026-07-29, protocol 3.4) ---
@@ -227,35 +232,31 @@ extension BridgeMessage: Codable {
             )
 
         case .event:
+            let workspaceId = try container.decode(String.self, forKey: .workspaceId)
+            let sessionId = try container.decode(String.self, forKey: .sessionId)
+            let event: BridgeEvent
             switch try container.decode(EventKey.self, forKey: .event) {
             case .agentThinking:
-                self = .event(.agentThinking)
+                event = .agentThinking
             case .toolCall:
-                self = .event(
-                    .toolCall(
-                        tool: try container.decode(String.self, forKey: .tool),
-                        detail: try container.decodeIfPresent(JSONValue.self, forKey: .detail)
-                    )
+                event = .toolCall(
+                    tool: try container.decode(String.self, forKey: .tool),
+                    detail: try container.decodeIfPresent(JSONValue.self, forKey: .detail)
                 )
             case .toolResult:
-                self = .event(.toolResult(ok: try container.decode(Bool.self, forKey: .ok)))
+                event = .toolResult(ok: try container.decode(Bool.self, forKey: .ok))
             case .awaitApproval:
-                self = .event(
-                    .awaitApproval(
-                        summary: try container.decode(String.self, forKey: .summary),
-                        approvalId: try container.decode(String.self, forKey: .approvalId),
-                        workspaceId: try container.decode(String.self, forKey: .workspaceId),
-                        sessionId: try container.decode(String.self, forKey: .sessionId)
-                    )
+                event = .awaitApproval(
+                    summary: try container.decode(String.self, forKey: .summary),
+                    approvalId: try container.decode(String.self, forKey: .approvalId)
                 )
             case .agentDone:
-                self = .event(
-                    .agentDone(
-                        ok: try container.decode(Bool.self, forKey: .ok),
-                        summary: try container.decode(String.self, forKey: .summary)
-                    )
+                event = .agentDone(
+                    ok: try container.decode(Bool.self, forKey: .ok),
+                    summary: try container.decode(String.self, forKey: .summary)
                 )
             }
+            self = .event(event, workspaceId: workspaceId, sessionId: sessionId)
 
         case .userInput:
             self = .userInput(
@@ -340,8 +341,10 @@ extension BridgeMessage: Codable {
             try container.encodeIfPresent(result.error, forKey: .error)
             try container.encodeIfPresent(result.detail, forKey: .detail)
 
-        case .event(let event):
+        case .event(let event, let workspaceId, let sessionId):
             try container.encode(TypeKey.event, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
+            try container.encode(sessionId, forKey: .sessionId)
             switch event {
             case .agentThinking:
                 try container.encode(EventKey.agentThinking, forKey: .event)
@@ -352,12 +355,10 @@ extension BridgeMessage: Codable {
             case .toolResult(let ok):
                 try container.encode(EventKey.toolResult, forKey: .event)
                 try container.encode(ok, forKey: .ok)
-            case .awaitApproval(let summary, let approvalId, let workspaceId, let sessionId):
+            case .awaitApproval(let summary, let approvalId):
                 try container.encode(EventKey.awaitApproval, forKey: .event)
                 try container.encode(summary, forKey: .summary)
                 try container.encode(approvalId, forKey: .approvalId)
-                try container.encode(workspaceId, forKey: .workspaceId)
-                try container.encode(sessionId, forKey: .sessionId)
             case .agentDone(let ok, let summary):
                 try container.encode(EventKey.agentDone, forKey: .event)
                 try container.encode(ok, forKey: .ok)

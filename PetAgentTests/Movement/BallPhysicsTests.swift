@@ -241,3 +241,62 @@ final class BallPhysicsTests: XCTestCase {
         XCTAssertEqual(next, state)
     }
 }
+
+/// A toy that has landed still has to notice when what it landed on goes
+/// away (byeolki: "펫이 움직이면 장난감이 공중부양을 해", 2026-07-30).
+final class BallRestingSurfaceTests: XCTestCase {
+    private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
+
+    func test_aRestingToyStaysPutWhileItsSurfaceIsThere() {
+        let state = BallState(position: CGPoint(x: 500, y: 400), phase: .resting)
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: 400, roamableArea: roamableArea)
+
+        XCTAssertEqual(next.phase, .resting)
+        XCTAssertEqual(next.position, state.position)
+    }
+
+    /// The pet walks out from under it: the floor is now much further down.
+    func test_aRestingToyFallsOnceItsSurfaceGoesAway() {
+        let state = BallState(position: CGPoint(x: 500, y: 400), phase: .resting)
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: 560, roamableArea: roamableArea)
+
+        XCTAssertEqual(next.phase, .falling, "left floating in mid-air")
+    }
+
+    /// ...and then actually lands on whatever was underneath.
+    func test_aToyLeftInMidAirLandsOnTheFloorBelow() {
+        var state = BallState(position: CGPoint(x: 500, y: 400), phase: .resting)
+
+        // Not `where state.phase != .resting` -- it starts resting, which
+        // would skip every iteration and test nothing.
+        for _ in 0..<600 {
+            state = BallPhysics.step(state, dt: 1.0 / 60, landingY: 560, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(state.phase, .resting)
+        XCTAssertEqual(state.position.y, 560, accuracy: 0.01)
+    }
+
+    /// A toy that has just settled must not immediately decide it's floating
+    /// -- landing leaves it a rounding error away from its surface.
+    func test_aToyThatJustSettledDoesNotImmediatelyRefall() {
+        let state = BallState(position: CGPoint(x: 500, y: 400 - 0.2), phase: .resting)
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: 400, roamableArea: roamableArea)
+
+        XCTAssertEqual(next.phase, .resting)
+    }
+
+    /// Something can also appear underneath it -- a window opening below a
+    /// toy is not a reason to launch it upward.
+    func test_aSurfaceRisingUnderneathDoesNotMoveIt() {
+        let state = BallState(position: CGPoint(x: 500, y: 400), phase: .resting)
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: 300, roamableArea: roamableArea)
+
+        XCTAssertEqual(next.phase, .resting)
+        XCTAssertEqual(next.position, state.position)
+    }
+}

@@ -11,13 +11,15 @@ import AppKit
 final class MenuBarController {
     var onOpenSettings: (() -> Void)?
     var onSwitchAvatar: (() -> Void)?
-    /// F12 (optional): spawns a ball the pet chases and kicks away. Lowest
-    /// priority, purely decorative -- see 02_pet-app.md F12.
-    /// Which toy to fetch. The menu is where the toy is summoned from, so it
-    /// is also where it gets picked -- Settings keeps the same choice, but
-    /// having to go there first to change what "throw" throws is a step
-    /// nobody expects (byeolki: "메뉴에서 지팡이 추가가 없는데", 2026-07-29).
-    var onThrowToy: ((Toy) -> Void)?
+    /// F12 (optional): the toys the pet plays with. Lowest priority, purely
+    /// decorative -- see 02_pet-app.md F12.
+    ///
+    /// Each entry is an on/off switch for one toy rather than a "throw"
+    /// action, and several can be on at once (byeolki: "메뉴를 열면 밑에
+    /// 이미지와 함께 장난감 이름이 나오고 그걸 눌러서 나오게하고 다시 눌러서
+    /// 없애는", 2026-07-30). AppDelegate answers with what is out afterwards,
+    /// via `setToysOut` -- the menu never assumes its own toggle took.
+    var onToggleToy: ((Toy) -> Void)?
     /// byeolki's request, 2026-07-29: hide/show the pet without quitting.
     var onToggleVisibility: (() -> Void)?
     var onQuit: (() -> Void)?
@@ -27,8 +29,8 @@ final class MenuBarController {
     private let switchAvatarItem: NSMenuItem
     /// One entry per toy in the catalogue, built once -- adding a toy to
     /// ToyCatalogue puts it in this menu with no further wiring.
-    private let throwToyItem: NSMenuItem
-    private let throwToyMenu = NSMenu()
+    private let toysItem: NSMenuItem
+    private let toysMenu = NSMenu()
     private let visibilityMenuItem: NSMenuItem
     private let quitItem: NSMenuItem
     /// setVisibilityLabel's callers don't know the current language --
@@ -44,7 +46,7 @@ final class MenuBarController {
 
         settingsItem = NSMenuItem(title: "", action: #selector(handleOpenSettings), keyEquivalent: ",")
         switchAvatarItem = NSMenuItem(title: "", action: #selector(handleSwitchAvatar), keyEquivalent: "")
-        throwToyItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        toysItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         visibilityMenuItem = NSMenuItem(title: "", action: #selector(handleToggleVisibility), keyEquivalent: "h")
         quitItem = NSMenuItem(title: "", action: #selector(handleQuit), keyEquivalent: "q")
 
@@ -53,17 +55,18 @@ final class MenuBarController {
         }
 
         for (index, toy) in ToyCatalogue.all.enumerated() {
-            let item = NSMenuItem(title: "", action: #selector(handleThrowToy(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: "", action: #selector(handleToggleToy(_:)), keyEquivalent: "")
             item.target = self
             item.tag = index // the catalogue index, read back in the handler
-            throwToyMenu.addItem(item)
+            item.image = ToyThumbnail.image(for: toy)
+            toysMenu.addItem(item)
         }
-        throwToyItem.submenu = throwToyMenu
+        toysItem.submenu = toysMenu
 
         let menu = NSMenu()
         menu.addItem(settingsItem)
         menu.addItem(switchAvatarItem)
-        menu.addItem(throwToyItem)
+        menu.addItem(toysItem)
         menu.addItem(visibilityMenuItem)
         menu.addItem(.separator())
         menu.addItem(quitItem)
@@ -80,9 +83,9 @@ final class MenuBarController {
         self.language = language
         settingsItem.title = Strings.text(.menuSettings, language)
         switchAvatarItem.title = Strings.text(.menuSwitchAvatar, language)
-        throwToyItem.title = Strings.text(.menuThrowToy, language)
-        for (index, toy) in ToyCatalogue.all.enumerated() where index < throwToyMenu.items.count {
-            throwToyMenu.items[index].title = Strings.text(Self.label(for: toy), language)
+        toysItem.title = Strings.text(.menuToys, language)
+        for (index, toy) in ToyCatalogue.all.enumerated() where index < toysMenu.items.count {
+            toysMenu.items[index].title = Strings.text(Self.label(for: toy), language)
         }
         quitItem.title = Strings.text(.menuQuit, language)
         setVisibilityLabel(isHidden: isCharacterHidden)
@@ -98,9 +101,18 @@ final class MenuBarController {
 
     @objc private func handleOpenSettings() { onOpenSettings?() }
     @objc private func handleSwitchAvatar() { onSwitchAvatar?() }
-    @objc private func handleThrowToy(_ sender: NSMenuItem) {
+    @objc private func handleToggleToy(_ sender: NSMenuItem) {
         guard ToyCatalogue.all.indices.contains(sender.tag) else { return }
-        onThrowToy?(ToyCatalogue.all[sender.tag])
+        onToggleToy?(ToyCatalogue.all[sender.tag])
+    }
+
+    /// Ticks the toys that are currently out. Same contract as
+    /// `setVisibilityLabel`: pushed by AppDelegate from real state, so a
+    /// toggle that didn't happen doesn't leave a checkmark lying about.
+    func setToysOut(_ names: Set<String>) {
+        for (index, toy) in ToyCatalogue.all.enumerated() where index < toysMenu.items.count {
+            toysMenu.items[index].state = names.contains(toy.name) ? .on : .off
+        }
     }
 
     /// Toy names are catalogue data; their menu labels are translated text.

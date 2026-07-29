@@ -28,7 +28,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case volumeLabel, muteLabel, autoMuteLabel
 
-    case avoidClimbingLabel, speedLabel, toySizeLabel, toyLabel, toyPumpkin, toyWand
+    case avoidClimbingLabel, speedLabel, toySizeLabel, toyPumpkin, toyWand
 
     case avatarsHeader, importAvatarButton, importPanelPrompt
     case sizeHeader
@@ -44,7 +44,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case updatedEmotionFormat
     case failedToSetEmotionFormat
 
-    case menuSettings, menuSwitchAvatar, menuThrowToy, menuHide, menuShow, menuQuit
+    case menuSettings, menuSwitchAvatar, menuToys, menuHide, menuShow, menuQuit
 }
 
 enum Strings {
@@ -86,7 +86,6 @@ enum Strings {
         ],
         .speedLabel: [.english: "Speed", .korean: "이동 속도"],
         .toySizeLabel: [.english: "Toy size", .korean: "장난감 크기"],
-        .toyLabel: [.english: "Toy", .korean: "장난감"],
         .toyPumpkin: [.english: "Pumpkin", .korean: "호박"],
         .toyWand: [.english: "Wand", .korean: "지팡이"],
 
@@ -128,7 +127,7 @@ enum Strings {
 
         .menuSettings: [.english: "Settings…", .korean: "설정…"],
         .menuSwitchAvatar: [.english: "Switch Avatar…", .korean: "아바타 변경…"],
-        .menuThrowToy: [.english: "Throw toy", .korean: "장난감 던지기"],
+        .menuToys: [.english: "Toys", .korean: "장난감"],
         .menuHide: [.english: "Hide", .korean: "숨기기"],
         .menuShow: [.english: "Show", .korean: "보이기"],
         .menuQuit: [.english: "Quit PetAgent", .korean: "PetAgent 종료"],

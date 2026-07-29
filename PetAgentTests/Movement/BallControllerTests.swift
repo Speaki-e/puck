@@ -621,8 +621,9 @@ extension BallToyCarryTests {
         XCTAssertNotEqual(controller.layer.affineTransform().b, 0, "not spinning in flight")
     }
 
-    /// ...and lands upright, rather than coming to rest on its side.
-    func test_aSpinToySettlesUpright() {
+    /// ...and stops spinning once it lands, settling into whatever
+    /// orientation that toy rests in (for the wand, on its side).
+    func test_aSpinToyStopsSpinningWhenItLands() {
         let controller = toy()
         controller.grab()
         controller.move(to: CGPoint(x: 400, y: 100))
@@ -633,7 +634,13 @@ extension BallToyCarryTests {
         }
 
         XCTAssertEqual(controller.state?.phase, .resting)
-        XCTAssertEqual(controller.layer.affineTransform(), .identity, "came to rest on its side")
+        let settled = controller.layer.affineTransform()
+
+        // Ticking further must not move it any more -- a toy that kept
+        // spinning where it lay would never look settled.
+        controller.tick(dt: 0.5, landingY: 500, roamableArea: roamableArea)
+
+        XCTAssertEqual(controller.layer.affineTransform(), settled, "still turning after it landed")
     }
 
     /// A toy that doesn't twirl must not start doing so in flight.
@@ -647,5 +654,166 @@ extension BallToyCarryTests {
         controller.tick(dt: 0.1, landingY: 5000, roamableArea: roamableArea)
 
         XCTAssertEqual(controller.layer.affineTransform(), .identity)
+    }
+}
+
+/// A long toy comes to rest lying on its side, not standing on its end
+/// (byeolki: "이 긴 막대가 계속 이미지의 형태로 비정상적으로 서있는데",
+/// 2026-07-30).
+final class BallToyRestingOrientationTests: XCTestCase {
+    private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
+
+    private func landed(_ toy: Toy, floor: CGFloat = 500) -> BallController {
+        let controller = BallController(parent: CALayer(), toy: toy)
+        controller.spawn(at: CGPoint(x: 300, y: 50))
+        for _ in 0..<900 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+        }
+        return controller
+    }
+
+    /// Whether the layer is turned about a quarter turn.
+    private func isOnItsSide(_ controller: BallController) -> Bool {
+        abs(controller.layer.affineTransform().b) > 0.9
+    }
+
+    func test_aLongToyLandsLyingDown() {
+        let wand = landed(ToyCatalogue.wand)
+
+        XCTAssertEqual(wand.state?.phase, .resting)
+        XCTAssertTrue(isOnItsSide(wand), "the wand is standing on its end")
+        XCTAssertGreaterThan(
+            wand.visualBounds.width,
+            wand.visualBounds.height,
+            "its footprint must be the shape it's actually drawn in"
+        )
+    }
+
+    /// Whatever orientation it rests in, it has to rest ON the floor -- the
+    /// outline used for landing must match the one it ends up drawn in, or a
+    /// wand hovers a stick-length above the ground or sinks into it.
+    func test_aLongToyRestsExactlyOnTheFloor() {
+        let floor: CGFloat = 500
+        let wand = landed(ToyCatalogue.wand, floor: floor)
+
+        XCTAssertEqual(
+            (wand.state?.position.y ?? 0) + wand.visualBounds.maxY,
+            floor,
+            accuracy: 0.01,
+            "not sitting on the floor"
+        )
+    }
+
+    /// A round toy has no reason to tip over.
+    func test_aRoundToyRestsUpright() {
+        let pumpkin = landed(ToyCatalogue.pumpkin)
+
+        XCTAssertFalse(isOnItsSide(pumpkin))
+    }
+
+    /// Picking it up straightens it; letting it land lies it down again.
+    func test_pickingItUpStraightensItAndDroppingItLiesItDownAgain() {
+        let wand = landed(ToyCatalogue.wand)
+        let restingTilt = wand.layer.affineTransform()
+
+        wand.grab()
+        XCTAssertEqual(wand.layer.affineTransform(), .identity, "still tilted in the hand")
+
+        wand.move(to: CGPoint(x: 400, y: 100))
+        wand.release()
+        for _ in 0..<900 where wand.state?.phase != .resting {
+            wand.tick(dt: 1.0 / 60, landingY: 500, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(wand.layer.affineTransform(), restingTilt, "should settle the same way it did before")
+    }
+}
+
+/// Bouncing a toy off whatever it just landed on (byeolki: "머리 위에 두면
+/// 통통 튕겨서 내려가게", 2026-07-30).
+final class BallToyBounceTests: XCTestCase {
+    private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
+
+    /// Drops a toy from `height` above the surface so it arrives with real
+    /// speed, as one dropped on the pet's head would.
+    private func landedToy(fallingFrom height: CGFloat = 300, floor: CGFloat = 500) -> BallController {
+        let controller = BallController(parent: CALayer(), toy: ToyCatalogue.pumpkin)
+        controller.spawn(at: CGPoint(x: 500, y: floor - height))
+        for _ in 0..<900 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+        }
+        return controller
+    }
+
+    func test_bouncingSendsItBackUpAndSideways() {
+        let controller = landedToy()
+
+        controller.bounce(drift: 90)
+
+        XCTAssertEqual(controller.state?.phase, .kicked)
+        XCTAssertLessThan(controller.state?.verticalVelocity ?? 0, 0, "should be heading up")
+        XCTAssertEqual(controller.state?.horizontalVelocity, 90, "should drift off the surface")
+    }
+
+    /// Proportional to the arrival, using the shared restitution -- a gentle
+    /// placement and a hurled toy shouldn't bounce identically.
+    func test_theBounceIsProportionalToHowHardItLanded() {
+        let gentle = landedToy(fallingFrom: 40)
+        let hard = landedToy(fallingFrom: 400)
+
+        gentle.bounce(drift: 0)
+        hard.bounce(drift: 0)
+
+        XCTAssertGreaterThan(
+            abs(hard.state?.verticalVelocity ?? 0),
+            abs(gentle.state?.verticalVelocity ?? 0),
+            "a harder landing should bounce higher"
+        )
+    }
+
+    /// A toy that barely arrived has nothing left to bounce with; it stays
+    /// put rather than hopping forever on ever-smaller bounces.
+    func test_aToyThatBarelyLandedDoesNotBounce() {
+        let controller = landedToy(fallingFrom: 1)
+
+        controller.bounce(drift: 90)
+
+        XCTAssertEqual(controller.state?.phase, .resting)
+    }
+
+    /// Only a toy that has actually landed -- a stray call must not relaunch
+    /// one in mid-flight or snatch one out of the user's hand.
+    func test_bouncingOnlyAppliesToARestingToy() {
+        let controller = landedToy()
+        controller.grab()
+
+        controller.bounce(drift: 90)
+
+        XCTAssertTrue(controller.isHeld)
+    }
+
+    /// The whole point: it ends up on the floor, not perched where it landed.
+    func test_aBouncedToyMakesItsWayDownToTheFloor() {
+        let floor: CGFloat = 500
+        let controller = landedToy(floor: floor)
+        // Landed on a "head" 200pt above the floor, then bounced off it.
+        controller.spawn(at: CGPoint(x: 500, y: 100))
+        for _ in 0..<900 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: 300, roamableArea: roamableArea)
+        }
+        controller.bounce(drift: 90)
+
+        // From here the surface is the floor: the head has been left behind.
+        for _ in 0..<1200 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(controller.state?.phase, .resting)
+        XCTAssertEqual(
+            (controller.state?.position.y ?? 0) + controller.visualBounds.maxY,
+            floor,
+            accuracy: 0.01,
+            "never made it down to the floor"
+        )
     }
 }

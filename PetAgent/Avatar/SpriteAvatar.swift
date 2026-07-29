@@ -32,6 +32,9 @@ final class SpriteAvatar: AvatarPlayable {
     private let tintLayer = CALayer()
     private let tintMaskLayer = CALayer()
     private var loadedImages: [String: CGImage] = [:]
+    /// The showing image's silhouette, for hit testing. Built once per image
+    /// alongside the outline measurement.
+    private var hitMask: AlphaHitMask?
     /// The showing image's opaque pixel box and its size, measured once when
     /// the image is swapped in. Only the *scan* is cached: mapping it into
     /// layer coordinates is a handful of arithmetic and is redone on read, so
@@ -325,11 +328,40 @@ final class SpriteAvatar: AvatarPlayable {
     /// The alpha scan -- the expensive half. Kept off the frame loop by
     /// running only here, on the image swap.
     private func measureVisualBounds(of image: CGImage) {
+        hitMask = AlphaHitMask(image: image)
         guard let opaque = OpaquePixelBounds.of(image) else {
             currentMeasurement = nil
             return
         }
         currentMeasurement = (opaque, CGSize(width: image.width, height: image.height))
+    }
+
+    func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool {
+        guard let hitMask, let currentMeasurement else {
+            // No artwork measured yet: the layer box is the best answer there is.
+            return visualBounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point)
+        }
+
+        let size = spriteLayer.bounds.size
+        // `point` is relative to the ground point; the layer's own origin sits
+        // half a width to the left of it and a full height above -- or below,
+        // hanging from a ceiling, where setScreenPosition flips the offset.
+        let layerPoint = isUpsideDown
+            ? CGPoint(x: point.x + size.width / 2, y: point.y)
+            : CGPoint(x: point.x + size.width / 2, y: point.y + size.height)
+
+        guard let unit = SpriteHitTest.unitPoint(
+            forLayerPoint: layerPoint,
+            transform: spriteLayer.affineTransform(),
+            layerSize: size,
+            imagePixelSize: currentMeasurement.imagePixelSize
+        ) else { return false }
+
+        // Tolerance is in points; the mask works in fractions of the artwork.
+        let fit = min(size.width / currentMeasurement.imagePixelSize.width,
+                      size.height / currentMeasurement.imagePixelSize.height)
+        let drawnHeight = currentMeasurement.imagePixelSize.height * fit
+        return hitMask.isDrawn(atUnit: unit, tolerance: drawnHeight > 0 ? tolerance / drawnHeight : 0)
     }
 
     /// Only caches on a successful load -- caching a failure would make a

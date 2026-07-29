@@ -3,164 +3,70 @@
 //  PetAgent
 //
 //  F1 test · owner: 강상우 (Sangwoo Kang)
-//  Pure hitbox hit-test: plan/02_pet-app.md F1 ("커서가 캐릭터 히트박스
-//  (manifest hitbox 기준 AABB) 진입 시 false, 이탈 시 복귀").
+//  The head region used for petting.
 //
-//  `characterScreenPosition` is the character's ground/feet point -- the
-//  same convention CharacterBody.position/StateContext use everywhere else
-//  (WalkState's targets, LandingSurfaceResolver, USDZAvatar's root-at-feet
-//  rig). This is AppKit *global* screen space (bottom-left origin, Y
-//  increases upward), so the hitbox extends *upward* (toward larger Y) from
-//  the ground point, not symmetrically around it -- the previous
-//  symmetric-around-point version left the character's upper half outside
-//  its own hitbox (byeolki's report: clicking/dragging the pet felt broken
-//  after the 2D switch made `characterScreenPosition` unambiguously the feet).
+//  Clicking the pet is no longer a rectangle at all -- it is measured against
+//  the artwork's silhouette (AlphaHitMask), so the padded-AABB tests that
+//  used to live here went with `shouldAllowClicks`. Petting deliberately
+//  stays a rectangle: it asks "is the cursor over the pet's head?", which is
+//  a region of the body rather than a set of drawn pixels, and stroking the
+//  air just above the hair should still count.
+//
+//  `characterScreenPosition` is the character's ground/feet point -- the same
+//  convention CharacterBody.position uses everywhere -- in AppKit *global*
+//  space (bottom-left origin, Y increasing upward), so the body extends
+//  upward from it and the head is the top slice.
 //
 
 import XCTest
 import CoreGraphics
 @testable import PetAgent
 
-final class ClickThroughControllerTests: XCTestCase {
-    private let groundPoint = CGPoint(x: 500, y: 500)
-    private let hitboxSize = CGSize(width: 120, height: 140)
+final class ClickThroughHeadRectTests: XCTestCase {
+    private let ground = CGPoint(x: 500, y: 200)
+    private let hitbox = CGSize(width: 130, height: 133)
 
-    func test_cursorAtTheGroundPoint_allowsClicks() {
-        XCTAssertTrue(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: groundPoint,
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
+    private func head(isUpsideDown: Bool = false) -> CGRect {
+        ClickThroughController.headRect(
+            characterScreenPosition: ground,
+            hitboxSize: hitbox,
+            isUpsideDown: isUpsideDown
         )
     }
 
-    func test_cursorAboveTheGroundPoint_withinHitboxHeight_allowsClicks() {
-        // The character's upper body/head, not just its feet -- this is
-        // exactly what the symmetric-around-point version missed.
-        let nearHead = CGPoint(x: groundPoint.x, y: groundPoint.y + 130)
-        XCTAssertTrue(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: nearHead,
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
-        )
+    func test_theHeadIsTheTopSliceOfTheBody() {
+        let rect = head()
+
+        XCTAssertEqual(rect.maxY, ground.y + hitbox.height, accuracy: 0.001, "should reach the top of the head")
+        XCTAssertEqual(rect.height, hitbox.height * ClickThroughController.headFraction, accuracy: 0.001)
+        XCTAssertGreaterThan(rect.minY, ground.y, "must not reach down to the feet")
     }
 
-    /// Padding (2026-07-29, byeolki: "히트박스가 너무 작아서 잘 안 잡힘")
-    /// makes clicking near the feet forgiving instead of needing
-    /// pixel-perfect precision on a sprite that renders quite small.
-    func test_cursorSlightlyBelowTheGroundPoint_allowsClicks() {
-        let slightlyBelow = CGPoint(x: groundPoint.x, y: groundPoint.y - 1)
-        XCTAssertTrue(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: slightlyBelow,
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
-        )
+    func test_theHeadSpansTheBodysFullWidth() {
+        let rect = head()
+
+        XCTAssertEqual(rect.minX, ground.x - hitbox.width / 2, accuracy: 0.001)
+        XCTAssertEqual(rect.width, hitbox.width, accuracy: 0.001)
     }
 
-    func test_cursorFarBelowTheGroundPoint_beyondPadding_doesNotAllowClicks() {
-        let farBelow = CGPoint(x: groundPoint.x, y: groundPoint.y - ClickThroughController.hitTestPadding - 1)
-        XCTAssertFalse(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: farBelow,
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
-        )
+    /// Hanging from a ceiling the body extends downward, so the head is the
+    /// bottom slice -- the same flip SpriteAvatar applies when drawing it.
+    func test_upsideDownTheHeadIsTheBottomSlice() {
+        let rect = head(isUpsideDown: true)
+
+        XCTAssertEqual(rect.minY, ground.y - hitbox.height, accuracy: 0.001)
+        XCTAssertLessThan(rect.maxY, ground.y, "must not reach up to the feet")
     }
 
-    func test_cursorFarAway_doesNotAllowClicks() {
-        XCTAssertFalse(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: CGPoint(x: 0, y: 0),
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
-        )
+    func test_thePetsFeetAreNotItsHead() {
+        XCTAssertFalse(head().contains(ground), "stroking the feet is not petting")
     }
 
-    func test_cursorJustInsideHitboxEdges_allowsClicks() {
-        // Half-width = 60 either side of x; full height = 140 above the ground point.
-        let justInside = CGPoint(x: groundPoint.x + 59, y: groundPoint.y + 139)
-        XCTAssertTrue(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: justInside,
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
-        )
-    }
+    /// An avatar that hasn't loaded has no head to stroke -- an empty rect
+    /// rather than a degenerate one somewhere at the origin.
+    func test_aZeroSizedAvatarHasNoHead() {
+        let rect = ClickThroughController.headRect(characterScreenPosition: ground, hitboxSize: .zero)
 
-    func test_cursorJustInsideThePaddedEdges_allowsClicks() {
-        let padding = ClickThroughController.hitTestPadding
-        let justInside = CGPoint(x: groundPoint.x + hitboxSize.width / 2 + padding - 1, y: groundPoint.y + hitboxSize.height + padding - 1)
-        XCTAssertTrue(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: justInside,
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
-        )
-    }
-
-    func test_cursorJustOutsideThePaddedEdges_doesNotAllowClicks() {
-        let padding = ClickThroughController.hitTestPadding
-        let justOutside = CGPoint(x: groundPoint.x + hitboxSize.width / 2 + padding + 1, y: groundPoint.y + hitboxSize.height + padding + 1)
-        XCTAssertFalse(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: justOutside,
-                characterScreenPosition: groundPoint,
-                hitboxSize: hitboxSize
-            )
-        )
-    }
-
-    func test_zeroSizeHitbox_neverAllowsClicks() {
-        XCTAssertFalse(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: groundPoint,
-                characterScreenPosition: groundPoint,
-                hitboxSize: .zero
-            )
-        )
-    }
-
-    // MARK: - isUpsideDown (F3 ceiling-crawling, 2026-07-29)
-
-    /// Hanging from the ceiling, the character's body extends DOWNWARD
-    /// (toward smaller Y in this AppKit bottom-left-origin space) from the
-    /// attachment point -- the same rect the ground case uses, built above
-    /// the point instead of below it, makes the visibly-hanging pet
-    /// unclickable (byeolki: "애가 잘 안 잡힘" while it was on the ceiling).
-    func test_cursorBelowTheCeilingPoint_withinHitboxHeight_allowsClicksWhenUpsideDown() {
-        let ceilingPoint = CGPoint(x: 500, y: 900)
-        let belowCeiling = CGPoint(x: ceilingPoint.x, y: ceilingPoint.y - 130)
-        XCTAssertTrue(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: belowCeiling,
-                characterScreenPosition: ceilingPoint,
-                hitboxSize: hitboxSize,
-                isUpsideDown: true
-            )
-        )
-    }
-
-    func test_cursorAboveTheCeilingPoint_doesNotAllowClicksWhenUpsideDown() {
-        let ceilingPoint = CGPoint(x: 500, y: 900)
-        // Beyond the padding too -- padding is forgiving in every direction,
-        // so a point just 1px above the ceiling point is now inside it.
-        let aboveCeiling = CGPoint(x: ceilingPoint.x, y: ceilingPoint.y + ClickThroughController.hitTestPadding + 1)
-        XCTAssertFalse(
-            ClickThroughController.shouldAllowClicks(
-                cursorPosition: aboveCeiling,
-                characterScreenPosition: ceilingPoint,
-                hitboxSize: hitboxSize,
-                isUpsideDown: true
-            )
-        )
+        XCTAssertEqual(rect, .zero)
     }
 }

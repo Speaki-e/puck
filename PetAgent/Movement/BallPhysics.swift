@@ -57,6 +57,10 @@ enum BallPhysics {
     /// How far outside roamableArea still counts as "worth simulating" before
     /// a kicked ball is considered gone.
     static let outOfBoundsMargin: CGFloat = 200
+    /// How far a resting toy may sit above its surface before it counts as
+    /// having nothing underneath it. Absorbs the rounding of the landing
+    /// itself, so a toy that just settled doesn't immediately re-fall.
+    static let surfaceTolerance: CGFloat = 0.5
 
     /// `visualBounds` is the toy's visible outline relative to its position,
     /// so it bounces off a wall when its artwork meets it rather than when
@@ -86,7 +90,18 @@ enum BallPhysics {
             return next
 
         case .resting:
-            return state // waits for kick(_:direction:) to move it into .kicked
+            // Whatever it was resting on can go away -- most obviously the
+            // pet's own head, which walks off (byeolki: "장난감은 펫 머리 위에
+            // 올리고 펫이 움직이면 장난감이 공중부양을 해", 2026-07-30), but
+            // equally a window that closes. Without this a resting toy is
+            // pinned in the air forever, because nothing else ever re-examines
+            // a toy that has already landed.
+            //
+            // IdleState does exactly this for the pet, for the same reason.
+            guard state.position.y < landingY - surfaceTolerance else { return state }
+            var next = state
+            next.phase = .falling
+            return next
 
         case .held, .carried:
             return state // someone is holding it; nothing else may move it

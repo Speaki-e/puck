@@ -74,9 +74,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// How far above the pet's head a spun toy floats.
     private static let spinHoverGap: CGFloat = 14
 
-    /// The layer the toy is parented to, kept so it can be rebuilt in place
-    /// when the user picks a different one.
-    private weak var toyParentLayer: CALayer?
     /// The toy's throw speed, measured the same way the pet's is.
     private var toyThrowVelocity = CursorVelocityTracker()
     /// Mouse events don't arrive on a clock, so the tracker's dt comes from
@@ -89,7 +86,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private let chaseBallState = ChaseBallState()
     private let juggleBallState = JuggleBallState()
     private let kickBallState = KickBallState()
-    private var ballController: BallController?
+    /// Every toy that's out, and which one the pet is playing with. The FSM
+    /// states above still only ever deal with one toy -- `toyBox.focused`.
+    private var toyBox: ToyBox?
+    /// The toy the cursor picked up, decided once on mouse-down. Held for the
+    /// whole gesture for the same reason ClickThroughController holds its
+    /// subject: the toy moves while being dragged, so re-testing per event
+    /// could hand the rest of the drag to a different one.
+    private var grabbedToy: BallController?
 
     private let frameClock = FrameClock()
     private var idleFrameRate = IdleFrameRatePolicy()
@@ -188,7 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         let menuBar = MenuBarController()
         menuBar.onOpenSettings = { [weak self] in self?.showSettingsWindow() }
         menuBar.onSwitchAvatar = { [weak self] in self?.showAvatarManagementWindow() }
-        menuBar.onThrowToy = { [weak self] toy in self?.throwToy(toy) }
+        menuBar.onToggleToy = { [weak self] toy in self?.toggleToy(toy) }
         menuBar.onToggleVisibility = { [weak self] in self?.toggleCharacterVisibility() }
         menuBar.onQuit = { NSApplication.shared.terminate(nil) }
         menuBar.applyLanguage(settingsStore.language)
@@ -313,9 +317,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         settingsStore.onVolumeChanged = { [weak sfxPlayer] volume in sfxPlayer?.volume = volume }
         settingsStore.onMuteChanged = { [weak sfxPlayer] isMuted in sfxPlayer?.isMuted = isMuted }
         settingsStore.onToyScaleChanged = { [weak self] scale in
-            self?.ballController?.updateScale(scale)
+            self?.toyBox?.updateScale(scale)
         }
-        settingsStore.onToyChanged = { [weak self] _ in self?.rebuildToy() }
         settingsStore.onWalkSpeedMultiplierChanged = { [weak self] multiplier in
             self?.characterController?.walkSpeed = MovementSolver.walkSpeed * multiplier
         }
@@ -398,7 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // F12 (optional, lowest priority): ball-toy interaction. Lives on the
         // same sprite layer as the avatar so it reparents on display changes
         // the same way.
-        makeToy(on: spriteView.contentLayer)
+        makeToyBox(on: spriteView.contentLayer)
 
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
         // is the piece that uses it (click-through everywhere except over the
@@ -424,6 +427,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             self?.handleCursorMoved(cursor, overHead: overHead)
         }
         clickThrough.onToyGesture = { [weak self] gesture in self?.handleToyGesture(gesture) }
+        clickThrough.isOnPet = { [weak self] cursor in self?.isCursorOnPet(cursor) ?? false }
+        clickThrough.isOnToy = { [weak self] cursor in self?.isCursorOnToy(cursor) ?? false }
         clickThrough.startMonitoring()
         return clickThrough
     }
@@ -494,10 +499,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             window.orderOut(nil)
         }
         avatar.reparent(to: spriteView.contentLayer)
-        ballController?.reparent(to: spriteView.contentLayer)
-        // The rebuilt view owns the toy now; a later toy change has to build
-        // onto this layer, not the discarded one.
-        toyParentLayer = spriteView.contentLayer
+        toyBox?.reparent(to: spriteView.contentLayer)
         // Through characterBody, not avatar directly -- its didSet is the
         // only path that's supposed to push position to the avatar. Setting
         // avatar.setScreenPosition() here left characterBody.position stale,
@@ -595,6 +597,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
                 return
             }
             controller.transition(to: .climbToCeiling)
+        case .playWithToy:
+            // Before this draw, play could only ever start at the moment a toy
+            // LANDED -- so a toy the pet had kicked away and walked off from
+            // was abandoned for good. Falls back to roaming when nothing is
+            // out or nothing has settled yet, same as the climbs do.
+            guard let box = toyBox,
+                  let name = ToyInterestPolicy.next(
+                      from: box.candidates,
+                      lastPlayed: box.lastPlayedName,
+                      petPosition: characterBody?.position ?? .zero
+                  )
+            else {
+                walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+                controller.transition(to: .walk)
+                return
+            }
+            startPlaying(with: ToyCatalogue.toy(named: name))
         case .stay:
             break
         }
@@ -626,24 +645,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             guard let self else { return }
             self.characterController?.update(dt: dt)
             self.pointingController.tick(dt: dt)
-            if let controller = self.characterController, let ball = self.ballController, ball.isActive {
-                let ballPosition = ball.state?.position ?? .zero
-                let floorLandingY = controller.landingY(ballPosition)
-                // A ball falling through the character's head bonks off it
-                // instead of passing straight through to the floor/window
-                // below -- see BallController.onLanded for what happens once
-                // it actually lands there.
-                let headLandingY = self.characterBody.flatMap {
-                    BallHeadCollision.landingY(
-                        ballX: ballPosition.x,
-                        ballHalfWidth: ball.visualBounds.width / 2,
-                        characterPosition: $0.position,
-                        avatarSize: self.avatarHitboxSize
-                    )
-                }
-                ball.tick(
+            if let controller = self.characterController, let toyBox = self.toyBox {
+                // Resolved per toy: where a toy comes to rest depends on where
+                // it is and how big it is, and with several out they are in
+                // different places over different windows.
+                toyBox.tickAll(
                     dt: dt,
-                    landingY: min(floorLandingY, headLandingY ?? floorLandingY),
+                    landingY: { ball in
+                        let ballPosition = ball.state?.position ?? .zero
+                        let floorLandingY = controller.landingY(ballPosition)
+                        // A ball falling through the character's head bonks off
+                        // it instead of passing straight through to the
+                        // floor/window below -- see ToyBox.onLanded for what
+                        // happens once it actually lands there.
+                        let headLandingY = self.characterBody.flatMap {
+                            BallHeadCollision.landingY(
+                                ballX: ballPosition.x,
+                                ballHalfWidth: ball.visualBounds.width / 2,
+                                characterPosition: $0.position,
+                                avatarSize: self.avatarHitboxSize
+                            )
+                        }
+                        return min(floorLandingY, headLandingY ?? floorLandingY)
+                    },
                     roamableArea: controller.roamableArea
                 )
             }
@@ -658,45 +682,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             // A spin-style toy is carried above the pet's head for as long as
             // the pet is playing with it -- position and rotation both come
             // from here, since it is the frame loop that knows dt.
-            if let ball = self.ballController, ball.isActive, let body = self.characterBody {
+            if let toyBox = self.toyBox, let body = self.characterBody {
                 let isPlaying = self.characterController?.currentState === self.juggleBallState
-                // Only a toy the pet actually has. Held means the cursor took
-                // it; kicked means it is mid-throw, by the user or by the pet
-                // itself. Without this the pet re-attaches it to its head on
-                // the very next frame, and a spun toy can never be thrown at
-                // all (byeolki: "지팡이도 다른 장난감처럼 던져지고", 2026-07-29).
-                let petMayHold = ball.state.map { $0.phase != .held && $0.phase != .kicked } ?? false
-                if isPlaying, petMayHold, self.settingsStore.toy.play == .spinOverhead {
-                    ball.carry(
-                        to: CGPoint(
-                            x: body.position.x,
-                            y: body.position.y - self.avatarHitboxSize.height - Self.spinHoverGap
-                        ),
-                        dt: dt
-                    )
-                } else if ball.state?.phase == .carried {
-                    // Play ended (or something interrupted it): give the toy
-                    // back to physics rather than leaving it stuck in the air.
-                    ball.stopCarrying()
+                let spins = toyBox.focusedToy?.play == .spinOverhead
+                for ball in toyBox.all where ball.isActive {
+                    // Only a toy the pet actually has. Held means the cursor
+                    // took it; kicked means it is mid-throw, by the user or by
+                    // the pet itself. Without this the pet re-attaches it to
+                    // its head on the very next frame, and a spun toy can never
+                    // be thrown at all (byeolki: "지팡이도 다른 장난감처럼
+                    // 던져지고", 2026-07-29).
+                    let petMayHold = ball.state.map { $0.phase != .held && $0.phase != .kicked } ?? false
+                    if isPlaying, spins, petMayHold, ball === toyBox.focused {
+                        ball.carry(
+                            to: CGPoint(
+                                x: body.position.x,
+                                y: body.position.y - self.avatarHitboxSize.height - Self.spinHoverGap
+                            ),
+                            dt: dt
+                        )
+                    } else if ball.state?.phase == .carried {
+                        // Play ended (or something interrupted it): give the
+                        // toy back to physics rather than leaving it stuck in
+                        // the air.
+                        ball.stopCarrying()
+                    }
                 }
             }
 
-            // The toy's clickable rect follows it the same way the pet's does.
-            if let window = self.overlayController?.windows.first {
-                let toy = self.ballController.flatMap { ball -> CGRect? in
-                    guard ball.isActive, let position = ball.state?.position else { return nil }
-                    let global = self.globalAppKitPoint(fromWindowLocal: position, window: window)
-                    // Y is flipped between the two spaces, so the outline's
-                    // own top/bottom swap over as well.
-                    let outline = ball.visualBounds
-                    return CGRect(
-                        x: global.x + outline.minX,
-                        y: global.y - outline.maxY,
-                        width: outline.width,
-                        height: outline.height
-                    )
-                }
-                self.clickThroughController?.updateToy(rect: toy)
+            // The toy being played with can be taken away mid-game -- from the
+            // menu, or by the cursor. The play states have nothing to act on
+            // once it's gone, so the pet is put back to idle rather than left
+            // miming a game with nothing.
+            if self.isPlayingWithToy, self.toyBox?.focused == nil {
+                self.characterController?.transition(to: .idle)
             }
 
             // The hitbox has to follow the pet, or clicks only work where it
@@ -813,19 +832,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
+    /// Whether the cursor is on the pet's drawn artwork rather than on the
+    /// transparent canvas around it. Converted into the pet's own space and
+    /// then answered by the avatar, which is the only thing that knows how it
+    /// is currently drawn (byeolki: "내가 보이는 부분만을 누를 수 있게",
+    /// 2026-07-30).
+    private func isCursorOnPet(_ cursor: CGPoint) -> Bool {
+        guard let body = characterBody else { return false }
+        let local = windowLocalPoint(fromGlobalAppKit: cursor)
+        return body.hitTest(
+            CGPoint(x: local.x - body.position.x, y: local.y - body.position.y),
+            tolerance: Self.hitTestTolerance
+        )
+    }
+
+    private func isCursorOnToy(_ cursor: CGPoint) -> Bool {
+        toyUnderCursor(cursor) != nil
+    }
+
+    /// The topmost toy drawn under the cursor, or nil. Topmost rather than
+    /// nearest: toys can overlap once several are out, and the one on top is
+    /// the one the user sees themselves reaching for.
+    private func toyUnderCursor(_ cursor: CGPoint) -> BallController? {
+        toyBox?.hitTest(windowLocalPoint(fromGlobalAppKit: cursor), tolerance: Self.hitTestTolerance)
+    }
+
+    /// How far outside the artwork still counts as clicking it. Grabbing a
+    /// ~130pt character by its exact silhouette is needlessly fiddly, and
+    /// byeolki has reported a hitbox being hard to grab before -- but this is
+    /// a fraction of the 28pt the old rectangle padded by, because it now
+    /// hugs the drawing rather than a box around it.
+    private static let hitTestTolerance: CGFloat = 8
+
     /// Picking the toy up with the cursor (byeolki: "호박도 펫처럼 커서로
     /// 집을 수 있게", 2026-07-29). The same rigid model the pet's drag uses:
     /// the grab offset is captured once so whatever point was grabbed stays
     /// under the cursor, and the toy is assigned outright rather than eased.
     private func handleToyGesture(_ gesture: PetGesture) {
-        guard let ball = ballController, ball.isActive else { return }
+        if case .dragBegan(let point) = gesture {
+            // Which toy this gesture is about is decided here and held for the
+            // rest of it; every other case reads `grabbedToy`.
+            grabbedToy = toyUnderCursor(point)
+        }
+        guard let ball = grabbedToy, ball.isActive else { return }
         switch gesture {
         case .dragBegan(let point):
-            // Taking the toy ends the pet's game with it -- otherwise the pet
-            // stands there playing with something it no longer has, and (for
-            // a spun toy) tries to keep hold of it.
-            if characterController?.currentState === juggleBallState {
+            // Taking the toy the pet is playing with ends the game --
+            // otherwise the pet stands there playing with something it no
+            // longer has, and (for a spun toy) tries to keep hold of it.
+            // Picking up a DIFFERENT toy leaves the game alone.
+            if ball === toyBox?.focused, isPlayingWithToy {
                 ball.stopCarrying()
+                toyBox?.clearFocus()
                 characterController?.transition(to: .idle)
             }
             let local = windowLocalPoint(fromGlobalAppKit: point)
@@ -1145,20 +1203,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     }
 
 
-    /// Builds the toy and wires every callback that involves it.
-    ///
-    /// Rebuilt rather than mutated when the user picks a different toy: a toy
-    /// is its artwork, its proportions and its measured outline together, and
-    /// swapping those in place means keeping four things in step for no gain
-    /// — the toy is created once at launch and once per deliberate change.
-    private func makeToy(on parent: CALayer) {
-        let previousPosition = ballController?.state?.position
-        ballController?.layer.removeFromSuperlayer()
-        toyParentLayer = parent
+    /// Whether the pet is currently in a toy-play state.
+    private var isPlayingWithToy: Bool {
+        let state = characterController?.currentState
+        return state === chaseBallState || state === juggleBallState || state === kickBallState
+    }
 
-        let ball = BallController(parent: parent, toy: settingsStore.toy, scale: settingsStore.toyScale)
-        ball.onLanded = { [weak self] position in
-            guard let self else { return }
+    /// Builds the toy box and wires every callback that involves a toy.
+    ///
+    /// Called once, at launch: individual toys come and go through the menu
+    /// (ToyBox.toggle), and a display change reparents the box rather than
+    /// rebuilding it.
+    private func makeToyBox(on parent: CALayer) {
+        let box = ToyBox(parent: parent, scale: settingsStore.toyScale)
+        box.onLanded = { [weak self] toy, position in
+            guard let self, let ball = self.toyBox?.controller(for: toy) else { return }
             // A toy that fell onto the character's head bonks off it
             // immediately instead of resting there to be chased (byeolki:
             // "캐릭터 머리로 떨어져서 통 튀어서"). It stays in play after the
@@ -1168,86 +1227,88 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             // good 20pt above whatever it landed on. Comparing centres here
             // meant a toy that had genuinely landed on the head read as
             // having missed it, and it sat on the pet instead of bouncing.
-            let toyBottom = position.y + (self.ballController?.visualBounds.maxY ?? 0)
+            let toyBottom = position.y + ball.visualBounds.maxY
             if let body = self.characterBody,
                let headY = BallHeadCollision.landingY(
                    ballX: position.x,
-                   ballHalfWidth: (self.ballController?.visualBounds.width ?? 0) / 2,
+                   ballHalfWidth: ball.visualBounds.width / 2,
                    characterPosition: body.position,
                    avatarSize: self.avatarHitboxSize
                ),
                abs(toyBottom - headY) < 0.5 {
-                // Caught, not headed: the toy is left resting on the pet's
-                // head and JuggleBall throws it again after a beat. Popping
-                // it here instead would make contact and re-launch the same
-                // instant, which reads as a bounce.
-                self.juggleBallState.caught()
+                if self.characterController?.currentState === self.juggleBallState,
+                   ball === self.toyBox?.focused {
+                    // Mid-game: caught, not headed. The toy is left resting on
+                    // the pet's head and JuggleBall throws it again after a
+                    // beat. Popping it here instead would make contact and
+                    // re-launch the same instant, which reads as a bounce.
+                    self.juggleBallState.caught()
+                } else {
+                    // Dropped on the pet's head by the user, out of the blue:
+                    // it bounces off and makes its way down rather than
+                    // perching there. The drift is what gets it off the head;
+                    // straight up would just land on the same spot again.
+                    ball.bounce(drift: .random(in: 70...110) * (Bool.random() ? 1 : -1))
+                }
                 return
             }
 
-            guard let controller = self.characterController else { return }
             // Idle/Walk-only gate (F3's priority rule): the pet must not
             // abandon an agent-driven task to go chase a ball.
-            guard controller.currentState === self.idleState || controller.currentState === self.walkState else { return }
-            // Beside the toy and on the surface it's resting on -- not at the
-            // toy's own centre, which is a toy-radius up in the air and puts
-            // the pet on top of it.
-            self.chaseBallState.target = ToyApproach.standingPosition(
-                toyPosition: position,
-                toyBounds: self.ballController?.visualBounds ?? .zero,
-                petPosition: self.characterBody?.position ?? position,
-                petBounds: self.characterBody?.visualBounds ?? .zero
-            )
-            self.juggleBallState.style = self.settingsStore.toy.play
-            controller.transition(to: .chaseBall)
+            guard let controller = self.characterController,
+                  controller.currentState === self.idleState || controller.currentState === self.walkState
+            else { return }
+            self.startPlaying(with: toy)
         }
         juggleBallState.onThrow = { [weak self] in
             guard let self, let body = self.characterBody else { return }
             // Straight up over the pet's own x, so it comes back down on the
             // head rather than beside it.
-            self.ballController?.lift(
+            self.toyBox?.focused?.lift(
                 overX: body.position.x,
                 headTop: body.position.y - self.avatarHitboxSize.height
             )
         }
         kickBallState.onEnter = { [weak self] in
-            self?.ballController?.kick(direction: self?.characterBody?.facing ?? .right)
+            self?.toyBox?.focused?.kick(direction: self?.characterBody?.facing ?? .right)
         }
-        ballController = ball
-
-        // Put the new toy where the old one was, so switching mid-play
-        // doesn't make it vanish until the next throw.
-        if let previousPosition {
-            ball.spawn(at: previousPosition)
-        }
+        toyBox = box
     }
 
-    /// The toy setting changed: build the new one on the layer the old one
-    /// was living on. Remembered rather than looked up, because the toy sits
-    /// on SpriteLayerView's content layer specifically -- not the window's
-    /// backing layer -- and that view is rebuilt on display changes.
-    private func rebuildToy() {
-        guard let parent = toyParentLayer else { return }
-        makeToy(on: parent)
+    /// Sends the pet off to play with one particular toy. The single entry
+    /// point into the play states, so "which toy is the pet playing with" is
+    /// only ever answered in one place.
+    private func startPlaying(with toy: Toy) {
+        guard let controller = characterController,
+              let box = toyBox,
+              let ball = box.controller(for: toy),
+              let position = ball.state?.position
+        else { return }
+
+        box.focus(ball)
+        // Beside the toy and on the surface it's resting on -- not at the
+        // toy's own centre, which is a toy-radius up in the air and puts
+        // the pet on top of it.
+        chaseBallState.target = ToyApproach.standingPosition(
+            toyPosition: position,
+            toyBounds: ball.visualBounds,
+            petPosition: characterBody?.position ?? position,
+            petBounds: characterBody?.visualBounds ?? .zero
+        )
+        juggleBallState.style = toy.play
+        controller.transition(to: .chaseBall)
     }
 
     // MARK: - Ball toy (F12, optional)
 
-    /// Menu bar "Throw toy" — drops the chosen toy at the cursor, onto
-    /// whatever's below it (F4's landing-surface logic, same as Fall).
-    ///
-    /// Picking a different toy from the menu also makes it the current one,
-    /// so the menu and Settings never disagree about which toy the pet has.
-    ///
-    /// Still one toy at a time, but throwing again MOVES it rather than doing
-    /// nothing: the toy is permanent as of 2026-07-29 ("던지고 사라지지 않게
-    /// 계속 남아있게"), so a no-op would leave the menu dead after the first
-    /// throw, with no way to retrieve a toy that had settled somewhere.
-    private func throwToy(_ toy: Toy) {
-        if settingsStore.toy != toy {
-            // Rebuilds the toy via onToyChanged.
-            settingsStore.toy = toy
-        }
-        ballController?.spawn(at: windowLocalPoint(fromGlobalAppKit: NSEvent.mouseLocation))
+    /// Menu bar toy list — puts the chosen toy out at the cursor, onto
+    /// whatever's below it (F4's landing-surface logic, same as Fall), or
+    /// takes it away if it was already out (byeolki: "그걸 눌러서
+    /// 나오게하고 다시 눌러서 없애는", 2026-07-30).
+    private func toggleToy(_ toy: Toy) {
+        guard let box = toyBox else { return }
+        box.toggle(toy, at: windowLocalPoint(fromGlobalAppKit: NSEvent.mouseLocation))
+        // From what's actually out, not from what the toggle was asked to do.
+        menuBarController?.setToysOut(box.outToyNames)
     }
 }

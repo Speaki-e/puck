@@ -23,8 +23,12 @@ final class ClickThroughController {
     private var hitboxSize: CGSize = .zero
     private var isUpsideDown = false
     private var gestureRecognizer = PetGestureRecognizer()
-    /// The toy's clickable rect, or nil when there is no toy on screen.
-    private var toyRect: CGRect?
+    /// Asks whether a cursor position (AppKit global) lands on the pet's
+    /// artwork, and on the toy's. Injected rather than computed here: only
+    /// the renderers know their own silhouettes and transforms, and this type
+    /// deliberately knows nothing about either.
+    var isOnPet: ((CGPoint) -> Bool)?
+    var isOnToy: ((CGPoint) -> Bool)?
     /// Which subject the in-flight gesture belongs to. Decided once on
     /// mouse-down and held for the whole press: the pet and the toy move
     /// while being dragged, so re-testing per event could hand the second
@@ -60,12 +64,6 @@ final class ClickThroughController {
         characterScreenPosition = screenPosition
         self.hitboxSize = hitboxSize
         self.isUpsideDown = isUpsideDown
-    }
-
-    /// Called whenever the toy moves or goes away. `rect` is in the same
-    /// AppKit global space as `updateCharacter`'s position.
-    func updateToy(rect: CGRect?) {
-        toyRect = rect
     }
 
     /// A *global* monitor only delivers events sent to OTHER apps -- the
@@ -108,13 +106,9 @@ final class ClickThroughController {
             // The toy is tested first: it is much the smaller target, and it
             // sits in front of the pet, so a press that could be either is
             // the one the user aimed at.
-            if let toyRect, toyRect.contains(cursor) {
+            if isOnToy?(cursor) == true {
                 gestureSubject = .toy
-            } else if Self.shouldAllowClicks(
-                cursorPosition: cursor,
-                characterScreenPosition: characterScreenPosition,
-                hitboxSize: hitboxSize
-            ) {
+            } else if isOnPet?(cursor) == true {
                 gestureSubject = .pet
             } else {
                 // Neither — ignoresMouseEvents may not have caught up with a
@@ -140,16 +134,10 @@ final class ClickThroughController {
 
     private func handleMouseMoved() {
         let cursor = NSEvent.mouseLocation
-        let overPet = Self.shouldAllowClicks(
-            cursorPosition: cursor,
-            characterScreenPosition: characterScreenPosition,
-            hitboxSize: hitboxSize,
-            isUpsideDown: isUpsideDown
-        )
         // The toy has to make the window clickable too, or a press on it goes
         // straight through to whatever is behind the overlay.
-        let overToy = toyRect?.contains(cursor) ?? false
-        window?.ignoresMouseEvents = !(overPet || overToy)
+        let overSomething = isOnPet?(cursor) == true || isOnToy?(cursor) == true
+        window?.ignoresMouseEvents = !overSomething
 
         let head = Self.headRect(
             characterScreenPosition: characterScreenPosition,
@@ -174,24 +162,10 @@ final class ClickThroughController {
     /// SpriteAvatar.setScreenPosition flip this mirrors on the click-test
     /// side. Missing this made a visibly-hanging pet unclickable.
     ///
-    /// Extra margin added on every side beyond the manifest hitbox (2026-07-29,
-    /// byeolki: "히트박스가 너무 작아서 잘 안 잡힘") -- the dummy avatar
-    /// renders at ~130x133px, and requiring pixel-perfect precision on a
-    /// sprite that small made grabbing it feel unreliable. A zero-size
-    /// hitbox is still never clickable -- that's an unconfigured/loading
-    /// avatar, not a small one, and padding shouldn't manufacture a
-    /// clickable area out of nothing.
-    ///
-    /// Trimmed down slightly (2026-07-29, byeolki: "히트박스 넘모 큰데 아주
-    /// 살짝만 줄여볼까") -- 40 read as too generous once the full expression
-    /// set was in daily use; still forgiving, just less so.
-    static let hitTestPadding: CGFloat = 28
 
-    /// The character's full, unpadded body rect: the ground point plus
-    /// hitboxSize, flipped by isUpsideDown. `shouldAllowClicks` pads this on
-    /// every side; `headRect` slices a fraction off its "head" edge --
-    /// previously each rebuilt this same vertical-slice-anchored-at-the-
-    /// ground-point math independently (found via review).
+    /// The character's full body rect: the ground point plus hitboxSize,
+    /// flipped by isUpsideDown. `headRect` slices a fraction off its "head"
+    /// edge.
     private static func bodyRect(characterScreenPosition: CGPoint, hitboxSize: CGSize, isUpsideDown: Bool) -> CGRect {
         let originY = isUpsideDown
             ? characterScreenPosition.y - hitboxSize.height
@@ -204,17 +178,6 @@ final class ClickThroughController {
         )
     }
 
-    static func shouldAllowClicks(
-        cursorPosition: CGPoint,
-        characterScreenPosition: CGPoint,
-        hitboxSize: CGSize,
-        isUpsideDown: Bool = false
-    ) -> Bool {
-        guard hitboxSize != .zero else { return false }
-        let body = bodyRect(characterScreenPosition: characterScreenPosition, hitboxSize: hitboxSize, isUpsideDown: isUpsideDown)
-        let rect = body.insetBy(dx: -hitTestPadding, dy: -hitTestPadding)
-        return rect.contains(cursorPosition)
-    }
 
     /// Fraction of the character's height, measured down from the top, that
     /// counts as its head for petting. The art is a chibi with a very large
@@ -222,9 +185,13 @@ final class ClickThroughController {
     /// "쓰담쓰담" on the pet's feet isn't petting.
     static let headFraction: CGFloat = 0.45
 
-    /// The head's rectangle, in the same AppKit global space as
-    /// `shouldAllowClicks`. No hit-test padding: petting should require
-    /// actually being on the pet, unlike grabbing it.
+    /// The head's rectangle, in the same AppKit global space as the cursor
+    /// positions this type is given.
+    ///
+    /// Still a rectangle, deliberately, where clicking is now measured
+    /// against the artwork's silhouette: petting asks "is the cursor over the
+    /// pet's head?", which is a region of the body, not a set of drawn
+    /// pixels. Stroking the air just above the hair should still count.
     static func headRect(
         characterScreenPosition: CGPoint,
         hitboxSize: CGSize,

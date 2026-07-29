@@ -17,7 +17,6 @@ final class SettingsStore {
         static let avoidClimbingFocusedWindow = "PetAgent.avoidClimbingFocusedWindow"
         static let walkSpeedMultiplier = "PetAgent.walkSpeedMultiplier"
         static let toyScale = "PetAgent.toyScale"
-        static let toyName = "PetAgent.toyName"
         static let speechLocale = "PetAgent.speechLocale"
         static let language = "PetAgent.language"
         static let appearance = "PetAgent.appearance"
@@ -111,18 +110,10 @@ final class SettingsStore {
 
     var onToyScaleChanged: ((Double) -> Void)?
 
-    /// Which toy the pet gets (ToyCatalogue). Stored by name so an unknown
-    /// or removed one falls back to the default rather than leaving the user
-    /// with nothing.
-    var toy: Toy {
-        get { ToyCatalogue.toy(named: defaults.string(forKey: Keys.toyName) ?? ToyCatalogue.default.name) }
-        set {
-            defaults.set(newValue.name, forKey: Keys.toyName)
-            onToyChanged?(newValue)
-        }
-    }
-
-    var onToyChanged: ((Toy) -> Void)?
+    // Which toy the pet has stopped being a setting on 2026-07-30: several
+    // can be out at once now, and the menu bar's per-toy on/off list is the
+    // one place that decides. A stored "current toy" alongside it would just
+    // be a second answer to the same question.
 
     var language: AppLanguage {
         get {

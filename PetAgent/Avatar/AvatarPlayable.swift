@@ -62,6 +62,22 @@ protocol AvatarPlayable: AnyObject {
     /// itself is treated as having no extent, which is exactly the old
     /// behaviour, so nothing regresses.
     var visualBounds: CGRect { get }
+
+    /// Whether `point` -- relative to the pet's ground point, in the same
+    /// space as `visualBounds` -- lands on the artwork itself rather than on
+    /// the transparent canvas around it.
+    ///
+    /// Asked of the avatar rather than computed by the click handling,
+    /// because only the avatar knows how it is currently drawn: which way it
+    /// faces, whether it is upside-down on a ceiling, how the procedural
+    /// bounce is squashing it, whether it is rotated flat against a wall.
+    ///
+    /// `tolerance` is in points, and dilates the silhouette so grabbing
+    /// something small doesn't demand pixel precision.
+    ///
+    /// Default falls back to `visualBounds`, which is what an avatar with no
+    /// measurable artwork (usdz, video) can honestly answer.
+    func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool
 }
 
 extension AvatarPlayable {
@@ -71,4 +87,8 @@ extension AvatarPlayable {
     func setUpsideDown(_ isUpsideDown: Bool) {}
     func triggerJump() {}
     var visualBounds: CGRect { .zero }
+
+    func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool {
+        visualBounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point)
+    }
 }

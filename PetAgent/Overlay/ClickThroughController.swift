@@ -23,6 +23,18 @@ final class ClickThroughController {
     private var hitboxSize: CGSize = .zero
     private var isUpsideDown = false
     private var gestureRecognizer = PetGestureRecognizer()
+    /// The toy's clickable rect, or nil when there is no toy on screen.
+    private var toyRect: CGRect?
+    /// Which subject the in-flight gesture belongs to. Decided once on
+    /// mouse-down and held for the whole press: the pet and the toy move
+    /// while being dragged, so re-testing per event could hand the second
+    /// half of a drag to the other one.
+    private var gestureSubject: GestureSubject = .pet
+
+    enum GestureSubject {
+        case pet
+        case toy
+    }
 
     /// Emitted when the user clicks or drags the character itself. Cursor
     /// positions are AppKit global screen coordinates — the same space
@@ -35,6 +47,9 @@ final class ClickThroughController {
     /// itself lives outside this type, which only knows about hit testing.
     var onCursorMoved: ((CGPoint, Bool) -> Void)?
 
+    /// The same gestures, for the toy rather than the pet.
+    var onToyGesture: ((PetGesture) -> Void)?
+
     init(window: NSWindow) {
         self.window = window
         window.ignoresMouseEvents = true
@@ -45,6 +60,12 @@ final class ClickThroughController {
         characterScreenPosition = screenPosition
         self.hitboxSize = hitboxSize
         self.isUpsideDown = isUpsideDown
+    }
+
+    /// Called whenever the toy moves or goes away. `rect` is in the same
+    /// AppKit global space as `updateCharacter`'s position.
+    func updateToy(rect: CGRect?) {
+        toyRect = rect
     }
 
     /// A *global* monitor only delivers events sent to OTHER apps -- the
@@ -84,13 +105,22 @@ final class ClickThroughController {
         let gesture: PetGesture?
         switch event.type {
         case .leftMouseDown:
-            // Only a press that actually landed on the character counts —
-            // ignoresMouseEvents may not have caught up with a fast cursor.
-            guard Self.shouldAllowClicks(
+            // The toy is tested first: it is much the smaller target, and it
+            // sits in front of the pet, so a press that could be either is
+            // the one the user aimed at.
+            if let toyRect, toyRect.contains(cursor) {
+                gestureSubject = .toy
+            } else if Self.shouldAllowClicks(
                 cursorPosition: cursor,
                 characterScreenPosition: characterScreenPosition,
                 hitboxSize: hitboxSize
-            ) else { return }
+            ) {
+                gestureSubject = .pet
+            } else {
+                // Neither — ignoresMouseEvents may not have caught up with a
+                // fast cursor.
+                return
+            }
             gesture = gestureRecognizer.mouseDown(at: cursor)
         case .leftMouseDragged:
             gesture = gestureRecognizer.mouseDragged(to: cursor)
@@ -101,19 +131,25 @@ final class ClickThroughController {
             return
         }
         if let gesture {
-            onGesture?(gesture)
+            switch gestureSubject {
+            case .pet: onGesture?(gesture)
+            case .toy: onToyGesture?(gesture)
+            }
         }
     }
 
     private func handleMouseMoved() {
         let cursor = NSEvent.mouseLocation
-        let allow = Self.shouldAllowClicks(
+        let overPet = Self.shouldAllowClicks(
             cursorPosition: cursor,
             characterScreenPosition: characterScreenPosition,
             hitboxSize: hitboxSize,
             isUpsideDown: isUpsideDown
         )
-        window?.ignoresMouseEvents = !allow
+        // The toy has to make the window clickable too, or a press on it goes
+        // straight through to whatever is behind the overlay.
+        let overToy = toyRect?.contains(cursor) ?? false
+        window?.ignoresMouseEvents = !(overPet || overToy)
 
         let head = Self.headRect(
             characterScreenPosition: characterScreenPosition,

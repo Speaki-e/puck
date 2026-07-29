@@ -75,46 +75,125 @@ final class ChaseBallStateTests: XCTestCase {
     }
 }
 
+/// Playing with the toy overhead: catch, throw, repeat -- then get bored and
+/// throw it away (byeolki: "다시 잡아서 던진다는 개념으로 / 일정 시간동안
+/// 던진 뒤엔 대충 던지고 나서 할거 하게", 2026-07-29).
 final class JuggleBallStateTests: XCTestCase {
-    func test_firesOnBounceImmediatelyOnEntry() {
-        let state = JuggleBallState()
-        var bounceCount = 0
-        state.onBounce = { bounceCount += 1 }
-
-        state.enter()
-
-        XCTAssertEqual(bounceCount, 1)
+    /// Runs one full catch-and-throw round, returning the throws it caused.
+    private func playRound(_ state: JuggleBallState, in world: TestStateWorld) {
+        state.caught()
+        world.run(state, seconds: JuggleBallState.holdTime + 0.02)
     }
 
-    func test_bouncesTheConfiguredNumberOfTimes_thenRequestsKick() {
-        let world = TestStateWorld()
+    func test_throwsOnceOnEntry() {
         let state = JuggleBallState()
-        var bounceCount = 0
-        state.onBounce = { bounceCount += 1 }
+        var throwCount = 0
+        state.onThrow = { throwCount += 1 }
+
         state.enter()
 
-        world.run(state, seconds: JuggleBallState.bounceInterval * TimeInterval(JuggleBallState.bounceCount) + 0.1)
+        XCTAssertEqual(throwCount, 1)
+    }
 
-        XCTAssertEqual(bounceCount, JuggleBallState.bounceCount)
+    /// The catch is a pause, not a bounce: nothing is thrown at the instant
+    /// the toy arrives.
+    func test_catchingDoesNotThrowImmediately() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        state.enter()
+        var throwCount = 0
+        state.onThrow = { throwCount += 1 }
+
+        state.caught()
+        world.run(state, seconds: JuggleBallState.holdTime * 0.5)
+
+        XCTAssertEqual(throwCount, 0, "the toy should still be sitting on the pet's head")
+    }
+
+    func test_throwsAgainAfterHoldingTheCaughtToy() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        state.enter()
+        var throwCount = 0
+        state.onThrow = { throwCount += 1 }
+
+        playRound(state, in: world)
+
+        XCTAssertEqual(throwCount, 1)
+    }
+
+    func test_keepsPlayingForItsWholePlayDuration() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        state.enter()
+        var throwCount = 0
+        state.onThrow = { throwCount += 1 }
+
+        // Rounds well inside the play duration.
+        for _ in 0..<4 {
+            playRound(state, in: world)
+            world.run(state, seconds: 0.3) // the toy's arc
+        }
+
+        XCTAssertGreaterThanOrEqual(throwCount, 4)
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "gave up while still meant to be playing")
+    }
+
+    /// Bored: the final throw is a proper throw-away (KickBall), and it
+    /// happens from the hand -- on a catch, not by snatching the toy out of
+    /// the air mid-arc.
+    func test_onceBoredItThrowsTheToyAwayOnTheNextCatch() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        state.enter()
+
+        // Keep playing -- catching each time -- until it's had enough.
+        var played: TimeInterval = 0
+        while played < JuggleBallState.playDuration {
+            playRound(state, in: world)
+            world.run(state, seconds: 0.4) // the toy's arc
+            played += JuggleBallState.holdTime + 0.42
+            XCTAssertTrue(world.requestedTransitions.isEmpty, "gave up early, at \(played)s")
+        }
+
+        // Bored now, but still mid-air: it must wait for the toy in hand.
+        XCTAssertEqual(world.requestedTransitions, [], "must not bail out mid-air")
+
+        playRound(state, in: world)
+
         XCTAssertEqual(world.requestedTransitions, [.kickBall])
     }
 
-    func test_doesNotRequestKickBeforeAllBouncesFinish() {
+    /// A toy that never comes back -- picked up by the cursor, knocked away --
+    /// ends play without a throw-away, since there is nothing in hand.
+    func test_givesUpWhenTheToyNeverComesBack() {
         let world = TestStateWorld()
         let state = JuggleBallState()
         state.enter()
 
-        world.run(state, seconds: JuggleBallState.bounceInterval * 0.5)
+        world.run(state, seconds: JuggleBallState.patience + 0.1)
 
-        XCTAssertTrue(world.requestedTransitions.isEmpty)
+        XCTAssertEqual(world.requestedTransitions, [.idle])
     }
 
-    func test_requestsKickOnlyOnce() {
+    func test_aCatchResetsTheGiveUpTimer() {
         let world = TestStateWorld()
         let state = JuggleBallState()
         state.enter()
 
-        world.run(state, seconds: JuggleBallState.bounceInterval * TimeInterval(JuggleBallState.bounceCount) + 2)
+        world.run(state, seconds: JuggleBallState.patience * 0.9)
+        playRound(state, in: world) // caught and thrown again
+        world.run(state, seconds: JuggleBallState.patience * 0.9)
+
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "the catch should have reset the wait")
+    }
+
+    func test_endsOnlyOnce() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        state.enter()
+
+        world.run(state, seconds: JuggleBallState.patience + 5)
 
         XCTAssertEqual(world.requestedTransitions.count, 1)
     }

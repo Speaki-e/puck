@@ -36,9 +36,9 @@ final class JSONLinesDecoderTests: XCTestCase {
     func test_feedsMultipleLinesAtOnce_returnsAllMessages() {
         var decoder = JSONLinesDecoder()
         let chunk = line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#)
-            + line(#"{"type":"event","event":"tool_result","ok":true,"workspace_id":"default","session_id":"default"}"#)
+            + line(#"{"type":"event","event":"tool_result","id":"t1","ok":true,"workspace_id":"default","session_id":"default"}"#)
 
-        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking, workspaceId: "default", sessionId: "default"), .event(.toolResult(ok: true), workspaceId: "default", sessionId: "default")])
+        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking, workspaceId: "default", sessionId: "default"), .event(.toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil), workspaceId: "default", sessionId: "default")])
     }
 
     func test_malformedLine_isSkipped_subsequentLinesStillParse() {

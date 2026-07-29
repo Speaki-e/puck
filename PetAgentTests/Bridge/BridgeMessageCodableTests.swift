@@ -113,23 +113,39 @@ final class BridgeMessageCodableTests: XCTestCase {
     }
 
     func test_decodesEvent_toolCall_withDetail() throws {
-        let json = #"{"type":"event","event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"},"workspace_id":"w1","session_id":"s2"}"#
+        let json = #"{"type":"event","event":"tool_call","id":"t2","tool":"code_editor","args":{"task":"fix the bug","project_path":"/tmp/x"},"detail":{"path":"src/main.ts"},"workspace_id":"w1","session_id":"s2"}"#
         let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
 
-        guard case .event(.toolCall(let tool, let detail), let workspaceId, let sessionId) = message else {
+        guard case .event(.toolCall(let id, let tool, let args, let detail), let workspaceId, let sessionId) = message else {
             return XCTFail("expected .event(.toolCall), got \(message)")
         }
+        XCTAssertEqual(id, "t2")
         XCTAssertEqual(tool, "code_editor")
+        XCTAssertEqual(args, .object(["task": .string("fix the bug"), "project_path": .string("/tmp/x")]))
         XCTAssertEqual(detail, .object(["path": .string("src/main.ts")]))
         XCTAssertEqual(workspaceId, "w1")
         XCTAssertEqual(sessionId, "s2")
     }
 
     func test_decodesEvent_toolResult() throws {
-        let json = #"{"type":"event","event":"tool_result","ok":true,"workspace_id":"default","session_id":"default"}"#
+        let json = #"{"type":"event","event":"tool_result","id":"t1","ok":true,"data":{"stdout":"3 passed","stderr":"","exit_code":0},"workspace_id":"default","session_id":"default"}"#
         let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
 
-        XCTAssertEqual(message, .event(.toolResult(ok: true), workspaceId: "default", sessionId: "default"))
+        XCTAssertEqual(
+            message,
+            .event(
+                .toolResult(id: "t1", ok: true, data: .object(["stdout": .string("3 passed"), "stderr": .string(""), "exit_code": .number(0)]), error: nil, detail: nil),
+                workspaceId: "default",
+                sessionId: "default"
+            )
+        )
+    }
+
+    func test_decodesEvent_textChunk() throws {
+        let json = #"{"type":"event","event":"text_chunk","text":"Running the test suite now...","workspace_id":"default","session_id":"default"}"#
+        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message, .event(.textChunk(text: "Running the test suite now..."), workspaceId: "default", sessionId: "default"))
     }
 
     func test_decodesEvent_awaitApproval() throws {

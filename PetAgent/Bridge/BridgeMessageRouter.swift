@@ -77,7 +77,7 @@ final class BridgeMessageRouter {
             dispatchToMain { [weak self] in
                 guard let self else { return }
                 let reaction = EventRouter.reaction(for: event, previousCodeEditorPath: self.lastCodeEditorPath)
-                if case .toolCall(let tool, let detail) = event, tool == "code_editor" {
+                if case .toolCall(_, let tool, _, let detail) = event, tool == "code_editor" {
                     self.lastCodeEditorPath = EventRouter.codeEditorPath(from: detail) ?? self.lastCodeEditorPath
                 }
                 self.onEventReaction?(reaction)

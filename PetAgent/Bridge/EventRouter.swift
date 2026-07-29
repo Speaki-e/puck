@@ -83,7 +83,12 @@ enum EventRouter {
         case .agentThinking:
             return EventReaction(stateTransition: .idle, emotion: "thinking")
 
-        case .toolCall(let tool, let detail):
+        case .textChunk:
+            // Chat-rendering data for F13 (2026-07-29), not a pet reaction --
+            // no-op here, same as toolResult(ok: true) below.
+            return EventReaction()
+
+        case .toolCall(_, let tool, _, let detail):
             // code_editor gets a dedicated typing reaction; every other tool
             // (run_shell, run_applescript, and anything else) points at wherever
             // the action is happening — the "run_shell 계열" row in the table.
@@ -94,7 +99,7 @@ enum EventRouter {
             let pathChanged = previousCodeEditorPath != nil && path != nil && path != previousCodeEditorPath
             return EventReaction(stateTransition: .type, jump: pathChanged)
 
-        case .toolResult(let ok):
+        case .toolResult(_, let ok, _, _, _):
             return ok
                 ? EventReaction()
                 : EventReaction(stateTransition: .reactClick, sfxKey: "task_fail", emotion: "sad")

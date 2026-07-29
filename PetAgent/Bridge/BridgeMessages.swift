@@ -44,10 +44,18 @@ struct ToolResult: Equatable {
 /// the event needs enough to route that response to the right pending resolve.
 /// workspaceId/sessionId live on BridgeMessage.event's wrapper, not here -- every
 /// event kind needs them once more than one session can be open, not just this one.
+///
+/// textChunk, and toolCall/toolResult's id/args/data/error/detail (2026-07-29) exist
+/// because this stream now feeds two audiences, not just the pet's reactions: pet-app's
+/// F13 chat view needs a real timeline (streaming assistant text, which tool ran with
+/// what args, what it actually returned) -- effectively AgentCallbacks proxied over the
+/// socket. toolCall.detail is unchanged from its original purpose (a curated summary,
+/// e.g. code_editor's path) and is distinct from args (the tool's raw call arguments).
 enum BridgeEvent: Equatable {
     case agentThinking
-    case toolCall(tool: String, detail: JSONValue?)
-    case toolResult(ok: Bool)
+    case textChunk(text: String)
+    case toolCall(id: String, tool: String, args: JSONValue?, detail: JSONValue?)
+    case toolResult(id: String, ok: Bool, data: JSONValue?, error: String?, detail: String?)
     case awaitApproval(summary: String, approvalId: String)
     case agentDone(ok: Bool, summary: String)
 }
@@ -182,6 +190,7 @@ extension BridgeMessage: Codable {
 
     private enum EventKey: String, Codable {
         case agentThinking = "agent_thinking"
+        case textChunk = "text_chunk"
         case toolCall = "tool_call"
         case toolResult = "tool_result"
         case awaitApproval = "await_approval"
@@ -237,13 +246,23 @@ extension BridgeMessage: Codable {
             switch try container.decode(EventKey.self, forKey: .event) {
             case .agentThinking:
                 event = .agentThinking
+            case .textChunk:
+                event = .textChunk(text: try container.decode(String.self, forKey: .text))
             case .toolCall:
                 event = .toolCall(
+                    id: try container.decode(String.self, forKey: .id),
                     tool: try container.decode(String.self, forKey: .tool),
+                    args: try container.decodeIfPresent(JSONValue.self, forKey: .args),
                     detail: try container.decodeIfPresent(JSONValue.self, forKey: .detail)
                 )
             case .toolResult:
-                event = .toolResult(ok: try container.decode(Bool.self, forKey: .ok))
+                event = .toolResult(
+                    id: try container.decode(String.self, forKey: .id),
+                    ok: try container.decode(Bool.self, forKey: .ok),
+                    data: try container.decodeIfPresent(JSONValue.self, forKey: .data),
+                    error: try container.decodeIfPresent(String.self, forKey: .error),
+                    detail: try container.decodeIfPresent(String.self, forKey: .detail)
+                )
             case .awaitApproval:
                 event = .awaitApproval(
                     summary: try container.decode(String.self, forKey: .summary),
@@ -347,13 +366,22 @@ extension BridgeMessage: Codable {
             switch event {
             case .agentThinking:
                 try container.encode(EventKey.agentThinking, forKey: .event)
-            case .toolCall(let tool, let detail):
+            case .textChunk(let text):
+                try container.encode(EventKey.textChunk, forKey: .event)
+                try container.encode(text, forKey: .text)
+            case .toolCall(let id, let tool, let args, let detail):
                 try container.encode(EventKey.toolCall, forKey: .event)
+                try container.encode(id, forKey: .id)
                 try container.encode(tool, forKey: .tool)
+                try container.encodeIfPresent(args, forKey: .args)
                 try container.encodeIfPresent(detail, forKey: .detail)
-            case .toolResult(let ok):
+            case .toolResult(let id, let ok, let data, let error, let detail):
                 try container.encode(EventKey.toolResult, forKey: .event)
+                try container.encode(id, forKey: .id)
                 try container.encode(ok, forKey: .ok)
+                try container.encodeIfPresent(data, forKey: .data)
+                try container.encodeIfPresent(error, forKey: .error)
+                try container.encodeIfPresent(detail, forKey: .detail)
             case .awaitApproval(let summary, let approvalId):
                 try container.encode(EventKey.awaitApproval, forKey: .event)
                 try container.encode(summary, forKey: .summary)

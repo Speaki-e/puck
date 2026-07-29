@@ -68,8 +68,10 @@ agent tries to call a pet-app executor tool, it gets back an immediate
 
 ```json
 {"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}
-{"type":"event","event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"},"workspace_id":"default","session_id":"default"}
-{"type":"event","event":"tool_result","ok":true,"workspace_id":"default","session_id":"default"}
+{"type":"event","event":"text_chunk","text":"Running the test suite now...","workspace_id":"default","session_id":"default"}
+{"type":"event","event":"tool_call","id":"t1","tool":"run_shell","args":{"command":"npm test"},"workspace_id":"default","session_id":"default"}
+{"type":"event","event":"tool_call","id":"t2","tool":"code_editor","args":{"task":"fix the bug","project_path":"/tmp/x"},"detail":{"path":"src/main.ts"},"workspace_id":"default","session_id":"default"}
+{"type":"event","event":"tool_result","id":"t1","ok":true,"data":{"stdout":"3 passed","stderr":"","exit_code":0},"workspace_id":"default","session_id":"default"}
 {"type":"event","event":"await_approval","summary":"requesting to run rm -rf ./dist","approval_id":"a1","workspace_id":"w1","session_id":"s2"}
 {"type":"event","event":"agent_done","ok":true,"summary":"3 tests passed","workspace_id":"default","session_id":"default"}
 ```
@@ -78,6 +80,19 @@ agent tries to call a pet-app executor tool, it gets back an immediate
   once more than one chat session can be open (channel 4), pet-app needs to know which
   session's timeline an incoming event belongs to, or it has no way to route
   `agent_thinking`/`tool_call`/`tool_result`/`agent_done` to the right one.
+- `text_chunk`, and `tool_call`/`tool_result`'s `id`/`args`/`data`/`error`/`detail`
+  (2026-07-29) exist because this stream now feeds two audiences, not just the pet's
+  reactions — pet-app's F13 chat view needs a real timeline (streaming assistant text,
+  which tool ran with what args, what it actually returned), effectively `AgentCallbacks`
+  (see [`agent-interface.md`](./agent-interface.md)) proxied over the socket.
+  - `tool_call.detail` is unchanged from its original purpose — a curated summary (e.g.
+    code_editor's `{"path":...}`) used for the pet's jump-on-path-change reaction — and is
+    distinct from `args` (the tool's actual raw call arguments, new).
+  - `tool_call.id`/`tool_result.id` (both required) let the chat view correlate a call to
+    its result, the same `tool_use` id `AgentCallbacks.onToolCallStart`/`onToolResult`
+    already carry — parallel tool_use in one turn is exactly why this was needed there too.
+  - `tool_result.data`/`error`/`detail` mirror `tool_result`'s dispatch-channel fields
+    (channel 1) — same shapes, same standard error codes.
 - `await_approval`'s `approval_id` additionally exists because the approval UI now lives in
   pet-app's client window rather than workspace's own renderer — resolving it has to
   round-trip this socket via `approval_response` (channel 6), so the event needs enough to

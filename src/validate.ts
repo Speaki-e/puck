@@ -65,13 +65,23 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
       switch (value.event) {
         case "agent_thinking":
           return true;
+        case "text_chunk":
+          return typeof value.text === "string";
         case "tool_call":
           return (
+            typeof value.id === "string" &&
             typeof value.tool === "string" &&
+            (value.args === undefined || isJSONValue(value.args)) &&
             (value.detail === undefined || isJSONValue(value.detail))
           );
         case "tool_result":
-          return typeof value.ok === "boolean";
+          return (
+            typeof value.id === "string" &&
+            typeof value.ok === "boolean" &&
+            (value.data === undefined || isJSONValue(value.data)) &&
+            (value.error === undefined || TOOL_ERROR_CODES.has(value.error as ToolErrorCode)) &&
+            (value.detail === undefined || typeof value.detail === "string")
+          );
         case "await_approval":
           return typeof value.summary === "string" && typeof value.approval_id === "string";
         case "agent_done":

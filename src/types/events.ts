@@ -70,11 +70,21 @@ export interface ToolResult {
  * `resolve` (plan/01_protocol.md 3.6). workspace_id/session_id live on the
  * wrapper (BridgeEventMessage below), since every event kind needs them once
  * multiple sessions can be open at once -- not just await_approval.
+ *
+ * text_chunk, and tool_call/tool_result's id/args/data/error/detail
+ * (2026-07-29) exist because this stream now feeds two audiences, not just
+ * the pet's reactions: pet-app's F13 chat view needs a real timeline
+ * (streaming assistant text, which tool ran with what args, what it actually
+ * returned) -- effectively AgentCallbacks proxied over the socket. `detail`
+ * on tool_call is unchanged from its original purpose (a curated summary,
+ * e.g. code_editor's `{"path":...}` for jump-on-change) and is distinct from
+ * `args` (the tool's raw call arguments, new).
  */
 export type BridgeEvent =
   | { event: "agent_thinking" }
-  | { event: "tool_call"; tool: string; detail?: JSONValue }
-  | { event: "tool_result"; ok: boolean }
+  | { event: "text_chunk"; text: string }
+  | { event: "tool_call"; id: string; tool: string; args?: JSONValue; detail?: JSONValue }
+  | { event: "tool_result"; id: string; ok: boolean; data?: JSONValue; error?: ToolErrorCode; detail?: string }
   | { event: "await_approval"; summary: string; approval_id: string }
   | { event: "agent_done"; ok: boolean; summary: string };
 

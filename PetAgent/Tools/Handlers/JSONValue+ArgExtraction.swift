@@ -18,7 +18,8 @@ extension JSONValue {
             case .number(let x)? = frameFields["x"],
             case .number(let y)? = frameFields["y"],
             case .number(let width)? = frameFields["width"],
-            case .number(let height)? = frameFields["height"]
+            case .number(let height)? = frameFields["height"],
+            x.isFinite, y.isFinite, width.isFinite, height.isFinite
         else {
             return nil
         }

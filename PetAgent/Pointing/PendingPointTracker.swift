@@ -33,4 +33,12 @@ final class PendingPointTracker {
         defer { pending = nil }
         return pending
     }
+
+    /// Called on tool_cancel/timeout. Unlike `replace`'s "superseded" case,
+    /// this must NOT invoke the pending callback: ToolExecutor already
+    /// replied .cancelled for this dispatch, so calling onStarted after would
+    /// be stale, not a legitimate reply.
+    func clearPending() {
+        pending = nil
+    }
 }

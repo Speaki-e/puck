@@ -23,6 +23,10 @@ struct JSONLinesDecoder {
     struct FeedResult {
         let messages: [BridgeMessage]
         let didOverflow: Bool
+        /// How many lines this specific `feed()` call dropped -- distinct
+        /// from `droppedLineCount`'s running total, so a caller can react
+        /// (e.g. log) to a fresh drop without diffing the total itself.
+        let droppedThisCall: Int
     }
 
     private var buffer = Data()
@@ -38,6 +42,7 @@ struct JSONLinesDecoder {
         buffer.append(data)
 
         var messages: [BridgeMessage] = []
+        var droppedThisCall = 0
         while let newlineIndex = buffer.firstIndex(of: 0x0A) {
             let lineData = buffer[..<newlineIndex]
             buffer.removeSubrange(...newlineIndex)
@@ -46,14 +51,15 @@ struct JSONLinesDecoder {
                 messages.append(message)
             } else {
                 droppedLineCount += 1
+                droppedThisCall += 1
             }
         }
 
         guard buffer.count <= maxLineLength else {
             buffer.removeAll()
-            return FeedResult(messages: messages, didOverflow: true)
+            return FeedResult(messages: messages, didOverflow: true, droppedThisCall: droppedThisCall)
         }
-        return FeedResult(messages: messages, didOverflow: false)
+        return FeedResult(messages: messages, didOverflow: false, droppedThisCall: droppedThisCall)
     }
 }
 
@@ -76,6 +82,12 @@ final class BridgeConnection {
     /// a send error — previously both were silently swallowed, leaving the
     /// agent side to time out with no diagnostic on our end.
     var onSendError: ((Error) -> Void)?
+    /// Fires once per line JSONLinesDecoder drops -- droppedLineCount was
+    /// previously only ever read by tests, so protocol drift or a hostile
+    /// connection produced zero operational signal (found via review); the
+    /// only symptom was a tool_result that never arrived, indistinguishable
+    /// from "the tool is just slow" until ToolExecutor's own timeout.
+    var onMalformedLine: (() -> Void)?
 
     init(connection: NWConnection) {
         self.connection = connection
@@ -131,6 +143,9 @@ final class BridgeConnection {
                 let result = self.linesDecoder.feed(data)
                 for message in result.messages {
                     self.onMessage?(message)
+                }
+                for _ in 0..<result.droppedThisCall {
+                    self.onMalformedLine?()
                 }
                 if result.didOverflow {
                     self.cancel() // triggers stateUpdateHandler -> .cancelled -> close()

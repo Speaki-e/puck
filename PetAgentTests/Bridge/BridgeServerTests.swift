@@ -118,6 +118,45 @@ final class BridgeServerTests: XCTestCase {
         wait(for: [disconnected], timeout: 6)
     }
 
+    /// droppedLineCount was previously only ever read by JSONLinesDecoderTests
+    /// -- nothing surfaced a drop happening on a live connection, so protocol
+    /// drift or a hostile client produced zero operational signal (found via
+    /// review).
+    func test_onMalformedLine_firesWhenAClientSendsAnUndecodableLine() {
+        let malformed = expectation(description: "server reported the malformed line")
+        server.onMalformedLine = { malformed.fulfill() }
+
+        let client = makeClient()
+        client.stateUpdateHandler = { state in
+            if case .ready = state {
+                let data = Data("not json\n".utf8)
+                client.send(content: data, completion: .contentProcessed { _ in })
+            }
+        }
+        client.start(queue: .main)
+
+        wait(for: [malformed], timeout: 5)
+        client.cancel()
+    }
+
+    // The socket had no peer authentication and default permissions
+    // (srwxr-xr-x) -- any other process running as the same local user could
+    // connect and dispatch run_shell/run_applescript, bypassing ai-module's
+    // upstream approval UI entirely (found via review). Restricting to owner
+    // read/write closes that off for every other local user account at
+    // least, even though same-user processes are still trusted by design.
+    func test_socketFile_isNotAccessibleToOtherUsers() {
+        let ready = expectation(description: "socket file exists with its final permissions")
+        pollUntilTrue(timeout: 5, expectation: ready) {
+            FileManager.default.fileExists(atPath: self.socketURL.path)
+        }
+        wait(for: [ready], timeout: 6)
+
+        let attributes = try? FileManager.default.attributesOfItem(atPath: socketURL.path)
+        let permissions = (attributes?[.posixPermissions] as? NSNumber)?.uint16Value
+        XCTAssertEqual(permissions, 0o600)
+    }
+
     private func pollUntilTrue(timeout: TimeInterval, expectation: XCTestExpectation, condition: @escaping () -> Bool) {
         let deadline = Date().addingTimeInterval(timeout)
         func poll() {

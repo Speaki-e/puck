@@ -23,20 +23,19 @@ final class ClimbToCeilingState: StateHandler {
     let clipKey = "climb"
     let loopsClip = true
 
-    private var hasRequestedTransition = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
-        hasRequestedTransition = false
+        oneShot.reset()
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedTransition else { return }
+        guard !oneShot.hasFired else { return }
 
         guard WindowSupport.windowBeingClimbed(at: context.body.position, in: context.windows) != nil else {
             // No wall here (or climbed past the top of a short one) --
             // there's nothing left to hold onto.
-            hasRequestedTransition = true
-            context.requestTransition(.fall)
+            oneShot.fire(.fall, using: context.requestTransition)
             return
         }
 
@@ -54,8 +53,7 @@ final class ClimbToCeilingState: StateHandler {
         context.body.position = step.position
 
         if step.hasArrived {
-            hasRequestedTransition = true
-            context.requestTransition(.ceiling)
+            oneShot.fire(.ceiling, using: context.requestTransition)
         }
     }
 }

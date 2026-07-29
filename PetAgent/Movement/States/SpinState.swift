@@ -30,23 +30,22 @@ final class SpinState: StateHandler {
     /// swallowed, same reasoning as the other reaction states.
     let restartsOnReentry = true
 
-    /// Long enough for the full turns BouncePreset.spin plays, and short
-    /// enough that the pet gets back to roaming promptly.
-    static let duration: TimeInterval = 2.0
+    /// However long BouncePreset.spin's flip animation takes -- this state
+    /// just needs to stay entered exactly that long before returning to Idle.
+    static let duration: TimeInterval = BouncePreset.spinDuration
 
     private var elapsed: TimeInterval = 0
-    private var hasRequestedIdle = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
         elapsed = 0
-        hasRequestedIdle = false
+        oneShot.reset()
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedIdle else { return }
+        guard !oneShot.hasFired else { return }
         elapsed += dt
         guard elapsed >= Self.duration else { return }
-        hasRequestedIdle = true
-        context.requestTransition(.idle)
+        oneShot.fire(.idle, using: context.requestTransition)
     }
 }

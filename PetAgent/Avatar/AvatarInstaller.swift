@@ -36,8 +36,18 @@ enum AvatarInstaller {
     /// avatar over it. A destination directory missing its manifest.json is
     /// not a real install (a previous copy that died partway through) and is
     /// repaired rather than left broken forever.
+    ///
+    /// `overwriteExisting` is for the user-driven "Import Avatar Package…"
+    /// flow (AvatarManagementView), which explicitly means to replace
+    /// whatever's there -- it used to reimplement this copy-in logic by hand
+    /// instead of going through here, silently skipping the LFS-pointer check
+    /// below (found via review).
     @discardableResult
-    static func installIfNeeded(bundledPackage: URL, intoAvatarsDirectory avatarsDirectory: URL) -> Outcome {
+    static func installIfNeeded(
+        bundledPackage: URL,
+        intoAvatarsDirectory avatarsDirectory: URL,
+        overwriteExisting: Bool = false
+    ) -> Outcome {
         let fileManager = FileManager.default
 
         guard fileManager.fileExists(atPath: bundledPackage.path) else {
@@ -46,7 +56,7 @@ enum AvatarInstaller {
 
         let destination = avatarsDirectory.appendingPathComponent(bundledPackage.lastPathComponent, isDirectory: true)
         let destinationManifest = destination.appendingPathComponent("manifest.json")
-        guard !fileManager.fileExists(atPath: destinationManifest.path) else {
+        guard overwriteExisting || !fileManager.fileExists(atPath: destinationManifest.path) else {
             return .alreadyPresent
         }
 

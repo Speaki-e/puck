@@ -29,4 +29,26 @@ final class TextInputBubbleWindowTests: XCTestCase {
     func test_floatsAboveNormalWindows() {
         XCTAssertEqual(makeWindow().level, .floating)
     }
+
+    // Re-triggering the hotkey while the bubble is already open used to
+    // recapture previouslyFrontmostApp with PetAgent itself (since PetAgent's
+    // own bubble window is key at that point), silently clobbering the real
+    // target app -- closeAndRestoreFocus() then "restored" focus to PetAgent
+    // instead (found via review). Counting frontmostAppProvider calls, rather
+    // than comparing NSWorkspace.shared.frontmostApplication before/after, is
+    // what makes this deterministic: a real frontmost-app query can't be
+    // relied on to actually change value inside a test runner.
+    func test_reTriggeringWhileAlreadyVisible_doesNotRecaptureFrontmostApp() {
+        let window = makeWindow()
+        var captureCount = 0
+        window.frontmostAppProvider = {
+            captureCount += 1
+            return nil
+        }
+
+        window.showAndActivate()
+        window.showAndActivate()
+
+        XCTAssertEqual(captureCount, 1, "must not recapture the frontmost app while already visible")
+    }
 }

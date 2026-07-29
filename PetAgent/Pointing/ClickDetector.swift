@@ -22,6 +22,22 @@ final class ClickDetector: ClickDetectorProviding {
 
     private var monitor: Any?
     private var targetFrame: CGRect = .zero
+    private let mouseLocationProvider: () -> CGPoint
+    private let screenSpaceProvider: () -> GlobalScreenSpace?
+
+    /// `targetFrame` (point_at/UIElementInspector) arrives in global Quartz
+    /// coordinates (top-left origin, Y-down) -- protocol section 4 -- but
+    /// NSEvent.mouseLocation is AppKit's global space (bottom-left origin,
+    /// Y-up). Comparing them directly silently misses genuine clicks on the
+    /// target (found via review); mouseLocationProvider/screenSpaceProvider
+    /// exist so a test can inject both sides of that conversion.
+    init(
+        mouseLocationProvider: @escaping () -> CGPoint = { NSEvent.mouseLocation },
+        screenSpaceProvider: @escaping () -> GlobalScreenSpace? = { GlobalScreenSpace.current() }
+    ) {
+        self.mouseLocationProvider = mouseLocationProvider
+        self.screenSpaceProvider = screenSpaceProvider
+    }
 
     /// Calling this again without an intervening stopMonitoring() (e.g.
     /// re-pointing at a new target before the previous point released)
@@ -30,7 +46,7 @@ final class ClickDetector: ClickDetectorProviding {
         stopMonitoring()
         self.targetFrame = targetFrame
         monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
-            self?.handleClick(at: NSEvent.mouseLocation)
+            self?.handleClick()
         }
     }
 
@@ -41,8 +57,12 @@ final class ClickDetector: ClickDetectorProviding {
         monitor = nil
     }
 
-    private func handleClick(at location: CGPoint) {
-        if Self.isClick(at: location, insideTargetFrame: targetFrame) {
+    func handleClick() {
+        // If the display configuration can't be determined right now, there's
+        // no safe way to convert the click -- skip it rather than compare
+        // raw AppKit coordinates against a Quartz-space frame.
+        guard let normalized = screenSpaceProvider()?.normalized(fromAppKit: mouseLocationProvider()) else { return }
+        if Self.isClick(at: normalized, insideTargetFrame: targetFrame) {
             onClickInsideTarget?()
         }
     }

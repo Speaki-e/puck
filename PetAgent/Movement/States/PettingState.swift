@@ -33,7 +33,7 @@ final class PettingState: StateHandler {
     static let duration: TimeInterval = 0.8
 
     private var elapsed: TimeInterval = 0
-    private var hasRequestedExit = false
+    private var oneShot = OneShotTransition()
     /// True while the user is actively stroking the pet's head.
     private var isBeingStroked = false
     /// Whether this reaction came from stroking — which earns a twirl —
@@ -42,7 +42,7 @@ final class PettingState: StateHandler {
 
     func enter() {
         elapsed = 0
-        hasRequestedExit = false
+        oneShot.reset()
         isBeingStroked = false
         wasStroked = false
     }
@@ -63,13 +63,12 @@ final class PettingState: StateHandler {
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedExit else { return }
+        guard !oneShot.hasFired else { return }
         // Being stroked holds the reaction open for as long as it lasts.
         guard !isBeingStroked else { return }
 
         elapsed += dt
         guard elapsed >= Self.duration else { return }
-        hasRequestedExit = true
-        context.requestTransition(wasStroked ? .spin : .idle)
+        oneShot.fire(wasStroked ? .spin : .idle, using: context.requestTransition)
     }
 }

@@ -16,7 +16,7 @@ import Foundation
 
 final class KickBallState: StateHandler {
     let name = "KickBall"
-    let clipKey = "kick" // falls back to react_click, then idle, if the manifest has no dedicated clip
+    let clipKey = "kick" // falls back straight to idle if the manifest has no dedicated clip (AvatarLoader.resolvedClipName)
     let loopsClip = false
 
     /// Long enough for BouncePreset's kick anticipation+impact motion to read.
@@ -27,19 +27,18 @@ final class KickBallState: StateHandler {
     var onEnter: (() -> Void)?
 
     private var elapsed: TimeInterval = 0
-    private var hasRequestedIdle = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
         elapsed = 0
-        hasRequestedIdle = false
+        oneShot.reset()
         onEnter?()
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedIdle else { return }
+        guard !oneShot.hasFired else { return }
         elapsed += dt
         guard elapsed >= Self.duration else { return }
-        hasRequestedIdle = true
-        context.requestTransition(.idle)
+        oneShot.fire(.idle, using: context.requestTransition)
     }
 }

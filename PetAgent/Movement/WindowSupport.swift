@@ -38,6 +38,26 @@ enum WindowSupport {
         }
     }
 
+    /// Windows the pet could actually climb from `position`: at the pet's
+    /// height, and with enough headroom above (`roamableTop`/`avatarHeight`)
+    /// that climbing wouldn't clip its head off the top of the screen.
+    /// Shared by `nearestClimbTarget` and `blockingWindow`, which used to
+    /// duplicate this exact two-stage filter (found via review).
+    private static func climbableWindows(
+        at position: CGPoint,
+        in windows: [WindowInfo],
+        roamableTop: CGFloat,
+        avatarHeight: CGFloat
+    ) -> [WindowInfo] {
+        windows
+            .filter { window in
+                position.y >= window.frame.minY && position.y <= window.frame.maxY
+            }
+            .filter { window in
+                window.frame.minY - roamableTop >= avatarHeight
+            }
+    }
+
     /// A point to walk to that will put the pet against the nearest climbable
     /// window's side, so `blockingWindow` picks it up and Walk hands off to
     /// Climb (2026-07-29, byeolki: "너무 바닥에 붙어있는데 어느정도 위로 기어
@@ -62,15 +82,7 @@ enum WindowSupport {
         // never triggers.
         let overshoot: CGFloat = 4
 
-        let edges = windows
-            .filter { window in
-                // Only windows the pet's own height can reach the side of...
-                position.y >= window.frame.minY && position.y <= window.frame.maxY
-            }
-            .filter { window in
-                // ...and only ones with room to stand on top afterwards.
-                window.frame.minY - roamableTop >= avatarHeight
-            }
+        let edges = climbableWindows(at: position, in: windows, roamableTop: roamableTop, avatarHeight: avatarHeight)
             .flatMap { [$0.frame.minX, $0.frame.maxX] }
             // Already standing at this edge: pick a different one rather than
             // walking a zero-length path and re-deciding a moment later.
@@ -101,14 +113,7 @@ enum WindowSupport {
         avatarHeight: CGFloat = 0
     ) -> WindowInfo? {
         let goingRight = target.x > position.x
-        return windows
-            .filter { window in
-                // Must be at the pet's height to be in the way at all.
-                position.y >= window.frame.minY && position.y <= window.frame.maxY
-            }
-            .filter { window in
-                window.frame.minY - roamableTop >= avatarHeight
-            }
+        return climbableWindows(at: position, in: windows, roamableTop: roamableTop, avatarHeight: avatarHeight)
             .filter { window in
                 let edge = goingRight ? window.frame.minX : window.frame.maxX
                 return goingRight ? (edge > position.x && edge <= target.x) : (edge < position.x && edge >= target.x)

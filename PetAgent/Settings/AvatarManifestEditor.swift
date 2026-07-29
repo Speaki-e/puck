@@ -15,6 +15,10 @@ import Foundation
 
 enum AvatarManifestEditorError: Error {
     case manifestNotFound
+    /// A custom emotion name (Settings' TextField, only whitespace-trimmed)
+    /// containing "/" or made entirely of dots would let `"\(emotion).png"`
+    /// land outside the avatar directory, or overwrite an unrelated file.
+    case invalidEmotionName(String)
 }
 
 enum AvatarManifestEditor {
@@ -65,6 +69,9 @@ enum AvatarManifestEditor {
     /// manifest.emotions[emotion] at it.
     @discardableResult
     static func setEmotionImage(named emotion: String, sourceFile: URL, directory: URL) throws -> AvatarManifest {
+        guard isValidEmotionName(emotion) else {
+            throw AvatarManifestEditorError.invalidEmotionName(emotion)
+        }
         let existing = try loadManifest(directory: directory)
 
         let destination = directory.appendingPathComponent("\(emotion).png")
@@ -87,5 +94,12 @@ enum AvatarManifestEditor {
         )
         try save(updated, directory: directory)
         return updated
+    }
+
+    /// No path separators, and not made entirely of dots (rules out "." and
+    /// the traversal case "..") -- an emotion name is a bare file-stem, never
+    /// a path.
+    static func isValidEmotionName(_ name: String) -> Bool {
+        !name.isEmpty && !name.contains("/") && !name.allSatisfy { $0 == "." }
     }
 }

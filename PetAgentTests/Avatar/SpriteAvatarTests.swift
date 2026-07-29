@@ -410,6 +410,24 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(avatar.spriteLayer.bounds.size, CGSize(width: 240, height: 280))
     }
 
+    /// updateScale changes spriteLayer.bounds.height, which
+    /// setScreenPosition's ground-point offset depends on -- previously left
+    /// as an undocumented-in-code caller contract ("the caller is expected to
+    /// re-push the character's position afterward"), unlike setUpsideDown,
+    /// which already self-heals via the same setScreenPosition(lastPosition)
+    /// call (found via review). A future caller that forgot the follow-up
+    /// would leave the sprite floating at the stale ground offset.
+    func test_updateScale_reappliesTheGroundOffsetForTheNewHeight() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult() // hitbox 120x140
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+        avatar.setScreenPosition(CGPoint(x: 100, y: 200))
+
+        avatar.updateScale(0.5) // new height 70 -> offset -35
+
+        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 100, y: 165))
+    }
+
     // MARK: - showEmotion (Settings emotion mapping, 2026-07-29)
 
     func test_showEmotion_setsLayerContentsFromTheMappedPNG() throws {

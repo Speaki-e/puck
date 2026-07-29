@@ -95,6 +95,56 @@ final class AvatarInstallerTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: partial.appendingPathComponent("manifest.json").path))
     }
 
+    /// AvatarManagementView's user-driven "Import Avatar Package…" flow used
+    /// to reimplement this copy-in logic by hand and skip the LFS-pointer
+    /// check entirely (found via review) -- overwriteExisting: true lets it
+    /// route through here instead, replacing an existing install (the user
+    /// explicitly chose to import over it) while keeping every safety check.
+    func test_overwriteExisting_replacesAnAlreadyInstalledPackage() throws {
+        try FileManager.default.createDirectory(
+            at: destinationRoot.appendingPathComponent("dummy", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        let staleManifest = destinationRoot.appendingPathComponent("dummy/manifest.json")
+        try Data("{\"old\":true}".utf8).write(to: staleManifest)
+
+        let outcome = AvatarInstaller.installIfNeeded(
+            bundledPackage: bundled,
+            intoAvatarsDirectory: destinationRoot,
+            overwriteExisting: true
+        )
+
+        XCTAssertEqual(outcome, .installed)
+        XCTAssertEqual(try Data(contentsOf: staleManifest), Data("{}".utf8))
+    }
+
+    /// The same un-pulled-LFS-pointer safety check must apply to a
+    /// user-driven overwrite import, not just the first-run bootstrap seed.
+    func test_overwriteExisting_stillDetectsUnpulledLFSPointerFiles() throws {
+        let pointerText = "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 12345\n"
+        try Data(pointerText.utf8).write(to: bundled.appendingPathComponent("idle.usdz"))
+        try FileManager.default.createDirectory(
+            at: destinationRoot.appendingPathComponent("dummy", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data("{\"old\":true}".utf8).write(to: destinationRoot.appendingPathComponent("dummy/manifest.json"))
+
+        let outcome = AvatarInstaller.installIfNeeded(
+            bundledPackage: bundled,
+            intoAvatarsDirectory: destinationRoot,
+            overwriteExisting: true
+        )
+
+        guard case .failed = outcome else {
+            return XCTFail("expected .failed for un-pulled LFS pointers, got \(outcome)")
+        }
+        XCTAssertEqual(
+            try Data(contentsOf: destinationRoot.appendingPathComponent("dummy/manifest.json")),
+            Data("{\"old\":true}".utf8),
+            "must not clobber the existing install with a package containing unpulled LFS pointers"
+        )
+    }
+
     /// A contributor who cloned without `git lfs pull` gets ~130-byte LFS
     /// pointer text files named e.g. idle.usdz instead of the real usdz
     /// binary. Every layer above (AvatarLoader, USDZAvatar) would otherwise

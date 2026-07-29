@@ -42,7 +42,7 @@ final class ReactDragState: StateHandler {
     private static let velocitySmoothingRate: CGFloat = 12
 
     private var isReleased = false
-    private var hasRequestedFall = false
+    private var oneShot = OneShotTransition()
     /// Where the pet sat relative to the cursor when it was grabbed. Held for
     /// the whole drag so the grabbed point stays under the cursor.
     private var grabOffset: CGPoint?
@@ -52,7 +52,7 @@ final class ReactDragState: StateHandler {
 
     func enter() {
         isReleased = false
-        hasRequestedFall = false
+        oneShot.reset()
         cursorPosition = nil
         grabOffset = nil
         cursorVelocity = .zero
@@ -66,13 +66,12 @@ final class ReactDragState: StateHandler {
 
     func update(dt: TimeInterval, context: StateContext) {
         if isReleased {
-            guard !hasRequestedFall else { return }
-            hasRequestedFall = true
+            guard !oneShot.hasFired else { return }
             // Hand the throw to Fall. Let go of a still cursor and this is
             // zero, i.e. the plain straight-down drop it always was.
             context.body.launchVelocity = MovementSolver.cappedThrow(cursorVelocity)
             // Dropped where it was let go, not wherever the cursor went next.
-            context.requestTransition(.fall)
+            oneShot.fire(.fall, using: context.requestTransition)
             return
         }
 

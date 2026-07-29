@@ -30,28 +30,27 @@ final class CeilingState: StateHandler {
     private var direction: CGFloat = 1
     private var elapsed: TimeInterval = 0
     private var duration: TimeInterval = 0
-    private var hasRequestedFall = false
+    private var oneShot = OneShotTransition()
 
     init(durationProvider: @escaping () -> TimeInterval = { TimeInterval.random(in: 3...8) }) {
         self.durationProvider = durationProvider
     }
 
     func enter() {
-        hasRequestedFall = false
+        oneShot.reset()
         elapsed = 0
         duration = durationProvider()
         direction = 1
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedFall else { return }
+        guard !oneShot.hasFired else { return }
 
         context.body.isUpsideDown = true
 
         elapsed += dt
         guard elapsed < duration else {
-            hasRequestedFall = true
-            context.requestTransition(.fall)
+            oneShot.fire(.fall, using: context.requestTransition)
             return
         }
 
@@ -66,7 +65,11 @@ final class CeilingState: StateHandler {
             y: context.roamableArea.minY
         )
         let contained = ScreenBounds.contain(travelled, visualBounds: context.visualBounds, in: context.roamableArea)
-        if contained.x != travelled.x {
+        // An oversized avatar (Settings' size slider) has no position where
+        // it actually fits -- `contain` always pins to leftLimit regardless
+        // of `travelled`, so comparing against it would flip `direction`
+        // every frame forever instead of settling.
+        if contained.x != travelled.x, !ScreenBounds.isOversizedHorizontally(visualBounds: context.visualBounds, in: context.roamableArea) {
             direction = -direction
         }
 

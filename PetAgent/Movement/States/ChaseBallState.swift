@@ -23,10 +23,10 @@ final class ChaseBallState: StateHandler {
     /// Where the ball landed, in the pet's coordinate space.
     var target: CGPoint?
 
-    private var hasHandedOver = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
-        hasHandedOver = false
+        oneShot.reset()
     }
 
     func exit() {
@@ -34,10 +34,10 @@ final class ChaseBallState: StateHandler {
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasHandedOver else { return }
+        guard !oneShot.hasFired else { return }
 
         guard let target else {
-            handOver(.idle, context)
+            oneShot.fire(.idle, using: context.requestTransition)
             return
         }
 
@@ -49,12 +49,7 @@ final class ChaseBallState: StateHandler {
         context.body.position = step.position
 
         if step.hasArrived {
-            handOver(.juggleBall, context)
+            oneShot.fire(.juggleBall, using: context.requestTransition)
         }
-    }
-
-    private func handOver(_ kind: StateKind, _ context: StateContext) {
-        hasHandedOver = true
-        context.requestTransition(kind)
     }
 }

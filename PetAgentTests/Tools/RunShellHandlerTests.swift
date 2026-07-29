@@ -138,6 +138,37 @@ final class RunShellHandlerTests: XCTestCase {
         )
     }
 
+    /// cancel() previously only sent SIGTERM (via Process.terminate()) with
+    /// no escalation -- a command that traps/ignores SIGTERM survives
+    /// indefinitely despite the caller already being told "cancelled" (found
+    /// via review). This is the highest-privilege tool in the registry, so a
+    /// cancel guarantee that a trap can defeat is worth closing.
+    func test_cancel_escalatesToSIGKILL_whenTheProcessIgnoresSIGTERM() {
+        let handler = RunShellHandler()
+        let pidFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("petagent_test_trap_\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+
+        handler.execute(
+            args: .object(["command": .string("echo $$ > \(pidFile.path); trap '' TERM; sleep 30")])
+        ) { _ in
+            // Not expected to complete in this test -- killed instead.
+        }
+
+        guard let pid = Self.waitForPID(at: pidFile, timeout: 2) else {
+            XCTFail("trap-resistant process never reported its pid")
+            return
+        }
+        XCTAssertEqual(kill(pid, 0), 0, "process should still be alive before cancel")
+
+        handler.cancel()
+
+        XCTAssertTrue(
+            Self.waitUntilProcessDies(pid, timeout: 3),
+            "cancel() must escalate to SIGKILL when the process ignores SIGTERM"
+        )
+    }
+
     private static func waitForPID(at file: URL, timeout: TimeInterval) -> pid_t? {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {

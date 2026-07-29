@@ -26,19 +26,18 @@ final class WalkOnTopState: StateHandler {
     /// edge approaching from the right), so walking a hardcoded direction
     /// from there could walk straight back off the very edge just climbed.
     private var direction: CGFloat?
-    private var hasRequestedFall = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
-        hasRequestedFall = false
+        oneShot.reset()
         direction = nil
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedFall else { return }
+        guard !oneShot.hasFired else { return }
 
         guard let window = WindowSupport.supportingWindow(under: context.body.position, in: context.windows) else {
-            hasRequestedFall = true
-            context.requestTransition(.fall)
+            oneShot.fire(.fall, using: context.requestTransition)
             return
         }
 

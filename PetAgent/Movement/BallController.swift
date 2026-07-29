@@ -67,6 +67,14 @@ final class BallController {
         state = BallPhysics.kick(current, direction: direction)
     }
 
+    /// Pops a resting ball straight up -- a no-op if it's still falling or
+    /// already kicked, same guard as kick(direction:). Used for the
+    /// juggle-before-kick variety (2026-07-29).
+    func juggle() {
+        guard let current = state, current.phase == .resting else { return }
+        state = BallPhysics.juggle(current)
+    }
+
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
     /// on a real display change -- mirrors SpriteAvatar.reparent's precedent.
     func reparent(to newParent: CALayer) {

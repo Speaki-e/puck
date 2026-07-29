@@ -38,6 +38,34 @@ final class ReactClickStateTests: XCTestCase {
     }
 }
 
+final class PettingStateTests: XCTestCase {
+    func test_returnsToIdleAfterTheReactionPlays() {
+        let world = TestStateWorld()
+        let state = PettingState()
+        state.enter()
+
+        world.run(state, seconds: 0.1)
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "the wiggle needs a moment to read")
+
+        world.run(state, seconds: 2)
+        XCTAssertEqual(world.requestedTransitions, [.idle])
+    }
+
+    /// Petting the pet again while it's still reacting should replay the
+    /// reaction, not queue up a backlog of transitions from the first one.
+    func test_reentryRestartsTheTimer() {
+        let world = TestStateWorld()
+        let state = PettingState()
+
+        state.enter()
+        world.run(state, seconds: 2)
+        state.enter()
+        world.run(state, seconds: 0.1)
+
+        XCTAssertEqual(world.requestedTransitions.count, 1, "the second reaction has not finished yet")
+    }
+}
+
 final class ReactDragStateTests: XCTestCase {
     func test_followsTheCursor() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 0))

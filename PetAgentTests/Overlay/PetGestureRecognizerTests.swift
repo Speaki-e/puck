@@ -74,4 +74,74 @@ final class PetGestureRecognizerTests: XCTestCase {
         _ = recognizer.mouseDown(at: CGPoint(x: 300, y: 0))
         XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 300, y: 0)), .tapped, "the previous drag must not leak")
     }
+
+    // MARK: - Double-tap ("petting" interaction, 2026-07-29)
+
+    func test_twoQuickTapsCloseTogether_isADoubleTap() {
+        var currentTime: TimeInterval = 0
+        var recognizer = PetGestureRecognizer(now: { currentTime })
+
+        _ = recognizer.mouseDown(at: CGPoint(x: 100, y: 100))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 100, y: 100)), .tapped)
+
+        currentTime += 0.2
+        _ = recognizer.mouseDown(at: CGPoint(x: 102, y: 101))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 102, y: 101)), .doubleTapped)
+    }
+
+    func test_twoTapsTooFarApartInTime_areTwoSeparateTaps() {
+        var currentTime: TimeInterval = 0
+        var recognizer = PetGestureRecognizer(now: { currentTime })
+
+        _ = recognizer.mouseDown(at: CGPoint(x: 100, y: 100))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 100, y: 100)), .tapped)
+
+        currentTime += 1.0 // well past the double-tap window
+        _ = recognizer.mouseDown(at: CGPoint(x: 100, y: 100))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 100, y: 100)), .tapped)
+    }
+
+    func test_twoTapsTooFarApartInSpace_areTwoSeparateTaps() {
+        var currentTime: TimeInterval = 0
+        var recognizer = PetGestureRecognizer(now: { currentTime })
+
+        _ = recognizer.mouseDown(at: CGPoint(x: 100, y: 100))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 100, y: 100)), .tapped)
+
+        currentTime += 0.1
+        _ = recognizer.mouseDown(at: CGPoint(x: 300, y: 300))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 300, y: 300)), .tapped)
+    }
+
+    /// The double-tap is consumed once it fires, so a third quick tap starts
+    /// a fresh single/double cycle rather than chaining forever.
+    func test_thirdQuickTap_afterADoubleTap_isASingleTapAgain() {
+        var currentTime: TimeInterval = 0
+        var recognizer = PetGestureRecognizer(now: { currentTime })
+
+        _ = recognizer.mouseDown(at: .zero)
+        _ = recognizer.mouseUp(at: .zero)
+        currentTime += 0.1
+        _ = recognizer.mouseDown(at: .zero)
+        XCTAssertEqual(recognizer.mouseUp(at: .zero), .doubleTapped)
+
+        currentTime += 0.1
+        _ = recognizer.mouseDown(at: .zero)
+        XCTAssertEqual(recognizer.mouseUp(at: .zero), .tapped)
+    }
+
+    /// Only a completed tap should seed the double-tap window -- a drag
+    /// ending shouldn't make the next tap register as a double.
+    func test_dragEnding_doesNotCountTowardADoubleTap() {
+        var currentTime: TimeInterval = 0
+        var recognizer = PetGestureRecognizer(now: { currentTime })
+
+        _ = recognizer.mouseDown(at: .zero)
+        _ = recognizer.mouseDragged(to: CGPoint(x: 200, y: 0))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 200, y: 0)), .dragEnded)
+
+        currentTime += 0.1
+        _ = recognizer.mouseDown(at: CGPoint(x: 200, y: 0))
+        XCTAssertEqual(recognizer.mouseUp(at: CGPoint(x: 200, y: 0)), .tapped)
+    }
 }

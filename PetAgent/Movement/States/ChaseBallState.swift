@@ -6,8 +6,9 @@
 //  ChaseBall state's StateHandler implementation (optional ball-toy
 //  interaction, 02_pet-app.md F12).
 //
-//  "Idle/Walk 한정 | 공 던지기(F12) | ChaseBall → KickBall → Idle"
-//  (plan/02_pet-app.md section 3). Mirrors MoveToState almost exactly --
+//  "Idle/Walk 한정 | 공 던지기(F12) | ChaseBall → JuggleBall → KickBall → Idle"
+//  (plan/02_pet-app.md section 3; JuggleBall added 2026-07-29). Mirrors
+//  MoveToState almost exactly --
 //  ignores windows in the way for the same reason MoveTo does: the pet is
 //  headed somewhere specific (the ball), not wandering.
 
@@ -48,7 +49,7 @@ final class ChaseBallState: StateHandler {
         context.body.position = step.position
 
         if step.hasArrived {
-            handOver(.kickBall, context)
+            handOver(.juggleBall, context)
         }
     }
 

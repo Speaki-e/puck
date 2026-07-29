@@ -13,10 +13,14 @@
 //
 
 import CoreGraphics
+import Foundation
 
 enum PetGesture: Equatable {
     /// Pressed and released without meaningfully moving.
     case tapped
+    /// Two taps in quick succession, close together -- "petting" the
+    /// character (2026-07-29, byeolki's request for more interactions).
+    case doubleTapped
     case dragBegan(CGPoint)
     case dragMoved(CGPoint)
     case dragEnded
@@ -26,9 +30,20 @@ struct PetGestureRecognizer {
     /// How far the cursor may travel while pressed and still count as a click.
     /// A hand shifting a pixel or two shouldn't yank the pet across the screen.
     static let dragThreshold: CGFloat = 4
+    /// How close together two taps must land, in both position and time, to
+    /// count as a double-tap rather than two unrelated single taps.
+    static let doubleTapDistanceThreshold: CGFloat = 20
+    static let doubleTapMaxInterval: TimeInterval = 0.4
 
     private var pressOrigin: CGPoint?
     private var isDragging = false
+    private var lastTapTime: TimeInterval?
+    private var lastTapPosition: CGPoint?
+    private let now: () -> TimeInterval
+
+    init(now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+        self.now = now
+    }
 
     mutating func mouseDown(at point: CGPoint) -> PetGesture? {
         pressOrigin = point
@@ -57,6 +72,21 @@ struct PetGestureRecognizer {
             pressOrigin = nil
             isDragging = false
         }
-        return isDragging ? .dragEnded : .tapped
+        guard !isDragging else { return .dragEnded }
+
+        let currentTime = now()
+        if let lastTapTime, let lastTapPosition,
+           currentTime - lastTapTime <= Self.doubleTapMaxInterval,
+           hypot(point.x - lastTapPosition.x, point.y - lastTapPosition.y) <= Self.doubleTapDistanceThreshold {
+            // Consumed: a third quick tap starts a fresh cycle rather than
+            // chaining into a triple-tap.
+            self.lastTapTime = nil
+            self.lastTapPosition = nil
+            return .doubleTapped
+        }
+
+        lastTapTime = currentTime
+        lastTapPosition = point
+        return .tapped
     }
 }

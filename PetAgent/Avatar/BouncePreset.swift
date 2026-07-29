@@ -31,6 +31,8 @@ enum BouncePreset: Equatable {
     /// point/react_click's short "pop" pulse.
     case pop
     case kick
+    /// "pet" (double-tap petting reaction, 2026-07-29).
+    case wiggle
 
     /// Which preset a clip name uses. Clips with no bounce behavior (climb,
     /// fall, type, listen, react_drag, and anything unrecognized) get `.none`.
@@ -41,6 +43,7 @@ enum BouncePreset: Equatable {
         case "land": return .land
         case "point", "react_click": return .pop
         case "kick": return .kick
+        case "pet": return .wiggle
         default: return .none
         }
     }
@@ -110,6 +113,16 @@ enum BouncePreset: Equatable {
                 let s = intensity * sin(localT * .pi)
                 return BounceTransform(scaleX: 1 - s * 0.2, scaleY: 1 + s * 0.3)
             }
+
+        case .wiggle:
+            // A joyful side-to-side shake, several quick pulses, decaying to
+            // identity by the end of the reaction so it settles rather than
+            // cutting off abruptly mid-wiggle.
+            let duration = 0.8
+            let t = min(elapsed / duration, 1)
+            let decay = 1 - t
+            let wiggle = sin(2 * .pi * elapsed / 0.15) * intensity * decay
+            return BounceTransform(scaleX: 1 + wiggle * 0.12, scaleY: 1 - wiggle * 0.06)
         }
     }
 }

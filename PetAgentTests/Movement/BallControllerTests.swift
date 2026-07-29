@@ -70,6 +70,33 @@ final class BallControllerTests: XCTestCase {
         XCTAssertTrue(controller.isActive) // unaffected -- no crash, no state change
     }
 
+    // MARK: - juggle() (F12 juggle-before-kick variety, 2026-07-29)
+
+    func test_juggle_whileResting_popsItUpward() {
+        let controller = BallController(parent: CALayer())
+        controller.spawn(at: CGPoint(x: 200, y: 495))
+        controller.tick(dt: 0.1, landingY: 500, roamableArea: roamableArea) // now resting
+        let restingY = controller.layer.position.y
+
+        controller.juggle()
+        controller.tick(dt: 0.05, landingY: 500, roamableArea: roamableArea)
+
+        XCTAssertLessThan(controller.layer.position.y, restingY, "should have popped upward")
+    }
+
+    func test_juggle_thenFallsBackAndRests() {
+        let controller = BallController(parent: CALayer())
+        controller.spawn(at: CGPoint(x: 200, y: 495))
+        controller.tick(dt: 0.1, landingY: 500, roamableArea: roamableArea) // now resting
+
+        controller.juggle()
+        for _ in 0..<30 { // enough time for a small pop to arc back down
+            controller.tick(dt: 0.05, landingY: 500, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(controller.layer.position.y, 500, accuracy: 0.5)
+    }
+
     func test_tick_hidesTheLayerAndDeactivates_onceGone() {
         let controller = BallController(parent: CALayer())
         controller.spawn(at: CGPoint(x: 200, y: 495))

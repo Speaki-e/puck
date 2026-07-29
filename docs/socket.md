@@ -11,8 +11,11 @@ This document explains it; the types are normative.
 | Path | `~/Library/Application Support/PetAgent/bridge.sock` |
 | Encoding | JSON Lines (newline-delimited JSON, UTF-8) |
 | Server | pet-app (`NWListener`) |
-| Client | workspace (Node `net`), reconnects with exponential backoff (1s -> 2s -> 4s, capped at 30s) |
+| Client | workspace (Node `net`) and PetAgentClient (2026-07-30, the F13 chat/editor window's own process), both reconnect with exponential backoff (1s -> 2s -> 4s, capped at 30s) |
 | Common field | every message has a required `type` field |
+
+pet-app now relays between the two client roles rather than just talking to workspace
+directly — see channel 7.
 
 ## Disconnected behavior
 
@@ -172,3 +175,25 @@ instead of workspace's renderer, so channel 2's `await_approval` needs a reply p
 - `run_cancel`: aborts the `AbortSignal` behind the named session's in-flight `run()` — a
   different level from channel 1's `tool_cancel` (which abandons a single tool dispatch, not
   the whole conversation turn).
+
+### 7. Client role handshake (either side -> pet-app, 2026-07-30)
+
+The F13 client window moved out of pet-app's own process into its own app
+(PetAgentClient), so pet-app's socket now has two kinds of connections open at once and
+needs to tell them apart:
+
+```json
+{"type":"client_hello","role":"workspace"}
+{"type":"client_hello","role":"gui"}
+```
+
+- Sent once, immediately after connecting.
+- pet-app tracks each connection's role and relays accordingly: `user_input`,
+  `workspace_create_request`, `session_create_request`, `approval_response`, and
+  `run_cancel` (whichever role originates them) go to the `workspace` connection; channel 2's
+  events plus `workspace_create`, `session_create`, `editor_view_ready`, and
+  `editor_view_unavailable` go to every `gui` connection.
+- pet-app also pins the on-screen character (F3 Pinned state) while at least one `gui`
+  connection is open, and unpins it once the last one disconnects — this replaces the old
+  in-process "client window opened/closed" callback from when the chat window and the pet
+  shared a process.

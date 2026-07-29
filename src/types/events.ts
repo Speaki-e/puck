@@ -208,8 +208,28 @@ export interface RunCancel {
   session_id: string;
 }
 
+/**
+ * Who is on the other end of a bridge.sock connection: `workspace` (the
+ * agent backend) or `gui` (a chat/editor client -- historically pet-app
+ * itself, now also PetAgentClient once the F13 client window moved to its
+ * own process, 2026-07-30). pet-app relays by role once more than one
+ * connection role can be open at a time: user_input/workspace_create_request/
+ * session_create_request/approval_response/run_cancel go to the workspace
+ * connection; BridgeEventMessage/workspace_create/session_create/
+ * editor_view_ready/editor_view_unavailable go to gui connections.
+ * Sent once, right after connecting.
+ */
+export type ClientRole = "workspace" | "gui";
+
+/** Either side -> pet-app: identifies which role this connection plays. */
+export interface ClientHello {
+  type: "client_hello";
+  role: ClientRole;
+}
+
 /** Every JSON Lines message on the socket, discriminated by `type`. */
 export type BridgeMessage =
+  | ClientHello
   | ToolDispatch
   | ToolCancel
   | ToolResult

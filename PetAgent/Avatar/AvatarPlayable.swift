@@ -45,6 +45,13 @@ protocol AvatarPlayable: AnyObject {
     /// avatars have no use for this, only SpriteAvatar acts on it.
     func setUpsideDown(_ isUpsideDown: Bool)
 
+    /// A short visual hop (02_pet-app.md F3: agent_done, code_editor
+    /// detail.path changes) -- JumpFlourish, purely a render-time overlay
+    /// like bounce/tint, never touching the FSM's actual position. Default
+    /// is a no-op -- usdz/video avatars have no use for this, only
+    /// SpriteAvatar acts on it.
+    func triggerJump()
+
     /// The character's visible outline as a rectangle, relative to its ground
     /// point (the position the FSM moves): `minX`/`maxX` are how far the
     /// artwork extends to either side, `minY` how far above (negative, since Y
@@ -62,5 +69,6 @@ extension AvatarPlayable {
     func updateScale(_ scale: Double) {}
     func showEmotion(_ emotion: String) {}
     func setUpsideDown(_ isUpsideDown: Bool) {}
+    func triggerJump() {}
     var visualBounds: CGRect { .zero }
 }

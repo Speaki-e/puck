@@ -116,6 +116,27 @@ final class BridgeMessageRouterTests: XCTestCase {
         wait(for: [replied], timeout: 2)
     }
 
+    /// 02_pet-app.md F3: "detail.path 변경 시 짧은 점프" -- EventRouter itself
+    /// is a pure function with no session state, so BridgeMessageRouter (an
+    /// already-stateful class) is where the "previous path" has to live
+    /// across calls.
+    func test_codeEditorPathChange_acrossTwoEvents_jumpsOnlyOnTheSecond() {
+        let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
+        var reactions: [EventReaction] = []
+        let allThreeReceived = expectation(description: "all three reactions delivered")
+        router.onEventReaction = { reaction in
+            reactions.append(reaction)
+            if reactions.count == 3 { allThreeReceived.fulfill() }
+        }
+
+        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")]))), reply: { _ in })
+        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")]))), reply: { _ in })
+        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("b.ts")]))), reply: { _ in })
+
+        wait(for: [allThreeReceived], timeout: 2)
+        XCTAssertEqual(reactions.map(\.jump), [false, false, true])
+    }
+
     func test_messagesPetAppOnlySends_areIgnored() {
         let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
         router.onEventReaction = { _ in XCTFail("should not react to a message pet-app only sends") }

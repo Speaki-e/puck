@@ -21,6 +21,45 @@ final class EventRouterTests: XCTestCase {
         XCTAssertEqual(reaction, EventReaction(stateTransition: .type))
     }
 
+    // MARK: - code_editor detail.path change -> jump (02_pet-app.md F3:
+    // "detail.path 변경 시 짧은 점프") -- decoded via EventReaction.jump but
+    // never actually checked for a change until now (found via spec
+    // cross-check).
+
+    func test_toolCall_codeEditor_firstEventEver_doesNotJump() {
+        // Nothing to compare the very first path against -- entering Type
+        // isn't itself a "change".
+        let reaction = EventRouter.reaction(
+            for: .toolCall(tool: "code_editor", detail: .object(["path": .string("src/main.ts")])),
+            previousCodeEditorPath: nil
+        )
+        XCTAssertEqual(reaction, EventReaction(stateTransition: .type, jump: false))
+    }
+
+    func test_toolCall_codeEditor_samePathAsBefore_doesNotJump() {
+        let reaction = EventRouter.reaction(
+            for: .toolCall(tool: "code_editor", detail: .object(["path": .string("src/main.ts")])),
+            previousCodeEditorPath: "src/main.ts"
+        )
+        XCTAssertEqual(reaction, EventReaction(stateTransition: .type, jump: false))
+    }
+
+    func test_toolCall_codeEditor_differentPathThanBefore_jumps() {
+        let reaction = EventRouter.reaction(
+            for: .toolCall(tool: "code_editor", detail: .object(["path": .string("src/other.ts")])),
+            previousCodeEditorPath: "src/main.ts"
+        )
+        XCTAssertEqual(reaction, EventReaction(stateTransition: .type, jump: true))
+    }
+
+    func test_toolCall_runShell_neverJumpsRegardlessOfPreviousPath() {
+        let reaction = EventRouter.reaction(
+            for: .toolCall(tool: "run_shell", detail: nil),
+            previousCodeEditorPath: "src/main.ts"
+        )
+        XCTAssertEqual(reaction, EventReaction(stateTransition: .point, jump: false))
+    }
+
     func test_toolCall_runShell_transitionsToPoint() {
         let reaction = EventRouter.reaction(for: .toolCall(tool: "run_shell", detail: nil))
         XCTAssertEqual(reaction, EventReaction(stateTransition: .point))

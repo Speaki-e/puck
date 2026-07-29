@@ -119,6 +119,7 @@ pet-app/
 │   ├── Tools/                      # F11 (박해영)
 │   │   ├── ToolExecutor.swift
 │   │   ├── ToolExecutionLogger.swift
+│   │   ├── ToolTimeouts.swift       # protocol mirror: per-tool timeout_sec
 │   │   └── Handlers/
 │   │       ├── LaunchAppHandler.swift
 │   │       ├── ListRunningAppsHandler.swift

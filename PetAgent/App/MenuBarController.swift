@@ -11,6 +11,11 @@ import AppKit
 final class MenuBarController {
     var onOpenSettings: (() -> Void)?
     var onSwitchAvatar: (() -> Void)?
+    /// F13 (2026-07-30): PetAgentClient is a separate Dock-resident app now
+    /// -- this activates/launches it (byeolki: "별도의 앱으로 해서 dock에
+    /// 상시 표시"), replacing the old Option+Shift+Space-opens-the-window
+    /// behavior, which is back to being just the quick-capture bubble.
+    var onOpenClient: (() -> Void)?
     /// F12 (optional): the toys the pet plays with. Lowest priority, purely
     /// decorative -- see 02_pet-app.md F12.
     ///
@@ -27,6 +32,7 @@ final class MenuBarController {
     private let statusItem: NSStatusItem
     private let settingsItem: NSMenuItem
     private let switchAvatarItem: NSMenuItem
+    private let openClientItem: NSMenuItem
     /// One entry per toy in the catalogue, built once -- adding a toy to
     /// ToyCatalogue puts it in this menu with no further wiring.
     private let toysItem: NSMenuItem
@@ -46,11 +52,12 @@ final class MenuBarController {
 
         settingsItem = NSMenuItem(title: "", action: #selector(handleOpenSettings), keyEquivalent: ",")
         switchAvatarItem = NSMenuItem(title: "", action: #selector(handleSwitchAvatar), keyEquivalent: "")
+        openClientItem = NSMenuItem(title: "", action: #selector(handleOpenClient), keyEquivalent: "")
         toysItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         visibilityMenuItem = NSMenuItem(title: "", action: #selector(handleToggleVisibility), keyEquivalent: "h")
         quitItem = NSMenuItem(title: "", action: #selector(handleQuit), keyEquivalent: "q")
 
-        for item in [settingsItem, switchAvatarItem, visibilityMenuItem, quitItem] {
+        for item in [settingsItem, switchAvatarItem, openClientItem, visibilityMenuItem, quitItem] {
             item.target = self
         }
 
@@ -64,6 +71,7 @@ final class MenuBarController {
         toysItem.submenu = toysMenu
 
         let menu = NSMenu()
+        menu.addItem(openClientItem)
         menu.addItem(settingsItem)
         menu.addItem(switchAvatarItem)
         menu.addItem(toysItem)
@@ -81,6 +89,7 @@ final class MenuBarController {
     /// explicitly.
     func applyLanguage(_ language: AppLanguage) {
         self.language = language
+        openClientItem.title = Strings.text(.menuOpenClient, language)
         settingsItem.title = Strings.text(.menuSettings, language)
         switchAvatarItem.title = Strings.text(.menuSwitchAvatar, language)
         toysItem.title = Strings.text(.menuToys, language)
@@ -101,6 +110,7 @@ final class MenuBarController {
 
     @objc private func handleOpenSettings() { onOpenSettings?() }
     @objc private func handleSwitchAvatar() { onSwitchAvatar?() }
+    @objc private func handleOpenClient() { onOpenClient?() }
     @objc private func handleToggleToy(_ sender: NSMenuItem) {
         guard ToyCatalogue.all.indices.contains(sender.tag) else { return }
         onToggleToy?(ToyCatalogue.all[sender.tag])

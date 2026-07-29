@@ -74,7 +74,18 @@ final class BridgeConnection {
     private var linesDecoder = JSONLinesDecoder()
     private var hasClosed = false
 
+    /// Set once, from this connection's client_hello (protocol 3.7) --
+    /// nil until then. BridgeServer uses it to decide which connections a
+    /// given message relays to (ClientRelay.targetRole).
+    var role: ClientRole?
+
     var onMessage: ((BridgeMessage) -> Void)?
+    /// Fires once the wrapped connection reaches .ready -- PetAgentClient's
+    /// own outbound connection (2026-07-30) needs this to know when it's
+    /// safe to send client_hello, which BridgeServer's accepted (server-side)
+    /// connections never needed since they're only handed to onMessage/
+    /// onClose once already open.
+    var onReady: (() -> Void)?
     /// Fires exactly once per connection, regardless of whether the close was
     /// observed via stateUpdateHandler or the receive completion handler.
     var onClose: (() -> Void)?
@@ -96,6 +107,8 @@ final class BridgeConnection {
     func start(queue: DispatchQueue) {
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
+            case .ready:
+                self?.onReady?()
             case .cancelled, .failed:
                 self?.close()
             default:

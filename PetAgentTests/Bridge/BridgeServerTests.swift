@@ -157,6 +157,127 @@ final class BridgeServerTests: XCTestCase {
         XCTAssertEqual(permissions, 0o600)
     }
 
+    // MARK: - Client role handshake + relay (protocol 3.7, 2026-07-30)
+    //
+    // The F13 client window moved out of pet-app's own process into
+    // PetAgentClient, so bridge.sock now has two roles connected at once and
+    // pet-app has to relay between them rather than just handling everything
+    // itself in-process.
+
+    private func send(_ message: BridgeMessage, on client: NWConnection) {
+        var data = try! JSONEncoder().encode(message)
+        data.append(0x0A)
+        client.send(content: data, completion: .contentProcessed { _ in })
+    }
+
+    private final class ReceiveBuffer {
+        var data = Data()
+    }
+
+    private func receiveOne(on client: NWConnection, into buffer: ReceiveBuffer, then handle: @escaping (BridgeMessage) -> Void) {
+        client.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, _, _ in
+            if let data { buffer.data.append(data) }
+            if let newlineIndex = buffer.data.firstIndex(of: 0x0A) {
+                let line = buffer.data[..<newlineIndex]
+                buffer.data.removeSubrange(...newlineIndex)
+                if let message = try? JSONDecoder().decode(BridgeMessage.self, from: line) {
+                    handle(message)
+                    return
+                }
+            }
+            self.receiveOne(on: client, into: buffer, then: handle)
+        }
+    }
+
+    func test_guiOriginatedMessage_relaysToTheWorkspaceConnection() {
+        let workspaceReceived = expectation(description: "workspace connection received the relayed message")
+
+        let workspaceClient = makeClient()
+        let guiClient = makeClient()
+        let workspaceBuffer = ReceiveBuffer()
+
+        workspaceClient.stateUpdateHandler = { state in
+            if case .ready = state { self.send(.clientHello(role: .workspace), on: workspaceClient) }
+        }
+        guiClient.stateUpdateHandler = { state in
+            if case .ready = state {
+                self.send(.clientHello(role: .gui), on: guiClient)
+                self.send(.userInput(UserInput(text: "hi", source: .text)), on: guiClient)
+            }
+        }
+        receiveOne(on: workspaceClient, into: workspaceBuffer) { message in
+            guard case .userInput(let input) = message else { return }
+            XCTAssertEqual(input.text, "hi")
+            workspaceReceived.fulfill()
+        }
+
+        workspaceClient.start(queue: .main)
+        guiClient.start(queue: .main)
+
+        wait(for: [workspaceReceived], timeout: 5)
+        workspaceClient.cancel()
+        guiClient.cancel()
+    }
+
+    func test_workspaceOriginatedEvent_relaysToTheGUIConnection() {
+        let guiReceived = expectation(description: "gui connection received the relayed event")
+
+        let workspaceClient = makeClient()
+        let guiClient = makeClient()
+        let guiBuffer = ReceiveBuffer()
+
+        guiClient.stateUpdateHandler = { state in
+            if case .ready = state { self.send(.clientHello(role: .gui), on: guiClient) }
+        }
+        workspaceClient.stateUpdateHandler = { state in
+            if case .ready = state {
+                self.send(.clientHello(role: .workspace), on: workspaceClient)
+                self.send(.event(.agentThinking, workspaceId: "w1", sessionId: "s1"), on: workspaceClient)
+            }
+        }
+        receiveOne(on: guiClient, into: guiBuffer) { message in
+            guard case .event(let event, let workspaceId, let sessionId) = message else { return }
+            XCTAssertEqual(event, .agentThinking)
+            XCTAssertEqual(workspaceId, "w1")
+            XCTAssertEqual(sessionId, "s1")
+            guiReceived.fulfill()
+        }
+
+        guiClient.start(queue: .main)
+        workspaceClient.start(queue: .main)
+
+        wait(for: [guiReceived], timeout: 5)
+        workspaceClient.cancel()
+        guiClient.cancel()
+    }
+
+    /// AppDelegate pins the on-screen character (F3 Pinned state) while a
+    /// chat client is attached, and unpins it once the last one disconnects
+    /// -- this replaces the old in-process "client window opened/closed"
+    /// callback from when the chat window and the pet shared a process.
+    func test_onGUIPresenceChanged_firesOnFirstConnectAndLastDisconnect() {
+        var presenceEvents: [Bool] = []
+        let connected = expectation(description: "gui presence became true")
+        let disconnected = expectation(description: "gui presence became false")
+        server.onGUIPresenceChanged = { present in
+            presenceEvents.append(present)
+            if present { connected.fulfill() } else { disconnected.fulfill() }
+        }
+
+        let guiClient = makeClient()
+        guiClient.stateUpdateHandler = { state in
+            if case .ready = state { self.send(.clientHello(role: .gui), on: guiClient) }
+        }
+        guiClient.start(queue: .main)
+
+        wait(for: [connected], timeout: 5)
+        XCTAssertEqual(presenceEvents, [true])
+
+        guiClient.cancel()
+        wait(for: [disconnected], timeout: 5)
+        XCTAssertEqual(presenceEvents, [true, false])
+    }
+
     private func pollUntilTrue(timeout: TimeInterval, expectation: XCTestExpectation, condition: @escaping () -> Bool) {
         let deadline = Date().addingTimeInterval(timeout)
         func poll() {

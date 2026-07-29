@@ -125,8 +125,22 @@ enum EditorViewUnavailableReason: String, Codable {
     case noProjectPath = "no_project_path"
 }
 
+/// Who is on the other end of a bridge.sock connection: workspace (the agent backend)
+/// or gui (a chat/editor client -- historically pet-app itself, now also
+/// PetAgentClient once the F13 client window moved to its own process, 2026-07-30).
+/// pet-app relays by role once more than one connection role can be open at a time:
+/// userInput/workspaceCreateRequest/sessionCreateRequest/approvalResponse/runCancel go
+/// to the workspace connection; event/workspaceCreate/sessionCreate/editorViewReady/
+/// editorViewUnavailable go to gui connections. Sent once, right after connecting.
+enum ClientRole: String, Codable {
+    case workspace
+    case gui
+}
+
 /// Top-level type for every JSON Lines message on the socket, discriminated by "type".
 enum BridgeMessage: Equatable {
+    /// Either side -> pet-app: identifies which role this connection plays (protocol 3.7).
+    case clientHello(role: ClientRole)
     case toolDispatch(ToolDispatch)
     /// workspace -> pet-app: abandon an in-flight dispatch (protocol 3.1) --
     /// the handler is cancelled and the original id replies error="cancelled".
@@ -173,6 +187,7 @@ enum BridgeMessage: Equatable {
 
 extension BridgeMessage: Codable {
     private enum TypeKey: String, Codable {
+        case clientHello = "client_hello"
         case toolDispatch = "tool_dispatch"
         case toolCancel = "tool_cancel"
         case toolResult = "tool_result"
@@ -210,12 +225,16 @@ extension BridgeMessage: Codable {
         case reason
         case approvalId = "approval_id"
         case approved
+        case role
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         switch try container.decode(TypeKey.self, forKey: .type) {
+        case .clientHello:
+            self = .clientHello(role: try container.decode(ClientRole.self, forKey: .role))
+
         case .toolDispatch:
             self = .toolDispatch(
                 ToolDispatch(
@@ -341,6 +360,10 @@ extension BridgeMessage: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
+        case .clientHello(let role):
+            try container.encode(TypeKey.clientHello, forKey: .type)
+            try container.encode(role, forKey: .role)
+
         case .toolDispatch(let dispatch):
             try container.encode(TypeKey.toolDispatch, forKey: .type)
             try container.encode(dispatch.id, forKey: .id)

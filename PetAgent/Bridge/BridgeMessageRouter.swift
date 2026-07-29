@@ -98,6 +98,9 @@ final class BridgeMessageRouter {
 
         case .toolResult, .userInput, .workspaceCreateRequest, .sessionCreateRequest, .approvalResponse, .runCancel:
             break // pet-app only ever sends these, never receives them
+
+        case .clientHello:
+            break // intercepted by BridgeServer before reaching here (assigns the connection's role)
         }
     }
 }

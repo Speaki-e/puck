@@ -45,6 +45,10 @@ enum L10nKey: String, CaseIterable, Hashable {
     case failedToSetEmotionFormat
 
     case menuSettings, menuSwitchAvatar, menuToys, menuHide, menuShow, menuQuit
+    /// F13 (2026-07-30): PetAgentClient is a separate Dock-resident app now
+    /// -- this menu item activates/launches it, replacing the old
+    /// Option+Shift+Space-opens-the-client-window behavior.
+    case menuOpenClient
 }
 
 enum Strings {
@@ -131,5 +135,6 @@ enum Strings {
         .menuHide: [.english: "Hide", .korean: "숨기기"],
         .menuShow: [.english: "Show", .korean: "보이기"],
         .menuQuit: [.english: "Quit PetAgent", .korean: "PetAgent 종료"],
+        .menuOpenClient: [.english: "Open PetAgent Chat", .korean: "PetAgent 채팅 열기"],
     ]
 }

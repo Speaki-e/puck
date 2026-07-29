@@ -21,6 +21,7 @@ final class ClickThroughController {
     private var localMonitor: Any?
     private var characterScreenPosition: CGPoint = .zero
     private var hitboxSize: CGSize = .zero
+    private var isUpsideDown = false
     private var gestureRecognizer = PetGestureRecognizer()
 
     /// Emitted when the user clicks or drags the character itself. Cursor
@@ -34,9 +35,10 @@ final class ClickThroughController {
     }
 
     /// Called whenever the character moves or its avatar (and thus hitbox) changes.
-    func updateCharacter(screenPosition: CGPoint, hitboxSize: CGSize) {
+    func updateCharacter(screenPosition: CGPoint, hitboxSize: CGSize, isUpsideDown: Bool = false) {
         characterScreenPosition = screenPosition
         self.hitboxSize = hitboxSize
+        self.isUpsideDown = isUpsideDown
     }
 
     /// A *global* monitor only delivers events sent to OTHER apps -- the
@@ -101,7 +103,8 @@ final class ClickThroughController {
         let allow = Self.shouldAllowClicks(
             cursorPosition: NSEvent.mouseLocation,
             characterScreenPosition: characterScreenPosition,
-            hitboxSize: hitboxSize
+            hitboxSize: hitboxSize,
+            isUpsideDown: isUpsideDown
         )
         window?.ignoresMouseEvents = !allow
     }
@@ -115,10 +118,21 @@ final class ClickThroughController {
     /// hitbox extends *upward* from it, not symmetrically around it. Building
     /// it symmetric around the feet left the character's upper half outside
     /// its own hitbox.
-    static func shouldAllowClicks(cursorPosition: CGPoint, characterScreenPosition: CGPoint, hitboxSize: CGSize) -> Bool {
+    ///
+    /// F3 ceiling-crawling (2026-07-29): hanging from the ceiling, the body
+    /// extends *downward* from the attachment point instead -- the same
+    /// SpriteAvatar.setScreenPosition flip this mirrors on the click-test
+    /// side. Missing this made a visibly-hanging pet unclickable.
+    static func shouldAllowClicks(
+        cursorPosition: CGPoint,
+        characterScreenPosition: CGPoint,
+        hitboxSize: CGSize,
+        isUpsideDown: Bool = false
+    ) -> Bool {
+        let originY = isUpsideDown ? characterScreenPosition.y - hitboxSize.height : characterScreenPosition.y
         let rect = CGRect(
             x: characterScreenPosition.x - hitboxSize.width / 2,
-            y: characterScreenPosition.y,
+            y: originY,
             width: hitboxSize.width,
             height: hitboxSize.height
         )

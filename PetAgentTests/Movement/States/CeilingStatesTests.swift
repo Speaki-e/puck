@@ -36,6 +36,23 @@ final class ClimbToCeilingStateTests: XCTestCase {
         XCTAssertEqual(world.body.position.y, 0, accuracy: MovementSolver.arrivalRadius)
     }
 
+    /// Position is still the feet here (right-side-up) -- arriving with the
+    /// feet at the literal top of the screen would push the head off-screen
+    /// before "arrival" (this was the actual bug: the pet visibly vanished
+    /// while climbing, then reappeared once Ceiling took over, reading as a
+    /// teleport). It must stop with the HEAD at the ceiling instead.
+    func test_arrivesWithTheHeadAtTheCeiling_notTheFeet() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 200))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        world.avatarHeight = 140
+        let state = ClimbToCeilingState()
+        state.enter()
+
+        world.run(state, seconds: 3)
+
+        XCTAssertEqual(world.body.position.y, 140, accuracy: MovementSolver.arrivalRadius)
+    }
+
     func test_requestsCeilingOnlyOnce() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 10))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)

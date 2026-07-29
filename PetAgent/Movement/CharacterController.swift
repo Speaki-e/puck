@@ -37,6 +37,9 @@ final class CharacterController {
     /// Where the pet may roam, and what it lands on. Set at bootstrap and
     /// refreshed when the display configuration or window list changes.
     var roamableArea: CGRect = .zero
+    /// Kept in sync with the live avatar's rendered height -- see
+    /// StateContext.avatarHeight.
+    var avatarHeight: CGFloat = 0
     var landingY: (CGPoint) -> CGFloat = { _ in .zero }
     /// Refreshed from F4 every frame by the bootstrap wiring.
     var windows: () -> [WindowInfo] = { [] }
@@ -87,6 +90,7 @@ final class CharacterController {
         let context = StateContext(
             body: body,
             roamableArea: roamableArea,
+            avatarHeight: avatarHeight,
             windows: windows(),
             landingY: landingY,
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }

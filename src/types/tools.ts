@@ -5,7 +5,12 @@
  * and dispatch routing -- a declaration file cannot hold them.
  */
 
-export type ToolExecutorKind = "pet-app" | "workspace";
+/**
+ * "ai-module" (2026-07-29) is not a real dispatch target -- it marks the one
+ * tool (open_task_session) ai-module's own tool-use loop handles inline,
+ * never crossing tool_dispatch/tool_result on the socket.
+ */
+export type ToolExecutorKind = "pet-app" | "workspace" | "ai-module";
 
 /**
  * How a tool's approval requirement works. `whitelisted` and `acp_internal`
@@ -183,5 +188,22 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     ],
     description: "Return a file's contents (read-only, does not open a tab).",
     responseNote: "TBD -- workspace has not been implemented yet. Expected to carry file contents as a string; update this note once workspace ships read_file.",
+  },
+  {
+    name: "open_task_session",
+    executor: "ai-module",
+    approval: not_required,
+    // Never dispatched, so no timeout applies -- 0 is a placeholder, not a real value.
+    timeoutSec: 0,
+    params: [
+      { name: "title", type: "string", required: true, description: "Short title for the new task session, shown in pet-app's sidebar." },
+      { name: "brief", type: "string", required: true, description: "Seed context for the new session -- becomes its first system message." },
+    ],
+    description:
+      "Branch the current casual conversation into a new task session when a clear work request has come in. " +
+      "The only tool that never dispatches over the socket: ai-module's tool-use loop handles it inline, " +
+      "allocating a new session id, seeding its history with brief, and notifying pet-app via " +
+      "onSessionCreated -> session_create(origin=agent).",
+    responseNote: "null. Never crosses tool_dispatch/tool_result on the wire.",
   },
 ];

@@ -70,15 +70,86 @@ agent tries to call a pet-app executor tool, it gets back an immediate
 {"type":"event","event":"agent_thinking"}
 {"type":"event","event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"}}
 {"type":"event","event":"tool_result","ok":true}
-{"type":"event","event":"await_approval","summary":"requesting to run rm -rf ./dist"}
+{"type":"event","event":"await_approval","summary":"requesting to run rm -rf ./dist","approval_id":"a1","workspace_id":"w1","session_id":"s2"}
 {"type":"event","event":"agent_done","ok":true,"summary":"3 tests passed"}
 ```
+
+- `await_approval`'s `approval_id`/`workspace_id`/`session_id` (2026-07-29) exist because
+  the approval UI now lives in pet-app's client window rather than workspace's own
+  renderer — resolving it has to round-trip this socket via `approval_response` (channel 6),
+  so the event needs enough to route that response back to the right pending `resolve`.
 
 ### 3. User input (pet-app -> workspace)
 
 ```json
-{"type":"user_input","text":"run this project's tests","source":"voice"}
-{"type":"user_input","text":"open README","source":"text"}
+{"type":"user_input","text":"run this project's tests","source":"voice","workspace_id":"default","session_id":"default"}
+{"type":"user_input","text":"look at this","source":"text","workspace_id":"w1","session_id":"s2","attachments":[{"type":"image","path":"/tmp/petagent-capture-1234.png"}]}
 ```
 
 - `source`: `voice` | `text`
+- `workspace_id`/`session_id` (2026-07-29, optional): default to `"default"` when omitted —
+  existing single-workspace/single-session consumers are unaffected (see channel 4).
+- `attachments` (2026-07-29, optional): images attached via pet-app's drag capture (F14).
+  `path` is a local temp file on the same machine — not base64, to keep the socket message
+  small.
+
+### 4. Sessions and workspaces (2026-07-29)
+
+pet-app's client window shows a sidebar with a workspace switcher and a per-workspace
+chat session list. `workspace` still means a `code_editor` project_path unit; `session` is
+one conversation under that workspace.
+
+```json
+{"type":"workspace_create_request","name":"cat house project","project_path":"/Users/x/cat-house"}
+{"type":"workspace_create","workspace_id":"w2","name":"cat house project","project_path":"/Users/x/cat-house"}
+{"type":"session_create_request","workspace_id":"w1","title":"new chat"}
+{"type":"session_create","workspace_id":"w1","session_id":"s2","title":"fix the build error","origin":"agent"}
+```
+
+- Messages with a `_request` suffix are pet-app -> workspace; the confirming event without
+  the suffix is workspace -> pet-app. The sidebar's "new chat"/"add workspace" buttons go
+  through this round trip — workspace (ai-module) is the only source of truth for ids.
+- `workspace_id: "default"` (no `project_path`) and, under it, `session_id: "default"` (the
+  casual conversation) always exist implicitly from app start — no creation message needed.
+- A workspace with no `project_path` (chat-only) is valid — `code_editor` and the editor view
+  (channel 5) are unavailable for it.
+- `session_create.origin`: `user` (created via the sidebar) | `agent` (the agent branched a
+  casual conversation into a task session on its own judgement — see `onSessionCreated` in
+  [`agent-interface.md`](./agent-interface.md) and plan/04_ai-module.md 3.7).
+
+### 5. Editor view (2026-07-29)
+
+The editor screen (file tree + Monaco) is now an embeddable web bundle workspace builds;
+pet-app just loads it into a `WKWebView` (plan/02_pet-app.md F13, plan/03_workspace.md 4.7).
+This traffic never crosses `bridge.sock` itself — it's high-frequency UI sync, unlike the
+low-frequency pet-reaction events above, and pet-app relaying every byte would add nothing.
+Instead workspace opens a per-workspace local loopback (127.0.0.1) HTTP+WebSocket server and
+serves file tree/Monaco buffers/ACP progress directly to that webview.
+
+```json
+{"type":"editor_view_ready","workspace_id":"w1","url":"http://127.0.0.1:53912/editor"}
+{"type":"editor_view_unavailable","workspace_id":"w1","reason":"no_project_path"}
+```
+
+- pet-app keeps the URL from this event and loads it into a `WKWebView` when the sidebar's
+  editor button is clicked.
+- The local server's lifecycle matches the workspace process (goes down when it does), fixed
+  to 127.0.0.1 so it's never exposed externally.
+- Running workspace standalone (pet-app disconnected) loads the same bundle into workspace's
+  own fallback Electron shell instead (plan/03_workspace.md section 2, independence principle).
+
+### 6. Approval response / run cancel (pet-app -> workspace, 2026-07-29)
+
+The allow/deny approval UI and the chat's stop button now live in pet-app's client window
+instead of workspace's renderer, so channel 2's `await_approval` needs a reply path:
+
+```json
+{"type":"approval_response","approval_id":"a1","approved":true}
+{"type":"run_cancel","session_id":"s2"}
+```
+
+- `approval_response`: matched by `approval_id` to the `resolve(approved)` workspace is
+  holding. Unknown/already-resolved ids are ignored (idempotent).
+- `run_cancel`: aborts the `AbortSignal` behind the named session's in-flight `run()` — a
+  different level from channel 1's `tool_cancel` (which abandons a single tool dispatch, not
+  the whole conversation turn).

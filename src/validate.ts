@@ -29,6 +29,13 @@ function isJSONValue(value: unknown): boolean {
   return false;
 }
 
+function isAttachmentArray(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (a) => isRecord(a) && a.type === "image" && typeof a.path === "string",
+  );
+}
+
 export function isBridgeMessage(value: unknown): value is BridgeMessage {
   if (!isRecord(value)) return false;
 
@@ -65,7 +72,12 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
         case "tool_result":
           return typeof value.ok === "boolean";
         case "await_approval":
-          return typeof value.summary === "string";
+          return (
+            typeof value.summary === "string" &&
+            typeof value.approval_id === "string" &&
+            typeof value.workspace_id === "string" &&
+            typeof value.session_id === "string"
+          );
         case "agent_done":
           return typeof value.ok === "boolean" && typeof value.summary === "string";
         default:
@@ -75,8 +87,47 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
     case "user_input":
       return (
         typeof value.text === "string" &&
-        (value.source === "voice" || value.source === "text")
+        (value.source === "voice" || value.source === "text") &&
+        (value.workspace_id === undefined || typeof value.workspace_id === "string") &&
+        (value.session_id === undefined || typeof value.session_id === "string") &&
+        (value.attachments === undefined || isAttachmentArray(value.attachments))
       );
+
+    case "workspace_create_request":
+      return (
+        typeof value.name === "string" &&
+        (value.project_path === undefined || typeof value.project_path === "string")
+      );
+
+    case "workspace_create":
+      return (
+        typeof value.workspace_id === "string" &&
+        typeof value.name === "string" &&
+        (value.project_path === undefined || typeof value.project_path === "string")
+      );
+
+    case "session_create_request":
+      return typeof value.workspace_id === "string" && typeof value.title === "string";
+
+    case "session_create":
+      return (
+        typeof value.workspace_id === "string" &&
+        typeof value.session_id === "string" &&
+        typeof value.title === "string" &&
+        (value.origin === "user" || value.origin === "agent")
+      );
+
+    case "editor_view_ready":
+      return typeof value.workspace_id === "string" && typeof value.url === "string";
+
+    case "editor_view_unavailable":
+      return typeof value.workspace_id === "string" && value.reason === "no_project_path";
+
+    case "approval_response":
+      return typeof value.approval_id === "string" && typeof value.approved === "boolean";
+
+    case "run_cancel":
+      return typeof value.session_id === "string";
 
     default:
       return false;

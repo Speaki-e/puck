@@ -23,13 +23,24 @@ final class WanderScheduler {
         case stay
     }
 
+    /// How long Idle waits before drawing its next Outcome.
+    ///
+    /// Was `random(in: 8...30)` per 02_pet-app.md F3. Watching the real app,
+    /// that read as broken rather than calm: the pet walked for a few seconds
+    /// and then froze for up to half a minute, so its motion looked like it
+    /// was stuttering to a halt. 5s keeps it visibly alive.
+    ///
+    /// Note this is the wait between *draws*, not between moves -- 15% of
+    /// draws come back `.stay`, so some waits are still a multiple of this.
+    static let defaultInterval: TimeInterval = 5
+
     private var elapsed: TimeInterval = 0
     private var nextFireInterval: TimeInterval
     private let nextIntervalProvider: () -> TimeInterval
     private let outcomeProvider: () -> Outcome
 
     init(
-        nextIntervalProvider: @escaping () -> TimeInterval = { TimeInterval.random(in: 8...30) },
+        nextIntervalProvider: @escaping () -> TimeInterval = { WanderScheduler.defaultInterval },
         outcomeProvider: @escaping () -> Outcome = WanderScheduler.weightedRandomOutcome
     ) {
         self.nextIntervalProvider = nextIntervalProvider

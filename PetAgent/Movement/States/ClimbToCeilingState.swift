@@ -38,7 +38,7 @@ final class ClimbToCeilingState: StateHandler {
         // computes for position.y == roamableArea.minY once it flips upside
         // down, so the flip reads as an in-place turn, not a jump.
         let target = CGPoint(x: context.body.position.x, y: context.roamableArea.minY + context.avatarHeight)
-        let step = MovementSolver.step(from: context.body.position, toward: target, dt: dt)
+        let step = MovementSolver.step(from: context.body.position, toward: target, speed: context.walkSpeed, dt: dt)
         context.body.position = step.position
 
         if step.hasArrived {

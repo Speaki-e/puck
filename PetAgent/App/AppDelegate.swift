@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var avatar: SpriteAvatar?
     private var sfxPlayer: SFXPlayer?
     private var clickThroughController: ClickThroughController?
+    /// byeolki's request, 2026-07-29: menu bar Hide/Show toggle.
+    private var isCharacterHidden = false
     private var avatarHitboxSize: CGSize = .zero
     /// Unscaled manifest.hitbox -- recomputes avatarHitboxSize when Settings'
     /// size slider live-applies a new scale (applyLiveAvatarScale).
@@ -144,8 +146,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         menuBar.onOpenSettings = { [weak self] in self?.showSettingsWindow() }
         menuBar.onSwitchAvatar = { [weak self] in self?.showAvatarManagementWindow() }
         menuBar.onThrowBall = { [weak self] in self?.throwBall() }
+        menuBar.onToggleVisibility = { [weak self] in self?.toggleCharacterVisibility() }
         menuBar.onQuit = { NSApplication.shared.terminate(nil) }
         menuBarController = menuBar
+    }
+
+    /// byeolki's request, 2026-07-29: hide/show the pet without quitting the
+    /// app. orderOut/orderFrontRegardless rather than alphaValue -- an
+    /// ordered-out window also stops receiving/dispatching mouse events, so
+    /// there's nothing left to click on a hidden pet either.
+    private func toggleCharacterVisibility() {
+        isCharacterHidden.toggle()
+        for window in overlayController?.windows ?? [] {
+            if isCharacterHidden {
+                window.orderOut(nil)
+            } else {
+                window.orderFrontRegardless()
+            }
+        }
+        menuBarController?.setVisibilityLabel(isHidden: isCharacterHidden)
     }
 
     private func showSettingsWindow() {
@@ -233,6 +252,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // toggles had no live effect on a running session until restart.
         settingsStore.onVolumeChanged = { [weak sfxPlayer] volume in sfxPlayer?.volume = volume }
         settingsStore.onMuteChanged = { [weak sfxPlayer] isMuted in sfxPlayer?.isMuted = isMuted }
+        settingsStore.onWalkSpeedMultiplierChanged = { [weak self] multiplier in
+            self?.characterController?.walkSpeed = MovementSolver.walkSpeed * multiplier
+        }
 
         // autoMuteOnFocus existed as a setting with nothing acting on it --
         // FocusModeObserver was implemented but never instantiated anywhere.
@@ -264,6 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
         controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
         controller.avatarHeight = avatarHitboxSize.height
+        controller.walkSpeed = MovementSolver.walkSpeed * settingsStore.walkSpeedMultiplier
         // F4 reports global Quartz frames; the pet lives in overlay-local
         // pixels. Rebase once here so no state has to know both spaces.
         controller.windows = { [weak self, weak window] in
@@ -353,6 +376,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
 
         let position = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
+        // OverlayWindowController always orderFrontRegardless()s a freshly
+        // rebuilt window -- a display change (monitor plug/unplug) shouldn't
+        // silently un-hide a pet the user explicitly hid.
+        if isCharacterHidden {
+            window.orderOut(nil)
+        }
         avatar.reparent(to: spriteView.contentLayer)
         ballController?.reparent(to: spriteView.contentLayer)
         // Through characterBody, not avatar directly -- its didSet is the

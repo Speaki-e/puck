@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
     @State private var avoidClimbingFocusedWindow: Bool
+    @State private var walkSpeedMultiplier: Double
 
     init(store: SettingsStore) {
         self.store = store
@@ -22,6 +23,7 @@ struct SettingsView: View {
         _isMuted = State(initialValue: store.isMuted)
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
+        _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
     }
 
     var body: some View {
@@ -51,6 +53,13 @@ struct SettingsView: View {
             Section("Movement") {
                 Toggle("Don't climb over the focused window", isOn: $avoidClimbingFocusedWindow)
                     .onChange(of: avoidClimbingFocusedWindow) { store.avoidClimbingFocusedWindow = $0 }
+                HStack {
+                    Slider(value: $walkSpeedMultiplier, in: 0.25...3.0) { Text("Speed") }
+                        .onChange(of: walkSpeedMultiplier) { store.walkSpeedMultiplier = $0 }
+                    Text(String(format: "%.2fx", walkSpeedMultiplier))
+                        .monospacedDigit()
+                        .frame(width: 48, alignment: .trailing)
+                }
             }
         }
         .padding()

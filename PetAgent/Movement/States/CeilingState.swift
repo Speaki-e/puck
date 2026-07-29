@@ -55,7 +55,7 @@ final class CeilingState: StateHandler {
             return
         }
 
-        var nextX = context.body.position.x + direction * MovementSolver.walkSpeed * CGFloat(dt)
+        var nextX = context.body.position.x + direction * context.walkSpeed * CGFloat(dt)
         if nextX >= context.roamableArea.maxX {
             nextX = context.roamableArea.maxX
             direction = -1

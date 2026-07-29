@@ -99,6 +99,21 @@ final class ClimbStateTests: XCTestCase {
         XCTAssertTrue(world.avatar.facings.isEmpty)
     }
 
+    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    func test_respectsACustomWalkSpeed() {
+        let world = TestStateWorld(position: CGPoint(x: 300, y: 500))
+        world.walkSpeed = MovementSolver.walkSpeed * 2
+        world.windows = [window(x: 300, y: 200, width: 400, height: 300)]
+        let state = ClimbState()
+        state.enter()
+
+        world.run(state, seconds: 0.1)
+
+        // 300 (start) minus 2x the default speed over the elapsed time.
+        let expectedY = 500 - MovementSolver.walkSpeed * 2 * 0.1
+        XCTAssertEqual(world.body.position.y, expectedY, accuracy: 5)
+    }
+
     func test_withNoWindowToClimb_falls() {
         let world = TestStateWorld(position: CGPoint(x: 300, y: 500))
         world.windows = []
@@ -154,6 +169,20 @@ final class WalkOnTopStateTests: XCTestCase {
 
         XCTAssertTrue(world.requestedTransitions.isEmpty, "should walk into the window, not fall off the edge just climbed")
         XCTAssertGreaterThan(world.body.position.x, 305, "should be walking right, into the window")
+    }
+
+    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    func test_respectsACustomWalkSpeed() {
+        let world = TestStateWorld(position: CGPoint(x: 305, y: 200))
+        world.walkSpeed = MovementSolver.walkSpeed * 2
+        world.windows = [window(x: 300, y: 200, width: 400, height: 300)]
+        let state = WalkOnTopState()
+        state.enter()
+
+        world.run(state, seconds: 0.1)
+
+        let expectedX = 305 + MovementSolver.walkSpeed * 2 * 0.1
+        XCTAssertEqual(world.body.position.x, expectedX, accuracy: 5)
     }
 
     /// A pet that climbed the window's RIGHT edge (approaching from the

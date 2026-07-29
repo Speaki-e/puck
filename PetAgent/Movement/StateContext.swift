@@ -32,6 +32,10 @@ struct StateContext {
     /// screen edge the way there is above a window's top edge.
     let avatarHeight: CGFloat
 
+    /// px/sec for Walk/Climb/WalkOnTop/MoveTo/Ceiling -- MovementSolver.walkSpeed
+    /// scaled by Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    let walkSpeed: CGFloat
+
     /// Layer-0 windows in front-to-back Z order, already converted into the
     /// pet's coordinate space (F4 reports global Quartz frames; AppDelegate
     /// rebases them onto the overlay window before they get here).

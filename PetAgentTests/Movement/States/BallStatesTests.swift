@@ -59,6 +59,19 @@ final class ChaseBallStateTests: XCTestCase {
 
         XCTAssertEqual(world.requestedTransitions.count, 1)
     }
+
+    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    func test_respectsACustomWalkSpeed() {
+        let world = TestStateWorld(position: CGPoint(x: 0, y: 100))
+        world.walkSpeed = MovementSolver.walkSpeed * 2
+        let state = ChaseBallState()
+        state.target = CGPoint(x: 1000, y: 100)
+        state.enter()
+
+        world.run(state, seconds: 1)
+
+        XCTAssertEqual(world.body.position.x, MovementSolver.walkSpeed * 2, accuracy: 1)
+    }
 }
 
 final class KickBallStateTests: XCTestCase {

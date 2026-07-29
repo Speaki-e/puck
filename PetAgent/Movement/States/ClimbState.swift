@@ -34,7 +34,7 @@ final class ClimbState: StateHandler {
 
         // Straight up: no facing change, or the character flips partway up.
         let target = CGPoint(x: context.body.position.x, y: window.frame.minY)
-        let step = MovementSolver.step(from: context.body.position, toward: target, dt: dt)
+        let step = MovementSolver.step(from: context.body.position, toward: target, speed: context.walkSpeed, dt: dt)
         context.body.position = step.position
 
         if step.hasArrived {

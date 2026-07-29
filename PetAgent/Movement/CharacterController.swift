@@ -40,6 +40,9 @@ final class CharacterController {
     /// Kept in sync with the live avatar's rendered height -- see
     /// StateContext.avatarHeight.
     var avatarHeight: CGFloat = 0
+    /// Kept in sync with Settings' movement-speed slider -- see
+    /// StateContext.walkSpeed.
+    var walkSpeed: CGFloat = MovementSolver.walkSpeed
     var landingY: (CGPoint) -> CGFloat = { _ in .zero }
     /// Refreshed from F4 every frame by the bootstrap wiring.
     var windows: () -> [WindowInfo] = { [] }
@@ -91,6 +94,7 @@ final class CharacterController {
             body: body,
             roamableArea: roamableArea,
             avatarHeight: avatarHeight,
+            walkSpeed: walkSpeed,
             windows: windows(),
             landingY: landingY,
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }

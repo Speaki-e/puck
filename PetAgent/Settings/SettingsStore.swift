@@ -15,6 +15,7 @@ final class SettingsStore {
         static let isMuted = "PetAgent.isMuted"
         static let autoMuteOnFocus = "PetAgent.autoMuteOnFocus"
         static let avoidClimbingFocusedWindow = "PetAgent.avoidClimbingFocusedWindow"
+        static let walkSpeedMultiplier = "PetAgent.walkSpeedMultiplier"
         static let speechLocale = "PetAgent.speechLocale"
         static let pushToTalk = "PetAgent.hotkey.pushToTalk"
         static let textInput = "PetAgent.hotkey.textInput"
@@ -30,6 +31,7 @@ final class SettingsStore {
     /// instead of only after a restart.
     var onVolumeChanged: ((Float) -> Void)?
     var onMuteChanged: ((Bool) -> Void)?
+    var onWalkSpeedMultiplierChanged: ((Double) -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -71,6 +73,16 @@ final class SettingsStore {
     var avoidClimbingFocusedWindow: Bool {
         get { defaults.object(forKey: Keys.avoidClimbingFocusedWindow) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.avoidClimbingFocusedWindow) }
+    }
+
+    /// Multiplies MovementSolver.walkSpeed for Walk/Climb/WalkOnTop/MoveTo/
+    /// Ceiling (byeolki's request, 2026-07-29). 1.0 == the default speed.
+    var walkSpeedMultiplier: Double {
+        get { defaults.object(forKey: Keys.walkSpeedMultiplier) as? Double ?? 1.0 }
+        set {
+            defaults.set(newValue, forKey: Keys.walkSpeedMultiplier)
+            onWalkSpeedMultiplierChanged?(newValue)
+        }
     }
 
     var speechRecognitionLocaleIdentifier: String {

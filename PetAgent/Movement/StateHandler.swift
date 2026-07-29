@@ -27,6 +27,14 @@ protocol StateHandler: AnyObject {
     /// trigger to replay from the start; ambient states like Idle must NOT
     /// restart, or repeated same-kind events would reset their timers.
     var restartsOnReentry: Bool { get }
+    /// Whether entering this state should leave CharacterBody.isUpsideDown
+    /// alone instead of resetting it to false. Only CeilingState (F3
+    /// ceiling-crawling, 2026-07-29) overrides this -- any state can
+    /// interrupt any other (a click, a drag, an agent command), so a
+    /// centralized reset on entry is the only way to guarantee a state
+    /// entered *directly* from Ceiling (bypassing Fall's own reset entirely)
+    /// still comes back right-side-up.
+    var preservesUpsideDown: Bool { get }
 
     func enter()
     func update(dt: TimeInterval, context: StateContext)
@@ -36,6 +44,7 @@ protocol StateHandler: AnyObject {
 extension StateHandler {
     var loopsClip: Bool { false }
     var restartsOnReentry: Bool { false }
+    var preservesUpsideDown: Bool { false }
     func enter() {}
     func update(dt: TimeInterval, context: StateContext) {}
     func exit() {}

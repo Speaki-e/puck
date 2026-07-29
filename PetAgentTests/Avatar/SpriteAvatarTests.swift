@@ -139,6 +139,24 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 70))
     }
 
+    /// setUpsideDown only used to flip the transform (scaleY), never
+    /// recomputing the position offset -- that happened lazily, the next
+    /// time something called setScreenPosition. For one frame right as
+    /// CeilingState hands off to FallState (which resets isUpsideDown before
+    /// its own first position update runs), the sprite would render
+    /// right-side-up but still positioned with the hanging-downward offset:
+    /// a one-frame pop that reads as a stutter/teleport.
+    func test_setUpsideDown_immediatelyRecomputesTheCachedPosition() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult() // hitbox height 140, scale 1.0
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.setScreenPosition(CGPoint(x: 42, y: 0))
+        avatar.setUpsideDown(true)
+
+        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 70))
+    }
+
     func test_setFacingLeft_flipsLayerHorizontally() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()

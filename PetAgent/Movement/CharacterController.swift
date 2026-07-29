@@ -107,6 +107,9 @@ final class CharacterController {
 
     private func enterCurrentState() {
         stateElapsedTime = 0
+        if !currentState.preservesUpsideDown {
+            body.isUpsideDown = false
+        }
         body.play(clip: currentState.clipKey, loop: currentState.loopsClip)
         // Use clipKey (e.g. "walk"), not name (e.g. "Walk") — the manifest sounds
         // table is keyed by lowercase clip/event names (protocol section 6), so

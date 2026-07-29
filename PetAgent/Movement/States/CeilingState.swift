@@ -24,6 +24,7 @@ final class CeilingState: StateHandler {
     let name = "Ceiling"
     let clipKey = "walk"
     let loopsClip = true
+    let preservesUpsideDown = true
 
     private let durationProvider: () -> TimeInterval
     private var direction: CGFloat = 1

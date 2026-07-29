@@ -19,8 +19,13 @@ import Foundation
 enum MovementSolver {
     /// Default walking speed, px/sec.
     static let walkSpeed: CGFloat = 90
-    /// Default gravity, px/sec².
-    static let gravity: CGFloat = 1200
+    /// Default gravity, px/sec². High enough that even a short fall (off a
+    /// window's top edge) ramps up to terminalVelocity within roughly a
+    /// window's height, not just a long one (a manual drop from near the
+    /// top of the screen) -- otherwise short falls stay well below terminal
+    /// velocity for their entire duration and read as much slower/floatier
+    /// than a long drop, even though both use identical physics.
+    static let gravity: CGFloat = 2400
     /// Default terminal velocity, px/sec. A fall from the ceiling covers the
     /// whole screen's height, far more than any window-edge fall ever did --
     /// unbounded acceleration over that distance eventually moves the pet

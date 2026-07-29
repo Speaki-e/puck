@@ -134,6 +134,29 @@ final class MovementSolverTests: XCTestCase {
         XCTAssertEqual(step.velocity, 900, accuracy: 0.001)
     }
 
+    /// byeolki: "이새끼 창위에 있다가 떨어지는 속도가 너무 느림. 내가 잡아서
+    /// 위에서 놓아서 떨어지는 속도랑 너무 다름" -- a short fall (off a
+    /// window) must ramp up to terminal velocity within a much shorter
+    /// distance than it takes to fall the length of the whole screen (a
+    /// manual drop from near the top), or it never gets past "floaty" before
+    /// it lands. Uses the DEFAULT gravity/terminalVelocity (no override) so
+    /// this pins the actual live tuning, not just the math.
+    func test_defaultGravity_reachesTerminalVelocityWithinAShortFall() {
+        var velocity: CGFloat = 0
+        var position = CGPoint.zero
+        let dt: TimeInterval = 1.0 / 60
+        var elapsed: TimeInterval = 0
+
+        while velocity < MovementSolver.terminalVelocity, elapsed < 2 {
+            let step = MovementSolver.fallStep(position: position, velocity: velocity, dt: dt)
+            position = step.position
+            velocity = step.velocity
+            elapsed += dt
+        }
+
+        XCTAssertLessThan(position.y, 250, "should reach terminal velocity within roughly a window's height of falling")
+    }
+
     func test_fallVelocityBelowTerminal_acceleratesNormally() {
         let step = MovementSolver.fallStep(
             position: .zero,

@@ -29,6 +29,18 @@ final class IdleState: StateHandler {
     }
 
     func update(dt: TimeInterval, context: StateContext) {
+        // WalkOnTopState already re-checks its supporting window every frame;
+        // Idle never did, so a pet resting after Fall -> Land -> Idle (window
+        // tops are valid landing surfaces, see LandingSurfaceResolver) stayed
+        // floating in place forever if that window later closed/minimized.
+        // landingY(position) > position.y means a gap has opened up below --
+        // whatever was there is now gone.
+        let surfaceY = context.landingY(context.body.position)
+        guard surfaceY <= context.body.position.y + WindowSupport.footTolerance else {
+            context.requestTransition(.fall)
+            return
+        }
+
         if let outcome = scheduler.tick(dt: dt) {
             wanderDelegate?.idleStateDidRequestWander(outcome)
         }

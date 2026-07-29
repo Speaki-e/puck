@@ -17,6 +17,7 @@ final class SettingsStore {
         static let avoidClimbingFocusedWindow = "PetAgent.avoidClimbingFocusedWindow"
         static let walkSpeedMultiplier = "PetAgent.walkSpeedMultiplier"
         static let speechLocale = "PetAgent.speechLocale"
+        static let language = "PetAgent.language"
         static let pushToTalk = "PetAgent.hotkey.pushToTalk"
         static let textInput = "PetAgent.hotkey.textInput"
         static let characterSummon = "PetAgent.hotkey.characterSummon"
@@ -32,6 +33,10 @@ final class SettingsStore {
     var onVolumeChanged: ((Float) -> Void)?
     var onMuteChanged: ((Bool) -> Void)?
     var onWalkSpeedMultiplierChanged: ((Double) -> Void)?
+    /// byeolki: "한국어 언어모드도 만들어주고" -- the menu bar's own text
+    /// (built once at construction, unlike SwiftUI's live-recomputed body)
+    /// needs this to update its titles when Settings' language picker changes.
+    var onLanguageChanged: ((AppLanguage) -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -82,6 +87,16 @@ final class SettingsStore {
         set {
             defaults.set(newValue, forKey: Keys.walkSpeedMultiplier)
             onWalkSpeedMultiplierChanged?(newValue)
+        }
+    }
+
+    var language: AppLanguage {
+        get {
+            defaults.string(forKey: Keys.language).flatMap(AppLanguage.init(rawValue:)) ?? AppLanguage.systemDefault()
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.language)
+            onLanguageChanged?(newValue)
         }
     }
 

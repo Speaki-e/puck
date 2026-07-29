@@ -5,7 +5,9 @@
 //  F2 · owner: Sangwoo Kang
 //  Avatar import/switch UI, wired to AvatarImportValidator. 2026-07-29: also
 //  hosts the size slider and per-emotion image mapping (both edit the active
-//  avatar's manifest.json via AvatarManifestEditor).
+//  avatar's manifest.json via AvatarManifestEditor). Embedded as the
+//  Settings window's "Avatar" tab (byeolki's UI/UX redesign request,
+//  2026-07-29) rather than a separate window.
 //
 
 import AppKit
@@ -17,6 +19,8 @@ struct AvatarManagementView: View {
     /// plan/01_protocol.md section 6 -- plus whatever custom keys the
     /// manifest already has (loaded in onAppear) or the user adds below.
     private static let defaultEmotionKeys = ["happy", "thinking", "sad"]
+
+    let language: AppLanguage
 
     /// Called when the size slider changes, so AppDelegate can apply it to
     /// the *running* avatar immediately -- editing manifest.json alone only
@@ -30,56 +34,59 @@ struct AvatarManagementView: View {
     @State private var newEmotionName: String = ""
     @State private var emotionMessage = ""
 
+    private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Avatars").font(.headline)
-            Button("Import Avatar Package…") { importAvatar() }
-            if !reportMessage.isEmpty {
-                Text(reportMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Divider()
-
-            Text("Size").font(.headline)
-            HStack {
-                Slider(value: $scale, in: 0.25...3.0) { Text("Scale") }
-                    .onChange(of: scale) { applyScale($0) }
-                Text(String(format: "%.2fx", scale))
-                    .monospacedDigit()
-                    .frame(width: 48, alignment: .trailing)
-            }
-
-            Divider()
-
-            Text("Emotions").font(.headline)
-            Text("Maps a socket event (agent thinking, task failed, task done) to an image. Falls back to idle if unmapped.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            ForEach(emotionKeys, id: \.self) { emotion in
-                HStack {
-                    Text(emotion)
-                    Spacer()
-                    Text(mappedEmotions.contains(emotion) ? "Mapped" : "Not mapped")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(text(.avatarsHeader)).font(.headline)
+                Button(text(.importAvatarButton)) { importAvatar() }
+                if !reportMessage.isEmpty {
+                    Text(reportMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Button("Choose Image…") { chooseEmotionImage(for: emotion) }
                 }
-            }
-            HStack {
-                TextField("Custom emotion name", text: $newEmotionName)
-                Button("Add") { addCustomEmotion() }
-                    .disabled(newEmotionName.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            if !emotionMessage.isEmpty {
-                Text(emotionMessage)
+
+                Divider()
+
+                Text(text(.sizeHeader)).font(.headline)
+                HStack {
+                    Slider(value: $scale, in: 0.25...3.0) { Text(text(.sizeHeader)) }
+                        .onChange(of: scale) { applyScale($0) }
+                    Text(String(format: "%.2fx", scale))
+                        .monospacedDigit()
+                        .frame(width: 48, alignment: .trailing)
+                }
+
+                Divider()
+
+                Text(text(.emotionsHeader)).font(.headline)
+                Text(text(.emotionsExplanation))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                ForEach(emotionKeys, id: \.self) { emotion in
+                    HStack {
+                        Text(emotion)
+                        Spacer()
+                        Text(mappedEmotions.contains(emotion) ? text(.mappedLabel) : text(.notMappedLabel))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button(text(.chooseImageButton)) { chooseEmotionImage(for: emotion) }
+                    }
+                }
+                HStack {
+                    TextField(text(.customEmotionPlaceholder), text: $newEmotionName)
+                    Button(text(.addButton)) { addCustomEmotion() }
+                        .disabled(newEmotionName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                if !emotionMessage.isEmpty {
+                    Text(emotionMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .padding()
         }
-        .padding()
-        .frame(width: 380)
         .onAppear { loadCurrentManifest() }
     }
 
@@ -118,7 +125,7 @@ struct AvatarManagementView: View {
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [.png]
-        panel.prompt = "Choose"
+        panel.prompt = text(.choosePanelPrompt)
         guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
 
         do {
@@ -128,9 +135,9 @@ struct AvatarManagementView: View {
                 directory: AvatarManifestEditor.currentAvatarDirectory
             )
             mappedEmotions.insert(emotion)
-            emotionMessage = "Updated '\(emotion)'."
+            emotionMessage = String(format: text(.updatedEmotionFormat), emotion)
         } catch {
-            emotionMessage = "Failed to set '\(emotion)': \(error)"
+            emotionMessage = String(format: text(.failedToSetEmotionFormat), emotion, String(describing: error))
         }
     }
 
@@ -139,18 +146,18 @@ struct AvatarManagementView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "Import"
+        panel.prompt = text(.importPanelPrompt)
         guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
 
         let report: AvatarImportValidator.Report
         do {
             report = try AvatarImportValidator.validate(packageDirectory: sourceURL)
         } catch {
-            reportMessage = "Failed to validate: \(error)"
+            reportMessage = String(format: text(.failedToValidateFormat), String(describing: error))
             return
         }
         guard report.isValid else {
-            reportMessage = "Rejected — missing required clip file(s): \(report.missingRequiredClipFiles.joined(separator: ", "))"
+            reportMessage = String(format: text(.rejectedMissingRequiredFormat), report.missingRequiredClipFiles.joined(separator: ", "))
             return
         }
 
@@ -172,13 +179,16 @@ struct AvatarManagementView: View {
         switch outcome {
         case .installed:
             reportMessage = report.missingRecommendedClipFiles.isEmpty
-                ? "Installed '\(report.manifest.name)'."
-                : "Installed '\(report.manifest.name)' — missing recommended clips (falls back to idle): "
-                    + report.missingRecommendedClipFiles.joined(separator: ", ")
+                ? String(format: text(.installedFormat), report.manifest.name)
+                : String(
+                    format: text(.installedMissingRecommendedFormat),
+                    report.manifest.name,
+                    report.missingRecommendedClipFiles.joined(separator: ", ")
+                )
         case .failed(let reason):
-            reportMessage = "Validated but failed to install '\(report.manifest.name)': \(reason)"
+            reportMessage = String(format: text(.failedToInstallFormat), report.manifest.name, reason)
         case .alreadyPresent, .noBundledPackage:
-            reportMessage = "Failed to install '\(report.manifest.name)': \(outcome)"
+            reportMessage = String(format: text(.failedToInstallFormat), report.manifest.name, String(describing: outcome))
         }
     }
 }

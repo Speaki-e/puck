@@ -92,7 +92,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     private var menuBarController: MenuBarController?
     private var settingsWindow: NSWindow?
-    private var avatarManagementWindow: NSWindow?
     private var textInputBubbleWindow: TextInputBubbleWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -168,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         menuBar.onThrowBall = { [weak self] in self?.throwBall() }
         menuBar.onToggleVisibility = { [weak self] in self?.toggleCharacterVisibility() }
         menuBar.onQuit = { NSApplication.shared.terminate(nil) }
+        menuBar.applyLanguage(settingsStore.language)
         menuBarController = menuBar
     }
 
@@ -187,29 +187,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         menuBarController?.setVisibilityLabel(isHidden: isCharacterHidden)
     }
 
-    private func showSettingsWindow() {
-        let window = settingsWindow ?? {
-            let hostingController = NSHostingController(rootView: SettingsView(store: settingsStore))
+    /// Settings and avatar management used to be two separate windows
+    /// reachable from two separate menu items -- merged into one tabbed
+    /// window (byeolki's UI/UX redesign request, 2026-07-29). "Switch
+    /// Avatar…" now just opens this same window on the Avatar tab instead of
+    /// a second one.
+    private func showSettingsWindow(initialTab: SettingsView.Tab = .general) {
+        let view = SettingsView(
+            store: settingsStore,
+            initialTab: initialTab,
+            onAvatarScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) }
+        )
+        if let window = settingsWindow, let hosting = window.contentViewController as? NSHostingController<SettingsView> {
+            // Re-set rather than just re-showing the cached window: this is
+            // the only way to move an already-open window to a different
+            // initial tab (e.g. Settings is open on Sound, then "Switch
+            // Avatar…" is clicked).
+            hosting.rootView = view
+        } else {
+            let hostingController = NSHostingController(rootView: view)
             let newWindow = NSWindow(contentViewController: hostingController)
-            newWindow.title = "PetAgent Settings"
+            newWindow.title = Strings.text(.settingsWindowTitle, settingsStore.language)
             settingsWindow = newWindow
-            return newWindow
-        }()
-        window.makeKeyAndOrderFront(nil)
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
     private func showAvatarManagementWindow() {
-        let window = avatarManagementWindow ?? {
-            let view = AvatarManagementView(onScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) })
-            let hostingController = NSHostingController(rootView: view)
-            let newWindow = NSWindow(contentViewController: hostingController)
-            newWindow.title = "Switch Avatar"
-            avatarManagementWindow = newWindow
-            return newWindow
-        }()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        showSettingsWindow(initialTab: .avatar)
     }
 
     // MARK: - Overlay + avatar (F1/F2/F3/F5)
@@ -284,6 +290,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         settingsStore.onMuteChanged = { [weak sfxPlayer] isMuted in sfxPlayer?.isMuted = isMuted }
         settingsStore.onWalkSpeedMultiplierChanged = { [weak self] multiplier in
             self?.characterController?.walkSpeed = MovementSolver.walkSpeed * multiplier
+        }
+        // byeolki: "한국어 언어모드도 만들어주고" -- the menu bar's NSMenu
+        // titles are plain strings set once at construction, unlike SwiftUI's
+        // live-recomputed body, so they need an explicit push on change.
+        settingsStore.onLanguageChanged = { [weak self] language in
+            self?.menuBarController?.applyLanguage(language)
+            self?.settingsWindow?.title = Strings.text(.settingsWindowTitle, language)
         }
 
         // autoMuteOnFocus existed as a setting with nothing acting on it --

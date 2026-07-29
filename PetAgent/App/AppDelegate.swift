@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var clickThroughController: ClickThroughController?
     /// byeolki's request, 2026-07-29: menu bar Hide/Show toggle.
     private var isCharacterHidden = false
+    private var spaceChangeObserver: NSObjectProtocol?
     private var avatarHitboxSize: CGSize = .zero
     /// Unscaled manifest.hitbox -- recomputes avatarHitboxSize when Settings'
     /// size slider live-applies a new scale (applyLiveAvatarScale).
@@ -89,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         setUpBridgeServer()
         setUpGlobalHotkeys()
         setUpFrameLoop()
+        setUpSpaceChangeObserving()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -106,6 +108,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         windowListWatcher?.stop()
         focusModeObserver?.stopObserving()
         clickThroughController?.stopMonitoring()
+        if let spaceChangeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(spaceChangeObserver)
+        }
     }
 
     // MARK: - Permissions
@@ -358,6 +363,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         let dockInset = NSScreen.screens.first
             .map { DockInset.bottomInset(screenFrame: $0.frame, visibleFrame: $0.visibleFrame) } ?? 0
         return CGSize(width: window.frame.width, height: window.frame.height - dockInset)
+    }
+
+    /// byeolki's request, 2026-07-29: "전체화면 되면 dock위가 아니라 화면
+    /// 위로 다니게 바꿔줘" -- OverlayWindow already joins fullscreen Spaces
+    /// (.fullScreenAuxiliary), but nothing previously re-checked
+    /// groundAwareSize after initial setup, so roamableArea stayed reserved
+    /// for the Dock's height even in a fullscreen Space where the Dock isn't
+    /// actually shown at all (NSScreen.visibleFrame reports no Dock inset
+    /// there). Space switches don't fire didChangeScreenParametersNotification
+    /// (that's for real display reconfiguration), so this needs its own
+    /// observer. IdleState's existing "supporting surface disappeared" check
+    /// then naturally settles the pet onto the new, taller floor if the pet
+    /// happens to be resting when the Space changes.
+    private func setUpSpaceChangeObserving() {
+        spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshRoamableAreaForCurrentSpace()
+        }
+    }
+
+    private func refreshRoamableAreaForCurrentSpace() {
+        guard let window = overlayController?.windows.first, let controller = characterController else { return }
+        controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
     }
 
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView

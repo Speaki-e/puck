@@ -42,6 +42,13 @@ final class BridgeMessageRouter {
     /// store's shape.
     var onClientUpdate: ((BridgeMessage) -> Void)?
 
+    /// Emitted for every protocol 3.2 event, alongside onEventReaction --
+    /// F13's ClientWindowStore (2026-07-29) folds the raw event into the
+    /// right session's chat timeline (ChatSession.apply), which needs the
+    /// full event and its workspace_id/session_id, not just the derived pet
+    /// EventReaction onEventReaction carries.
+    var onChatEvent: ((BridgeEvent, _ workspaceId: String, _ sessionId: String) -> Void)?
+
     /// - Parameter dispatchToMain: injected so tests can observe the hop.
     ///   Defaults to an async hop to the main queue; it stays async even when
     ///   already on main so ordering is identical from every caller.
@@ -73,7 +80,7 @@ final class BridgeMessageRouter {
                 toolExecutor.cancel(id: id)
             }
 
-        case .event(let event, _, _):
+        case .event(let event, let workspaceId, let sessionId):
             dispatchToMain { [weak self] in
                 guard let self else { return }
                 let reaction = EventRouter.reaction(for: event, previousCodeEditorPath: self.lastCodeEditorPath)
@@ -81,6 +88,7 @@ final class BridgeMessageRouter {
                     self.lastCodeEditorPath = EventRouter.codeEditorPath(from: detail) ?? self.lastCodeEditorPath
                 }
                 self.onEventReaction?(reaction)
+                self.onChatEvent?(event, workspaceId, sessionId)
             }
 
         case .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:

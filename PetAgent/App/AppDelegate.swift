@@ -323,7 +323,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // the same way.
         let ball = BallController(parent: spriteView.contentLayer)
         ball.onLanded = { [weak self] position in
-            guard let self, let controller = self.characterController else { return }
+            guard let self else { return }
+            // A ball that fell onto the character's head bonks off
+            // immediately and disappears via the existing kicked-lifetime
+            // cleanup, instead of resting and waiting to be chased
+            // (byeolki: "축구공을 소환하면 캐릭터 머리로 떨어져서 통
+            // 튀어서 없어지게 해줘").
+            if let body = self.characterBody,
+               let headY = BallHeadCollision.landingY(ballX: position.x, characterPosition: body.position, avatarSize: self.avatarHitboxSize),
+               abs(position.y - headY) < 0.5 {
+                self.ballController?.kick(direction: Bool.random() ? .left : .right)
+                return
+            }
+
+            guard let controller = self.characterController else { return }
             // Idle/Walk-only gate (F3's priority rule): the pet must not
             // abandon an agent-driven task to go chase a ball.
             guard controller.currentState === self.idleState || controller.currentState === self.walkState else { return }
@@ -527,9 +540,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             self.characterController?.update(dt: dt)
             self.pointingController.tick(dt: dt)
             if let controller = self.characterController, let ball = self.ballController, ball.isActive {
+                let ballPosition = ball.state?.position ?? .zero
+                let floorLandingY = controller.landingY(ballPosition)
+                // A ball falling through the character's head bonks off it
+                // instead of passing straight through to the floor/window
+                // below -- see BallController.onLanded for what happens once
+                // it actually lands there.
+                let headLandingY = self.characterBody.flatMap {
+                    BallHeadCollision.landingY(ballX: ballPosition.x, characterPosition: $0.position, avatarSize: self.avatarHitboxSize)
+                }
                 ball.tick(
                     dt: dt,
-                    landingY: controller.landingY(ball.state?.position ?? .zero),
+                    landingY: min(floorLandingY, headLandingY ?? floorLandingY),
                     roamableArea: controller.roamableArea
                 )
             }

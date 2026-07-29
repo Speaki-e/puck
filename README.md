@@ -23,6 +23,7 @@ by reading each other's source.
 | [`src/types/logging.ts`](src/types/logging.ts) | Log entry types |
 | [`src/validate.ts`](src/validate.ts) | Runtime `isBridgeMessage` guard for JSON parsed off the socket |
 | [`swift/BridgeMessages.swift`](swift/BridgeMessages.swift), [`swift/JSONValue.swift`](swift/JSONValue.swift) | Swift `Codable` reference mirror of `events.ts` — pet-app copies these files |
+| [`swift/ToolTimeouts.swift`](swift/ToolTimeouts.swift) | Swift mirror of each tool's `timeoutSec` from `tools.ts` — pet-app copies this file. `src/swift-mirror.test.ts` fails if it drifts |
 
 ## Using this package
 

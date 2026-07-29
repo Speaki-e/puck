@@ -19,33 +19,33 @@ final class JSONLinesDecoderTests: XCTestCase {
 
     func test_feedsOneCompleteLine_returnsOneMessage() {
         var decoder = JSONLinesDecoder()
-        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
+        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#))
 
-        XCTAssertEqual(result.messages, [.event(.agentThinking)])
+        XCTAssertEqual(result.messages, [.event(.agentThinking, workspaceId: "default", sessionId: "default")])
         XCTAssertFalse(result.didOverflow)
     }
 
     func test_feedsPartialLine_returnsNothingUntilNewlineArrives() {
         var decoder = JSONLinesDecoder()
-        let partial = Data(#"{"type":"event","event":"agent_thinking""#.utf8) // no closing brace, no newline
+        let partial = Data(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default""#.utf8) // no closing brace, no newline
 
         XCTAssertEqual(decoder.feed(partial).messages, [])
-        XCTAssertEqual(decoder.feed(Data("}\n".utf8)).messages, [.event(.agentThinking)])
+        XCTAssertEqual(decoder.feed(Data("}\n".utf8)).messages, [.event(.agentThinking, workspaceId: "default", sessionId: "default")])
     }
 
     func test_feedsMultipleLinesAtOnce_returnsAllMessages() {
         var decoder = JSONLinesDecoder()
-        let chunk = line(#"{"type":"event","event":"agent_thinking"}"#)
-            + line(#"{"type":"event","event":"tool_result","ok":true}"#)
+        let chunk = line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#)
+            + line(#"{"type":"event","event":"tool_result","ok":true,"workspace_id":"default","session_id":"default"}"#)
 
-        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking), .event(.toolResult(ok: true))])
+        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking, workspaceId: "default", sessionId: "default"), .event(.toolResult(ok: true), workspaceId: "default", sessionId: "default")])
     }
 
     func test_malformedLine_isSkipped_subsequentLinesStillParse() {
         var decoder = JSONLinesDecoder()
-        let chunk = line("not json") + line(#"{"type":"event","event":"agent_thinking"}"#)
+        let chunk = line("not json") + line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#)
 
-        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking)])
+        XCTAssertEqual(decoder.feed(chunk).messages, [.event(.agentThinking, workspaceId: "default", sessionId: "default")])
     }
 
     func test_malformedLine_incrementsDroppedLineCount() {
@@ -62,14 +62,14 @@ final class JSONLinesDecoderTests: XCTestCase {
     // BridgeConnection wires into a per-connection callback.
     func test_malformedLine_reportsHowManyWereDroppedInThisCall() {
         var decoder = JSONLinesDecoder()
-        let result = decoder.feed(line("not json") + line("also not json") + line(#"{"type":"event","event":"agent_thinking"}"#))
+        let result = decoder.feed(line("not json") + line("also not json") + line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#))
 
         XCTAssertEqual(result.droppedThisCall, 2)
     }
 
     func test_noMalformedLines_reportsZeroDroppedThisCall() {
         var decoder = JSONLinesDecoder()
-        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
+        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#))
 
         XCTAssertEqual(result.droppedThisCall, 0)
     }
@@ -91,14 +91,14 @@ final class JSONLinesDecoderTests: XCTestCase {
         XCTAssertEqual(result.messages, [])
 
         // Buffer was cleared, so a fresh valid line after the overflow parses normally.
-        let next = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
-        XCTAssertEqual(next.messages, [.event(.agentThinking)])
+        let next = decoder.feed(line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#))
+        XCTAssertEqual(next.messages, [.event(.agentThinking, workspaceId: "default", sessionId: "default")])
         XCTAssertFalse(next.didOverflow)
     }
 
     func test_lineUnderMaxLength_doesNotOverflow() {
         var decoder = JSONLinesDecoder(maxLineLength: 1024)
-        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
+        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#))
 
         XCTAssertFalse(result.didOverflow)
     }

@@ -48,6 +48,10 @@ enum StateKind: Equatable, CaseIterable {
     /// more interactions). Never reachable from a socket event, same as
     /// chaseBall/kickBall.
     case petting
+    /// F13 (2026-07-29): holds still while the Option+Shift+Space client
+    /// window is open, same "capture then restore" pattern as Listen (F7).
+    /// Never reachable from a socket event.
+    case pinned
 }
 
 /// The result of routing one BridgeEvent: an optional state transition, an

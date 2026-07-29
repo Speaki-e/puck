@@ -33,6 +33,15 @@ final class BridgeMessageRouter {
     /// Emitted for protocol 3.2 status events, already on the main thread.
     var onEventReaction: ((EventReaction) -> Void)?
 
+    /// Emitted for the workspace/session/editor-view confirmations workspace
+    /// sends pet-app (protocol 3.4/3.5, 2026-07-29) -- workspace_create,
+    /// session_create, editor_view_ready, editor_view_unavailable. Already on
+    /// the main thread, like onEventReaction. F13's client-window store (task
+    /// #134) is the intended consumer; kept as the raw BridgeMessage rather
+    /// than a bespoke type since this router shouldn't need to know that
+    /// store's shape.
+    var onClientUpdate: ((BridgeMessage) -> Void)?
+
     /// - Parameter dispatchToMain: injected so tests can observe the hop.
     ///   Defaults to an async hop to the main queue; it stays async even when
     ///   already on main so ordering is identical from every caller.
@@ -64,7 +73,7 @@ final class BridgeMessageRouter {
                 toolExecutor.cancel(id: id)
             }
 
-        case .event(let event):
+        case .event(let event, _, _):
             dispatchToMain { [weak self] in
                 guard let self else { return }
                 let reaction = EventRouter.reaction(for: event, previousCodeEditorPath: self.lastCodeEditorPath)
@@ -74,7 +83,12 @@ final class BridgeMessageRouter {
                 self.onEventReaction?(reaction)
             }
 
-        case .toolResult, .userInput:
+        case .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
+            dispatchToMain { [weak self] in
+                self?.onClientUpdate?(message)
+            }
+
+        case .toolResult, .userInput, .workspaceCreateRequest, .sessionCreateRequest, .approvalResponse, .runCancel:
             break // pet-app only ever sends these, never receives them
         }
     }

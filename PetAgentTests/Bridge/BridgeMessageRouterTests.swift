@@ -37,7 +37,7 @@ final class BridgeMessageRouterTests: XCTestCase {
         }
 
         backgroundQueue.async {
-            router.handle(.event(.agentThinking), reply: { _ in })
+            router.handle(.event(.agentThinking, workspaceId: "default", sessionId: "default"), reply: { _ in })
         }
 
         wait(for: [reacted], timeout: 2)
@@ -80,7 +80,7 @@ final class BridgeMessageRouterTests: XCTestCase {
             reacted.fulfill()
         }
 
-        router.handle(.event(.agentDone(ok: true, summary: "done")), reply: { _ in })
+        router.handle(.event(.agentDone(ok: true, summary: "done"), workspaceId: "default", sessionId: "default"), reply: { _ in })
 
         wait(for: [reacted], timeout: 2)
         XCTAssertEqual(received, EventRouter.reaction(for: .agentDone(ok: true, summary: "done")))
@@ -129,9 +129,9 @@ final class BridgeMessageRouterTests: XCTestCase {
             if reactions.count == 3 { allThreeReceived.fulfill() }
         }
 
-        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")]))), reply: { _ in })
-        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")]))), reply: { _ in })
-        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("b.ts")]))), reply: { _ in })
+        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
+        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
+        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("b.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
 
         wait(for: [allThreeReceived], timeout: 2)
         XCTAssertEqual(reactions.map(\.jump), [false, false, true])
@@ -140,13 +140,64 @@ final class BridgeMessageRouterTests: XCTestCase {
     func test_messagesPetAppOnlySends_areIgnored() {
         let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
         router.onEventReaction = { _ in XCTFail("should not react to a message pet-app only sends") }
+        router.onClientUpdate = { _ in XCTFail("should not fire onClientUpdate for a message pet-app only sends") }
 
         router.handle(.userInput(UserInput(text: "hi", source: .text)), reply: { _ in XCTFail("should not reply") })
         router.handle(.toolResult(ToolResult(id: "t1", ok: true, data: nil, error: nil)), reply: { _ in XCTFail("should not reply") })
+        router.handle(.workspaceCreateRequest(name: "x", projectPath: nil), reply: { _ in XCTFail("should not reply") })
+        router.handle(.sessionCreateRequest(workspaceId: "w1", title: "x"), reply: { _ in XCTFail("should not reply") })
+        router.handle(.approvalResponse(approvalId: "a1", approved: true), reply: { _ in XCTFail("should not reply") })
+        router.handle(.runCancel(sessionId: "s2"), reply: { _ in XCTFail("should not reply") })
 
         // Give any (incorrect) async hop a chance to run before the test ends.
         let settled = expectation(description: "settled")
         DispatchQueue.main.async { settled.fulfill() }
         wait(for: [settled], timeout: 2)
+    }
+
+    // MARK: - workspace/session/editor-view updates (2026-07-29, F13's data layer consumes these)
+
+    func test_onClientUpdate_firesOnMainThread_forWorkspaceCreate() {
+        let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
+        var received: BridgeMessage?
+        var receivedOnMainThread: Bool?
+        let updated = expectation(description: "client update delivered")
+        router.onClientUpdate = { message in
+            received = message
+            receivedOnMainThread = Thread.isMainThread
+            updated.fulfill()
+        }
+
+        backgroundQueue.async {
+            router.handle(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: "/tmp/cat-house"), reply: { _ in })
+        }
+
+        wait(for: [updated], timeout: 2)
+        XCTAssertEqual(received, .workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: "/tmp/cat-house"))
+        XCTAssertEqual(receivedOnMainThread, true)
+    }
+
+    func test_onClientUpdate_firesFor_sessionCreate_editorViewReady_editorViewUnavailable() {
+        let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
+        var received: [BridgeMessage] = []
+        let allReceived = expectation(description: "all three client updates delivered")
+        router.onClientUpdate = { message in
+            received.append(message)
+            if received.count == 3 { allReceived.fulfill() }
+        }
+
+        router.handle(.sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent), reply: { _ in })
+        router.handle(.editorViewReady(workspaceId: "w1", url: "http://127.0.0.1:1/editor"), reply: { _ in })
+        router.handle(.editorViewUnavailable(workspaceId: "w3", reason: .noProjectPath), reply: { _ in })
+
+        wait(for: [allReceived], timeout: 2)
+        XCTAssertEqual(
+            received,
+            [
+                .sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent),
+                .editorViewReady(workspaceId: "w1", url: "http://127.0.0.1:1/editor"),
+                .editorViewUnavailable(workspaceId: "w3", reason: .noProjectPath),
+            ]
+        )
     }
 }

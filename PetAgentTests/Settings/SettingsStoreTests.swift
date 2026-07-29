@@ -105,6 +105,27 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(received, true)
     }
 
+    // byeolki: "한국어 언어모드도 만들어주고" -- an in-app language setting.
+    func test_language_defaultsToTheSystemLanguage() {
+        XCTAssertEqual(SettingsStore(defaults: defaults).language, AppLanguage.systemDefault())
+    }
+
+    func test_language_roundTrips() {
+        let store = SettingsStore(defaults: defaults)
+        store.language = .korean
+        XCTAssertEqual(store.language, .korean)
+    }
+
+    func test_settingLanguage_firesOnLanguageChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: AppLanguage?
+        store.onLanguageChanged = { received = $0 }
+
+        store.language = .korean
+
+        XCTAssertEqual(received, .korean)
+    }
+
     func test_hotkeyBindings_roundTrip() {
         let store = SettingsStore(defaults: defaults)
         var bindings = HotkeyBindings.defaults

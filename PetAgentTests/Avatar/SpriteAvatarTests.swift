@@ -120,6 +120,25 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 99 - 70))
     }
 
+    /// Hanging from the ceiling (F3, 2026-07-29): `position` is
+    /// `roamableArea.minY`, the ceiling line. The flip (setUpsideDown)
+    /// makes the art's feet render at the TOP of the layer and its head at
+    /// the bottom, so the layer must extend DOWNWARD from the ceiling point
+    /// -- the opposite offset from the ground-standing case. Getting this
+    /// wrong doesn't just look wrong, it renders the sprite entirely off the
+    /// top edge of the screen (this was the actual bug: nothing visibly hung
+    /// from the ceiling because the sprite was pushed off-screen).
+    func test_setScreenPosition_whenUpsideDown_hangsDownwardFromTheCeilingPoint() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult() // hitbox height 140, scale 1.0
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.setUpsideDown(true)
+        avatar.setScreenPosition(CGPoint(x: 42, y: 0))
+
+        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 70))
+    }
+
     func test_setFacingLeft_flipsLayerHorizontally() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()

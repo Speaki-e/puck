@@ -263,6 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             controller.register(state, as: kind)
         }
         controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
+        controller.avatarHeight = avatarHitboxSize.height
         // F4 reports global Quartz frames; the pet lives in overlay-local
         // pixels. Rebase once here so no state has to know both spaces.
         controller.windows = { [weak self, weak window] in
@@ -467,7 +468,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             if let body = self.characterBody, let window = self.overlayController?.windows.first {
                 self.clickThroughController?.updateCharacter(
                     screenPosition: self.globalAppKitPoint(fromWindowLocal: body.position, window: window),
-                    hitboxSize: self.avatarHitboxSize
+                    hitboxSize: self.avatarHitboxSize,
+                    isUpsideDown: body.isUpsideDown
                 )
             }
         }
@@ -647,6 +649,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private func applyLiveAvatarScale(_ scale: Double) {
         avatar?.updateScale(scale)
         avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
+        characterController?.avatarHeight = avatarHitboxSize.height
         // Not `body.position = body.position` -- Swift rejects that as a
         // self-assignment, and CharacterBody's didSet wouldn't fire anyway.
         // Push straight to the avatar instead, at the position it already has.

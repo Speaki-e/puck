@@ -102,4 +102,37 @@ final class ClickThroughControllerTests: XCTestCase {
             )
         )
     }
+
+    // MARK: - isUpsideDown (F3 ceiling-crawling, 2026-07-29)
+
+    /// Hanging from the ceiling, the character's body extends DOWNWARD
+    /// (toward smaller Y in this AppKit bottom-left-origin space) from the
+    /// attachment point -- the same rect the ground case uses, built above
+    /// the point instead of below it, makes the visibly-hanging pet
+    /// unclickable (byeolki: "애가 잘 안 잡힘" while it was on the ceiling).
+    func test_cursorBelowTheCeilingPoint_withinHitboxHeight_allowsClicksWhenUpsideDown() {
+        let ceilingPoint = CGPoint(x: 500, y: 900)
+        let belowCeiling = CGPoint(x: ceilingPoint.x, y: ceilingPoint.y - 130)
+        XCTAssertTrue(
+            ClickThroughController.shouldAllowClicks(
+                cursorPosition: belowCeiling,
+                characterScreenPosition: ceilingPoint,
+                hitboxSize: hitboxSize,
+                isUpsideDown: true
+            )
+        )
+    }
+
+    func test_cursorAboveTheCeilingPoint_doesNotAllowClicksWhenUpsideDown() {
+        let ceilingPoint = CGPoint(x: 500, y: 900)
+        let aboveCeiling = CGPoint(x: ceilingPoint.x, y: ceilingPoint.y + 1)
+        XCTAssertFalse(
+            ClickThroughController.shouldAllowClicks(
+                cursorPosition: aboveCeiling,
+                characterScreenPosition: ceilingPoint,
+                hitboxSize: hitboxSize,
+                isUpsideDown: true
+            )
+        )
+    }
 }

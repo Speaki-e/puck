@@ -26,6 +26,7 @@ final class TestStateWorld {
     let body: CharacterBody
     private(set) var requestedTransitions: [StateKind] = []
     var roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+    var avatarHeight: CGFloat = 0
     var landingY: CGFloat = 500
     var windows: [WindowInfo] = []
 
@@ -37,6 +38,7 @@ final class TestStateWorld {
         StateContext(
             body: body,
             roamableArea: roamableArea,
+            avatarHeight: avatarHeight,
             windows: windows,
             landingY: { [landingY] _ in landingY },
             requestTransition: { [weak self] kind in self?.requestedTransitions.append(kind) }

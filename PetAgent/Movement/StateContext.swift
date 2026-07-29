@@ -23,6 +23,15 @@ struct StateContext {
     /// The area the pet may roam, normally the union of every display.
     let roamableArea: CGRect
 
+    /// The rendered avatar's current height (manifest hitbox * scale). F3
+    /// ceiling-crawling (2026-07-29): ClimbToCeilingState needs this to climb
+    /// to where the character's HEAD reaches the ceiling, not its feet --
+    /// climbing feet-to-roamableArea.minY while still right-side-up (body
+    /// extending upward from the feet) pushes the head off the top of the
+    /// screen before "arrival," since there is no room above the literal
+    /// screen edge the way there is above a window's top edge.
+    let avatarHeight: CGFloat
+
     /// Layer-0 windows in front-to-back Z order, already converted into the
     /// pet's coordinate space (F4 reports global Quartz frames; AppDelegate
     /// rebases them onto the overlay window before they get here).

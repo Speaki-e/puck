@@ -66,7 +66,16 @@ final class SpriteAvatar: AvatarPlayable {
         // sprite floats half its height above wherever the FSM thinks it's
         // standing -- visible as the pet hanging in empty space instead of
         // standing on the Dock/window edge it just "landed" on.
-        spriteLayer.position = CGPoint(x: position.x, y: position.y - spriteLayer.bounds.height / 2)
+        //
+        // CeilingState instead passes roamableArea.minY (the ceiling line) as
+        // an attachment point the character hangs FROM, with its body
+        // extending downward into the room, not upward off the top of the
+        // screen -- and since setUpsideDown's flip renders the art's feet at
+        // the layer's top edge, that attachment point is the layer's top
+        // edge too. Getting this offset's sign wrong doesn't just look
+        // wrong, it pushes the whole sprite off the top of the screen.
+        let verticalOffset = isUpsideDown ? spriteLayer.bounds.height / 2 : -spriteLayer.bounds.height / 2
+        spriteLayer.position = CGPoint(x: position.x, y: position.y + verticalOffset)
     }
 
     func setFacing(_ facing: AvatarFacing) {

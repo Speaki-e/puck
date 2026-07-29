@@ -5,7 +5,17 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-30 · **Tests:** 829 passing (`xcodebuild test`) · **`main`:** `a58646e`
+**Last updated:** 2026-07-30 · **Tests:** 842 passing (`xcodebuild test`) · **`main`:** `4406142`
+
+**2026-07-30: the F13 client window becomes its own app, PetAgentClient, with a real Dock icon.** byeolki: "니가 만든 데스크톱 앱이 swift 특유의 디자인을 못 벗어나고. option shift space를 누르면 입력 모달만 떠야 하는데 창 전체가 뜨는 이슈가 있고, dock이나 스포트라이트로 에이전트 창을 표시하는 것도 안되고" -- then, on the two-separate-apps proposal: "별도의 앱으로 해서 dock에 상시 표시하면서 펫은... petapp을 끄거나 숨기지 않는 이상 지장이 안가는 형태는 안됨?" -- "1. ㅇㅇ 같이해야함 둘이 같이 가야하는거임".
+
+- **protocol 0.5.0**: new `client_hello {role: "workspace" | "gui"}` handshake (3.7) -- pet-app's bridge.sock now has two connection roles at once instead of just workspace, and needs to tell them apart.
+- **PetAgent (the pet)** stays `LSUIElement`/`.accessory`, still hosts bridge.sock, but is no longer the client window's home. `BridgeServer` now tracks each connection's role and relays: gui-originated messages (`user_input`, `approval_response`, ...) go to the workspace connection; workspace-originated ones (events, `workspace_create`, ...) go to every gui connection. `BridgeConnection` gained `onReady` (needed by the client side of a connection, not just the server's accept-path). Option+Shift+Space is back to being just the quick-capture bubble it was before F13 (`TextInputBubbleWindow`, pin/unpin still fully local) -- opening the *full* window is now a menu-bar item ("PetAgent 채팅 열기") that activates `PetAgentClient.app`.
+- **PetAgentClient (new app)**: a regular, Dock-resident macOS app that *is* the F13 client window -- real Dock icon, Cmd+Tab, Spotlight, all the things `LSUIElement` can't have. It connects to bridge.sock as its own client (`BridgeSocketClient`, sends `client_hello role: "gui"`, reconnects with the same 1s/2s/4s/30s backoff as workspace) and owns its own `ClientWindowStore`. `CompanionAppLauncher` makes the two apps start together either direction, since PetAgentClient does nothing useful without PetAgent hosting the socket.
+- No separate framework target: `ClientWindow/*`, `Localization/*`, and the wire-protocol subset of `Bridge/*` are just referenced directly from both targets' `sources:` in `project.yml` -- a real framework would mean marking ~17 files' worth of types `public` for no real benefit at this project's size.
+- Deliberately *not* wired: gui-connection presence does **not** pin the character. PetAgentClient is meant to stay running continuously (see the mutual-launch behavior above), so tying the pin to "is a gui attached" would freeze the pet indefinitely instead of just during the momentary quick-capture interaction. `BridgeServer.onGUIPresenceChanged` exists and is tested, just unused for this.
+- Known gap: PetAgentClient's own light/dark appearance isn't synced with PetAgent's Settings picker (defaults to system) -- cross-process settings sync deferred, since the two are now separate `UserDefaults` suites.
+- Verified this launch: `lsappinfo` confirms PetAgent is `type="UIElement"` (no Dock icon) and PetAgentClient is `type="Foreground"` (real Dock icon), with PetAgentClient's ASN parented under PetAgent's (auto-launched). Clean bootstrap, no BridgeServer failures. Not verified by hand: actually clicking the Dock icon / using Option+Shift+Space live (same Accessibility-permission sandbox limitation as every prior session).
 
 **2026-07-30: several toys out at once, a menu you pick them from, and clicking only what you can see.** Two byeolki asks landed together.
 

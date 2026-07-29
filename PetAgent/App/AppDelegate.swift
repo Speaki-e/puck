@@ -106,11 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     private var bridgeServer: BridgeServer?
     private var bridgeMessageRouter: BridgeMessageRouter?
+    /// Still used directly by voice/PTT (F7) -- the F13 client window that
+    /// used to also route through this moved out to PetAgentClient, its own
+    /// process, as of 2026-07-30.
     private lazy var userInputSender = UserInputSender { [weak self] in self?.bridgeServer }
-    /// F13 (2026-07-29): sidebar/session-list source of truth, fed by
-    /// bridgeMessageRouter's onClientUpdate/onChatEvent below. The client
-    /// window itself (task not yet built) will bind to this.
-    private lazy var clientWindowStore = ClientWindowStore(sender: userInputSender)
 
     private var hotkeyManager: GlobalHotkeyManager?
     private var voiceInputController: VoiceInputController?
@@ -119,11 +118,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var menuBarController: MenuBarController?
     private var settingsWindow: NSWindow?
     private var textInputBubbleWindow: TextInputBubbleWindow?
-    /// F13 (2026-07-29) -- the Claude-Desktop-style client window Option+Shift+Space summons.
-    private var clientWindow: ClientWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestPermissions()
+
+        // byeolki: "둘이 같이 가야하는거임" -- PetAgentClient (the F13 client
+        // window, now a separate Dock-resident app) is useless without this
+        // process hosting bridge.sock, so each launches the other.
+        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: "com.speaki-e.PetAgentClient")
 
         setUpMenuBar()
         setUpOverlayAndAvatar()
@@ -192,6 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         let menuBar = MenuBarController()
         menuBar.onOpenSettings = { [weak self] in self?.showSettingsWindow() }
         menuBar.onSwitchAvatar = { [weak self] in self?.showAvatarManagementWindow() }
+        menuBar.onOpenClient = { [weak self] in self?.openClientApp() }
         menuBar.onToggleToy = { [weak self] toy in self?.toggleToy(toy) }
         menuBar.onToggleVisibility = { [weak self] in self?.toggleCharacterVisibility() }
         menuBar.onQuit = { NSApplication.shared.terminate(nil) }
@@ -329,14 +332,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             self?.menuBarController?.applyLanguage(language)
             self?.settingsWindow?.title = Strings.text(.settingsWindowTitle, language)
         }
-        // byeolki: "화이트모드 다크모드 추가하고" -- the client window is a
-        // separate SwiftUI hierarchy from Settings (where the picker lives),
-        // so it needs this same explicit push to pick up a live change.
-        clientWindowStore.appearance = settingsStore.appearance
-        settingsStore.onAppearanceChanged = { [weak self] appearance in
-            self?.clientWindowStore.appearance = appearance
-        }
-
         // autoMuteOnFocus existed as a setting with nothing acting on it --
         // FocusModeObserver was implemented but never instantiated anywhere.
         let focusObserver = FocusModeObserver()
@@ -977,10 +972,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         let router = BridgeMessageRouter(toolExecutor: toolExecutor)
         router.onEventReaction = { [weak self] reaction in self?.applyEventReaction(reaction) }
-        router.onClientUpdate = { [weak self] message in self?.clientWindowStore.handleClientUpdate(message) }
-        router.onChatEvent = { [weak self] event, workspaceId, sessionId in
-            self?.clientWindowStore.handleChatEvent(event, workspaceId: workspaceId, sessionId: sessionId)
-        }
+        // onClientUpdate/onChatEvent go unset here -- PetAgentClient's own
+        // ClientWindowStore consumes those now (2026-07-30), fed by its own
+        // BridgeSocketClient connection, not this in-process router. This
+        // router's job is back to just the pet's own reactions + relaying
+        // (BridgeServer.relay handles the actual forwarding to whichever
+        // gui-role connections are attached).
         bridgeMessageRouter = router
 
         let server = BridgeServer()
@@ -1094,7 +1091,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         manager.onPushToTalkDown = { [weak voiceController] in voiceController?.pushToTalkDown() }
         manager.onPushToTalkUp = { [weak voiceController] in voiceController?.pushToTalkUp() }
-        manager.onTextInputRequested = { [weak self] in self?.showClientWindow() }
+        manager.onTextInputRequested = { [weak self] in self?.showTextInputBubble() }
         manager.onCharacterSummonRequested = { [weak self] in self?.summonCharacter() }
 
         if !manager.start() {
@@ -1104,11 +1101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     }
 
     private func sendUserInput(text: String, source: UserInput.Source) {
-        // Routed through clientWindowStore (2026-07-29) rather than
-        // userInputSender directly, so it already targets whichever
-        // workspace/session is active once the real client window (F13,
-        // not yet built) lets the user switch away from the default.
-        switch clientWindowStore.sendMessage(text, source: source) {
+        switch userInputSender.send(text: text, source: source) {
         case .sent:
             break
         case .workspaceDisconnected:
@@ -1119,26 +1112,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
-    /// F13 (2026-07-29): Option+Shift+Space pins the character and summons
-    /// the client window (byeolki: "캐릭터를 고정하고 그 옆에 입력 모달을
-    /// 보이고") -- docked beside it on first open, refocused if already open.
-    private func showClientWindow() {
+    /// F6 (2026-07-30 재정정): F13 클라이언트 창이 PetAgentClient라는 별도
+    /// 앱으로 분리되면서, 이 핫키는 다시 원래의 가벼운 퀵 캡처 말풍선만
+    /// 담당한다 -- 무거운 전체 창을 열 이유가 없어졌음.
+    private func showTextInputBubble() {
+        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
+
         pinCharacter()
 
-        let window = clientWindow ?? {
-            let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 720, height: 480))
-            newWindow.onWillClose = { [weak self] in self?.unpinCharacter() }
-            let hostingController = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
-            newWindow.contentViewController = hostingController
-            clientWindow = newWindow
-            return newWindow
-        }()
-
-        if let primaryWindow {
-            let center = CGPoint(x: primaryWindow.frame.midX, y: primaryWindow.frame.midY)
-            window.setFrameOrigin(NSPoint(x: center.x + 80, y: center.y))
+        bubbleView.onSubmit = { [weak self] text in
+            bubbleWindow.closeAndRestoreFocus()
+            self?.unpinCharacter()
+            self?.sendUserInput(text: text, source: .text)
         }
-        window.showAndActivate()
+        bubbleView.onCancel = { [weak self] in
+            bubbleWindow.closeAndRestoreFocus()
+            self?.unpinCharacter()
+        }
+        bubbleView.showInput()
+        bubbleWindow.showAndActivate()
+    }
+
+    /// F13 (2026-07-30): the client window is now PetAgentClient.app, a
+    /// separate Dock-resident process -- opening/focusing it is just
+    /// activating that app, the same as clicking its Dock icon.
+    private func openClientApp() {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.speaki-e.PetAgentClient") else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
     }
 
     /// No-op if already pinned (repeated Option+Shift+Space while the bubble

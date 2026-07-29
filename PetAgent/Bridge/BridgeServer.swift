@@ -20,10 +20,7 @@ enum BridgeServerError: Error, Equatable {
 /// as a client and reconnects with exponential backoff on its own; pet-app's
 /// job is just to accept connections and stay a pure pet when none are open.
 final class BridgeServer {
-    static let defaultSocketURL: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("PetAgent", isDirectory: true).appendingPathComponent("bridge.sock")
-    }()
+    static let defaultSocketURL: URL = BridgeSocketPath.default
 
     /// All access to `connections` (reads and writes) must go through `queue` —
     /// accept()/per-connection onClose already run there; `stop()` and any
@@ -49,6 +46,19 @@ final class BridgeServer {
     /// "the tool is just slow" until ToolExecutor's own timeout (found via
     /// review).
     var onMalformedLine: (() -> Void)?
+
+    /// Fires when the number of gui-role connections transitions between
+    /// zero and non-zero -- true on the first one connecting, false once the
+    /// last one disconnects (protocol 3.7, 2026-07-30). NOT wired to
+    /// pin/unpin the character: PetAgentClient is a Dock-resident app
+    /// expected to stay running continuously (byeolki: "둘이 같이
+    /// 가야하는거임"), so tying the pin to "is a gui connected" would freeze
+    /// the pet in place for as long as PetAgentClient is alive, not just
+    /// while its window is actually being used. Pin/unpin stays with the
+    /// local, in-process quick-capture bubble (Option+Shift+Space), which
+    /// is the one truly momentary interaction pet-app can observe directly.
+    var onGUIPresenceChanged: ((Bool) -> Void)?
+    private var lastGUIPresence = false
 
     init(socketURL: URL = BridgeServer.defaultSocketURL) {
         self.socketURL = socketURL
@@ -117,15 +127,44 @@ final class BridgeServer {
         let connection = BridgeConnection(connection: nwConnection)
         connection.onMessage = { [weak self, weak connection] message in
             guard let self, let connection else { return }
+            if case .clientHello(let role) = message {
+                connection.role = role
+                self.updateGUIPresence()
+                return
+            }
+            self.relay(message, from: connection)
             self.onMessage?(message, connection)
         }
         connection.onClose = { [weak self, weak connection] in
             guard let self, let connection else { return }
             self.connections.removeAll { $0 === connection }
+            self.updateGUIPresence()
         }
         connection.onMalformedLine = { [weak self] in self?.onMalformedLine?() }
         connections.append(connection)
         connection.start(queue: queue)
+    }
+
+    /// Forwards a message to every currently-connected role it's addressed
+    /// to (protocol 3.7) -- pet-app relays rather than handling everything
+    /// in-process now that the gui side can be a separate process
+    /// (PetAgentClient) from workspace.
+    private func relay(_ message: BridgeMessage, from origin: BridgeConnection) {
+        guard let targetRole = ClientRelay.targetRole(for: message) else { return }
+        for connection in connections where connection.role == targetRole {
+            connection.send(message)
+        }
+    }
+
+    /// Runs on `queue`, same as accept()/onClose -- only fires
+    /// onGUIPresenceChanged on an actual zero<->non-zero transition, not
+    /// every connect/disconnect (multiple gui connections are possible in
+    /// principle, even if only one PetAgentClient is expected in practice).
+    private func updateGUIPresence() {
+        let hasGUI = connections.contains { $0.role == .gui }
+        guard hasGUI != lastGUIPresence else { return }
+        lastGUIPresence = hasGUI
+        onGUIPresenceChanged?(hasGUI)
     }
 
     // MARK: - Listener failure mapping (pure, testable independent of real bind failures)

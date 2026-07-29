@@ -56,6 +56,44 @@ targets:
       commandLineArguments:
         "-PetAgentUITestMode": false
 
+  # F13 (2026-07-30): the Claude-Desktop-style client window used to live
+  # in-process inside PetAgent; it's now this separate, regular (Dock-
+  # resident) app instead, so it gets a real Dock icon / Cmd+Tab / Spotlight
+  # presence that an LSUIElement app can't have (byeolki: "별도의 앱으로
+  # 해서 dock에 상시 표시"). It shares ClientWindow/Localization and the
+  # wire-protocol subset of Bridge/ directly from PetAgent's sources rather
+  # than through a separate framework target -- at this project's size a
+  # real framework would mean marking ~17 files' worth of types/members
+  # `public` for no real benefit, so both targets just compile the same
+  # source files independently.
+  PetAgentClient:
+    type: application
+    platform: macOS
+    sources:
+      - path: PetAgentClient
+        excludes:
+          - Resources/Info.plist
+          - Resources/PetAgentClient.entitlements
+      - path: PetAgent/ClientWindow
+      - path: PetAgent/Localization
+      - path: PetAgent/Resources/Assets.xcassets
+      - path: PetAgent/Bridge/BridgeMessages.swift
+      - path: PetAgent/Bridge/JSONValue.swift
+      - path: PetAgent/Bridge/BridgeConnection.swift
+      - path: PetAgent/Bridge/BridgeSocketPath.swift
+      - path: PetAgent/Bridge/BridgeSocketClient.swift
+      - path: PetAgent/Bridge/UserInputSender.swift
+      - path: PetAgent/App/CompanionAppLauncher.swift
+    info:
+      path: PetAgentClient/Resources/Info.plist
+      properties:
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PetAgentClient
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: PetAgentClient/Resources/PetAgentClient.entitlements
+
   PetAgentTests:
     type: bundle.unit-test
     platform: macOS

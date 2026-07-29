@@ -13,12 +13,20 @@
 import SwiftUI
 
 enum ClientTheme {
-    /// A warm, friendly accent distinct from the system's default blue --
-    /// this app has a character in it, the UI shouldn't look like a plain
-    /// settings pane.
+    /// A distinct lime-green accent (byeolki: "컬러는 #A2E048 이런 류 색
+    /// 써서") instead of the system's default blue -- this app has a
+    /// character in it, the UI shouldn't look like a plain settings pane.
+    /// Kept as one fixed value across light/dark: it's bright/saturated
+    /// enough to read on both a near-white and a near-black surface, unlike
+    /// the semantic NSColor tokens below (which do need to vary by mode and
+    /// get that for free from AppKit's dynamic providers).
     enum Colors {
-        static let accent = Color(red: 0.95, green: 0.42, blue: 0.36)
+        static let accent = Color(red: 0xA2 / 255.0, green: 0xE0 / 255.0, blue: 0x48 / 255.0)
         static let accentSoft = accent.opacity(0.16)
+        /// #A2E048 is light/high-luminance -- white text on a solid fill of
+        /// it fails contrast. Anything filled with `accent` (the user bubble,
+        /// the send button, the approve button) uses this instead of white.
+        static let onAccent = Color.black.opacity(0.82)
 
         /// Sidebar/toolbar chrome uses VisualEffectBackground (real
         /// NSVisualEffectView vibrancy), not a flat color here -- a flat
@@ -26,7 +34,7 @@ enum ClientTheme {
         static let contentBackground = Color(nsColor: .textBackgroundColor)
 
         static let userBubble = accent
-        static let userBubbleText = Color.white
+        static let userBubbleText = onAccent
         static let assistantBubble = Color(nsColor: .controlBackgroundColor)
         static let assistantBubbleText = Color.primary
 

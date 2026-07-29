@@ -18,6 +18,7 @@ final class SettingsStore {
         static let walkSpeedMultiplier = "PetAgent.walkSpeedMultiplier"
         static let speechLocale = "PetAgent.speechLocale"
         static let language = "PetAgent.language"
+        static let appearance = "PetAgent.appearance"
         static let pushToTalk = "PetAgent.hotkey.pushToTalk"
         static let textInput = "PetAgent.hotkey.textInput"
         static let characterSummon = "PetAgent.hotkey.characterSummon"
@@ -37,6 +38,10 @@ final class SettingsStore {
     /// (built once at construction, unlike SwiftUI's live-recomputed body)
     /// needs this to update its titles when Settings' language picker changes.
     var onLanguageChanged: ((AppLanguage) -> Void)?
+    /// byeolki: "화이트모드 다크모드 추가하고" -- the client window (F13) is a
+    /// separate SwiftUI hierarchy from Settings, so it needs its own signal to
+    /// pick up a live appearance change instead of only reading it at open time.
+    var onAppearanceChanged: ((AppAppearance) -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -97,6 +102,16 @@ final class SettingsStore {
         set {
             defaults.set(newValue.rawValue, forKey: Keys.language)
             onLanguageChanged?(newValue)
+        }
+    }
+
+    var appearance: AppAppearance {
+        get {
+            defaults.string(forKey: Keys.appearance).flatMap(AppAppearance.init(rawValue:)) ?? .system
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.appearance)
+            onAppearanceChanged?(newValue)
         }
     }
 

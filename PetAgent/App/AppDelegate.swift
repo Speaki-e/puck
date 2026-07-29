@@ -309,6 +309,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             self?.menuBarController?.applyLanguage(language)
             self?.settingsWindow?.title = Strings.text(.settingsWindowTitle, language)
         }
+        // byeolki: "화이트모드 다크모드 추가하고" -- the client window is a
+        // separate SwiftUI hierarchy from Settings (where the picker lives),
+        // so it needs this same explicit push to pick up a live change.
+        clientWindowStore.appearance = settingsStore.appearance
+        settingsStore.onAppearanceChanged = { [weak self] appearance in
+            self?.clientWindowStore.appearance = appearance
+        }
 
         // autoMuteOnFocus existed as a setting with nothing acting on it --
         // FocusModeObserver was implemented but never instantiated anywhere.

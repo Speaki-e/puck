@@ -126,6 +126,27 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(received, .korean)
     }
 
+    // byeolki: "화이트모드 다크모드 추가하고" -- an explicit in-app appearance setting.
+    func test_appearance_defaultsToSystem() {
+        XCTAssertEqual(SettingsStore(defaults: defaults).appearance, .system)
+    }
+
+    func test_appearance_roundTrips() {
+        let store = SettingsStore(defaults: defaults)
+        store.appearance = .dark
+        XCTAssertEqual(store.appearance, .dark)
+    }
+
+    func test_settingAppearance_firesOnAppearanceChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: AppAppearance?
+        store.onAppearanceChanged = { received = $0 }
+
+        store.appearance = .light
+
+        XCTAssertEqual(received, .light)
+    }
+
     func test_hotkeyBindings_roundTrip() {
         let store = SettingsStore(defaults: defaults)
         var bindings = HotkeyBindings.defaults

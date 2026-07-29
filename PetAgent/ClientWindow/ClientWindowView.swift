@@ -57,6 +57,7 @@ struct ClientWindowView: View {
             .background(ClientTheme.Colors.contentBackground)
         }
         .frame(minWidth: 640, minHeight: 420)
+        .preferredColorScheme(store.appearance.colorScheme)
         .onChange(of: store.activeWorkspaceId) {
             // Switching to a workspace with no editor view falls back to chat
             // rather than showing a stale editor for the previous workspace.

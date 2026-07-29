@@ -180,9 +180,19 @@ private struct NewWorkspaceSheet: View {
             HStack {
                 Spacer()
                 Button("취소", action: onCancel)
+                // Not .borderedProminent.tint(accent) -- see ChatView's
+                // approval banner for why (white-on-#A2E048 contrast).
                 Button("추가") { onCreate(name, projectPath) }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ClientTheme.Colors.accent)
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                    .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+                    .background(
+                        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? ClientTheme.Colors.accent.opacity(0.4)
+                            : ClientTheme.Colors.accent
+                    )
+                    .foregroundStyle(ClientTheme.Colors.onAccent)
+                    .clipShape(Capsule())
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }

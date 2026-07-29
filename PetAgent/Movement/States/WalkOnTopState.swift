@@ -45,7 +45,7 @@ final class WalkOnTopState: StateHandler {
         let resolvedDirection = direction ?? Self.initialDirection(position: context.body.position, windowFrame: window.frame)
         direction = resolvedDirection
 
-        let nextX = context.body.position.x + resolvedDirection * MovementSolver.walkSpeed * CGFloat(dt)
+        let nextX = context.body.position.x + resolvedDirection * context.walkSpeed * CGFloat(dt)
         context.body.facing = resolvedDirection > 0 ? .right : .left
         context.body.position = CGPoint(x: nextX, y: window.frame.minY)
     }

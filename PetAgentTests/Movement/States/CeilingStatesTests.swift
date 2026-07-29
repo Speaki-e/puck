@@ -63,6 +63,20 @@ final class ClimbToCeilingStateTests: XCTestCase {
 
         XCTAssertEqual(world.requestedTransitions.count, 1)
     }
+
+    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    func test_respectsACustomWalkSpeed() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 400))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        world.walkSpeed = MovementSolver.walkSpeed * 2
+        let state = ClimbToCeilingState()
+        state.enter()
+
+        world.run(state, seconds: 0.1)
+
+        let expectedY = 400 - MovementSolver.walkSpeed * 2 * 0.1
+        XCTAssertEqual(world.body.position.y, expectedY, accuracy: 5)
+    }
 }
 
 final class CeilingStateTests: XCTestCase {
@@ -112,5 +126,19 @@ final class CeilingStateTests: XCTestCase {
         world.run(state, seconds: 3)
 
         XCTAssertEqual(world.requestedTransitions.count, 1)
+    }
+
+    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    func test_respectsACustomWalkSpeed() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        world.walkSpeed = MovementSolver.walkSpeed * 2
+        let state = CeilingState(durationProvider: { 100 })
+        state.enter()
+
+        world.run(state, seconds: 0.1)
+
+        let expectedX = 100 + MovementSolver.walkSpeed * 2 * 0.1
+        XCTAssertEqual(world.body.position.x, expectedX, accuracy: 5)
     }
 }

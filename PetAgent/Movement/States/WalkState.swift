@@ -60,6 +60,7 @@ final class WalkState: StateHandler {
             let step = MovementSolver.step(
                 from: context.body.position,
                 toward: CGPoint(x: edgeX, y: context.body.position.y),
+                speed: context.walkSpeed,
                 dt: dt
             )
             context.body.position = step.position
@@ -70,7 +71,7 @@ final class WalkState: StateHandler {
             return
         }
 
-        let step = MovementSolver.step(from: context.body.position, toward: target, dt: dt)
+        let step = MovementSolver.step(from: context.body.position, toward: target, speed: context.walkSpeed, dt: dt)
         context.body.position = step.position
 
         if step.hasArrived {

@@ -44,7 +44,7 @@ final class ChaseBallState: StateHandler {
             context.body.facing = facing
         }
 
-        let step = MovementSolver.step(from: context.body.position, toward: target, dt: dt)
+        let step = MovementSolver.step(from: context.body.position, toward: target, speed: context.walkSpeed, dt: dt)
         context.body.position = step.position
 
         if step.hasArrived {

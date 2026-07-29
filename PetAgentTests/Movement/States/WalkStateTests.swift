@@ -27,6 +27,7 @@ final class TestStateWorld {
     private(set) var requestedTransitions: [StateKind] = []
     var roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
     var avatarHeight: CGFloat = 0
+    var walkSpeed: CGFloat = MovementSolver.walkSpeed
     var landingY: CGFloat = 500
     var windows: [WindowInfo] = []
 
@@ -39,6 +40,7 @@ final class TestStateWorld {
             body: body,
             roamableArea: roamableArea,
             avatarHeight: avatarHeight,
+            walkSpeed: walkSpeed,
             windows: windows,
             landingY: { [landingY] _ in landingY },
             requestTransition: { [weak self] kind in self?.requestedTransitions.append(kind) }
@@ -101,6 +103,18 @@ final class WalkStateTests: XCTestCase {
         world.run(state, seconds: 0.1)
 
         XCTAssertEqual(world.requestedTransitions.first, .idle)
+    }
+
+    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    func test_respectsACustomWalkSpeed() {
+        let world = TestStateWorld(position: CGPoint(x: 0, y: 100))
+        world.walkSpeed = MovementSolver.walkSpeed * 2
+        let state = WalkState()
+        state.target = CGPoint(x: 1000, y: 100)
+
+        world.run(state, seconds: 1)
+
+        XCTAssertEqual(world.body.position.x, MovementSolver.walkSpeed * 2, accuracy: 1)
     }
 
     func test_arrivalIsRequestedOnlyOnce() {

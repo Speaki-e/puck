@@ -75,6 +75,26 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(received, 0.6)
     }
 
+    func test_walkSpeedMultiplier_defaultsToOne() {
+        XCTAssertEqual(SettingsStore(defaults: defaults).walkSpeedMultiplier, 1.0)
+    }
+
+    func test_walkSpeedMultiplier_roundTrips() {
+        let store = SettingsStore(defaults: defaults)
+        store.walkSpeedMultiplier = 1.8
+        XCTAssertEqual(store.walkSpeedMultiplier, 1.8)
+    }
+
+    func test_settingWalkSpeedMultiplier_firesOnWalkSpeedMultiplierChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: Double?
+        store.onWalkSpeedMultiplierChanged = { received = $0 }
+
+        store.walkSpeedMultiplier = 0.5
+
+        XCTAssertEqual(received, 0.5)
+    }
+
     func test_settingIsMuted_firesOnMuteChanged() {
         let store = SettingsStore(defaults: defaults)
         var received: Bool?

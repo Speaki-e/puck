@@ -191,6 +191,48 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(transform.d, 0.7, accuracy: 0.001)
     }
 
+    // MARK: - Climbing rotation (F3 wall-climbing, 2026-07-29)
+
+    /// byeolki: "벽 타는 것도 사진 돌려서 올라가게 해주고" -- climbing (both
+    /// ClimbState and ClimbToCeilingState share the "climb" clip) rotates
+    /// the sprite 90 degrees, the same way isUpsideDown flips it for the
+    /// ceiling. Derived from the clip name already passed into updateBounce
+    /// every frame -- no new AvatarPlayable method needed.
+    func test_updateBounce_withClimbClip_rotatesTheSpriteNinetyDegrees() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.updateBounce(clip: "climb", elapsed: 0, intensity: 1.0)
+
+        let transform = avatar.spriteLayer.affineTransform()
+        XCTAssertEqual(transform.a, 0, accuracy: 0.001)
+        XCTAssertEqual(abs(transform.b), 1, accuracy: 0.001)
+    }
+
+    func test_updateBounce_withNonClimbClip_doesNotRotate() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 1.0)
+
+        let transform = avatar.spriteLayer.affineTransform()
+        XCTAssertEqual(transform.b, 0, accuracy: 0.001)
+    }
+
+    func test_updateBounce_leavingClimbClip_resetsRotation() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+
+        avatar.updateBounce(clip: "climb", elapsed: 0, intensity: 1.0)
+        avatar.updateBounce(clip: "walk", elapsed: 0, intensity: 1.0)
+
+        let transform = avatar.spriteLayer.affineTransform()
+        XCTAssertEqual(transform.b, 0, accuracy: 0.001)
+    }
+
     func test_init_sizesLayerToHitboxTimesScale() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()

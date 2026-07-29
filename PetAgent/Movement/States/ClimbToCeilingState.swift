@@ -6,9 +6,13 @@
 //  ClimbToCeiling state's StateHandler implementation.
 //
 //  F3 ceiling-crawling (2026-07-29): climbs straight up to the roamable
-//  area's top edge, independent of any window (unlike ClimbState, which
-//  rides a window's side) -- WanderScheduler's .climbToCeiling outcome can
-//  fire from anywhere the pet happens to be standing.
+//  area's top edge. Requires an actual window edge underfoot, the same way
+//  ClimbState does (WindowSupport.windowBeingClimbed, re-checked every
+//  frame) -- byeolki: "이거 화면에 있는 벽? 통해서만 올라갈 수 있게 해줘
+//  그냥 아무 지형에서 올라가버리냐" (it was climbing from anywhere, not
+//  just via a real wall on screen). A wall that doesn't reach near the
+//  ceiling just gets climbed as far as it goes, then falls, same as running
+//  out of window climbing ClimbState's own wall.
 //
 
 import CoreGraphics
@@ -27,6 +31,14 @@ final class ClimbToCeilingState: StateHandler {
 
     func update(dt: TimeInterval, context: StateContext) {
         guard !hasRequestedTransition else { return }
+
+        guard WindowSupport.windowBeingClimbed(at: context.body.position, in: context.windows) != nil else {
+            // No wall here (or climbed past the top of a short one) --
+            // there's nothing left to hold onto.
+            hasRequestedTransition = true
+            context.requestTransition(.fall)
+            return
+        }
 
         // Straight up: x stays fixed, same "no facing change mid-climb" rule
         // ClimbState uses. The target is roamableArea.minY + avatarHeight,

@@ -7,14 +7,28 @@
 //  straight up to the roamable area's top edge, then crawls upside-down
 //  along it, bouncing off the horizontal bounds instead of falling off.
 //
+//  ClimbToCeiling requires an actual window edge to climb, the same way
+//  ClimbState does -- byeolki: "이거 화면에 있는 벽? 통해서만 올라갈 수
+//  있게 해줘 그냥 아무 지형에서 올라가버리냐" (it was climbing from
+//  anywhere, not just via a real wall on screen).
+//
 
 import XCTest
 @testable import PetAgent
 
+private func window(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> WindowInfo {
+    WindowInfo(windowID: 1, ownerPID: 1, ownerName: nil, title: nil, layer: 0, frame: CGRect(x: x, y: y, width: width, height: height))
+}
+
 final class ClimbToCeilingStateTests: XCTestCase {
+    // A wall tall enough to span from well below the pet's start position up
+    // past the ceiling target, at x=100 so windowBeingClimbed recognizes it.
+    private let tallWall = window(x: 100, y: 0, width: 400, height: 500)
+
     func test_climbsStraightUpTowardTheCeiling() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 400))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        world.windows = [tallWall]
         let state = ClimbToCeilingState()
         state.enter()
 
@@ -27,6 +41,7 @@ final class ClimbToCeilingStateTests: XCTestCase {
     func test_arrivalAtTheCeilingRequestsCeilingTransition() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 10))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        world.windows = [tallWall]
         let state = ClimbToCeilingState()
         state.enter()
 
@@ -45,6 +60,7 @@ final class ClimbToCeilingStateTests: XCTestCase {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 200))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
         world.avatarHeight = 140
+        world.windows = [tallWall]
         let state = ClimbToCeilingState()
         state.enter()
 
@@ -56,6 +72,7 @@ final class ClimbToCeilingStateTests: XCTestCase {
     func test_requestsCeilingOnlyOnce() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 10))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        world.windows = [tallWall]
         let state = ClimbToCeilingState()
         state.enter()
 
@@ -69,6 +86,7 @@ final class ClimbToCeilingStateTests: XCTestCase {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 400))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
         world.walkSpeed = MovementSolver.walkSpeed * 2
+        world.windows = [tallWall]
         let state = ClimbToCeilingState()
         state.enter()
 
@@ -76,6 +94,34 @@ final class ClimbToCeilingStateTests: XCTestCase {
 
         let expectedY = 400 - MovementSolver.walkSpeed * 2 * 0.1
         XCTAssertEqual(world.body.position.y, expectedY, accuracy: 5)
+    }
+
+    // MARK: - Requires an actual wall (2026-07-29)
+
+    func test_withoutAnyNearbyWindow_fallsInstead() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 400))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        // no windows at all
+        let state = ClimbToCeilingState()
+        state.enter()
+
+        world.run(state, seconds: 0.1)
+
+        XCTAssertEqual(world.requestedTransitions.first, .fall)
+    }
+
+    /// A wall that doesn't reach anywhere near the ceiling: the pet can
+    /// climb it, but only as far as the wall actually goes.
+    func test_climbingPastTheTopOfAShortWall_fallsInstead() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 400))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        world.windows = [window(x: 100, y: 350, width: 400, height: 150)] // spans y 350...500 only
+        let state = ClimbToCeilingState()
+        state.enter()
+
+        world.run(state, seconds: 3)
+
+        XCTAssertEqual(world.requestedTransitions.first, .fall)
     }
 }
 

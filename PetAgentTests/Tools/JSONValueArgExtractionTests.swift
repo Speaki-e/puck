@@ -38,6 +38,24 @@ final class JSONValueArgExtractionTests: XCTestCase {
         XCTAssertEqual(args.extractFrame(), CGRect(x: 1, y: 2, width: 3, height: 4))
     }
 
+    // A NaN/Infinity frame reaches MoveToState.target unguarded and
+    // permanently wedges the pet (MovementSolver's arrival check never
+    // becomes true) -- extractPID already guards this same class of
+    // malformed-number input, extractFrame must too.
+    func test_extractFrame_returnsNil_whenAFieldIsNotFinite() {
+        let args = JSONValue.object([
+            "frame": .object(["x": .number(.nan), "y": .number(2), "width": .number(3), "height": .number(4)]),
+        ])
+        XCTAssertNil(args.extractFrame())
+    }
+
+    func test_extractFrame_returnsNil_whenAFieldIsInfinite() {
+        let args = JSONValue.object([
+            "frame": .object(["x": .number(1), "y": .number(2), "width": .number(.infinity), "height": .number(4)]),
+        ])
+        XCTAssertNil(args.extractFrame())
+    }
+
     func test_extractPID_returnsValue_whenKeyIsANumber() {
         let args = JSONValue.object(["pid": .number(501)])
         XCTAssertEqual(args.extractPID(), 501)

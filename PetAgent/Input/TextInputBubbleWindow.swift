@@ -12,7 +12,10 @@
 import AppKit
 
 final class TextInputBubbleWindow: NSWindow {
-    private var previouslyFrontmostApp: NSRunningApplication?
+    private(set) var previouslyFrontmostApp: NSRunningApplication?
+    /// Injectable for tests -- real NSWorkspace frontmost-app state can't be
+    /// relied on to change inside a test runner the way it does in a live app.
+    var frontmostAppProvider: () -> NSRunningApplication? = { NSWorkspace.shared.frontmostApplication }
 
     convenience init(contentRect: CGRect) {
         self.init(
@@ -31,8 +34,17 @@ final class TextInputBubbleWindow: NSWindow {
     override var canBecomeKey: Bool { true }
 
     /// Remembers whichever app is frontmost right now, then takes focus.
+    /// Skips recapturing while already visible: this window itself would be
+    /// frontmost at that point (a re-triggered hotkey while the bubble is
+    /// still open), so recapturing would clobber the real target app with
+    /// PetAgent -- closeAndRestoreFocus() would then "restore" focus to
+    /// PetAgent instead of the app the user actually invoked this from.
     func showAndActivate() {
-        previouslyFrontmostApp = NSWorkspace.shared.frontmostApplication
+        guard !isVisible else {
+            makeKeyAndOrderFront(nil)
+            return
+        }
+        previouslyFrontmostApp = frontmostAppProvider()
         makeKeyAndOrderFront(nil)
     }
 

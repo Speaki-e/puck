@@ -26,10 +26,10 @@ final class MoveToState: StateHandler {
     /// relocation leaves it at `.idle`.
     var nextState: StateKind = .idle
 
-    private var hasHandedOver = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
-        hasHandedOver = false
+        oneShot.reset()
     }
 
     func exit() {
@@ -39,10 +39,10 @@ final class MoveToState: StateHandler {
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasHandedOver else { return }
+        guard !oneShot.hasFired else { return }
 
         guard let target else {
-            handOver(.idle, context)
+            oneShot.fire(.idle, using: context.requestTransition)
             return
         }
 
@@ -54,12 +54,7 @@ final class MoveToState: StateHandler {
         context.body.position = step.position
 
         if step.hasArrived {
-            handOver(nextState, context)
+            oneShot.fire(nextState, using: context.requestTransition)
         }
-    }
-
-    private func handOver(_ kind: StateKind, _ context: StateContext) {
-        hasHandedOver = true
-        context.requestTransition(kind)
     }
 }

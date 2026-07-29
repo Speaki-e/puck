@@ -103,7 +103,11 @@ struct AvatarManagementView: View {
 
     private func addCustomEmotion() {
         let name = newEmotionName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, !emotionKeys.contains(name) else { return }
+        // AvatarManifestEditor.setEmotionImage rejects this same shape
+        // defensively, but checking here too keeps an invalid name from ever
+        // reaching the emotion list in the first place (found via review: a
+        // name with "/" or ".." used unsanitized as a file path component).
+        guard !name.isEmpty, !emotionKeys.contains(name), AvatarManifestEditor.isValidEmotionName(name) else { return }
         emotionKeys.append(name)
         newEmotionName = ""
     }
@@ -150,24 +154,31 @@ struct AvatarManagementView: View {
             return
         }
 
-        do {
-            // Avatars/ itself may not exist yet on a fresh install (only the
-            // dummy avatar's own directory is guaranteed to be pre-seeded).
-            let avatarsDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("PetAgent/Avatars", isDirectory: true)
-            try FileManager.default.createDirectory(at: avatarsDirectory, withIntermediateDirectories: true)
+        // Avatars/ itself may not exist yet on a fresh install (only the
+        // dummy avatar's own directory is guaranteed to be pre-seeded).
+        let avatarsDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PetAgent/Avatars", isDirectory: true)
 
-            let destination = avatarsDirectory.appendingPathComponent(report.manifest.name, isDirectory: true)
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.copyItem(at: sourceURL, to: destination)
-        } catch {
-            reportMessage = "Validated but failed to install '\(report.manifest.name)': \(error)"
-            return
+        // Previously reimplemented the copy-in here by hand, which silently
+        // skipped AvatarInstaller's Git-LFS-pointer-file check -- an import
+        // of a package with un-pulled LFS pointers reported false success
+        // with broken assets (found via review). overwriteExisting: true
+        // because the user explicitly chose to import over whatever's there.
+        let outcome = AvatarInstaller.installIfNeeded(
+            bundledPackage: sourceURL,
+            intoAvatarsDirectory: avatarsDirectory,
+            overwriteExisting: true
+        )
+        switch outcome {
+        case .installed:
+            reportMessage = report.missingRecommendedClipFiles.isEmpty
+                ? "Installed '\(report.manifest.name)'."
+                : "Installed '\(report.manifest.name)' — missing recommended clips (falls back to idle): "
+                    + report.missingRecommendedClipFiles.joined(separator: ", ")
+        case .failed(let reason):
+            reportMessage = "Validated but failed to install '\(report.manifest.name)': \(reason)"
+        case .alreadyPresent, .noBundledPackage:
+            reportMessage = "Failed to install '\(report.manifest.name)': \(outcome)"
         }
-
-        reportMessage = report.missingRecommendedClipFiles.isEmpty
-            ? "Installed '\(report.manifest.name)'."
-            : "Installed '\(report.manifest.name)' — missing recommended clips (falls back to idle): "
-                + report.missingRecommendedClipFiles.joined(separator: ", ")
     }
 }

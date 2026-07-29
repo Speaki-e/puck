@@ -14,11 +14,16 @@ import CoreGraphics
 
 private final class SpyPointingCoordinator: PetPointingCoordinating {
     private(set) var requestedFrames: [CGRect] = []
+    private(set) var cancelCount = 0
     private var pending: (() -> Void)?
 
     func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void) {
         requestedFrames.append(frame)
         pending = onPointingStarted
+    }
+
+    func cancelPointing() {
+        cancelCount += 1
     }
 
     /// Simulates the pet finishing its walk and entering Point.
@@ -86,5 +91,18 @@ final class PointAtHandlerTests: XCTestCase {
         coordinator.completeArrival()
 
         XCTAssertEqual(ok, true)
+    }
+
+    /// ToolExecutor's default cancel() is a no-op -- a cancelled point_at
+    /// left AppDelegate.pendingPointTracker's entry live, so the pet kept
+    /// walking/pointing on the caller's behalf after cancellation (found via
+    /// review).
+    func test_cancel_tellsTheCoordinatorToCancelPointing() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+
+        handler.cancel()
+
+        XCTAssertEqual(coordinator.cancelCount, 1)
     }
 }

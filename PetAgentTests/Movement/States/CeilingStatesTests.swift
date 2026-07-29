@@ -187,4 +187,27 @@ final class CeilingStateTests: XCTestCase {
         let expectedX = 100 + MovementSolver.walkSpeed * 2 * 0.1
         XCTAssertEqual(world.body.position.x, expectedX, accuracy: 5)
     }
+
+    /// ScreenBounds.contain always pins to leftLimit when the avatar (Settings'
+    /// size slider) is wider than the roamable area -- comparing that pinned
+    /// result against ever-advancing `travelled.x` used to flip `direction`
+    /// every single frame forever, instead of settling (found via review).
+    func test_oversizedAvatar_holdsStillInsteadOfJitteringForever() {
+        let world = TestStateWorld(position: CGPoint(x: 25, y: 0))
+        // visualBounds defaults to width 100 (x: -50...50); a 50-wide roamable
+        // area is narrower than the avatar.
+        world.roamableArea = CGRect(x: 0, y: 0, width: 50, height: 500)
+        let state = CeilingState(durationProvider: { 100 })
+        state.enter()
+
+        var facingHistory: [AvatarFacing] = []
+        for _ in 0..<180 {
+            state.update(dt: 1.0 / 60, context: world.context)
+            facingHistory.append(world.body.facing)
+        }
+
+        // Once settled, facing must stop alternating frame-to-frame.
+        let tail = facingHistory.suffix(10)
+        XCTAssertTrue(tail.allSatisfy { $0 == tail.first }, "facing should settle, not alternate every frame: \(tail)")
+    }
 }

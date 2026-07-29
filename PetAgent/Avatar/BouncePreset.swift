@@ -29,11 +29,26 @@ struct BounceTransform: Equatable {
     /// Hue in 0...1 to wash the character in, or nil for its own colours.
     /// Only the artwork is tinted, never the space around it.
     var tintHue: Double?
+    /// Whether the whole sprite should be turned 90 degrees before `rotation`
+    /// is applied (wall-climbing). Previously SpriteAvatar re-derived this
+    /// itself by comparing the raw clip name to "climb" independently of
+    /// BouncePreset.preset(for:)'s own dispatch on that same string (found
+    /// via review) -- a future preset needing the same effect would have had
+    /// to keep both string literals in sync by hand.
+    var rotatesQuarterTurn = false
 
     static let identity = BounceTransform(scaleX: 1, scaleY: 1)
 }
 
 enum BouncePreset: Equatable {
+    /// How long `.spin`'s flip animation takes to complete -- SpinState reads
+    /// this (not the other way around) so the FSM's timing depends on the
+    /// rendering layer's constant, not vice versa. This used to read
+    /// SpinState.duration directly, inverted from every other dependency in
+    /// the codebase and meaning whoever tunes the *look* of the spin had to
+    /// know to edit a Movement/States file (found via review).
+    static let spinDuration: TimeInterval = 2.0
+
     case none
     case idle
     case walk
@@ -175,7 +190,8 @@ enum BouncePreset: Equatable {
             return BounceTransform(
                 scaleX: 1,
                 scaleY: 1 - reach * abs(phase),
-                rotation: lean * phase
+                rotation: lean * phase,
+                rotatesQuarterTurn: true
             )
 
         case .spin:
@@ -197,7 +213,7 @@ enum BouncePreset: Equatable {
             // monotonic -- it peaks partway through and returns to zero, so
             // the pet visibly winds up and then unwinds backwards.
             let turns = 3.0
-            let progress = min(elapsed / SpinState.duration, 1)
+            let progress = min(elapsed / Self.spinDuration, 1)
             let easedOut = 1 - (1 - progress) * (1 - progress) // fast, then coasting to a stop
             let angle = 2 * .pi * turns * easedOut
 

@@ -124,6 +124,33 @@ final class AvatarManifestEditorTests: XCTestCase {
         XCTAssertEqual(updated.emotions?["happy"], .name("happy"))
     }
 
+    // A custom emotion name typed into Settings' TextField was only trimmed
+    // of whitespace before being used as `"\(emotion).png"` -- a name
+    // containing "/" or ".." let writes land outside the avatar directory
+    // (found via review). This is the defense-in-depth check at the point
+    // the path is actually built; AvatarManagementView.addCustomEmotion also
+    // rejects these earlier, at input time.
+    func test_setEmotionImage_rejectsANameContainingAPathSeparator() throws {
+        try writeManifest()
+
+        XCTAssertThrowsError(
+            try AvatarManifestEditor.setEmotionImage(
+                named: "../../evil",
+                sourceFile: try makeSourceFile(name: "a.png"),
+                directory: directory
+            )
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.deletingLastPathComponent().appendingPathComponent("evil.png").path))
+    }
+
+    func test_setEmotionImage_rejectsADotOnlyName() throws {
+        try writeManifest()
+
+        XCTAssertThrowsError(
+            try AvatarManifestEditor.setEmotionImage(named: "..", sourceFile: try makeSourceFile(name: "a.png"), directory: directory)
+        )
+    }
+
     private func makeSourceFile(name: String) throws -> URL {
         let sourceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)

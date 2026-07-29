@@ -36,6 +36,16 @@ enum ScreenBounds {
         var velocity: CGFloat
     }
 
+    /// True when `visualBounds` is wider than `area` -- there's no position
+    /// where the avatar fits, so `contain`/`bounceHorizontally` always pin to
+    /// `leftLimit` regardless of input. A caller comparing its own pre-pin
+    /// position against that pinned result (to detect a bounce, e.g.
+    /// CeilingState reversing direction) would see a mismatch every single
+    /// frame and oscillate forever instead of settling -- found via review.
+    static func isOversizedHorizontally(visualBounds: CGRect, in area: CGRect) -> Bool {
+        (area.minX - visualBounds.minX) > (area.maxX - visualBounds.maxX)
+    }
+
     /// Clamps `position` so `visualBounds` stays inside `area`, without any
     /// velocity involved. For states that move under their own power (walk,
     /// climb) and simply must not leave the screen.

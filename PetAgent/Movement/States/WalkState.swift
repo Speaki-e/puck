@@ -24,10 +24,10 @@ final class WalkState: StateHandler {
     /// destination can't be re-walked next time Walk is entered.
     var target: CGPoint?
 
-    private var hasRequestedIdle = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
-        hasRequestedIdle = false
+        oneShot.reset()
     }
 
     func exit() {
@@ -37,12 +37,12 @@ final class WalkState: StateHandler {
     func update(dt: TimeInterval, context: StateContext) {
         // One arrival, one request: the transition only lands after this
         // update returns, so further frames would queue duplicates.
-        guard !hasRequestedIdle else { return }
+        guard !oneShot.hasFired else { return }
 
         guard let target else {
             // Nothing to walk to — looping the walk clip on the spot would
             // read as the pet moonwalking.
-            requestIdle(context)
+            oneShot.fire(.idle, using: context.requestTransition)
             return
         }
 
@@ -65,8 +65,7 @@ final class WalkState: StateHandler {
             )
             context.body.position = step.position
             if step.hasArrived {
-                hasRequestedIdle = true
-                context.requestTransition(.climb)
+                oneShot.fire(.climb, using: context.requestTransition)
             }
             return
         }
@@ -75,12 +74,7 @@ final class WalkState: StateHandler {
         context.body.position = step.position
 
         if step.hasArrived {
-            requestIdle(context)
+            oneShot.fire(.idle, using: context.requestTransition)
         }
-    }
-
-    private func requestIdle(_ context: StateContext) {
-        hasRequestedIdle = true
-        context.requestTransition(.idle)
     }
 }

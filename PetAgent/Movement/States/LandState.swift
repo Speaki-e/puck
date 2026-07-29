@@ -20,18 +20,17 @@ final class LandState: StateHandler {
     static let duration: TimeInterval = 0.35
 
     private var elapsed: TimeInterval = 0
-    private var hasRequestedIdle = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
         elapsed = 0
-        hasRequestedIdle = false
+        oneShot.reset()
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedIdle else { return }
+        guard !oneShot.hasFired else { return }
         elapsed += dt
         guard elapsed >= Self.duration else { return }
-        hasRequestedIdle = true
-        context.requestTransition(.idle)
+        oneShot.fire(.idle, using: context.requestTransition)
     }
 }

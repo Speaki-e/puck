@@ -14,6 +14,14 @@ import Foundation
 final class RunShellHandler: ToolHandler {
     let toolName = "run_shell"
 
+    /// How long a SIGTERM'd process gets before cancel() escalates to
+    /// SIGKILL. Process.terminate() alone left a command that traps/ignores
+    /// SIGTERM running forever despite the caller already being told
+    /// "cancelled" (found via review) -- this is the highest-privilege tool
+    /// in the registry, so its cancel guarantee shouldn't be defeatable by a
+    /// trap.
+    static var killGracePeriod: TimeInterval = 0.5
+
     /// The in-flight process, so a timed-out call can actually kill it
     /// instead of leaving it running with nobody reading its pipes.
     /// `execute` sets this on whatever queue the caller runs on, the
@@ -24,8 +32,18 @@ final class RunShellHandler: ToolHandler {
     private var runningProcess: Process?
 
     func cancel() {
-        stateQueue.sync { runningProcess }?.terminate()
+        guard let process = stateQueue.sync(execute: { runningProcess }) else { return }
         stateQueue.sync { runningProcess = nil }
+        process.terminate()
+
+        // Foundation's Process places the child in its own new process
+        // group, so signaling -pid reaches backgrounded grandchildren too
+        // (same reasoning as terminate() itself, see RunShellHandlerTests).
+        let pid = process.processIdentifier
+        DispatchQueue.global().asyncAfter(deadline: .now() + Self.killGracePeriod) {
+            guard process.isRunning else { return }
+            kill(-pid, SIGKILL)
+        }
     }
 
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {

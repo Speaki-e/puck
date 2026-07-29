@@ -147,6 +147,23 @@ final class ClickThroughController {
     /// clickable area out of nothing.
     static let hitTestPadding: CGFloat = 40
 
+    /// The character's full, unpadded body rect: the ground point plus
+    /// hitboxSize, flipped by isUpsideDown. `shouldAllowClicks` pads this on
+    /// every side; `headRect` slices a fraction off its "head" edge --
+    /// previously each rebuilt this same vertical-slice-anchored-at-the-
+    /// ground-point math independently (found via review).
+    private static func bodyRect(characterScreenPosition: CGPoint, hitboxSize: CGSize, isUpsideDown: Bool) -> CGRect {
+        let originY = isUpsideDown
+            ? characterScreenPosition.y - hitboxSize.height
+            : characterScreenPosition.y
+        return CGRect(
+            x: characterScreenPosition.x - hitboxSize.width / 2,
+            y: originY,
+            width: hitboxSize.width,
+            height: hitboxSize.height
+        )
+    }
+
     static func shouldAllowClicks(
         cursorPosition: CGPoint,
         characterScreenPosition: CGPoint,
@@ -154,17 +171,8 @@ final class ClickThroughController {
         isUpsideDown: Bool = false
     ) -> Bool {
         guard hitboxSize != .zero else { return false }
-        let paddedWidth = hitboxSize.width + hitTestPadding * 2
-        let paddedHeight = hitboxSize.height + hitTestPadding * 2
-        let originY = isUpsideDown
-            ? characterScreenPosition.y - hitboxSize.height - hitTestPadding
-            : characterScreenPosition.y - hitTestPadding
-        let rect = CGRect(
-            x: characterScreenPosition.x - paddedWidth / 2,
-            y: originY,
-            width: paddedWidth,
-            height: paddedHeight
-        )
+        let body = bodyRect(characterScreenPosition: characterScreenPosition, hitboxSize: hitboxSize, isUpsideDown: isUpsideDown)
+        let rect = body.insetBy(dx: -hitTestPadding, dy: -hitTestPadding)
         return rect.contains(cursorPosition)
     }
 
@@ -183,18 +191,12 @@ final class ClickThroughController {
         isUpsideDown: Bool = false
     ) -> CGRect {
         guard hitboxSize != .zero else { return .zero }
+        let body = bodyRect(characterScreenPosition: characterScreenPosition, hitboxSize: hitboxSize, isUpsideDown: isUpsideDown)
         let headHeight = hitboxSize.height * headFraction
         // Y grows upward here, and the body extends up from the feet -- so the
         // head is the TOP slice, unless the pet is hanging from the ceiling
         // and its head is the bottom one.
-        let originY = isUpsideDown
-            ? characterScreenPosition.y - hitboxSize.height
-            : characterScreenPosition.y + hitboxSize.height - headHeight
-        return CGRect(
-            x: characterScreenPosition.x - hitboxSize.width / 2,
-            y: originY,
-            width: hitboxSize.width,
-            height: headHeight
-        )
+        let originY = isUpsideDown ? body.minY : body.maxY - headHeight
+        return CGRect(x: body.minX, y: originY, width: body.width, height: headHeight)
     }
 }

@@ -32,7 +32,7 @@ extension CALayer {
     /// Core Animation's documented "do nothing" -- it doesn't merely shorten
     /// the implicit animation, it stops one from being created at all.
     private static let handDrivenProperties = [
-        "position", "transform", "contents", "bounds", "hidden", "opacity",
+        "position", "transform", "contents", "bounds", "hidden", "opacity", "backgroundColor",
     ]
 
     /// Call once at construction for any layer the frame loop mutates.

@@ -55,6 +55,25 @@ final class JSONLinesDecoderTests: XCTestCase {
         XCTAssertEqual(decoder.droppedLineCount, 2)
     }
 
+    // droppedLineCount was only ever read by these tests -- nothing in
+    // BridgeConnection/BridgeServer surfaced a drop happening live, so
+    // protocol drift or a hostile connection produced zero operational
+    // signal (found via review). FeedResult.droppedThisCall is what
+    // BridgeConnection wires into a per-connection callback.
+    func test_malformedLine_reportsHowManyWereDroppedInThisCall() {
+        var decoder = JSONLinesDecoder()
+        let result = decoder.feed(line("not json") + line("also not json") + line(#"{"type":"event","event":"agent_thinking"}"#))
+
+        XCTAssertEqual(result.droppedThisCall, 2)
+    }
+
+    func test_noMalformedLines_reportsZeroDroppedThisCall() {
+        var decoder = JSONLinesDecoder()
+        let result = decoder.feed(line(#"{"type":"event","event":"agent_thinking"}"#))
+
+        XCTAssertEqual(result.droppedThisCall, 0)
+    }
+
     func test_emptyLine_isSkipped() {
         var decoder = JSONLinesDecoder()
         XCTAssertEqual(decoder.feed(Data("\n".utf8)).messages, [])

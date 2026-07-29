@@ -19,6 +19,11 @@ protocol PetPointingCoordinating: AnyObject {
     /// Walks the pet to `frame` and starts pointing at it.
     /// - Parameter onPointingStarted: called when Point actually begins.
     func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void)
+
+    /// Abandons the in-flight point_at (tool_cancel or ToolExecutor's
+    /// timeout) -- without this the pet kept walking/pointing on the
+    /// caller's behalf after cancellation (found via review).
+    func cancelPointing()
 }
 
 final class PointAtHandler: ToolHandler {
@@ -38,5 +43,9 @@ final class PointAtHandler: ToolHandler {
         coordinator.pointAt(frame: frame) {
             completion(.success(nil))
         }
+    }
+
+    func cancel() {
+        coordinator.cancelPointing()
     }
 }

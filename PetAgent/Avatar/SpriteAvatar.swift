@@ -49,9 +49,6 @@ final class SpriteAvatar: AvatarPlayable {
     private let now: () -> TimeInterval
     private var currentBounce = BounceTransform.identity
     private var isUpsideDown = false
-    /// Derived from the clip name passed to updateBounce, not a separate
-    /// AvatarPlayable method -- see updateBounce's doc comment.
-    private var isClimbing = false
     /// The last logical position passed to setScreenPosition, so
     /// setUpsideDown can immediately recompute the rendered offset for it --
     /// see setUpsideDown's doc comment.
@@ -155,10 +152,11 @@ final class SpriteAvatar: AvatarPlayable {
     /// 올라가게 해주고"): rotates the sprite 90deg while the "climb" clip is
     /// playing -- ClimbState (a window's side) and ClimbToCeilingState (open
     /// air, toward the ceiling) both use it, so both get the rotation for
-    /// free with no per-state wiring.
+    /// free with no per-state wiring. The rotation fact itself lives on
+    /// BounceTransform (BouncePreset.preset(for:)'s own dispatch), not
+    /// re-derived here from the raw clip string.
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {
         currentBounce = BouncePreset.preset(for: clip).transform(elapsed: elapsed, intensity: intensity)
-        isClimbing = clip == "climb"
         applyTransform()
     }
 
@@ -181,13 +179,16 @@ final class SpriteAvatar: AvatarPlayable {
 
     /// Settings' size slider. Recomputes from the original manifest hitbox
     /// (not the layer's current bounds) so this stays idempotent under
-    /// repeated calls -- the caller is expected to re-push the character's
-    /// position afterward (via CharacterBody), since the ground-point offset
-    /// in setScreenPosition depends on this height.
+    /// repeated calls. Self-heals the ground-point offset via
+    /// setScreenPosition(lastPosition) -- same pattern setUpsideDown uses --
+    /// rather than leaving that an implicit caller contract (found via
+    /// review: a call site that forgot to re-push the position would leave
+    /// the sprite floating at the stale offset).
     func updateScale(_ scale: Double) {
         spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
         tintLayer.frame = spriteLayer.bounds
         tintMaskLayer.frame = spriteLayer.bounds
+        setScreenPosition(lastPosition)
     }
 
     /// Settings' emotion mapping / EventRouter-driven mood swap. Silent
@@ -236,7 +237,7 @@ final class SpriteAvatar: AvatarPlayable {
         let flipX = FlipAnimation.horizontalScale(atAngle: currentFlipAngle)
         let flipY: CGFloat = isUpsideDown ? -1 : 1
         var transform = CGAffineTransform(scaleX: CGFloat(currentBounce.scaleX) * flipX, y: CGFloat(currentBounce.scaleY) * flipY)
-        if isClimbing {
+        if currentBounce.rotatesQuarterTurn {
             transform = transform.rotated(by: .pi / 2)
         }
         // After the climb turn, so the preset's rocking is relative to

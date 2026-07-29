@@ -44,6 +44,12 @@ final class BridgeServer {
     /// socket is actually listening yet.
     var onFailure: ((Error) -> Void)?
 
+    /// Forwarded from BridgeConnection.onMalformedLine -- a dropped line
+    /// otherwise produced zero operational signal, indistinguishable from
+    /// "the tool is just slow" until ToolExecutor's own timeout (found via
+    /// review).
+    var onMalformedLine: (() -> Void)?
+
     init(socketURL: URL = BridgeServer.defaultSocketURL) {
         self.socketURL = socketURL
     }
@@ -70,6 +76,9 @@ final class BridgeServer {
             self?.accept(newConnection)
         }
         listener.stateUpdateHandler = { [weak self] state in
+            if case .ready = state {
+                self?.restrictSocketPermissions()
+            }
             if let error = Self.failureError(for: state) {
                 self?.onFailure?(error)
             }
@@ -114,6 +123,7 @@ final class BridgeServer {
             guard let self, let connection else { return }
             self.connections.removeAll { $0 === connection }
         }
+        connection.onMalformedLine = { [weak self] in self?.onMalformedLine?() }
         connections.append(connection)
         connection.start(queue: queue)
     }
@@ -147,6 +157,15 @@ final class BridgeServer {
 
     private static func writeLockFile(at url: URL, pid: Int32) {
         try? Data(String(pid).utf8).write(to: url)
+    }
+
+    /// The socket had no peer authentication and default permissions
+    /// (srwxr-xr-x) -- any other local-user-owned process could connect and
+    /// dispatch run_shell/run_applescript, bypassing ai-module's upstream
+    /// approval UI entirely (found via review). Restricting to owner-only
+    /// read/write at least closes it off to every other local account.
+    private func restrictSocketPermissions() {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: socketURL.path)
     }
 }
 

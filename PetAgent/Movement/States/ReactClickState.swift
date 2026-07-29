@@ -26,20 +26,19 @@ final class ReactClickState: StateHandler {
     static let duration: TimeInterval = 0.6
 
     private var elapsed: TimeInterval = 0
-    private var hasRequestedIdle = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
         // Restart on re-entry: clicking the pet again replays the reaction
         // rather than inheriting the previous one's remaining time.
         elapsed = 0
-        hasRequestedIdle = false
+        oneShot.reset()
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedIdle else { return }
+        guard !oneShot.hasFired else { return }
         elapsed += dt
         guard elapsed >= Self.duration else { return }
-        hasRequestedIdle = true
-        context.requestTransition(.idle)
+        oneShot.fire(.idle, using: context.requestTransition)
     }
 }

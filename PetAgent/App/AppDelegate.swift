@@ -32,6 +32,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private let pendingPointTracker = PendingPointTracker()
     private var focusModeObserver: FocusModeObserver?
 
+    /// OverlayWindowController creates one window per display, but every
+    /// ground/roamable/click-through computation in this file is scoped to
+    /// a single display -- multi-monitor support is not implemented, this
+    /// just names the existing single-display assumption in one place
+    /// instead of repeating `overlayController?.windows.first` at each site.
+    private var primaryWindow: NSWindow? { overlayController?.windows.first }
+
     // One shared instance per FSM state, reused for every transition into it.
     // CharacterController.transition's same-state no-op guard is reference
     // equality (StateHandler: AnyObject) -- constructing a fresh instance per
@@ -247,6 +254,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             return
         }
 
+        // manifest.hitbox scaled by manifest.scale -- must be computed before
+        // controller.avatarHeight below, which the FSM's climb/land/wander
+        // logic depends on being non-zero from the very first frame (found
+        // via review: this used to read the .zero default here because the
+        // computation used to happen after controller setup instead of
+        // before it).
+        let scale = loadResult.manifest.scale
+        baseHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
+        avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
+
         let avatar = SpriteAvatar(
             avatarDirectory: avatarDirectory,
             loadResult: loadResult,
@@ -303,8 +320,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         controller.walkSpeed = MovementSolver.walkSpeed * settingsStore.walkSpeedMultiplier
         // F4 reports global Quartz frames; the pet lives in overlay-local
         // pixels. Rebase once here so no state has to know both spaces.
-        controller.windows = { [weak self, weak window] in
-            guard let self, let window else { return [] }
+        // Looks up the current overlay window each call rather than
+        // capturing `window` -- a captured reference goes stale (weak-nils,
+        // or worse, refers to a since-discarded window) the moment
+        // OverlayWindowController rebuilds its windows on a real display
+        // change, found via review since handleWindowsRebuilt() never
+        // re-assigns this closure.
+        controller.windows = { [weak self] in
+            guard let self, let window = self.primaryWindow else { return [] }
             return self.overlayLocalWindows(excluding: window)
         }
         controller.landingY = { [weak self, weak controller] point in
@@ -356,16 +379,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
         // is the piece that uses it (click-through everywhere except over the
-        // character), just never instantiated here.
-        // Scaled, not just the raw manifest values -- this must match SpriteAvatar's
-        // actual rendered layer size (hitbox * scale) or click-through/grounding
-        // math drifts from where the sprite visually is whenever scale != 1.
-        let scale = loadResult.manifest.scale
-        baseHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
-        avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
+        // character), just never instantiated here. (avatarHitboxSize itself
+        // is now computed earlier, above, before controller.avatarHeight needs it.)
+        clickThroughController = makeClickThroughController(window: window, screenPosition: initialPosition)
+    }
+
+    /// Shared by initial setup and `handleWindowsRebuilt` -- previously
+    /// duplicated verbatim at both call sites (found via review), which is
+    /// exactly the kind of duplication that already caused one regression
+    /// ("clicking the pet silently stops working after a display change",
+    /// see the comment this used to carry at the rebuild site) since the two
+    /// copies could drift.
+    private func makeClickThroughController(window: NSWindow, screenPosition: CGPoint) -> ClickThroughController {
         let clickThrough = ClickThroughController(window: window)
         clickThrough.updateCharacter(
-            screenPosition: globalAppKitPoint(fromWindowLocal: initialPosition, window: window),
+            screenPosition: globalAppKitPoint(fromWindowLocal: screenPosition, window: window),
             hitboxSize: avatarHitboxSize
         )
         clickThrough.onGesture = { [weak self] gesture in self?.handlePetGesture(gesture) }
@@ -373,7 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             self?.handleCursorMoved(cursor, overHead: overHead)
         }
         clickThrough.startMonitoring()
-        clickThroughController = clickThrough
+        return clickThrough
     }
 
     /// ScreenSpaceMapper's screen points are window-local (top-left origin,
@@ -415,7 +443,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     }
 
     private func refreshRoamableAreaForCurrentSpace() {
-        guard let window = overlayController?.windows.first, let controller = characterController else { return }
+        guard let window = primaryWindow, let controller = characterController else { return }
         controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
     }
 
@@ -427,7 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// before setUpOverlayAndAvatar has built them yet) -- nothing to do then.
     private func handleWindowsRebuilt() {
         guard
-            let window = overlayController?.windows.first,
+            let window = primaryWindow,
             let spriteView = window.contentView as? SpriteLayerView,
             let avatar
         else {
@@ -452,21 +480,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // from the stale position.
         characterBody?.position = position
 
+        // Rebuilding the window drops the old monitor with its handler;
+        // without re-attaching (via makeClickThroughController below),
+        // clicking the pet silently stops working after a display change.
         clickThroughController?.stopMonitoring()
-        let clickThrough = ClickThroughController(window: window)
-        clickThrough.updateCharacter(
-            screenPosition: globalAppKitPoint(fromWindowLocal: position, window: window),
-            hitboxSize: avatarHitboxSize
-        )
-        // Rebuilding the window drops the old monitor with its handler; without
-        // re-attaching, clicking the pet silently stops working after a display
-        // change.
-        clickThrough.onGesture = { [weak self] gesture in self?.handlePetGesture(gesture) }
-        clickThrough.onCursorMoved = { [weak self] cursor, overHead in
-            self?.handleCursorMoved(cursor, overHead: overHead)
-        }
-        clickThrough.startMonitoring()
-        clickThroughController = clickThrough
+        clickThroughController = makeClickThroughController(window: window, screenPosition: position)
     }
 
     /// F4's window list rebased from global Quartz coordinates into the
@@ -482,7 +500,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // already observes and refreshes on).
         guard
             let watcher = windowListWatcher,
-            let overlayFrame = overlayController?.windows.first?.frame,
+            let overlayFrame = primaryWindow?.frame,
             let screenSpace = screenManager?.current
         else {
             return []
@@ -607,7 +625,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
             // The hitbox has to follow the pet, or clicks only work where it
             // first appeared.
-            if let body = self.characterBody, let window = self.overlayController?.windows.first {
+            if let body = self.characterBody, let window = self.primaryWindow {
                 self.clickThroughController?.updateCharacter(
                     screenPosition: self.globalAppKitPoint(fromWindowLocal: body.position, window: window),
                     hitboxSize: self.avatarHitboxSize,
@@ -662,6 +680,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             self.moveToState.target = CGPoint(x: frame.midX - standOffset, y: frame.maxY)
             self.moveToState.nextState = .point
             controller.transition(to: .moveTo)
+        }
+    }
+
+    /// tool_cancel or ToolExecutor's 15s timeout for an in-flight point_at.
+    /// Clears the tracked entry so a pet that arrives after cancellation
+    /// doesn't still fire onPointingStarted for a call the caller was
+    /// already told was cancelled (found via review).
+    func cancelPointing() {
+        DispatchQueue.main.async { [weak self] in
+            self?.pendingPointTracker.clearPending()
         }
     }
 
@@ -737,7 +765,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     /// Inverse of globalAppKitPoint(fromWindowLocal:window:).
     private func windowLocalPoint(fromGlobalAppKit point: CGPoint) -> CGPoint {
-        guard let window = overlayController?.windows.first else { return point }
+        guard let window = primaryWindow else { return point }
         return CGPoint(x: point.x - window.frame.origin.x, y: window.frame.height - (point.y - window.frame.origin.y))
     }
 
@@ -780,6 +808,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         let server = BridgeServer()
         server.onFailure = { error in
             AppLogger.shared.log(.error, "BridgeServer failed: \(error)")
+        }
+        server.onMalformedLine = {
+            AppLogger.shared.log(.warning, "BridgeServer: dropped a malformed line from a client")
         }
         server.onMessage = { message, connection in
             // Delivered on BridgeServer's background queue. The router hops to
@@ -910,7 +941,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     }
 
     private func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
-        guard let window = overlayController?.windows.first else { return nil }
+        guard let window = primaryWindow else { return nil }
 
         let bubbleWindow = textInputBubbleWindow ?? {
             let newWindow = TextInputBubbleWindow(contentRect: CGRect(x: 0, y: 0, width: 240, height: 40))
@@ -931,7 +962,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // now that MoveToState exists and is used by point_at/launch_app)
         // isn't wired up here yet. For now this just re-centers the pet on
         // the primary display, standing on the ground.
-        guard let window = overlayController?.windows.first else { return }
+        guard let window = primaryWindow else { return }
         let position = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
         // Through characterBody (see handleWindowsRebuilt's comment) so the
         // frame-loop's hitbox tracking and any in-flight movement state stay

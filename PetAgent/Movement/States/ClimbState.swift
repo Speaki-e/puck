@@ -17,18 +17,18 @@ final class ClimbState: StateHandler {
     let clipKey = "climb"
     let loopsClip = true
 
-    private var hasRequestedTransition = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
-        hasRequestedTransition = false
+        oneShot.reset()
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedTransition else { return }
+        guard !oneShot.hasFired else { return }
 
         guard let window = WindowSupport.windowBeingClimbed(at: context.body.position, in: context.windows) else {
             // The window went away mid-climb — there is nothing to hold on to.
-            request(.fall, context)
+            oneShot.fire(.fall, using: context.requestTransition)
             return
         }
 
@@ -38,12 +38,7 @@ final class ClimbState: StateHandler {
         context.body.position = step.position
 
         if step.hasArrived {
-            request(.walkOnTop, context)
+            oneShot.fire(.walkOnTop, using: context.requestTransition)
         }
-    }
-
-    private func request(_ kind: StateKind, _ context: StateContext) {
-        hasRequestedTransition = true
-        context.requestTransition(kind)
     }
 }

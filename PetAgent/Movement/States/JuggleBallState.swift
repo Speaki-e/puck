@@ -35,17 +35,17 @@ final class JuggleBallState: StateHandler {
 
     private var elapsed: TimeInterval = 0
     private var bouncesDone = 0
-    private var hasRequestedKick = false
+    private var oneShot = OneShotTransition()
 
     func enter() {
         elapsed = 0
-        hasRequestedKick = false
+        oneShot.reset()
         bouncesDone = 1
         onBounce?()
     }
 
     func update(dt: TimeInterval, context: StateContext) {
-        guard !hasRequestedKick else { return }
+        guard !oneShot.hasFired else { return }
         elapsed += dt
         guard elapsed >= Self.bounceInterval else { return }
         elapsed = 0
@@ -54,8 +54,7 @@ final class JuggleBallState: StateHandler {
             bouncesDone += 1
             onBounce?()
         } else {
-            hasRequestedKick = true
-            context.requestTransition(.kickBall)
+            oneShot.fire(.kickBall, using: context.requestTransition)
         }
     }
 }

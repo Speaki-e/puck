@@ -305,7 +305,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
                 atX: point.x,
                 fallingFromY: point.y,
                 windows: self.overlayLocalWindows(excluding: nil),
-                screenBottomY: controller.roamableArea.maxY
+                screenBottomY: controller.roamableArea.maxY,
+                roamableTop: controller.roamableArea.minY,
+                avatarHeight: controller.avatarHeight
             )
         }
         idleState.wanderDelegate = self

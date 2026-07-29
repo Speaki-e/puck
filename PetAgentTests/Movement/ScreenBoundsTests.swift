@@ -201,6 +201,70 @@ final class ScreenBoundsTests: XCTestCase {
         XCTAssertEqual(bounce.position.y, 120)
     }
 
+    // MARK: - bounceOffFloor (byeolki: "퉁퉁 튕겨서 사악 미끄러지게" -- a hard
+    // landing should bounce a couple of times and slide, not stop dead the
+    // instant it touches down)
+
+    func test_floor_bouncesAHardImpactOffTheGround() {
+        let bounce = ScreenBounds.bounceOffFloor(
+            position: CGPoint(x: 500, y: 210), // 10pt past the floor
+            velocity: 700, // positive = falling
+            floorY: 200
+        )
+
+        XCTAssertLessThan(bounce.velocity, 0, "now heading back up")
+        XCTAssertEqual(bounce.velocity, -700 * ScreenBounds.landingRestitution, accuracy: 0.001)
+        XCTAssertEqual(bounce.position.y, 190, "reflected back up by its overshoot")
+    }
+
+    func test_floor_ignoresAPetTravellingUpward() {
+        let bounce = ScreenBounds.bounceOffFloor(position: CGPoint(x: 500, y: 210), velocity: -400, floorY: 200)
+
+        XCTAssertEqual(bounce.velocity, -400, "already heading away from the floor")
+        XCTAssertEqual(bounce.position.y, 210, "left where it was")
+    }
+
+    func test_floor_ignoresAPetAboveTheFloor() {
+        let bounce = ScreenBounds.bounceOffFloor(position: CGPoint(x: 500, y: 100), velocity: 700, floorY: 200)
+
+        XCTAssertEqual(bounce.velocity, 700)
+        XCTAssertEqual(bounce.position.y, 100)
+    }
+
+    func test_floor_belowTheMinimumBounceSpeed_restsOnTheFloor() {
+        let bounce = ScreenBounds.bounceOffFloor(position: CGPoint(x: 500, y: 205), velocity: 200, floorY: 200)
+
+        XCTAssertEqual(bounce.velocity, 0)
+        XCTAssertEqual(bounce.position.y, 200)
+    }
+
+    /// Landing loses more energy per bounce than a wall/ceiling hit does -- a
+    /// soft flop onto the ground, not a rubber ball off a wall.
+    func test_floor_restitutionIsLowerThanWallBounce() {
+        XCTAssertLessThan(ScreenBounds.landingRestitution, ScreenBounds.restitution)
+    }
+
+    func test_floor_repeated_eventuallySettles() {
+        var position = CGPoint(x: 0, y: 210)
+        var velocity: CGFloat = 900
+        var bouncedAtLeastOnce = false
+
+        for _ in 0..<20 {
+            let bounce = ScreenBounds.bounceOffFloor(position: position, velocity: velocity, floorY: 200)
+            position = bounce.position
+            velocity = bounce.velocity
+            // Drive it straight back down into the same floor each time.
+            if velocity != 0 {
+                bouncedAtLeastOnce = true
+                position = CGPoint(x: 0, y: 210)
+                velocity = abs(velocity)
+            }
+        }
+
+        XCTAssertEqual(velocity, 0, "the bouncing dies out")
+        XCTAssertTrue(bouncedAtLeastOnce)
+    }
+
     /// Degenerate but reachable via the size slider: an avatar scaled wider
     /// than the display has no position that fits. It must still end up
     /// somewhere visible rather than at an inverted clamp.

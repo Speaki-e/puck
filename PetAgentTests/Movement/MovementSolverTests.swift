@@ -185,7 +185,11 @@ final class MovementSolverTests: XCTestCase {
         XCTAssertEqual(step.velocity, 100, accuracy: 0.001)
     }
 
-    func test_fallStopsAtTheLandingSurface() {
+    /// bounceOnLanding defaults to false: BallPhysics's kicked-ball/juggle
+    /// drop reuses this exact function and already has its own separate
+    /// bounce/juggle mechanics -- it must keep landing (and resting)
+    /// immediately, unaffected by FallState opting into the new behavior.
+    func test_fallStopsAtTheLandingSurface_byDefault_regardlessOfImpactSpeed() {
         let step = MovementSolver.fallStep(
             position: CGPoint(x: 0, y: 95),
             velocity: 1000,
@@ -196,5 +200,119 @@ final class MovementSolverTests: XCTestCase {
 
         XCTAssertEqual(step.position.y, 100, accuracy: 0.001, "must not sink through the surface")
         XCTAssertTrue(step.hasLanded)
+        XCTAssertTrue(step.touchedFloor)
+        XCTAssertEqual(step.velocity, 0)
+    }
+
+    // MARK: - Bouncing on landing, opt-in via bounceOnLanding: true (byeolki:
+    // "퉁퉁 튕겨서 사악 미끄러지게" -- a hard landing, e.g. after being
+    // thrown and bouncing off a wall, should bounce a couple of times before
+    // it settles, not stop dead on contact). Only FallState (the pet itself)
+    // opts in; BallPhysics does not, see the default-behavior test above.
+
+    func test_fallHardImpact_bouncesInsteadOfLandingImmediately_whenOptedIn() {
+        let step = MovementSolver.fallStep(
+            position: CGPoint(x: 0, y: 95),
+            velocity: 1000,
+            gravity: 1000,
+            dt: 1,
+            landingY: 100,
+            bounceOnLanding: true
+        )
+
+        XCTAssertFalse(step.hasLanded, "still has too much energy to rest")
+        XCTAssertTrue(step.touchedFloor, "but it did just make contact")
+        XCTAssertLessThan(step.velocity, 0, "and is now heading back up")
+    }
+
+    func test_fallNeverLandsSunkenBelowTheSurface_evenWhileBouncing() {
+        let step = MovementSolver.fallStep(
+            position: CGPoint(x: 0, y: 95),
+            velocity: 1000,
+            gravity: 1000,
+            dt: 1,
+            landingY: 100,
+            bounceOnLanding: true
+        )
+
+        XCTAssertLessThanOrEqual(step.position.y, 100, "reflected back above the surface, not sunk into it")
+    }
+
+    /// A gentle impact still just lands, even opted in -- ScreenBounds.
+    /// bounceOffFloor's own minimum-speed rest case handles this, no
+    /// special-casing needed here.
+    func test_fallGentleImpact_stillJustLands_evenWhenOptedIn() {
+        let step = MovementSolver.fallStep(
+            position: CGPoint(x: 0, y: 99.9),
+            velocity: 50,
+            gravity: 1000,
+            dt: 0.1,
+            landingY: 100,
+            bounceOnLanding: true
+        )
+
+        XCTAssertEqual(step.position.y, 100, accuracy: 0.001)
+        XCTAssertTrue(step.hasLanded)
+    }
+
+    /// The whole point: repeated hard impacts eventually decay down to a
+    /// gentle one and land for real, instead of bouncing forever.
+    func test_fallRepeatedHardBounces_eventuallySettlesAndLands() {
+        var position = CGPoint(x: 0, y: 0)
+        var velocity: CGFloat = 0
+        var bounced = false
+
+        for _ in 0..<300 { // five seconds at 60fps -- plenty for a few decaying bounces
+            let step = MovementSolver.fallStep(position: position, velocity: velocity, dt: 1.0 / 60, landingY: 200, bounceOnLanding: true)
+            if step.touchedFloor, !step.hasLanded { bounced = true }
+            position = step.position
+            velocity = step.velocity
+            if step.hasLanded { break }
+        }
+
+        XCTAssertTrue(bounced, "should have visibly bounced at least once first")
+        XCTAssertEqual(position.y, 200, accuracy: 0.001)
+        XCTAssertEqual(velocity, 0)
+    }
+
+    func test_fallWithNoLandingSurface_neverTouchesTheFloor() {
+        let step = MovementSolver.fallStep(position: .zero, velocity: 100, dt: 0.1, landingY: nil, bounceOnLanding: true)
+
+        XCTAssertFalse(step.touchedFloor)
+        XCTAssertFalse(step.hasLanded)
+    }
+
+    // MARK: - Ground friction (byeolki: "퉁퉁 튕겨서 사악 미끄러지게" -- once
+    // it has touched down, horizontal speed should decay to a slide-to-a-stop
+    // rather than staying constant or dropping to zero instantly)
+
+    func test_groundFriction_decaysVelocityTowardZero() {
+        let decayed = MovementSolver.applyGroundFriction(400, dt: 0.1)
+
+        XCTAssertLessThan(decayed, 400)
+        XCTAssertGreaterThan(decayed, 0)
+    }
+
+    func test_groundFriction_preservesDirection() {
+        XCTAssertLessThan(MovementSolver.applyGroundFriction(-400, dt: 0.1), 0)
+    }
+
+    func test_groundFriction_isFrameRateIndependent() {
+        // Two half-steps must land at the same place as one full step.
+        let half = MovementSolver.applyGroundFriction(MovementSolver.applyGroundFriction(400, dt: 0.05), dt: 0.05)
+        let whole = MovementSolver.applyGroundFriction(400, dt: 0.1)
+
+        XCTAssertEqual(half, whole, accuracy: 0.01)
+    }
+
+    func test_groundFriction_snapsToZeroOnceNegligible() {
+        // Many iterations of decay should eventually round down to exactly
+        // zero rather than leaving an imperceptible drift forever.
+        var velocity: CGFloat = 400
+        for _ in 0..<600 { // ten seconds at 60fps
+            velocity = MovementSolver.applyGroundFriction(velocity, dt: 1.0 / 60)
+        }
+
+        XCTAssertEqual(velocity, 0)
     }
 }

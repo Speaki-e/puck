@@ -202,6 +202,60 @@ final class FallStateTests: XCTestCase {
         XCTAssertEqual(world.body.position.x, 100, "the next fall is straight down")
     }
 
+    // MARK: - Bouncing + sliding on landing (byeolki: "이거 던져서 뭐 벽에
+    // 튕겨서 떨어지면 지면에 닿자마자 멈춰버리는데. 퉁퉁 튕겨서 사악
+    // 미끄러지게" -- a hard throw landing should bounce a couple of times
+    // and slide, not stop dead the instant it touches the ground)
+
+    func test_aHardThrow_bouncesOnLandingInsteadOfStoppingDead() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.landingY = 200
+        world.body.launchVelocity = CGPoint(x: 800, y: 0) // a hard sideways throw
+        let state = FallState()
+        state.enter()
+
+        // One frame past the moment it should first reach the surface --
+        // long enough to fall the 200px, not long enough to have fully
+        // settled yet.
+        world.run(state, seconds: 0.42)
+
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "still bouncing, must not have landed for real yet")
+    }
+
+    func test_aHardThrow_eventuallySettlesAndRequestsLand() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.landingY = 200
+        world.body.launchVelocity = CGPoint(x: 800, y: 0)
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 3)
+
+        XCTAssertEqual(world.body.position.y, 200, accuracy: 0.001)
+        XCTAssertEqual(world.requestedTransitions.first, .land)
+    }
+
+    /// The slide: horizontal speed keeps carrying the pet for a while after
+    /// it touches down, instead of the sideways motion also stopping dead.
+    func test_afterLanding_horizontalSpeedDecaysRatherThanStoppingInstantly() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 10_000, height: 500)
+        world.landingY = 200
+        world.body.launchVelocity = CGPoint(x: 800, y: 0)
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.42) // reaches the ground
+        let xAtTouchdown = world.body.position.x
+        world.run(state, seconds: 0.1) // a moment of sliding
+        let xShortlyAfter = world.body.position.x
+        world.run(state, seconds: 2) // long enough to fully settle
+        let xAtRest = world.body.position.x
+
+        XCTAssertGreaterThan(xShortlyAfter, xAtTouchdown, "still sliding just after touchdown")
+        XCTAssertGreaterThan(xAtRest, xShortlyAfter, "keeps sliding a little further before stopping")
+    }
+
     func test_aPlainFallIsUnaffected() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
         world.landingY = 10_000

@@ -44,6 +44,11 @@ enum MovementSolver {
     /// the screen before the eye can follow it; this crosses a display in
     /// roughly half a second, which still reads as a hard throw.
     static let maxThrowSpeed: CGFloat = 2500
+    /// How fast horizontal speed decays once the pet has touched the ground
+    /// after a bounce -- byeolki: "퉁퉁 튕겨서 사악 미끄러지게" wants a slide
+    /// to a stop, not an instant one. Frame-rate-independent exponential
+    /// decay, same idiom as ReactDragState's cursor-velocity smoothing.
+    static let groundFrictionRate: CGFloat = 3.0
     struct Step: Equatable {
         let position: CGPoint
         let hasArrived: Bool
@@ -53,6 +58,12 @@ enum MovementSolver {
         let position: CGPoint
         let velocity: CGFloat
         let hasLanded: Bool
+        /// True the frame gravity brought the pet down onto (or into) the
+        /// landing surface, whether that produced a bounce or the final rest
+        /// -- false throughout ordinary free fall. FallState uses this to
+        /// know when to start applying ground friction to horizontal speed
+        /// (byeolki: "퉁퉁 튕겨서 사악 미끄러지게").
+        let touchedFloor: Bool
     }
 
     /// One constant-velocity frame toward `target`.
@@ -114,14 +125,41 @@ enum MovementSolver {
         gravity: CGFloat = gravity,
         dt: TimeInterval,
         landingY: CGFloat? = nil,
-        terminalVelocity: CGFloat = terminalVelocity
+        terminalVelocity: CGFloat = terminalVelocity,
+        // Defaults to the original "stop dead on contact" behavior --
+        // BallPhysics's drop reuses this same function with its own
+        // separate bounce/juggle mechanics already tuned around landing
+        // meaning "resting", so it must not start bouncing too. Only
+        // FallState (the pet itself) opts in (byeolki: "퉁퉁 튕겨서 사악
+        // 미끄러지게").
+        bounceOnLanding: Bool = false
     ) -> FallStep {
         let newVelocity = min(velocity + gravity * CGFloat(dt), terminalVelocity)
         let newY = position.y + newVelocity * CGFloat(dt)
 
-        if let landingY, newY >= landingY {
-            return FallStep(position: CGPoint(x: position.x, y: landingY), velocity: 0, hasLanded: true)
+        guard let landingY, newY >= landingY else {
+            return FallStep(position: CGPoint(x: position.x, y: newY), velocity: newVelocity, hasLanded: false, touchedFloor: false)
         }
-        return FallStep(position: CGPoint(x: position.x, y: newY), velocity: newVelocity, hasLanded: false)
+
+        guard bounceOnLanding else {
+            return FallStep(position: CGPoint(x: position.x, y: landingY), velocity: 0, hasLanded: true, touchedFloor: true)
+        }
+
+        // ScreenBounds.bounceOffFloor rests for real once the damped speed
+        // drops below its own threshold, so this needs no separate "how many
+        // bounces" bookkeeping here.
+        let bounce = ScreenBounds.bounceOffFloor(position: CGPoint(x: position.x, y: newY), velocity: newVelocity, floorY: landingY)
+        return FallStep(position: bounce.position, velocity: bounce.velocity, hasLanded: bounce.velocity == 0, touchedFloor: true)
+    }
+
+    /// Ground friction applied to horizontal speed once FallState has
+    /// touched down (byeolki: "퉁퉁 튕겨서 사악 미끄러지게") -- a slide that
+    /// decays to a stop, rather than either staying constant forever or
+    /// dropping to zero the instant contact happens. Snaps to exactly zero
+    /// once negligible so a fall doesn't drift forever at an imperceptible
+    /// speed.
+    static func applyGroundFriction(_ velocity: CGFloat, dt: TimeInterval) -> CGFloat {
+        let decayed = velocity * CGFloat(exp(-groundFrictionRate * dt))
+        return abs(decayed) < 1 ? 0 : decayed
     }
 }

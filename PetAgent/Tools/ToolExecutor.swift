@@ -81,8 +81,18 @@ final class ToolExecutor {
     /// for an already-finished (or never-seen) id is a no-op.
     private var inFlightCancels: [String: () -> Void] = [:]
 
-    init(logger: ToolExecutionLogging? = nil) {
+    /// How the timeout work item gets scheduled. Injected so tests can observe
+    /// the resolved delay without actually waiting a tool's full timeout out.
+    private let scheduleTimeout: (TimeInterval, DispatchWorkItem) -> Void
+
+    init(
+        logger: ToolExecutionLogging? = nil,
+        scheduleTimeout: @escaping (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
+            DispatchQueue.global().asyncAfter(deadline: .now() + delay, execute: work)
+        }
+    ) {
         self.logger = logger
+        self.scheduleTimeout = scheduleTimeout
     }
 
     /// tool_cancel (protocol 3.1): abandon an in-flight dispatch -- the
@@ -104,9 +114,14 @@ final class ToolExecutor {
     }
 
     /// - Parameter timeout: seconds before this call is force-completed with a
-    ///   timeout error. Defaults to the tools.md registry default (15s);
-    ///   callers dispatching a tool with a higher `timeout_sec` should pass it.
-    func dispatch(_ request: ToolDispatch, timeout: TimeInterval = 15, completion: @escaping (ToolResult) -> Void) {
+    ///   timeout error. Defaults to the dispatched tool's registry
+    ///   `timeout_sec` (ToolTimeouts) -- resolved here rather than asked of the
+    ///   caller, because a caller that forgets silently caps every long tool
+    ///   (run_shell/run_applescript 60s, point_at 30s) at the 15s default and
+    ///   replies "timeout" while the sender is still legitimately waiting.
+    ///   Pass a value only to override, e.g. in tests.
+    func dispatch(_ request: ToolDispatch, timeout: TimeInterval? = nil, completion: @escaping (ToolResult) -> Void) {
+        let timeout = timeout ?? ToolTimeouts.seconds(for: request.tool)
         logger?.log(.execStart(id: request.id))
 
         var didComplete = false
@@ -141,7 +156,7 @@ final class ToolExecutor {
                 completeOnce(false, nil, .cancelled)
             }
         }
-        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
+        scheduleTimeout(timeout, timeoutWork)
 
         handler.execute(args: request.args) { result in
             timeoutWork.cancel()

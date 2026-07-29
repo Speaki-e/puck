@@ -170,4 +170,42 @@ final class ToolExecutorTests: XCTestCase {
         wait(for: [firstCompletion, unexpectedSecondCompletion], timeout: 0.5)
         XCTAssertEqual(callCount, 1)
     }
+
+    // MARK: - Registry timeouts (protocol section 4)
+
+    /// Dispatches `tool` with the timeout scheduler stubbed out and returns the
+    /// delay the executor asked for, without waiting that long.
+    private func scheduledTimeout(forTool tool: String) -> TimeInterval? {
+        var scheduled: TimeInterval?
+        let executor = ToolExecutor(scheduleTimeout: { delay, _ in scheduled = delay })
+        executor.register(StubHandler(toolName: tool) { _, _ in
+            // never completes -- the timeout is what's under test
+        })
+        executor.dispatch(ToolDispatch(id: "t", tool: tool, args: .object([:]))) { _ in }
+        return scheduled
+    }
+
+    func test_dispatchWithoutExplicitTimeout_usesTheToolsRegistryTimeout() {
+        // Regression: every tool was capped at the 15s default because the sole
+        // caller (BridgeMessageRouter) never passed `timeout`, so run_shell and
+        // run_applescript replied "timeout" at 15s of their allotted 60.
+        XCTAssertEqual(scheduledTimeout(forTool: "run_shell"), 60)
+        XCTAssertEqual(scheduledTimeout(forTool: "run_applescript"), 60)
+        XCTAssertEqual(scheduledTimeout(forTool: "point_at"), 30)
+        XCTAssertEqual(scheduledTimeout(forTool: "launch_app"), 15)
+        XCTAssertEqual(scheduledTimeout(forTool: "list_running_apps"), 5)
+        XCTAssertEqual(scheduledTimeout(forTool: "get_frontmost_window"), 5)
+    }
+
+    func test_toolAbsentFromTheMirror_fallsBackToTheRegistryDefault() {
+        XCTAssertEqual(scheduledTimeout(forTool: "not_in_the_registry"), 15)
+    }
+
+    func test_explicitTimeout_stillOverridesTheRegistry() {
+        var scheduled: TimeInterval?
+        let executor = ToolExecutor(scheduleTimeout: { delay, _ in scheduled = delay })
+        executor.register(StubHandler(toolName: "run_shell") { _, _ in })
+        executor.dispatch(ToolDispatch(id: "t", tool: "run_shell", args: .object([:])), timeout: 0.05) { _ in }
+        XCTAssertEqual(scheduled, 0.05)
+    }
 }

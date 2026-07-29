@@ -33,6 +33,9 @@ final class BallController {
         layer.borderColor = NSColor.black.cgColor
         layer.borderWidth = 1.5
         layer.isHidden = true
+        // Ticked every frame like the pet is, so the same rule applies: no
+        // implicit animation between the frames we compute.
+        layer.disableImplicitAnimations()
         parent.addSublayer(layer)
     }
 

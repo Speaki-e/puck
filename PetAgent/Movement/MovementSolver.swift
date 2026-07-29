@@ -20,25 +20,30 @@ enum MovementSolver {
     /// Default walking speed, px/sec.
     static let walkSpeed: CGFloat = 90
     /// Default gravity, px/sec². High enough that even a short fall (off a
-    /// window's top edge) ramps up to terminalVelocity within roughly a
-    /// window's height, not just a long one (a manual drop from near the
-    /// top of the screen) -- otherwise short falls stay well below terminal
-    /// velocity for their entire duration and read as much slower/floatier
-    /// than a long drop, even though both use identical physics.
+    /// window's top edge) picks up real speed within roughly a window's
+    /// height, instead of staying floaty for the whole drop the way a gentler
+    /// value does over so short a distance.
+    ///
     static let gravity: CGFloat = 2400
-    /// Default terminal velocity, px/sec. A fall from the ceiling covers the
-    /// whole screen's height, far more than any window-edge fall ever did --
-    /// unbounded acceleration over that distance eventually moves the pet
-    /// dozens of pixels in a single frame, reading as a teleport rather than
-    /// a fall.
-    static let terminalVelocity: CGFloat = 900
+    /// The speed a fall settles at, px/sec — what air resistance does to a
+    /// real falling object, and the reason a dropped ball reads as descending
+    /// steadily rather than ever faster (byeolki: "진짜 공 던지는것 처럼 쭉
+    /// 일정하게 떨어지게", 2026-07-29).
+    ///
+    /// Uncapped, the pet spends the last quarter of a long drop moving 35px a
+    /// frame, which reads as it being yanked onto the floor rather than
+    /// landing on it. The pairing matters: gravity stays high so a short fall
+    /// off a window edge still gets up to speed within its own height, and
+    /// this keeps a long fall from running away past that same speed.
+    static let terminalVelocity: CGFloat = 1200
     /// How close counts as "there".
     static let arrivalRadius: CGFloat = 2
-    /// Default ease rate for `ease(from:toward:)`, 1/sec. Tuned to converge
-    /// within roughly 100-150ms -- fast enough to stay responsive, slow
-    /// enough to actually be visible as a bit of "give."
-    static let dragEaseRate: CGFloat = 25
-
+    /// Fastest the pet can be thrown, px/sec (byeolki: "드래그해서 던지면
+    /// 던져지게", 2026-07-29). A flick of the wrist can move the cursor
+    /// several thousand px/sec, which would fire the pet off the far edge of
+    /// the screen before the eye can follow it; this crosses a display in
+    /// roughly half a second, which still reads as a hard throw.
+    static let maxThrowSpeed: CGFloat = 2500
     struct Step: Equatable {
         let position: CGPoint
         let hasArrived: Bool
@@ -80,19 +85,6 @@ enum MovementSolver {
         return Step(position: moved, hasArrived: false)
     }
 
-    /// Exponential ease-toward, frame-rate independent. Used by ReactDrag so
-    /// the pet has a small amount of natural "give" while being carried
-    /// instead of snapping exactly to the cursor every frame, which read as
-    /// a rigid teleport rather than something being held (byeolki: "내가
-    /// 잡고 움직일때 아직 움직임이 부자연스러워"). `1 - exp(-rate * dt)`
-    /// is the fraction of the remaining distance closed this frame -- it
-    /// converges to the same place regardless of how the same total dt was
-    /// split into frames, unlike a fixed per-frame percentage would.
-    static func ease(from position: CGPoint, toward target: CGPoint, rate: CGFloat = dragEaseRate, dt: TimeInterval) -> CGPoint {
-        let factor = 1 - exp(-rate * CGFloat(dt))
-        return CGPoint(x: position.x + (target.x - position.x) * factor, y: position.y + (target.y - position.y) * factor)
-    }
-
     /// Which way the character should face to head toward `target`, or nil for
     /// purely vertical motion (climbing must not flip it).
     static func facing(from position: CGPoint, toward target: CGPoint) -> AvatarFacing? {
@@ -101,8 +93,9 @@ enum MovementSolver {
         return dx > 0 ? .right : .left
     }
 
-    /// One accelerating frame of free fall. `landingY` stops the pet on a
-    /// surface instead of sinking through it when a frame overshoots.
+    /// One accelerating frame of free fall, settling at `terminalVelocity`.
+    /// `landingY` stops the pet on a surface instead of sinking through it
+    /// when a frame overshoots.
     static func fallStep(
         position: CGPoint,
         velocity: CGFloat,

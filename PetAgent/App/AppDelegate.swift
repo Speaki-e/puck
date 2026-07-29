@@ -661,10 +661,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             avatar?.showEmotion("happy")
         case .dragBegan(let point):
             // Order matters: transition(to:) calls ReactDragState.enter(),
-            // which resets cursorPosition to nil (so a stale drag can't
-            // resume mid-grab on re-entry) -- setting it before the
-            // transition let enter() immediately wipe it out, so the pet
-            // didn't snap to the grab point until the next dragMoved.
+            // which resets cursorPosition and the grab offset to nil (so a
+            // stale drag can't resume mid-grab on re-entry) -- setting the
+            // position before the transition let enter() immediately wipe it
+            // out, and the grab offset would then be captured from wherever
+            // the cursor had already moved on by, shifting the pet.
             controller.transition(to: .reactDrag)
             reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
         case .dragMoved(let point):

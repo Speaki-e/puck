@@ -44,6 +44,17 @@ protocol AvatarPlayable: AnyObject {
     /// CeilingState owns the character. Default is a no-op -- usdz/video
     /// avatars have no use for this, only SpriteAvatar acts on it.
     func setUpsideDown(_ isUpsideDown: Bool)
+
+    /// The character's visible outline as a rectangle, relative to its ground
+    /// point (the position the FSM moves): `minX`/`maxX` are how far the
+    /// artwork extends to either side, `minY` how far above (negative, since Y
+    /// grows downward). Used to keep the pet inside the screen and to bounce
+    /// it off the edges by its own outline rather than by its centre point.
+    ///
+    /// Default is the zero rect — a point. An avatar that can't measure
+    /// itself is treated as having no extent, which is exactly the old
+    /// behaviour, so nothing regresses.
+    var visualBounds: CGRect { get }
 }
 
 extension AvatarPlayable {
@@ -51,4 +62,5 @@ extension AvatarPlayable {
     func updateScale(_ scale: Double) {}
     func showEmotion(_ emotion: String) {}
     func setUpsideDown(_ isUpsideDown: Bool) {}
+    var visualBounds: CGRect { .zero }
 }

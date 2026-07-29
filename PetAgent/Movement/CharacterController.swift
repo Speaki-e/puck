@@ -90,7 +90,7 @@ final class CharacterController {
     }
 
     func update(dt: TimeInterval) {
-        let context = StateContext(
+        var context = StateContext(
             body: body,
             roamableArea: roamableArea,
             avatarHeight: avatarHeight,
@@ -99,7 +99,17 @@ final class CharacterController {
             landingY: landingY,
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }
         )
+        context.visualBounds = body.visualBounds
         currentState.update(dt: dt, context: context)
+
+        // The backstop for "펫이 화면 밖으로 나가지 못하게": states that bounce
+        // (Fall) or clamp deliberately have already had their say, and this
+        // catches every other route out of the screen — a drag carried past
+        // the edge, a wander target near a corner, an avatar that just grew
+        // via the size slider. Horizontal only: vertical placement is owned
+        // by landing surfaces and the ceiling, which legitimately sit on the
+        // area's own edges.
+        body.position = ScreenBounds.contain(body.position, visualBounds: context.visualBounds, in: roamableArea)
         stateElapsedTime += dt
         body.updateBounce(clip: currentState.clipKey, elapsed: stateElapsedTime)
 

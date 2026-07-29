@@ -86,6 +86,128 @@ final class FallStateTests: XCTestCase {
 
         XCTAssertEqual(fastFall, freshFall, accuracy: 1, "a re-entered fall starts from rest")
     }
+
+    // MARK: - Being thrown (byeolki: "드래그해서 던지면 던져지게", 2026-07-29)
+
+    func test_launchVelocityCarriesThePetSideways() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.landingY = 10_000
+        world.body.launchVelocity = CGPoint(x: 400, y: 0)
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.5)
+
+        // Accuracy covers one frame of travel either way (400px/s ÷ 60).
+        XCTAssertEqual(world.body.position.x, 300, accuracy: 10, "sideways travel is constant speed")
+        XCTAssertGreaterThan(world.body.position.y, 0, "and it still falls while doing it")
+    }
+
+    /// The sideways speed is constant while the downward speed accelerates --
+    /// that difference is what makes the path an arc rather than a diagonal.
+    func test_aThrowArcs() {
+        let world = TestStateWorld(position: CGPoint(x: 0, y: 0))
+        world.landingY = 10_000
+        world.body.launchVelocity = CGPoint(x: 400, y: 0)
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.25)
+        let first = world.body.position
+        world.run(state, seconds: 0.25)
+        let second = world.body.position
+
+        XCTAssertEqual(second.x - first.x, first.x, accuracy: 5, "same sideways distance each interval")
+        XCTAssertGreaterThan(second.y - first.y, first.y, "but a greater drop each interval")
+    }
+
+    /// byeolki: "화면경계에서 튕기게" — a throw at a wall comes back off it
+    /// rather than stopping dead against it, and never leaves the screen.
+    func test_aThrowBouncesOffTheEdgeOfTheRoamableArea() {
+        let world = TestStateWorld(position: CGPoint(x: 900, y: 0))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 10_000)
+        world.landingY = 10_000
+        world.body.launchVelocity = CGPoint(x: 2000, y: 0) // hard throw at the right wall
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.1) // long enough to reach the wall and turn around
+        let afterBounce = world.body.position.x
+        world.run(state, seconds: 0.1)
+
+        XCTAssertLessThan(afterBounce, 1000, "came back off the wall")
+        XCTAssertLessThan(world.body.position.x, afterBounce, "and keeps travelling the other way")
+    }
+
+    /// byeolki: "위쪽 화면도" — an upward throw comes off the top of the
+    /// screen and falls back, rather than disappearing above it.
+    func test_anUpwardThrowBouncesOffTheTopOfTheScreen() {
+        let world = TestStateWorld(position: CGPoint(x: 500, y: 300))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 800)
+        world.landingY = 800
+        world.body.launchVelocity = CGPoint(x: 0, y: -3000) // hurled straight up
+        let state = FallState()
+        state.enter()
+
+        var highest = CGFloat.greatestFiniteMagnitude
+        for _ in 0..<60 {
+            world.run(state, seconds: 1.0 / 60)
+            highest = min(highest, world.body.position.y)
+            XCTAssertGreaterThanOrEqual(world.body.position.y, 0, "never above the top of the screen")
+        }
+
+        // Never lands exactly on 0: a frame at 3000px/sec covers 50px, and the
+        // frame that would have crossed the ceiling is reflected back down
+        // instead. Getting within one frame of travel is "reached it".
+        XCTAssertLessThan(highest, 50, "it did reach the ceiling")
+        XCTAssertGreaterThan(world.body.position.y, highest, "and came back down from it")
+    }
+
+    func test_aThrowNeverLeavesTheScreen() {
+        let world = TestStateWorld(position: CGPoint(x: 900, y: 0))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 10_000)
+        world.landingY = 10_000
+        world.body.launchVelocity = CGPoint(x: 6000, y: 0) // as hard as it gets
+        let state = FallState()
+        state.enter()
+
+        for _ in 0..<120 { // two seconds of bouncing around
+            world.run(state, seconds: 1.0 / 60)
+            XCTAssertTrue(
+                (0...1000).contains(world.body.position.x),
+                "left the screen at x=\(world.body.position.x)"
+            )
+        }
+    }
+
+    /// One throw must not make every later fall drift sideways.
+    func test_launchVelocityIsConsumedByTheFall() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.landingY = 10_000
+        world.body.launchVelocity = CGPoint(x: 400, y: 0)
+        let state = FallState()
+
+        state.enter()
+        world.run(state, seconds: 0.2)
+        XCTAssertEqual(world.body.launchVelocity, .zero, "cleared as soon as it is taken")
+
+        world.body.position = CGPoint(x: 100, y: 0)
+        state.enter()
+        world.run(state, seconds: 0.2)
+
+        XCTAssertEqual(world.body.position.x, 100, "the next fall is straight down")
+    }
+
+    func test_aPlainFallIsUnaffected() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.landingY = 10_000
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.5)
+
+        XCTAssertEqual(world.body.position.x, 100, "no throw, no sideways drift")
+    }
 }
 
 final class LandStateTests: XCTestCase {

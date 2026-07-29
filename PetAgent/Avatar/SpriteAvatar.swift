@@ -25,6 +25,13 @@ final class SpriteAvatar: AvatarPlayable {
     private let hitbox: AvatarManifest.Hitbox
     let spriteLayer = CALayer()
     private var loadedImages: [String: CGImage] = [:]
+    /// Cached per decoded image — scanning a 1200px sprite's alpha is far too
+    /// slow to redo on every access, and the result never changes.
+    private var opaquePixelBounds: [ObjectIdentifier: CGRect?] = [:]
+    /// Whatever `spriteLayer.contents` currently holds. Kept alongside rather
+    /// than read back off the layer: `contents` is `Any?`, and Swift rejects
+    /// a conditional cast back to a CoreFoundation type as never-failing.
+    private var currentImage: CGImage?
     private var facing: AvatarFacing = .right
     private var currentBounce = BounceTransform.identity
     private var isUpsideDown = false
@@ -52,6 +59,9 @@ final class SpriteAvatar: AvatarPlayable {
         // ~1.5pt per frame renders as stair-stepped jitter. SpriteLayerView
         // keeps the parent's value current across display changes.
         spriteLayer.contentsScale = parent.contentsScale
+        // The FSM drives this layer every frame; Core Animation must not
+        // interpolate between those frames on top of it.
+        spriteLayer.disableImplicitAnimations()
         parent.addSublayer(spriteLayer)
     }
 
@@ -62,6 +72,7 @@ final class SpriteAvatar: AvatarPlayable {
         // caller with nothing" reasoning USDZAvatar's animation-less-file path uses.
         guard let image = loadedImage(named: fileName) else { return }
         spriteLayer.contents = image
+        currentImage = image
     }
 
     func stop() {
@@ -148,6 +159,7 @@ final class SpriteAvatar: AvatarPlayable {
             return
         }
         spriteLayer.contents = image
+        currentImage = image
     }
 
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
@@ -171,6 +183,37 @@ final class SpriteAvatar: AvatarPlayable {
             transform = transform.rotated(by: .pi / 2)
         }
         spriteLayer.setAffineTransform(transform)
+    }
+
+    /// Measured from whichever clip is currently showing, so a wider pose
+    /// gives a wider outline. Falls back to the layer box (the pre-existing
+    /// behaviour) when nothing has been drawn yet or the image is blank.
+    var visualBounds: CGRect {
+        let layerSize = spriteLayer.bounds.size
+        guard
+            let image = currentImage,
+            let opaque = opaquePixels(of: image)
+        else {
+            return CGRect(x: -layerSize.width / 2, y: -layerSize.height, width: layerSize.width, height: layerSize.height)
+        }
+
+        return SpriteVisualBounds.relativeToGroundPoint(
+            opaquePixels: opaque,
+            imagePixelSize: CGSize(width: image.width, height: image.height),
+            layerSize: layerSize
+        )
+    }
+
+    /// Scanning every pixel is far too slow to repeat per frame, and an
+    /// image's opaque box never changes once loaded.
+    private func opaquePixels(of image: CGImage) -> CGRect? {
+        let key = ObjectIdentifier(image)
+        if let cached = opaquePixelBounds[key] {
+            return cached
+        }
+        let measured = OpaquePixelBounds.of(image)
+        opaquePixelBounds[key] = measured
+        return measured
     }
 
     /// Only caches on a successful load -- caching a failure would make a

@@ -1,0 +1,129 @@
+//
+//  ScreenBounds.swift
+//  PetAgent
+//
+//  F3 · owner: 박해영 (Haeyoung Park)
+//  Keeps the pet inside the screen, and bounces it off the edges.
+//
+//  Every state used to clamp (or not) on its own, against the bare position
+//  — a point at the character's feet. Since that point is the horizontal
+//  centre of the artwork, "inside the roamable area" still left half the pet
+//  hanging off the side of the display, and a hard throw could put all of it
+//  past the edge before anything noticed.
+//
+//  The rule lives here so there is one definition of "inside the screen" for
+//  walking, falling and being thrown alike, expressed in terms of the pet's
+//  own outline (StateContext.visualBounds).
+//
+
+import CoreGraphics
+import Foundation
+
+enum ScreenBounds {
+    /// How much speed survives a bounce. A thrown pet coming off a wall
+    /// should visibly lose energy — a perfectly elastic bounce reads as the
+    /// pet being batted back and forth forever.
+    static let restitution: CGFloat = 0.55
+    /// Below this, a bounce is not worth playing: the pet would jitter
+    /// against the edge in ever-smaller hops instead of settling.
+    static let minimumBounceSpeed: CGFloat = 60
+
+    struct Bounce: Equatable {
+        /// The position with the pet's outline pushed back inside.
+        var position: CGPoint
+        /// The velocity after the bounce — reversed and damped if an edge was
+        /// hit, unchanged otherwise.
+        var velocity: CGFloat
+        /// Whether an edge was actually hit this frame.
+        var didBounce: Bool
+    }
+
+    /// Clamps `position` so `visualBounds` stays inside `area`, without any
+    /// velocity involved. For states that move under their own power (walk,
+    /// climb) and simply must not leave the screen.
+    static func contain(_ position: CGPoint, visualBounds: CGRect, in area: CGRect) -> CGPoint {
+        // The outline's offsets from the ground point. Symmetric artwork
+        // gives -width/2 and +width/2, but nothing requires symmetry.
+        let leftLimit = area.minX - visualBounds.minX
+        let rightLimit = area.maxX - visualBounds.maxX
+        // A pet wider than the screen has no valid position; keeping it
+        // pinned to the left edge at least keeps it on screen.
+        guard leftLimit <= rightLimit else { return CGPoint(x: leftLimit, y: position.y) }
+
+        return CGPoint(x: min(max(position.x, leftLimit), rightLimit), y: position.y)
+    }
+
+    /// One frame of horizontal travel that bounces off the left and right
+    /// edges instead of stopping at them.
+    static func bounceHorizontally(
+        position: CGPoint,
+        velocity: CGFloat,
+        visualBounds: CGRect,
+        in area: CGRect
+    ) -> Bounce {
+        let leftLimit = area.minX - visualBounds.minX
+        let rightLimit = area.maxX - visualBounds.maxX
+        guard leftLimit <= rightLimit else {
+            return Bounce(position: CGPoint(x: leftLimit, y: position.y), velocity: 0, didBounce: false)
+        }
+
+        if position.x < leftLimit, velocity < 0 {
+            return reflected(position: position, at: leftLimit, velocity: velocity)
+        }
+        if position.x > rightLimit, velocity > 0 {
+            return reflected(position: position, at: rightLimit, velocity: velocity)
+        }
+        return Bounce(position: position, velocity: velocity, didBounce: false)
+    }
+
+    /// One frame's worth of upward travel bounced off the top of the screen.
+    ///
+    /// Only upward motion is handled here: coming back *down* is a landing,
+    /// and which surface it lands on is F4's business (a window top edge, the
+    /// Dock, the floor), not a screen edge. The limit is where the pet's head
+    /// — the top of its outline — meets the top of the area, so a tall avatar
+    /// bounces sooner than a short one.
+    static func bounceOffCeiling(
+        position: CGPoint,
+        velocity: CGFloat,
+        visualBounds: CGRect,
+        in area: CGRect
+    ) -> Bounce {
+        // Y grows downward, so upward velocity is negative and the pet's head
+        // sits at position.y + visualBounds.minY (a negative offset).
+        let topLimit = area.minY - visualBounds.minY
+        guard velocity < 0, position.y < topLimit else {
+            return Bounce(position: position, velocity: velocity, didBounce: false)
+        }
+        return reflected(position: position, at: topLimit, velocity: velocity, axis: .vertical)
+    }
+
+    private enum Axis { case horizontal, vertical }
+
+    private static func reflected(position: CGPoint, at limit: CGFloat, velocity: CGFloat, axis: Axis = .horizontal) -> Bounce {
+        let pinned = axis == .horizontal
+            ? CGPoint(x: limit, y: position.y)
+            : CGPoint(x: position.x, y: limit)
+
+        let speed = abs(velocity) * restitution
+        guard speed >= minimumBounceSpeed else {
+            // Out of energy: rest against the edge rather than buzzing on it.
+            // Off the ceiling that means dropping away from it immediately,
+            // which gravity does on the very next frame.
+            return Bounce(position: pinned, velocity: 0, didBounce: false)
+        }
+        // Reflected about the edge, so a frame that overshot deep past the
+        // wall comes back out as far as it went in -- landing exactly on the
+        // limit instead would swallow part of the movement and make a fast
+        // bounce visibly lose ground.
+        let reflectedPosition = axis == .horizontal
+            ? CGPoint(x: 2 * limit - position.x, y: position.y)
+            : CGPoint(x: position.x, y: 2 * limit - position.y)
+
+        return Bounce(
+            position: reflectedPosition,
+            velocity: velocity < 0 ? speed : -speed,
+            didBounce: true
+        )
+    }
+}

@@ -99,39 +99,6 @@ final class MovementSolverTests: XCTestCase {
         )
     }
 
-    // MARK: - Ease (ReactDrag "give" while being carried, 2026-07-29)
-
-    /// byeolki: "내가 잡고 움직일때 아직 움직임이 부자연스러워" -- snapping
-    /// exactly to the cursor every frame reads as a rigid teleport rather
-    /// than something being carried. One frame must move PART of the way
-    /// there, not all the way, or there's no "give" to feel at all.
-    func test_ease_movesPartWayToTarget_notAllTheWay() {
-        let result = MovementSolver.ease(from: CGPoint(x: 0, y: 0), toward: CGPoint(x: 300, y: 150), dt: 1.0 / 60)
-
-        XCTAssertGreaterThan(result.x, 0)
-        XCTAssertLessThan(result.x, 300)
-        XCTAssertGreaterThan(result.y, 0)
-        XCTAssertLessThan(result.y, 150)
-    }
-
-    func test_ease_convergesCloseToTarget_overEnoughTime() {
-        var position = CGPoint(x: 0, y: 0)
-        let target = CGPoint(x: 300, y: 150)
-        let dt: TimeInterval = 1.0 / 60
-        for _ in 0..<120 { // 2 seconds, comfortably past convergence
-            position = MovementSolver.ease(from: position, toward: target, dt: dt)
-        }
-
-        XCTAssertEqual(position.x, target.x, accuracy: 0.5)
-        XCTAssertEqual(position.y, target.y, accuracy: 0.5)
-    }
-
-    func test_ease_alreadyAtTarget_staysPut() {
-        let result = MovementSolver.ease(from: CGPoint(x: 50, y: 50), toward: CGPoint(x: 50, y: 50), dt: 1.0 / 60)
-
-        XCTAssertEqual(result, CGPoint(x: 50, y: 50))
-    }
-
     // MARK: - Falling
 
     func test_fallAcceleratesDownward() {
@@ -149,16 +116,14 @@ final class MovementSolverTests: XCTestCase {
         )
     }
 
-    /// Falling from the ceiling (F3, 2026-07-29) covers far more distance
-    /// than falling off a window ever did, so unbounded acceleration
-    /// eventually moves the pet dozens of pixels in a single frame -- reads
-    /// as a teleport, not a fall (byeolki: "떨어지다가 개빨라져서 거의
-    /// 순간이동임"). A terminal velocity keeps per-frame movement bounded no
-    /// matter how far the drop.
-    func test_fallVelocityIsCappedAtTerminalVelocity() {
+    /// byeolki: "진짜 공 던지는것 처럼 쭉 일정하게 떨어지게" (2026-07-29).
+    /// A fall settles at a steady speed the way a real falling object does
+    /// under air resistance, instead of accelerating right up to the moment
+    /// it hits -- which read as the pet being yanked onto the floor.
+    func test_fallVelocitySettlesAtTerminalVelocity() {
         let step = MovementSolver.fallStep(
             position: .zero,
-            velocity: 2000, // already above any reasonable terminal velocity
+            velocity: 2000,
             gravity: 1000,
             dt: 1,
             terminalVelocity: 900
@@ -167,27 +132,46 @@ final class MovementSolverTests: XCTestCase {
         XCTAssertEqual(step.velocity, 900, accuracy: 0.001)
     }
 
-    /// byeolki: "이새끼 창위에 있다가 떨어지는 속도가 너무 느림. 내가 잡아서
-    /// 위에서 놓아서 떨어지는 속도랑 너무 다름" -- a short fall (off a
-    /// window) must ramp up to terminal velocity within a much shorter
-    /// distance than it takes to fall the length of the whole screen (a
-    /// manual drop from near the top), or it never gets past "floaty" before
-    /// it lands. Uses the DEFAULT gravity/terminalVelocity (no override) so
-    /// this pins the actual live tuning, not just the math.
-    func test_defaultGravity_reachesTerminalVelocityWithinAShortFall() {
+    /// The point of the cap: on the longest drop a display allows, the pet is
+    /// still moving at the same steady speed it settled into early on, not an
+    /// ever-growing one. Uses the DEFAULT tuning so this pins the real feel.
+    func test_aLongFallIsSteadyRatherThanEverFaster() {
         var velocity: CGFloat = 0
         var position = CGPoint.zero
         let dt: TimeInterval = 1.0 / 60
-        var elapsed: TimeInterval = 0
+        var midFallVelocity: CGFloat = 0
 
-        while velocity < MovementSolver.terminalVelocity, elapsed < 2 {
+        while position.y < 1200 { // taller than any display in points
             let step = MovementSolver.fallStep(position: position, velocity: velocity, dt: dt)
             position = step.position
             velocity = step.velocity
-            elapsed += dt
+            if position.y >= 400, midFallVelocity == 0 {
+                midFallVelocity = velocity
+            }
         }
 
-        XCTAssertLessThan(position.y, 250, "should reach terminal velocity within roughly a window's height of falling")
+        XCTAssertEqual(velocity, midFallVelocity, accuracy: 0.001, "same speed at the end as in the middle")
+        XCTAssertLessThan(velocity * CGFloat(dt), 25, "and a readable distance per frame")
+    }
+
+    /// byeolki: "이새끼 창위에 있다가 떨어지는 속도가 너무 느림. 내가 잡아서
+    /// 위에서 놓아서 떨어지는 속도랑 너무 다름" -- a short fall (off a window)
+    /// must pick up real speed within a much shorter distance than a drop down
+    /// the whole screen, or it never gets past "floaty" before it lands. Uses
+    /// the DEFAULT gravity (no override) so this pins the live tuning, not
+    /// just the math.
+    func test_defaultGravity_picksUpSpeedWithinAShortFall() {
+        var velocity: CGFloat = 0
+        var position = CGPoint.zero
+        let dt: TimeInterval = 1.0 / 60
+
+        while position.y < 250 { // roughly a window's height
+            let step = MovementSolver.fallStep(position: position, velocity: velocity, dt: dt)
+            position = step.position
+            velocity = step.velocity
+        }
+
+        XCTAssertGreaterThan(velocity, 1000, "a window-height fall is already moving properly")
     }
 
     func test_fallVelocityBelowTerminal_acceleratesNormally() {
@@ -195,8 +179,7 @@ final class MovementSolverTests: XCTestCase {
             position: .zero,
             velocity: 0,
             gravity: 1000,
-            dt: 0.1,
-            terminalVelocity: 900
+            dt: 0.1
         )
 
         XCTAssertEqual(step.velocity, 100, accuracy: 0.001)

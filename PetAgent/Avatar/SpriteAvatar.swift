@@ -53,6 +53,9 @@ final class SpriteAvatar: AvatarPlayable {
     /// setUpsideDown can immediately recompute the rendered offset for it --
     /// see setUpsideDown's doc comment.
     private var lastPosition: CGPoint = .zero
+    /// When the current jump flourish began, or nil if none is playing --
+    /// see triggerJump's doc comment.
+    private var jumpStartedAt: TimeInterval?
 
     init(
         avatarDirectory: URL,
@@ -135,7 +138,23 @@ final class SpriteAvatar: AvatarPlayable {
         // wrong, it pushes the whole sprite off the top of the screen.
         lastPosition = position
         let verticalOffset = isUpsideDown ? spriteLayer.bounds.height / 2 : -spriteLayer.bounds.height / 2
-        spriteLayer.position = CGPoint(x: position.x, y: position.y + verticalOffset)
+        spriteLayer.position = CGPoint(x: position.x, y: position.y + verticalOffset + currentJumpOffset)
+    }
+
+    /// A short visual hop -- 02_pet-app.md F3 (agent_done, code_editor
+    /// detail.path changes). Purely a render-time offset on top of whatever
+    /// the FSM's real `position` is, recomputed every frame via updateBounce
+    /// (already called unconditionally each frame) rather than baked into
+    /// the affine transform -- translatedBy inside applyTransform would
+    /// rotate along with climb's quarter-turn or any future rotation preset,
+    /// which a vertical screen-space hop must not do.
+    func triggerJump() {
+        jumpStartedAt = now()
+    }
+
+    private var currentJumpOffset: CGFloat {
+        guard let jumpStartedAt else { return 0 }
+        return JumpFlourish.offset(elapsed: now() - jumpStartedAt)
     }
 
     func setFacing(_ facing: AvatarFacing) {
@@ -158,6 +177,11 @@ final class SpriteAvatar: AvatarPlayable {
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {
         currentBounce = BouncePreset.preset(for: clip).transform(elapsed: elapsed, intensity: intensity)
         applyTransform()
+        // Called every frame regardless of state, same as applyTransform
+        // above -- the natural per-frame hook to keep an in-progress jump
+        // animating even while `position` itself doesn't change (Type,
+        // Point, ...).
+        setScreenPosition(lastPosition)
     }
 
     /// F3 ceiling-crawling. A Y-only flip (not a 180deg rotation) so the

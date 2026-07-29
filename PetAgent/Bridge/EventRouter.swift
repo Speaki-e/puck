@@ -65,16 +65,30 @@ struct EventReaction: Equatable {
 enum EventRouter {
     /// Maps a protocol 3.2 event to a reaction, per the table in
     /// 02_pet-app.md section 3 F3 ("소켓 이벤트 -> 반응 매핑").
-    static func reaction(for event: BridgeEvent) -> EventReaction {
+    ///
+    /// - Parameter previousCodeEditorPath: the `detail.path` from the most
+    ///   recent code_editor tool_call, if any -- kept here as an explicit
+    ///   parameter rather than mutable state on this type (a pure decision
+    ///   function, per the file header) so the caller (BridgeMessageRouter)
+    ///   owns tracking it across calls. Used to detect a path *change*
+    ///   ("detail.path 변경 시 짧은 점프") -- the very first code_editor
+    ///   event of a session has nothing to compare against, so it never
+    ///   jumps on its own.
+    static func reaction(for event: BridgeEvent, previousCodeEditorPath: String? = nil) -> EventReaction {
         switch event {
         case .agentThinking:
             return EventReaction(stateTransition: .idle, emotion: "thinking")
 
-        case .toolCall(let tool, _):
+        case .toolCall(let tool, let detail):
             // code_editor gets a dedicated typing reaction; every other tool
             // (run_shell, run_applescript, and anything else) points at wherever
             // the action is happening — the "run_shell 계열" row in the table.
-            return EventReaction(stateTransition: tool == "code_editor" ? .type : .point)
+            guard tool == "code_editor" else {
+                return EventReaction(stateTransition: .point)
+            }
+            let path = codeEditorPath(from: detail)
+            let pathChanged = previousCodeEditorPath != nil && path != nil && path != previousCodeEditorPath
+            return EventReaction(stateTransition: .type, jump: pathChanged)
 
         case .toolResult(let ok):
             return ok
@@ -91,5 +105,14 @@ enum EventRouter {
                 ? EventReaction(sfxKey: "task_success", jump: true, bubbleText: summary, emotion: "happy")
                 : EventReaction()
         }
+    }
+
+    /// Extracts `detail.path` from a code_editor tool_call (protocol 3.2:
+    /// `{"event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"}}`).
+    /// Exposed so BridgeMessageRouter can track it across calls without
+    /// duplicating the JSONValue destructuring.
+    static func codeEditorPath(from detail: JSONValue?) -> String? {
+        guard case .object(let fields)? = detail, case .string(let path)? = fields["path"] else { return nil }
+        return path
     }
 }

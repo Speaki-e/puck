@@ -231,6 +231,38 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 70))
     }
 
+    // MARK: - triggerJump (02_pet-app.md F3: agent_done / code_editor path change)
+
+    func test_triggerJump_offsetsPositionUpwardMidway() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let clock = TestClock()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer(), now: clock.now)
+        avatar.setScreenPosition(CGPoint(x: 10, y: 100))
+        let restingY = avatar.spriteLayer.position.y
+
+        avatar.triggerJump()
+        clock.advance(JumpFlourish.duration / 2)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 0)
+
+        XCTAssertLessThan(avatar.spriteLayer.position.y, restingY, "midway through a jump the sprite should be higher up (smaller y)")
+    }
+
+    func test_triggerJump_settlesBackToRestAfterItEnds() throws {
+        try writePNG(named: "idle", color: .red)
+        let loadResult = try makeLoadResult()
+        let clock = TestClock()
+        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer(), now: clock.now)
+        avatar.setScreenPosition(CGPoint(x: 10, y: 100))
+        let restingY = avatar.spriteLayer.position.y
+
+        avatar.triggerJump()
+        clock.advance(JumpFlourish.duration + 1)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 0)
+
+        XCTAssertEqual(avatar.spriteLayer.position.y, restingY, accuracy: 0.001)
+    }
+
     func test_setFacingLeft_flipsLayerHorizontally() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()

@@ -77,6 +77,13 @@ final class CharacterBody {
         avatar.updateBounce(clip: clip, elapsed: elapsed, intensity: bounceIntensity)
     }
 
+    /// A short visual hop -- EventRouter's agent_done/code_editor
+    /// path-change reactions (02_pet-app.md F3). Forwarded straight through,
+    /// same as every other avatar-facing call here.
+    func triggerJump() {
+        avatar.triggerJump()
+    }
+
     init(avatar: AvatarPlayable, position: CGPoint, facing: AvatarFacing = .right, bounceIntensity: Double = CharacterBody.defaultBounceIntensity) {
         self.avatar = avatar
         self.position = position

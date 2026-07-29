@@ -852,8 +852,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         if let emotion = reaction.emotion {
             avatar?.showEmotion(emotion)
         }
-        // TODO: reaction.jump (Overlay hop animation) and reaction.bubbleText
-        // (F6 text bubble, read-only display mode) aren't wired up yet.
+        if reaction.jump {
+            characterBody?.triggerJump()
+        }
+        if let bubbleText = reaction.bubbleText {
+            showAgentSummaryBubble(bubbleText)
+        }
+    }
+
+    /// 02_pet-app.md F3: agent_done(ok=true) shows its summary in a "말풍선"
+    /// -- reuses TextInputBubbleView's read-only notice mode (its own doc
+    /// comment already anticipated this exact use, found via spec
+    /// cross-check), same pattern as showWorkspaceOfflineBubble.
+    private func showAgentSummaryBubble(_ summary: String) {
+        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
+
+        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleView.showMessage(summary)
+        bubbleWindow.showAndActivate()
+        // Longer than the 2.5s "workspace offline" notice -- a summary is
+        // meant to actually be read, not just glanced at.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak bubbleWindow] in
+            bubbleWindow?.closeAndRestoreFocus()
+        }
     }
 
     // MARK: - Avatar appearance (Settings size slider, 2026-07-29)

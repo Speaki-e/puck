@@ -23,6 +23,12 @@ import Foundation
 final class BridgeMessageRouter {
     private let toolExecutor: ToolExecutor
     private let dispatchToMain: (@escaping () -> Void) -> Void
+    /// EventRouter.reaction(for:) is a pure function with no session state of
+    /// its own (per its header) -- this is the one place that lives, so a
+    /// code_editor tool_call can detect its detail.path *changing* across
+    /// calls (02_pet-app.md F3: "detail.path 변경 시 짧은 점프"). Read/written
+    /// only from `handle`, which always runs on main via dispatchToMain.
+    private var lastCodeEditorPath: String?
 
     /// Emitted for protocol 3.2 status events, already on the main thread.
     var onEventReaction: ((EventReaction) -> Void)?
@@ -59,9 +65,13 @@ final class BridgeMessageRouter {
             }
 
         case .event(let event):
-            let reaction = EventRouter.reaction(for: event)
             dispatchToMain { [weak self] in
-                self?.onEventReaction?(reaction)
+                guard let self else { return }
+                let reaction = EventRouter.reaction(for: event, previousCodeEditorPath: self.lastCodeEditorPath)
+                if case .toolCall(let tool, let detail) = event, tool == "code_editor" {
+                    self.lastCodeEditorPath = EventRouter.codeEditorPath(from: detail) ?? self.lastCodeEditorPath
+                }
+                self.onEventReaction?(reaction)
             }
 
         case .toolResult, .userInput:

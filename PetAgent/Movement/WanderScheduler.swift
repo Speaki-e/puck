@@ -25,14 +25,24 @@ final class WanderScheduler {
 
     /// How long Idle waits before drawing its next Outcome.
     ///
-    /// Was `random(in: 8...30)` per 02_pet-app.md F3. Watching the real app,
-    /// that read as broken rather than calm: the pet walked for a few seconds
-    /// and then froze for up to half a minute, so its motion looked like it
-    /// was stuttering to a halt. 5s keeps it visibly alive.
+    /// 02_pet-app.md F3 specified `8...30`, and both ends of that were wrong
+    /// in practice, in opposite directions:
     ///
-    /// Note this is the wait between *draws*, not between moves -- 15% of
-    /// draws come back `.stay`, so some waits are still a multiple of this.
-    static let defaultInterval: TimeInterval = 5
+    /// - 30s at the top read as broken rather than calm. Measured, the pet
+    ///   walked a few seconds and then froze for over 20, which looks like its
+    ///   motion is stuttering to a halt.
+    /// - A flat 5s (tried next) overcorrected: sampling the frame loop showed
+    ///   the pet in motion on essentially every frame of every window, and one
+    ///   `.climbToCeiling` draw chains ~12s of climb plus ceiling plus fall on
+    ///   top of that, so it effectively never rested.
+    ///
+    /// 8...15 keeps it visibly alive without it being in constant motion. It
+    /// stays a *range* because a fixed interval makes the pet metronomic --
+    /// the one thing a wander timer exists to avoid.
+    ///
+    /// Note this is the wait between *draws*, not between moves: 15% of draws
+    /// come back `.stay`, so some observed rests span two intervals.
+    static let defaultIntervalRange: ClosedRange<TimeInterval> = 8...15
 
     private var elapsed: TimeInterval = 0
     private var nextFireInterval: TimeInterval
@@ -40,7 +50,7 @@ final class WanderScheduler {
     private let outcomeProvider: () -> Outcome
 
     init(
-        nextIntervalProvider: @escaping () -> TimeInterval = { WanderScheduler.defaultInterval },
+        nextIntervalProvider: @escaping () -> TimeInterval = { .random(in: WanderScheduler.defaultIntervalRange) },
         outcomeProvider: @escaping () -> Outcome = WanderScheduler.weightedRandomOutcome
     ) {
         self.nextIntervalProvider = nextIntervalProvider

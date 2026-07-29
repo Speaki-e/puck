@@ -38,6 +38,7 @@ test("accepts each event kind, all of which carry workspace_id/session_id (2026-
     isBridgeMessage({
       type: "event",
       event: "tool_call",
+      id: "t1",
       tool: "code_editor",
       detail: { path: "src/main.ts" },
       workspace_id: "default",
@@ -45,7 +46,10 @@ test("accepts each event kind, all of which carry workspace_id/session_id (2026-
     }),
     true,
   );
-  assert.equal(isBridgeMessage({ type: "event", event: "tool_result", ok: true, workspace_id: "default", session_id: "default" }), true);
+  assert.equal(
+    isBridgeMessage({ type: "event", event: "tool_result", id: "t1", ok: true, workspace_id: "default", session_id: "default" }),
+    true,
+  );
   assert.equal(
     isBridgeMessage({
       type: "event",
@@ -60,6 +64,67 @@ test("accepts each event kind, all of which carry workspace_id/session_id (2026-
   assert.equal(
     isBridgeMessage({ type: "event", event: "agent_done", ok: true, summary: "3 tests passed", workspace_id: "default", session_id: "default" }),
     true,
+  );
+});
+
+// --- chat-rendering fields (2026-07-29, F13's chat view needs more than the
+// coarse pet-reaction stream carried): text_chunk, and tool_call/tool_result
+// gain id (+ args/data/error/detail) so a timeline can correlate and show
+// real content, not just a bare ok/fail. ---
+
+test("accepts text_chunk", () => {
+  assert.equal(
+    isBridgeMessage({ type: "event", event: "text_chunk", text: "Running the test suite now...", workspace_id: "default", session_id: "default" }),
+    true,
+  );
+});
+
+test("rejects text_chunk missing text", () => {
+  assert.equal(isBridgeMessage({ type: "event", event: "text_chunk", workspace_id: "default", session_id: "default" }), false);
+});
+
+test("accepts tool_call with args", () => {
+  assert.equal(
+    isBridgeMessage({
+      type: "event",
+      event: "tool_call",
+      id: "t1",
+      tool: "run_shell",
+      args: { command: "npm test" },
+      workspace_id: "default",
+      session_id: "default",
+    }),
+    true,
+  );
+});
+
+test("rejects tool_call missing id", () => {
+  assert.equal(
+    isBridgeMessage({ type: "event", event: "tool_call", tool: "run_shell", workspace_id: "default", session_id: "default" }),
+    false,
+  );
+});
+
+test("accepts tool_result with id/data/error/detail", () => {
+  assert.equal(
+    isBridgeMessage({
+      type: "event",
+      event: "tool_result",
+      id: "t1",
+      ok: false,
+      error: "execution_failed",
+      detail: "exit 127",
+      workspace_id: "default",
+      session_id: "default",
+    }),
+    true,
+  );
+});
+
+test("rejects tool_result missing id", () => {
+  assert.equal(
+    isBridgeMessage({ type: "event", event: "tool_result", ok: true, workspace_id: "default", session_id: "default" }),
+    false,
   );
 });
 

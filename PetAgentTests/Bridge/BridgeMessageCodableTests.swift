@@ -106,42 +106,47 @@ final class BridgeMessageCodableTests: XCTestCase {
     // MARK: - event (workspace -> pet-app, drives the pet's reactions)
 
     func test_decodesEvent_agentThinking() throws {
-        let json = #"{"type":"event","event":"agent_thinking"}"#
+        let json = #"{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}"#
         let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
 
-        XCTAssertEqual(message, .event(.agentThinking))
+        XCTAssertEqual(message, .event(.agentThinking, workspaceId: "default", sessionId: "default"))
     }
 
     func test_decodesEvent_toolCall_withDetail() throws {
-        let json = #"{"type":"event","event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"}}"#
+        let json = #"{"type":"event","event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"},"workspace_id":"w1","session_id":"s2"}"#
         let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
 
-        guard case .event(.toolCall(let tool, let detail)) = message else {
+        guard case .event(.toolCall(let tool, let detail), let workspaceId, let sessionId) = message else {
             return XCTFail("expected .event(.toolCall), got \(message)")
         }
         XCTAssertEqual(tool, "code_editor")
         XCTAssertEqual(detail, .object(["path": .string("src/main.ts")]))
+        XCTAssertEqual(workspaceId, "w1")
+        XCTAssertEqual(sessionId, "s2")
     }
 
     func test_decodesEvent_toolResult() throws {
-        let json = #"{"type":"event","event":"tool_result","ok":true}"#
+        let json = #"{"type":"event","event":"tool_result","ok":true,"workspace_id":"default","session_id":"default"}"#
         let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
 
-        XCTAssertEqual(message, .event(.toolResult(ok: true)))
+        XCTAssertEqual(message, .event(.toolResult(ok: true), workspaceId: "default", sessionId: "default"))
     }
 
     func test_decodesEvent_awaitApproval() throws {
-        let json = #"{"type":"event","event":"await_approval","summary":"rm -rf ./dist 실행 요청"}"#
+        let json = #"{"type":"event","event":"await_approval","summary":"rm -rf ./dist 실행 요청","approval_id":"a1","workspace_id":"w1","session_id":"s2"}"#
         let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
 
-        XCTAssertEqual(message, .event(.awaitApproval(summary: "rm -rf ./dist 실행 요청")))
+        XCTAssertEqual(
+            message,
+            .event(.awaitApproval(summary: "rm -rf ./dist 실행 요청", approvalId: "a1"), workspaceId: "w1", sessionId: "s2")
+        )
     }
 
     func test_decodesEvent_agentDone() throws {
-        let json = #"{"type":"event","event":"agent_done","ok":true,"summary":"테스트 3건 통과"}"#
+        let json = #"{"type":"event","event":"agent_done","ok":true,"summary":"테스트 3건 통과","workspace_id":"default","session_id":"default"}"#
         let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
 
-        XCTAssertEqual(message, .event(.agentDone(ok: true, summary: "테스트 3건 통과")))
+        XCTAssertEqual(message, .event(.agentDone(ok: true, summary: "테스트 3건 통과"), workspaceId: "default", sessionId: "default"))
     }
 
     // MARK: - user_input (pet-app -> workspace)
@@ -155,6 +160,90 @@ final class BridgeMessageCodableTests: XCTestCase {
 
     func test_encodesUserInput_text_roundTrips() throws {
         let original = BridgeMessage.userInput(UserInput(text: "README 열어줘", source: .text))
+
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(BridgeMessage.self, from: data)
+
+        XCTAssertEqual(decoded, original)
+    }
+
+    /// 2026-07-29 (plan/01_protocol.md 3.4): workspace_id/session_id default to
+    /// "default" when a single-workspace/single-session caller omits them.
+    func test_decodesUserInput_withWorkspaceSessionAndAttachments() throws {
+        let json = #"""
+        {"type":"user_input","text":"look at this","source":"text","workspace_id":"w1","session_id":"s2","attachments":[{"type":"image","path":"/tmp/capture.png"}]}
+        """#
+        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(
+            message,
+            .userInput(UserInput(text: "look at this", source: .text, workspaceId: "w1", sessionId: "s2", attachments: [Attachment(path: "/tmp/capture.png")]))
+        )
+    }
+
+    // MARK: - sessions/workspaces (pet-app <-> workspace, 2026-07-29)
+
+    func test_encodesWorkspaceCreateRequest_roundTrips() throws {
+        let original = BridgeMessage.workspaceCreateRequest(name: "cat house", projectPath: "/tmp/cat-house")
+
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(BridgeMessage.self, from: data)
+
+        XCTAssertEqual(decoded, original)
+    }
+
+    func test_decodesWorkspaceCreate_withNoProjectPath() throws {
+        let json = #"{"type":"workspace_create","workspace_id":"w1","name":"chat only"}"#
+        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message, .workspaceCreate(workspaceId: "w1", name: "chat only", projectPath: nil))
+    }
+
+    func test_encodesSessionCreateRequest_roundTrips() throws {
+        let original = BridgeMessage.sessionCreateRequest(workspaceId: "w1", title: "new chat")
+
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(BridgeMessage.self, from: data)
+
+        XCTAssertEqual(decoded, original)
+    }
+
+    func test_decodesSessionCreate_agentOrigin() throws {
+        let json = #"{"type":"session_create","workspace_id":"w1","session_id":"s2","title":"fix the bug","origin":"agent"}"#
+        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message, .sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix the bug", origin: .agent))
+    }
+
+    // MARK: - editor view (workspace -> pet-app, 2026-07-29)
+
+    func test_decodesEditorViewReady() throws {
+        let json = #"{"type":"editor_view_ready","workspace_id":"w1","url":"http://127.0.0.1:53912/editor"}"#
+        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message, .editorViewReady(workspaceId: "w1", url: "http://127.0.0.1:53912/editor"))
+    }
+
+    func test_decodesEditorViewUnavailable() throws {
+        let json = #"{"type":"editor_view_unavailable","workspace_id":"w1","reason":"no_project_path"}"#
+        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(message, .editorViewUnavailable(workspaceId: "w1", reason: .noProjectPath))
+    }
+
+    // MARK: - approval response / run cancel (pet-app -> workspace, 2026-07-29)
+
+    func test_encodesApprovalResponse_roundTrips() throws {
+        let original = BridgeMessage.approvalResponse(approvalId: "a1", approved: true)
+
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(BridgeMessage.self, from: data)
+
+        XCTAssertEqual(decoded, original)
+    }
+
+    func test_encodesRunCancel_roundTrips() throws {
+        let original = BridgeMessage.runCancel(sessionId: "s2")
 
         let data = try encoder.encode(original)
         let decoded = try decoder.decode(BridgeMessage.self, from: data)

@@ -62,7 +62,7 @@ final class ManifestSFXKeyCoverageTests: XCTestCase {
             .toolCall(tool: "run_shell", detail: nil),
             .toolResult(ok: true),
             .toolResult(ok: false),
-            .awaitApproval(summary: ""),
+            .awaitApproval(summary: "", approvalId: ""),
             .agentDone(ok: true, summary: ""),
             .agentDone(ok: false, summary: ""),
         ]

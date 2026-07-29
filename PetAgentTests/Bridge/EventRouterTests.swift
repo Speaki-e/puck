@@ -81,7 +81,7 @@ final class EventRouterTests: XCTestCase {
     }
 
     func test_awaitApproval_transitionsToPointWithWaitingSFX() {
-        let reaction = EventRouter.reaction(for: .awaitApproval(summary: "rm -rf ./dist"))
+        let reaction = EventRouter.reaction(for: .awaitApproval(summary: "rm -rf ./dist", approvalId: "a1"))
         XCTAssertEqual(reaction, EventReaction(stateTransition: .point, sfxKey: "await_approval", emotion: "thinking"))
     }
 

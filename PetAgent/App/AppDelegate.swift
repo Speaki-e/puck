@@ -60,6 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     // Double-tap "petting" interaction (2026-07-29, more interactions).
     private let pettingState = PettingState()
     private let spinState = SpinState()
+    // F13 (2026-07-29): Option+Shift+Space pins the character while the
+    // client window is open, same "capture then restore" pattern as
+    // stateBeforeListen below.
+    private let pinnedState = PinnedState()
+    private var stateBeforePin: StateHandler?
     /// Recognises the cursor being rubbed over the pet's head. Owned here
     /// rather than by ClickThroughController so that type stays about hit
     /// testing, matching how gesture -> FSM mapping already works.
@@ -325,6 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             (.petting, pettingState), (.spin, spinState),
             (.chaseBall, chaseBallState), (.juggleBall, juggleBallState), (.kickBall, kickBallState),
             (.climbToCeiling, climbToCeilingState), (.ceiling, ceilingState),
+            (.pinned, pinnedState),
         ] {
             controller.register(state, as: kind)
         }
@@ -950,16 +956,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
+    /// F13 (2026-07-29): stands in for the not-yet-built client window --
+    /// this still shows the old input bubble, but now pins the character for
+    /// its duration the same way the real client window will (byeolki:
+    /// "캐릭터를 고정하고 그 옆에 입력 모달을 보이고"). When the real window
+    /// replaces this bubble, carry the pin/unpin calls into its show/close
+    /// hooks.
     private func showTextInputBubble() {
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
+        pinCharacter()
+
         bubbleView.onSubmit = { [weak self] text in
             bubbleWindow.closeAndRestoreFocus()
+            self?.unpinCharacter()
             self?.sendUserInput(text: text, source: .text)
         }
-        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleView.onCancel = { [weak self] in
+            bubbleWindow.closeAndRestoreFocus()
+            self?.unpinCharacter()
+        }
         bubbleView.showInput()
         bubbleWindow.showAndActivate()
+    }
+
+    /// No-op if already pinned (repeated Option+Shift+Space while the bubble
+    /// is open) -- otherwise a second call would capture .pinned itself as
+    /// the state to restore to.
+    private func pinCharacter() {
+        guard let characterController, stateBeforePin == nil else { return }
+        stateBeforePin = characterController.currentState
+        characterController.transition(to: pinnedState)
+    }
+
+    private func unpinCharacter() {
+        guard let characterController else { return }
+        characterController.transition(to: stateBeforePin ?? idleState)
+        stateBeforePin = nil
     }
 
     /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선".

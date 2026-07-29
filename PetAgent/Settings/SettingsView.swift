@@ -28,6 +28,7 @@ struct SettingsView: View {
 
     @State private var selectedTab: Tab
     @State private var language: AppLanguage
+    @State private var appearance: AppAppearance
     @State private var volume: Double
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
@@ -39,6 +40,7 @@ struct SettingsView: View {
         self.onAvatarScaleChanged = onAvatarScaleChanged
         _selectedTab = State(initialValue: initialTab)
         _language = State(initialValue: store.language)
+        _appearance = State(initialValue: store.appearance)
         _volume = State(initialValue: Double(store.volume))
         _isMuted = State(initialValue: store.isMuted)
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
@@ -64,6 +66,7 @@ struct SettingsView: View {
                 .tag(Tab.avatar)
         }
         .frame(width: 420, height: 380)
+        .preferredColorScheme(appearance.colorScheme)
     }
 
     private var generalTab: some View {
@@ -76,6 +79,17 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: language) { store.language = $0 }
+            }
+            // byeolki: "화이트모드 다크모드 추가하고" -- an explicit override,
+            // not just passively following the system (.system does that).
+            Section(text(.appearanceLabel)) {
+                Picker(text(.appearanceLabel), selection: $appearance) {
+                    Text(text(.appearanceSystem)).tag(AppAppearance.system)
+                    Text(text(.appearanceLight)).tag(AppAppearance.light)
+                    Text(text(.appearanceDark)).tag(AppAppearance.dark)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: appearance) { store.appearance = $0 }
             }
             Section(text(.accessibilityLabel)) {
                 // The launch prompt only appears once, so this is the way back

@@ -22,6 +22,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case tabGeneral, tabSound, tabMovement, tabAvatar
 
     case languageLabel
+    case appearanceLabel, appearanceSystem, appearanceLight, appearanceDark
     case accessibilityLabel, accessibilityGranted, accessibilityNotGranted
     case openSystemSettingsButton, accessibilityExplanation
 
@@ -59,6 +60,10 @@ enum Strings {
         .tabAvatar: [.english: "Avatar", .korean: "아바타"],
 
         .languageLabel: [.english: "Language", .korean: "언어"],
+        .appearanceLabel: [.english: "Appearance", .korean: "모양"],
+        .appearanceSystem: [.english: "System", .korean: "시스템"],
+        .appearanceLight: [.english: "Light", .korean: "라이트"],
+        .appearanceDark: [.english: "Dark", .korean: "다크"],
         .accessibilityLabel: [.english: "Accessibility", .korean: "손쉬운 사용"],
         .accessibilityGranted: [.english: "Granted", .korean: "허용됨"],
         .accessibilityNotGranted: [.english: "Not granted", .korean: "허용 안 됨"],

@@ -33,6 +33,11 @@ final class ClientWindowStore: ObservableObject {
     @Published private(set) var workspaces: [ClientWorkspace]
     @Published var activeWorkspaceId: String
     @Published var activeSessionId: String
+    /// byeolki: "화이트모드 다크모드 추가하고" -- fed into
+    /// ClientWindowView's .preferredColorScheme. AppDelegate seeds this from
+    /// SettingsStore.appearance and keeps it live via onAppearanceChanged,
+    /// since this is a separate SwiftUI hierarchy from the Settings window.
+    @Published var appearance: AppAppearance = .system
 
     init(sender: UserInputSender) {
         self.sender = sender

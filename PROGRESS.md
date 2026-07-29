@@ -5,7 +5,11 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-29 · **Tests:** 694 passing (`xcodebuild test`) · **`main`:** `09ed925`
+**Last updated:** 2026-07-29 · **Tests:** 700 passing (`xcodebuild test`) · **`main`:** `6a18a60`
+
+**2026-07-29: Explicit light/dark appearance setting + accent color rebased to #A2E048.** byeolki: "화이트모드 다크모드 추가하고, 컬러는 #A2E048 이런 류 색 써서 디자인 해줘." Added `AppAppearance` (system/light/dark, mirrors `AppLanguage`'s shape) with a `colorScheme: ColorScheme?` mapping fed into `.preferredColorScheme(_:)`. `SettingsStore.appearance` persists it (`UserDefaults` key `PetAgent.appearance`) and fires `onAppearanceChanged`, same live-propagation pattern as `onLanguageChanged`; `SettingsView` gets a new segmented-picker Section. Since the client window is a separate SwiftUI hierarchy from Settings, `ClientWindowStore` got its own `@Published var appearance`, seeded and kept live from `AppDelegate` via that same callback.
+
+`ClientTheme.Colors.accent` is now `#A2E048` (a bright lime green). Because it's too light for white text/icons to read on when used as a solid fill, added `onAccent = Color.black.opacity(0.82)` and applied it everywhere accent is a fill: the user message bubble text, the send button icon, the "허용"/approve button, and the "추가"/add-workspace button. The latter two were rewritten off `.buttonStyle(.borderedProminent).tint(accent)` entirely — macOS auto-picks white label text for a tinted prominent button and that isn't overridable with `.foregroundStyle`, so they're now custom `.buttonStyle(.plain)` + explicit `.background`/`.foregroundStyle`/`Capsule()` clip.
 
 **2026-07-29: F13's client window gets an actual design system instead of default SwiftUI/List chrome.** byeolki, on seeing it: "이거 디자인을 뭘로 쳐한거임? 맥 기본 설정창처럼 생겻네" — accurate; the first pass used plain system colors/fonts and read as a settings pane. Then: "그냥 자체 앱 만들듯이 새로 UI 디자인시스템 짜서 디자인해와."
 - **`ClientTheme`** (new): one file of design tokens (accent/bubble/card colors, a rounded-design type scale, spacing/radius constants) everything in the client window now draws from, so the look has a single place to retune instead of ad hoc `.foregroundStyle(.secondary)` scattered around.

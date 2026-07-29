@@ -71,7 +71,7 @@ struct ChatView: View {
             } else {
                 Button(action: send) {
                     Image(systemName: "arrow.up")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(ClientTheme.Colors.onAccent)
                         .padding(8)
                         .background(Circle().fill(ClientTheme.Colors.accent))
                 }
@@ -114,9 +114,16 @@ private struct ApprovalBanner: View {
                 .font(ClientTheme.Typography.messageBody)
                 .foregroundStyle(.orange)
             HStack {
+                // Not .buttonStyle(.borderedProminent).tint(accent) --
+                // macOS picks a white label for a tinted prominent button,
+                // and #A2E048 is too light for white text to read on.
                 Button("허용") { onRespond(true) }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ClientTheme.Colors.accent)
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                    .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+                    .background(ClientTheme.Colors.accent)
+                    .foregroundStyle(ClientTheme.Colors.onAccent)
+                    .clipShape(Capsule())
                 Button("거부") { onRespond(false) }
                     .buttonStyle(.bordered)
                     .foregroundStyle(ClientTheme.Colors.failure)

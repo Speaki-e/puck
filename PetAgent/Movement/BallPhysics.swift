@@ -86,6 +86,19 @@ enum BallPhysics {
         }
     }
 
+    /// Pops a resting ball straight up, back into `.falling` -- it arcs back
+    /// down and lands (`.resting`) the same way a drop does, since a
+    /// negative (upward) initial velocity just decelerates under gravity,
+    /// peaks, and falls back via the exact same math (2026-07-29, more
+    /// interaction variety: a juggle before the final kick-away).
+    static func juggle(_ state: BallState, liftSpeed: CGFloat = 260) -> BallState {
+        var next = state
+        next.phase = .falling
+        next.verticalVelocity = -liftSpeed
+        next.horizontalVelocity = 0
+        return next
+    }
+
     /// Launches a resting ball up and in the pet's facing direction, so the
     /// "header" visually reads as sending it forward rather than straight up.
     static func kick(

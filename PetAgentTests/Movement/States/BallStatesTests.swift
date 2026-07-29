@@ -3,15 +3,16 @@
 //  PetAgent
 //
 //  F12 test · owner: 박해영 (Haeyoung Park)
-//  "Idle/Walk 한정 | 공 던지기(F12) | ChaseBall → KickBall → Idle"
-//  (plan/02_pet-app.md section 3, optional ball-toy interaction).
+//  "Idle/Walk 한정 | 공 던지기(F12) | ChaseBall → JuggleBall → KickBall → Idle"
+//  (plan/02_pet-app.md section 3, optional ball-toy interaction; JuggleBall
+//  added 2026-07-29 for more motion variety on the same interaction).
 //
 
 import XCTest
 @testable import PetAgent
 
 final class ChaseBallStateTests: XCTestCase {
-    func test_movesTowardTheBallAndRequestsKickOnArrival() {
+    func test_movesTowardTheBallAndRequestsJuggleOnArrival() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 100))
         let state = ChaseBallState()
         state.target = CGPoint(x: 30, y: 100)
@@ -20,7 +21,7 @@ final class ChaseBallStateTests: XCTestCase {
         world.run(state, seconds: 3)
 
         XCTAssertEqual(world.body.position.x, 30, accuracy: MovementSolver.arrivalRadius)
-        XCTAssertEqual(world.requestedTransitions, [.kickBall])
+        XCTAssertEqual(world.requestedTransitions, [.juggleBall])
     }
 
     func test_ignoresWindowsInTheWay_likeMoveTo() {
@@ -71,6 +72,51 @@ final class ChaseBallStateTests: XCTestCase {
         world.run(state, seconds: 1)
 
         XCTAssertEqual(world.body.position.x, MovementSolver.walkSpeed * 2, accuracy: 1)
+    }
+}
+
+final class JuggleBallStateTests: XCTestCase {
+    func test_firesOnBounceImmediatelyOnEntry() {
+        let state = JuggleBallState()
+        var bounceCount = 0
+        state.onBounce = { bounceCount += 1 }
+
+        state.enter()
+
+        XCTAssertEqual(bounceCount, 1)
+    }
+
+    func test_bouncesTheConfiguredNumberOfTimes_thenRequestsKick() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        var bounceCount = 0
+        state.onBounce = { bounceCount += 1 }
+        state.enter()
+
+        world.run(state, seconds: JuggleBallState.bounceInterval * TimeInterval(JuggleBallState.bounceCount) + 0.1)
+
+        XCTAssertEqual(bounceCount, JuggleBallState.bounceCount)
+        XCTAssertEqual(world.requestedTransitions, [.kickBall])
+    }
+
+    func test_doesNotRequestKickBeforeAllBouncesFinish() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        state.enter()
+
+        world.run(state, seconds: JuggleBallState.bounceInterval * 0.5)
+
+        XCTAssertTrue(world.requestedTransitions.isEmpty)
+    }
+
+    func test_requestsKickOnlyOnce() {
+        let world = TestStateWorld()
+        let state = JuggleBallState()
+        state.enter()
+
+        world.run(state, seconds: JuggleBallState.bounceInterval * TimeInterval(JuggleBallState.bounceCount) + 2)
+
+        XCTAssertEqual(world.requestedTransitions.count, 1)
     }
 }
 

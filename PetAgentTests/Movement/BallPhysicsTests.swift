@@ -66,6 +66,31 @@ final class BallPhysicsTests: XCTestCase {
         XCTAssertLessThan(kicked.horizontalVelocity, 0)
     }
 
+    // MARK: - juggle(_:) (F12 juggle-before-kick variety, 2026-07-29)
+
+    /// byeolki's request for more diverse motions/interactions -- a small
+    /// vertical pop that falls back down and rests again, reusing the exact
+    /// same .falling->.resting arc a drop already takes (an upward initial
+    /// velocity decelerates under gravity, peaks, then falls back down).
+    func test_juggle_popsUpward_thenFallsBackViaTheExistingFallingPhase() {
+        let resting = BallState(position: CGPoint(x: 100, y: 500), phase: .resting)
+
+        let juggled = BallPhysics.juggle(resting)
+
+        XCTAssertEqual(juggled.phase, .falling)
+        XCTAssertLessThan(juggled.verticalVelocity, 0) // negative = upward
+        XCTAssertEqual(juggled.horizontalVelocity, 0, "a juggle pop is straight up, not off to the side")
+    }
+
+    func test_juggle_isWeakerThanAKick() {
+        let resting = BallState(position: CGPoint(x: 100, y: 500), phase: .resting)
+
+        let juggled = BallPhysics.juggle(resting)
+        let kicked = BallPhysics.kick(resting, direction: .right)
+
+        XCTAssertGreaterThan(juggled.verticalVelocity, kicked.verticalVelocity, "less negative = a smaller pop than a full kick")
+    }
+
     // MARK: - kicked
 
     func test_kicked_movesByBothVelocitiesAndApplesGravity() {

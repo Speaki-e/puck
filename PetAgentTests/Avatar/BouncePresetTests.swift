@@ -29,6 +29,10 @@ final class BouncePresetTests: XCTestCase {
         XCTAssertEqual(BouncePreset.preset(for: "kick"), .kick)
     }
 
+    func test_preset_mapsPetToWiggle() {
+        XCTAssertEqual(BouncePreset.preset(for: "pet"), .wiggle)
+    }
+
     func test_preset_mapsUnhandledClipsToNone() {
         for clip in ["climb", "fall", "type", "listen", "react_drag", "not_a_real_clip"] {
             XCTAssertEqual(BouncePreset.preset(for: clip), .none, "expected .none for \(clip)")
@@ -38,7 +42,7 @@ final class BouncePresetTests: XCTestCase {
     // MARK: - intensity 0 / .none -> always identity
 
     func test_transform_zeroIntensity_isAlwaysIdentity() {
-        for preset: BouncePreset in [.idle, .walk, .land, .pop, .kick] {
+        for preset: BouncePreset in [.idle, .walk, .land, .pop, .kick, .wiggle] {
             let transform = preset.transform(elapsed: 1.0, intensity: 0)
             XCTAssertEqual(transform, .identity, "expected identity for \(preset) at intensity 0")
         }
@@ -129,6 +133,27 @@ final class BouncePresetTests: XCTestCase {
         let transform = BouncePreset.kick.transform(elapsed: 0.3, intensity: 1.0) // past the 0.16s anticipation threshold
         XCTAssertLessThan(transform.scaleX, 1.0)
         XCTAssertGreaterThan(transform.scaleY, 1.0)
+    }
+
+    // MARK: - wiggle: petting reaction (2026-07-29)
+
+    func test_wiggle_atZeroElapsed_isIdentity() {
+        let transform = BouncePreset.wiggle.transform(elapsed: 0, intensity: 1.0)
+        XCTAssertEqual(transform.scaleX, 1.0, accuracy: 0.0001)
+        XCTAssertEqual(transform.scaleY, 1.0, accuracy: 0.0001)
+    }
+
+    func test_wiggle_oscillatesSideToSide() {
+        // Near an odd multiple of the wiggle's quarter-period, scaleX should
+        // be visibly off from identity in one direction or the other.
+        let transform = BouncePreset.wiggle.transform(elapsed: 0.0375, intensity: 1.0) // 0.15s period / 4
+        XCTAssertNotEqual(transform.scaleX, 1.0, accuracy: 0.001)
+    }
+
+    func test_wiggle_decaysToIdentity_byTheEndOfItsDuration() {
+        let transform = BouncePreset.wiggle.transform(elapsed: 0.8, intensity: 1.0)
+        XCTAssertEqual(transform.scaleX, 1.0, accuracy: 0.01)
+        XCTAssertEqual(transform.scaleY, 1.0, accuracy: 0.01)
     }
 
     /// The old two-phase linear ramp jumped from its anticipation peak

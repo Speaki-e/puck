@@ -32,12 +32,19 @@ enum StateKind: Equatable, CaseIterable {
     /// then kick it away. Never reachable from a socket event -- see
     /// EventRouter.reaction(for:), which has no case producing these.
     case chaseBall
+    /// A couple of small pops before the final kick-away (2026-07-29, more
+    /// interaction variety), between chaseBall arriving and kickBall.
+    case juggleBall
     case kickBall
     /// F3 ceiling-crawling (2026-07-29): climb straight up to the ceiling,
     /// then crawl there upside-down. Reached only from WanderScheduler's
     /// idle roll, never from a socket event.
     case climbToCeiling
     case ceiling
+    /// Double-tap "petting" interaction (2026-07-29, byeolki's request for
+    /// more interactions). Never reachable from a socket event, same as
+    /// chaseBall/kickBall.
+    case petting
 }
 
 /// The result of routing one BridgeEvent: an optional state transition, an

@@ -50,11 +50,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private let listenState = ListenState()
     private let reactClickState = ReactClickState()
     private let reactDragState = ReactDragState()
+    // Double-tap "petting" interaction (2026-07-29, more interactions).
+    private let pettingState = PettingState()
     // F3 ceiling-crawling (2026-07-29): WanderScheduler's .climbToCeiling outcome.
     private let climbToCeilingState = ClimbToCeilingState()
     private let ceilingState = CeilingState()
     // F12 (optional, lowest priority): ball-toy interaction.
     private let chaseBallState = ChaseBallState()
+    private let juggleBallState = JuggleBallState()
     private let kickBallState = KickBallState()
     private var ballController: BallController?
 
@@ -284,7 +287,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             (.fall, fallState), (.land, landState), (.moveTo, moveToState),
             (.point, pointState), (.type, typeState), (.listen, listenState),
             (.reactClick, reactClickState), (.reactDrag, reactDragState),
-            (.chaseBall, chaseBallState), (.kickBall, kickBallState),
+            (.petting, pettingState),
+            (.chaseBall, chaseBallState), (.juggleBall, juggleBallState), (.kickBall, kickBallState),
             (.climbToCeiling, climbToCeilingState), (.ceiling, ceilingState),
         ] {
             controller.register(state, as: kind)
@@ -326,6 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             self.chaseBallState.target = position
             controller.transition(to: .chaseBall)
         }
+        juggleBallState.onBounce = { [weak self] in self?.ballController?.juggle() }
         kickBallState.onEnter = { [weak self] in
             self?.ballController?.kick(direction: self?.characterBody?.facing ?? .right)
         }
@@ -614,6 +619,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         switch gesture {
         case .tapped:
             controller.transition(to: .reactClick)
+        case .doubleTapped:
+            // A happier, distinct reaction from a plain click -- also shows
+            // the "happy" emotion if the user has mapped one in Settings,
+            // same as EventRouter-driven reactions do.
+            controller.transition(to: .petting)
+            avatar?.showEmotion("happy")
         case .dragBegan(let point):
             // Order matters: transition(to:) calls ReactDragState.enter(),
             // which resets cursorPosition to nil (so a stale drag can't

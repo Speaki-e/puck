@@ -90,4 +90,61 @@ final class UserInputSenderTests: XCTestCase {
         XCTAssertEqual(sender.send(text: "second", source: .text), .workspaceDisconnected)
         XCTAssertEqual(transport.broadcasted.count, 1, "the second send must not have gone out")
     }
+
+    // MARK: - F13 (2026-07-29): workspace_id/session_id on user_input, and the
+    // new session/workspace/approval/cancel messages -- same delivery
+    // semantics as plain user_input, reusing the same transport check.
+
+    func test_send_withWorkspaceAndSessionIds_includesThemOnUserInput() {
+        let transport = StubTransport(hasConnectedClients: true)
+        let sender = UserInputSender { transport }
+
+        let delivery = sender.send(text: "look at this", source: .text, workspaceId: "w1", sessionId: "s2")
+
+        XCTAssertEqual(delivery, .sent)
+        XCTAssertEqual(
+            transport.broadcasted,
+            [.userInput(UserInput(text: "look at this", source: .text, workspaceId: "w1", sessionId: "s2"))]
+        )
+    }
+
+    func test_createWorkspace_broadcastsWorkspaceCreateRequest() {
+        let transport = StubTransport(hasConnectedClients: true)
+        let sender = UserInputSender { transport }
+
+        XCTAssertEqual(sender.createWorkspace(name: "cat house", projectPath: "/tmp/cat-house"), .sent)
+        XCTAssertEqual(transport.broadcasted, [.workspaceCreateRequest(name: "cat house", projectPath: "/tmp/cat-house")])
+    }
+
+    func test_createSession_broadcastsSessionCreateRequest() {
+        let transport = StubTransport(hasConnectedClients: true)
+        let sender = UserInputSender { transport }
+
+        XCTAssertEqual(sender.createSession(workspaceId: "w1", title: "new chat"), .sent)
+        XCTAssertEqual(transport.broadcasted, [.sessionCreateRequest(workspaceId: "w1", title: "new chat")])
+    }
+
+    func test_respondToApproval_broadcastsApprovalResponse() {
+        let transport = StubTransport(hasConnectedClients: true)
+        let sender = UserInputSender { transport }
+
+        XCTAssertEqual(sender.respondToApproval(approvalId: "a1", approved: true), .sent)
+        XCTAssertEqual(transport.broadcasted, [.approvalResponse(approvalId: "a1", approved: true)])
+    }
+
+    func test_cancelRun_broadcastsRunCancel() {
+        let transport = StubTransport(hasConnectedClients: true)
+        let sender = UserInputSender { transport }
+
+        XCTAssertEqual(sender.cancelRun(sessionId: "s2"), .sent)
+        XCTAssertEqual(transport.broadcasted, [.runCancel(sessionId: "s2")])
+    }
+
+    func test_createWorkspace_withNoConnectedClient_reportsDisconnected() {
+        let transport = StubTransport(hasConnectedClients: false)
+        let sender = UserInputSender { transport }
+
+        XCTAssertEqual(sender.createWorkspace(name: "x", projectPath: nil), .workspaceDisconnected)
+        XCTAssertTrue(transport.broadcasted.isEmpty)
+    }
 }

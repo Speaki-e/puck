@@ -70,6 +70,25 @@ final class BridgeMessageRouterTests: XCTestCase {
         XCTAssertEqual(handler.ranOnMainThread, true)
     }
 
+    /// F13 (2026-07-29): the chat store needs the raw event + its
+    /// workspace_id/session_id, not just the derived pet EventReaction.
+    func test_onChatEvent_firesAlongsideOnEventReaction_withWorkspaceAndSessionIds() {
+        let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
+        var received: (event: BridgeEvent, workspaceId: String, sessionId: String)?
+        let chatEventReceived = expectation(description: "chat event delivered")
+        router.onChatEvent = { event, workspaceId, sessionId in
+            received = (event, workspaceId, sessionId)
+            chatEventReceived.fulfill()
+        }
+
+        router.handle(.event(.agentDone(ok: true, summary: "done"), workspaceId: "w1", sessionId: "s2"), reply: { _ in })
+
+        wait(for: [chatEventReceived], timeout: 2)
+        XCTAssertEqual(received?.event, .agentDone(ok: true, summary: "done"))
+        XCTAssertEqual(received?.workspaceId, "w1")
+        XCTAssertEqual(received?.sessionId, "s2")
+    }
+
     func test_reaction_matchesEventRouter() {
         let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
 

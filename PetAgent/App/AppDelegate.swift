@@ -90,6 +90,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var bridgeServer: BridgeServer?
     private var bridgeMessageRouter: BridgeMessageRouter?
     private lazy var userInputSender = UserInputSender { [weak self] in self?.bridgeServer }
+    /// F13 (2026-07-29): sidebar/session-list source of truth, fed by
+    /// bridgeMessageRouter's onClientUpdate/onChatEvent below. The client
+    /// window itself (task not yet built) will bind to this.
+    private lazy var clientWindowStore = ClientWindowStore(sender: userInputSender)
 
     private var hotkeyManager: GlobalHotkeyManager?
     private var voiceInputController: VoiceInputController?
@@ -822,6 +826,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         let router = BridgeMessageRouter(toolExecutor: toolExecutor)
         router.onEventReaction = { [weak self] reaction in self?.applyEventReaction(reaction) }
+        router.onClientUpdate = { [weak self] message in self?.clientWindowStore.handleClientUpdate(message) }
+        router.onChatEvent = { [weak self] event, workspaceId, sessionId in
+            self?.clientWindowStore.handleChatEvent(event, workspaceId: workspaceId, sessionId: sessionId)
+        }
         bridgeMessageRouter = router
 
         let server = BridgeServer()
@@ -945,7 +953,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     }
 
     private func sendUserInput(text: String, source: UserInput.Source) {
-        switch userInputSender.send(text: text, source: source) {
+        // Routed through clientWindowStore (2026-07-29) rather than
+        // userInputSender directly, so it already targets whichever
+        // workspace/session is active once the real client window (F13,
+        // not yet built) lets the user switch away from the default.
+        switch clientWindowStore.sendMessage(text, source: source) {
         case .sent:
             break
         case .workspaceDisconnected:

@@ -46,12 +46,57 @@ final class UserInputSender {
         self.transport = transport
     }
 
+    /// - Parameters:
+    ///   - workspaceId/sessionId: F13 (2026-07-29, protocol 3.4) -- default to
+    ///     nil (wire default "default") for callers that don't yet know about
+    ///     workspaces/sessions.
     @discardableResult
-    func send(text: String, source: UserInput.Source) -> UserInputDelivery {
+    func send(
+        text: String,
+        source: UserInput.Source,
+        workspaceId: String? = nil,
+        sessionId: String? = nil,
+        attachments: [Attachment]? = nil
+    ) -> UserInputDelivery {
+        broadcast(.userInput(UserInput(text: text, source: source, workspaceId: workspaceId, sessionId: sessionId, attachments: attachments)))
+    }
+
+    /// F13 (2026-07-29, protocol 3.4): request a new workspace via the
+    /// sidebar's "add workspace". Confirmed later by a workspace_create
+    /// BridgeMessageRouter.onClientUpdate callback, which is the one that
+    /// actually assigns workspace_id.
+    @discardableResult
+    func createWorkspace(name: String, projectPath: String?) -> UserInputDelivery {
+        broadcast(.workspaceCreateRequest(name: name, projectPath: projectPath))
+    }
+
+    /// F13 (2026-07-29, protocol 3.4): request a new chat session via the
+    /// sidebar's "new chat". Confirmed later by a session_create
+    /// onClientUpdate callback (origin: .user).
+    @discardableResult
+    func createSession(workspaceId: String, title: String) -> UserInputDelivery {
+        broadcast(.sessionCreateRequest(workspaceId: workspaceId, title: title))
+    }
+
+    /// F13 (2026-07-29, protocol 3.6): resolve a pending await_approval from
+    /// the chat view's allow/deny buttons.
+    @discardableResult
+    func respondToApproval(approvalId: String, approved: Bool) -> UserInputDelivery {
+        broadcast(.approvalResponse(approvalId: approvalId, approved: approved))
+    }
+
+    /// F13 (2026-07-29, protocol 3.6): the chat view's stop button -- aborts
+    /// the whole conversation turn, not a single tool (see ToolCancel for that).
+    @discardableResult
+    func cancelRun(sessionId: String) -> UserInputDelivery {
+        broadcast(.runCancel(sessionId: sessionId))
+    }
+
+    private func broadcast(_ message: BridgeMessage) -> UserInputDelivery {
         guard let transport = transport(), transport.hasConnectedClients else {
             return .workspaceDisconnected
         }
-        let delivered = transport.broadcast(.userInput(UserInput(text: text, source: source)))
+        let delivered = transport.broadcast(message)
         return delivered ? .sent : .workspaceDisconnected
     }
 }

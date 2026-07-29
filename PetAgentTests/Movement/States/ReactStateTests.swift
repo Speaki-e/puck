@@ -45,9 +45,26 @@ final class ReactDragStateTests: XCTestCase {
         state.enter()
 
         state.cursorPosition = CGPoint(x: 300, y: 150)
-        world.run(state, seconds: 0.05)
+        world.run(state, seconds: 1) // long enough for the ease to converge
 
-        XCTAssertEqual(world.body.position, CGPoint(x: 300, y: 150))
+        XCTAssertEqual(world.body.position.x, 300, accuracy: 0.5)
+        XCTAssertEqual(world.body.position.y, 150, accuracy: 0.5)
+    }
+
+    /// A small amount of "give" while being carried instead of snapping
+    /// exactly to the cursor every frame, which reads as a rigid teleport
+    /// rather than something being held (byeolki: "내가 잡고 움직일때
+    /// 아직 움직임이 부자연스러워").
+    func test_doesNotSnapInstantlyToTheCursor() {
+        let world = TestStateWorld(position: CGPoint(x: 0, y: 0))
+        let state = ReactDragState()
+        state.enter()
+
+        state.cursorPosition = CGPoint(x: 300, y: 150)
+        world.run(state, seconds: 1.0 / 60) // exactly one frame
+
+        XCTAssertGreaterThan(world.body.position.x, 0, "should have moved toward the cursor")
+        XCTAssertLessThan(world.body.position.x, 300, "but not all the way there in a single frame")
     }
 
     func test_releasingDropsThePet() {
@@ -70,14 +87,16 @@ final class ReactDragStateTests: XCTestCase {
         let state = ReactDragState()
         state.enter()
         state.cursorPosition = CGPoint(x: 300, y: 150)
-        world.run(state, seconds: 0.05)
+        world.run(state, seconds: 1) // converge close to the cursor first
+        let droppedPosition = world.body.position
+
         state.release()
         world.run(state, seconds: 0.05)
 
         state.cursorPosition = CGPoint(x: 900, y: 900)
         world.run(state, seconds: 0.05)
 
-        XCTAssertEqual(world.body.position, CGPoint(x: 300, y: 150))
+        XCTAssertEqual(world.body.position, droppedPosition)
     }
 
     func test_facesTheDirectionItIsDraggedIn() {

@@ -99,6 +99,39 @@ final class MovementSolverTests: XCTestCase {
         )
     }
 
+    // MARK: - Ease (ReactDrag "give" while being carried, 2026-07-29)
+
+    /// byeolki: "내가 잡고 움직일때 아직 움직임이 부자연스러워" -- snapping
+    /// exactly to the cursor every frame reads as a rigid teleport rather
+    /// than something being carried. One frame must move PART of the way
+    /// there, not all the way, or there's no "give" to feel at all.
+    func test_ease_movesPartWayToTarget_notAllTheWay() {
+        let result = MovementSolver.ease(from: CGPoint(x: 0, y: 0), toward: CGPoint(x: 300, y: 150), dt: 1.0 / 60)
+
+        XCTAssertGreaterThan(result.x, 0)
+        XCTAssertLessThan(result.x, 300)
+        XCTAssertGreaterThan(result.y, 0)
+        XCTAssertLessThan(result.y, 150)
+    }
+
+    func test_ease_convergesCloseToTarget_overEnoughTime() {
+        var position = CGPoint(x: 0, y: 0)
+        let target = CGPoint(x: 300, y: 150)
+        let dt: TimeInterval = 1.0 / 60
+        for _ in 0..<120 { // 2 seconds, comfortably past convergence
+            position = MovementSolver.ease(from: position, toward: target, dt: dt)
+        }
+
+        XCTAssertEqual(position.x, target.x, accuracy: 0.5)
+        XCTAssertEqual(position.y, target.y, accuracy: 0.5)
+    }
+
+    func test_ease_alreadyAtTarget_staysPut() {
+        let result = MovementSolver.ease(from: CGPoint(x: 50, y: 50), toward: CGPoint(x: 50, y: 50), dt: 1.0 / 60)
+
+        XCTAssertEqual(result, CGPoint(x: 50, y: 50))
+    }
+
     // MARK: - Falling
 
     func test_fallAcceleratesDownward() {

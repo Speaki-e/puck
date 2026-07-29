@@ -57,5 +57,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PetAgentTests
+        # Xcode 26 refuses to code sign a test bundle with no Info.plist.
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: PetAgent

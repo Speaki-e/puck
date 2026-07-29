@@ -382,10 +382,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// overlay window's local space, with our own overlay filtered out — the
     /// pet must not try to stand on the window it is drawn in.
     private func overlayLocalWindows(excluding overlay: NSWindow?) -> [WindowInfo] {
+        // Reuses ScreenManager's cached GlobalScreenSpace instead of calling
+        // GlobalScreenSpace.current() fresh here -- this runs every frame
+        // (60Hz while active) via CharacterController.windows(), and
+        // .current() re-queries NSScreen.screens and rebuilds the whole
+        // space from scratch every time, for a value that only actually
+        // changes on a real display reconfiguration (which ScreenManager
+        // already observes and refreshes on).
         guard
             let watcher = windowListWatcher,
             let overlayFrame = overlayController?.windows.first?.frame,
-            let screenSpace = GlobalScreenSpace.current()
+            let screenSpace = screenManager?.current
         else {
             return []
         }

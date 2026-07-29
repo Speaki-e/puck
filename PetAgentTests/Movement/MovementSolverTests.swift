@@ -116,6 +116,36 @@ final class MovementSolverTests: XCTestCase {
         )
     }
 
+    /// Falling from the ceiling (F3, 2026-07-29) covers far more distance
+    /// than falling off a window ever did, so unbounded acceleration
+    /// eventually moves the pet dozens of pixels in a single frame -- reads
+    /// as a teleport, not a fall (byeolki: "떨어지다가 개빨라져서 거의
+    /// 순간이동임"). A terminal velocity keeps per-frame movement bounded no
+    /// matter how far the drop.
+    func test_fallVelocityIsCappedAtTerminalVelocity() {
+        let step = MovementSolver.fallStep(
+            position: .zero,
+            velocity: 2000, // already above any reasonable terminal velocity
+            gravity: 1000,
+            dt: 1,
+            terminalVelocity: 900
+        )
+
+        XCTAssertEqual(step.velocity, 900, accuracy: 0.001)
+    }
+
+    func test_fallVelocityBelowTerminal_acceleratesNormally() {
+        let step = MovementSolver.fallStep(
+            position: .zero,
+            velocity: 0,
+            gravity: 1000,
+            dt: 0.1,
+            terminalVelocity: 900
+        )
+
+        XCTAssertEqual(step.velocity, 100, accuracy: 0.001)
+    }
+
     func test_fallStopsAtTheLandingSurface() {
         let step = MovementSolver.fallStep(
             position: CGPoint(x: 0, y: 95),

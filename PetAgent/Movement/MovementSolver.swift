@@ -21,6 +21,12 @@ enum MovementSolver {
     static let walkSpeed: CGFloat = 90
     /// Default gravity, px/sec².
     static let gravity: CGFloat = 1200
+    /// Default terminal velocity, px/sec. A fall from the ceiling covers the
+    /// whole screen's height, far more than any window-edge fall ever did --
+    /// unbounded acceleration over that distance eventually moves the pet
+    /// dozens of pixels in a single frame, reading as a teleport rather than
+    /// a fall.
+    static let terminalVelocity: CGFloat = 900
     /// How close counts as "there".
     static let arrivalRadius: CGFloat = 2
 
@@ -80,9 +86,10 @@ enum MovementSolver {
         velocity: CGFloat,
         gravity: CGFloat = gravity,
         dt: TimeInterval,
-        landingY: CGFloat? = nil
+        landingY: CGFloat? = nil,
+        terminalVelocity: CGFloat = terminalVelocity
     ) -> FallStep {
-        let newVelocity = velocity + gravity * CGFloat(dt)
+        let newVelocity = min(velocity + gravity * CGFloat(dt), terminalVelocity)
         let newY = position.y + newVelocity * CGFloat(dt)
 
         if let landingY, newY >= landingY {

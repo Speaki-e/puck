@@ -71,6 +71,35 @@ final class ChatSessionTests: XCTestCase {
         XCTAssertEqual(second, "Done.")
     }
 
+    // MARK: - user's own sent messages (2026-07-29) -- ChatSession.apply(_:)
+    // only ever folds in the *agent's* side of the conversation (BridgeEvent
+    // is workspace -> pet-app only); without this, what the user typed would
+    // never appear in their own chat view.
+
+    func test_appendUserMessage_addsATimelineEntry() {
+        let session = makeSession()
+        session.appendUserMessage("hi there")
+
+        XCTAssertEqual(session.timeline.count, 1)
+        guard case .userMessage(_, let text) = session.timeline[0] else {
+            return XCTFail("expected userMessage, got \(session.timeline[0])")
+        }
+        XCTAssertEqual(text, "hi there")
+    }
+
+    /// A user message must not be treated as the tail of a still-streaming
+    /// assistant reply -- the next textChunk has to start a fresh entry.
+    func test_textChunkAfterUserMessage_startsAFreshEntry_ratherThanMerging() {
+        let session = makeSession()
+        session.apply(.textChunk(text: "earlier reply"))
+        session.appendUserMessage("interrupting question")
+        session.apply(.textChunk(text: "new reply"))
+
+        XCTAssertEqual(session.timeline.count, 3)
+        guard case .assistantText(_, let last) = session.timeline[2] else { return XCTFail("expected assistantText") }
+        XCTAssertEqual(last, "new reply")
+    }
+
     func test_toolCall_appendsATimelineEntryWithItsArgs() {
         let session = makeSession()
         session.apply(.toolCall(id: "t1", tool: "run_shell", args: .object(["command": .string("npm test")]), detail: nil))

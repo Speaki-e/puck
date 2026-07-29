@@ -16,6 +16,11 @@ import Foundation
 /// session); the rest mint their own, since nothing else in the wire format
 /// gives them one.
 enum ChatTimelineEntry: Equatable {
+    /// The user's own sent message -- BridgeEvent never carries this (it's
+    /// workspace -> pet-app only), so ChatSession.appendUserMessage mints it
+    /// locally the moment the chat view sends, rather than folding it from
+    /// an event like every other case here.
+    case userMessage(id: UUID, text: String)
     case assistantText(id: UUID, text: String)
     case toolCall(id: String, tool: String, args: JSONValue?)
     case toolResult(id: String, ok: Bool, data: JSONValue?, error: String?, detail: String?)
@@ -29,6 +34,7 @@ extension ChatTimelineEntry: Identifiable {
     // entry* ids need distinct prefixes or the two rows collide.
     var id: AnyHashable {
         switch self {
+        case .userMessage(let id, _): return id
         case .assistantText(let id, _): return id
         case .toolCall(let id, _, _): return "call:\(id)"
         case .toolResult(let id, _, _, _, _): return "result:\(id)"
@@ -57,6 +63,12 @@ final class ChatSession: ObservableObject, Identifiable {
         self.workspaceId = workspaceId
         self.title = title
         self.origin = origin
+    }
+
+    /// Local echo of the user's own send -- called by ChatView, not folded
+    /// from a BridgeEvent (protocol never sends the user's own text back).
+    func appendUserMessage(_ text: String) {
+        timeline.append(.userMessage(id: UUID(), text: text))
     }
 
     /// Folds one BridgeEvent into the timeline. Caller (ClientWindowStore) is

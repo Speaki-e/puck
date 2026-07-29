@@ -16,6 +16,10 @@ struct ClientSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Clears the traffic-light buttons -- ClientWindow uses
+            // .fullSizeContentView + a transparent titlebar so the sidebar's
+            // own background runs to the top of the window.
+            Color.clear.frame(height: 28)
             sectionHeader("워크스페이스")
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
@@ -29,11 +33,14 @@ struct ClientSidebarView: View {
                         showingNewWorkspaceSheet = true
                     } label: {
                         Label("워크스페이스 추가", systemImage: "plus")
+                            .font(ClientTheme.Typography.sessionTitle)
+                            .foregroundStyle(ClientTheme.Colors.secondaryText)
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                    .padding(.vertical, ClientTheme.Metrics.spacingSmall)
                 }
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
             }
             .frame(maxHeight: 160)
 
@@ -42,10 +49,12 @@ struct ClientSidebarView: View {
             Button {
                 store.requestNewSession(title: "새 채팅", in: store.activeWorkspaceId)
             } label: {
-                Label("새 채팅", systemImage: "plus.bubble")
+                Label("새 채팅", systemImage: "square.and.pencil")
+                    .font(ClientTheme.Typography.workspaceName)
+                    .foregroundStyle(ClientTheme.Colors.accent)
             }
             .buttonStyle(.plain)
-            .padding(8)
+            .padding(ClientTheme.Metrics.spacingMedium)
 
             sectionHeader("세션")
             ScrollView {
@@ -56,10 +65,13 @@ struct ClientSidebarView: View {
                         }
                     }
                 }
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
             }
 
             Spacer()
         }
+        .frame(width: ClientTheme.Metrics.sidebarWidth)
+        .background(VisualEffectBackground(material: .sidebar))
         .sheet(isPresented: $showingNewWorkspaceSheet) {
             NewWorkspaceSheet(
                 onCreate: { name, projectPath in
@@ -73,10 +85,11 @@ struct ClientSidebarView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
+            .font(ClientTheme.Typography.sectionHeader)
+            .foregroundStyle(ClientTheme.Colors.secondaryText)
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+            .padding(.top, ClientTheme.Metrics.spacingMedium)
+            .padding(.bottom, ClientTheme.Metrics.spacingSmall)
     }
 }
 
@@ -87,20 +100,27 @@ private struct WorkspaceRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack {
+            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                Image(systemName: workspace.projectPath == nil ? "bubble.left.and.bubble.right.fill" : "folder.fill")
+                    .foregroundStyle(isActive ? ClientTheme.Colors.accent : ClientTheme.Colors.secondaryText)
+                    .frame(width: 18)
                 Text(workspace.name)
+                    .font(ClientTheme.Typography.workspaceName)
+                    .lineLimit(1)
                 Spacer()
                 if isActive {
                     Image(systemName: "checkmark")
+                        .font(.caption)
+                        .foregroundStyle(ClientTheme.Colors.accent)
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
-        .cornerRadius(4)
+        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+        .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+        .background(isActive ? ClientTheme.Colors.accentSoft : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius, style: .continuous))
     }
 }
 
@@ -111,8 +131,14 @@ private struct SessionRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack {
-                Text(session.title).lineLimit(1)
+            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                Image(systemName: "message.fill")
+                    .font(.caption)
+                    .foregroundStyle(isActive ? ClientTheme.Colors.accent : ClientTheme.Colors.secondaryText)
+                    .frame(width: 18)
+                Text(session.title)
+                    .font(ClientTheme.Typography.sessionTitle)
+                    .lineLimit(1)
                 Spacer()
                 if session.isRunning {
                     ProgressView().controlSize(.small)
@@ -121,10 +147,10 @@ private struct SessionRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
-        .cornerRadius(4)
+        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+        .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+        .background(isActive ? ClientTheme.Colors.accentSoft : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius, style: .continuous))
     }
 }
 
@@ -136,26 +162,31 @@ private struct NewWorkspaceSheet: View {
     @State private var projectPath: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("새 워크스페이스").font(.headline)
+        VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
+            Text("새 워크스페이스").font(.title3.weight(.semibold))
+
             TextField("이름", text: $name)
                 .textFieldStyle(.roundedBorder)
+
             HStack {
                 Text(projectPath ?? "프로젝트 폴더 없음 (순수 채팅)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ClientTheme.Colors.secondaryText)
                     .lineLimit(1)
                 Spacer()
                 Button("폴더 선택...") { choosePath() }
             }
+
             HStack {
                 Spacer()
                 Button("취소", action: onCancel)
                 Button("추가") { onCreate(name, projectPath) }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ClientTheme.Colors.accent)
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
-        .padding(20)
+        .padding(ClientTheme.Metrics.spacingLarge * 1.5)
         .frame(width: 360)
     }
 

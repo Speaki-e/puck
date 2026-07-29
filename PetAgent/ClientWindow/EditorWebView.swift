@@ -29,13 +29,15 @@ struct EditorWebView: NSViewRepresentable {
 /// project_path bound (protocol 3.5's editor_view_unavailable).
 struct EditorUnavailableView: View {
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: ClientTheme.Metrics.spacingMedium) {
             Image(systemName: "folder.badge.questionmark")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 40))
+                .foregroundStyle(ClientTheme.Colors.secondaryText)
             Text("이 워크스페이스에는 연결된 프로젝트가 없어요")
-                .foregroundStyle(.secondary)
+                .font(ClientTheme.Typography.sessionTitle)
+                .foregroundStyle(ClientTheme.Colors.secondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(ClientTheme.Colors.contentBackground)
     }
 }

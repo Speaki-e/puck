@@ -18,12 +18,18 @@ final class ClientWindow: NSWindow {
     convenience init(contentRect: CGRect) {
         self.init(
             contentRect: contentRect,
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         title = "PetAgent"
         isReleasedWhenClosed = false
+        // Lets the sidebar's own background run up under the traffic lights
+        // instead of a separate gray title bar strip -- the plain-titlebar
+        // look was part of what read as "default macOS settings pane"
+        // (byeolki: "맥 기본 설정창처럼 생겼네").
+        titlebarAppearsTransparent = true
+        titleVisibility = .hidden
         delegate = self
     }
 

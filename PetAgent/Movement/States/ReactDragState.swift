@@ -7,8 +7,11 @@
 //
 //  The pet hangs off the cursor while being dragged and drops when let go
 //  ("임의 | 캐릭터 드래그/드롭 | ReactDrag(커서 추종) → Fall",
-//  plan/02_pet-app.md section 3). Position is assigned outright rather than
-//  eased toward the cursor: anything else feels like lag while dragging.
+//  plan/02_pet-app.md section 3). Eases toward the cursor (MovementSolver.ease)
+//  rather than snapping to it outright -- byeolki reported the drag still felt
+//  unnatural ("아직 움직임이 부자연스러워") with an exact 1:1 follow, which
+//  reads as a rigid teleport rather than something being carried. The ease
+//  rate is fast enough to stay responsive, not laggy.
 //
 
 import CoreGraphics
@@ -50,6 +53,6 @@ final class ReactDragState: StateHandler {
         if let facing = MovementSolver.facing(from: context.body.position, toward: cursorPosition) {
             context.body.facing = facing
         }
-        context.body.position = cursorPosition
+        context.body.position = MovementSolver.ease(from: context.body.position, toward: cursorPosition, dt: dt)
     }
 }

@@ -34,6 +34,10 @@ enum MovementSolver {
     static let terminalVelocity: CGFloat = 900
     /// How close counts as "there".
     static let arrivalRadius: CGFloat = 2
+    /// Default ease rate for `ease(from:toward:)`, 1/sec. Tuned to converge
+    /// within roughly 100-150ms -- fast enough to stay responsive, slow
+    /// enough to actually be visible as a bit of "give."
+    static let dragEaseRate: CGFloat = 25
 
     struct Step: Equatable {
         let position: CGPoint
@@ -74,6 +78,19 @@ enum MovementSolver {
         // Normalize so diagonal motion isn't 1.41x faster than axis-aligned.
         let moved = CGPoint(x: position.x + dx / distance * travel, y: position.y + dy / distance * travel)
         return Step(position: moved, hasArrived: false)
+    }
+
+    /// Exponential ease-toward, frame-rate independent. Used by ReactDrag so
+    /// the pet has a small amount of natural "give" while being carried
+    /// instead of snapping exactly to the cursor every frame, which read as
+    /// a rigid teleport rather than something being held (byeolki: "내가
+    /// 잡고 움직일때 아직 움직임이 부자연스러워"). `1 - exp(-rate * dt)`
+    /// is the fraction of the remaining distance closed this frame -- it
+    /// converges to the same place regardless of how the same total dt was
+    /// split into frames, unlike a fixed per-frame percentage would.
+    static func ease(from position: CGPoint, toward target: CGPoint, rate: CGFloat = dragEaseRate, dt: TimeInterval) -> CGPoint {
+        let factor = 1 - exp(-rate * CGFloat(dt))
+        return CGPoint(x: position.x + (target.x - position.x) * factor, y: position.y + (target.y - position.y) * factor)
     }
 
     /// Which way the character should face to head toward `target`, or nil for

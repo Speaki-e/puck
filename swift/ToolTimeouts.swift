@@ -40,6 +40,9 @@ enum ToolTimeouts {
         "code_editor": 600,
         "open_in_editor": 10,
         "read_file": 10,
+        // ai-module executor -- never dispatched, so this never actually
+        // applies; 0 mirrors tools.ts's placeholder value (2026-07-29).
+        "open_task_session": 0,
     ]
 
     /// The registry timeout for `tool`, or `defaultSeconds` if unlisted.

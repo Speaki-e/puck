@@ -102,6 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var menuBarController: MenuBarController?
     private var settingsWindow: NSWindow?
     private var textInputBubbleWindow: TextInputBubbleWindow?
+    /// F13 (2026-07-29) -- the Claude-Desktop-style client window Option+Shift+Space summons.
+    private var clientWindow: ClientWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestPermissions()
@@ -943,7 +945,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         manager.onPushToTalkDown = { [weak voiceController] in voiceController?.pushToTalkDown() }
         manager.onPushToTalkUp = { [weak voiceController] in voiceController?.pushToTalkUp() }
-        manager.onTextInputRequested = { [weak self] in self?.showTextInputBubble() }
+        manager.onTextInputRequested = { [weak self] in self?.showClientWindow() }
         manager.onCharacterSummonRequested = { [weak self] in self?.summonCharacter() }
 
         if !manager.start() {
@@ -968,28 +970,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
-    /// F13 (2026-07-29): stands in for the not-yet-built client window --
-    /// this still shows the old input bubble, but now pins the character for
-    /// its duration the same way the real client window will (byeolki:
-    /// "캐릭터를 고정하고 그 옆에 입력 모달을 보이고"). When the real window
-    /// replaces this bubble, carry the pin/unpin calls into its show/close
-    /// hooks.
-    private func showTextInputBubble() {
-        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
-
+    /// F13 (2026-07-29): Option+Shift+Space pins the character and summons
+    /// the client window (byeolki: "캐릭터를 고정하고 그 옆에 입력 모달을
+    /// 보이고") -- docked beside it on first open, refocused if already open.
+    private func showClientWindow() {
         pinCharacter()
 
-        bubbleView.onSubmit = { [weak self] text in
-            bubbleWindow.closeAndRestoreFocus()
-            self?.unpinCharacter()
-            self?.sendUserInput(text: text, source: .text)
+        let window = clientWindow ?? {
+            let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 720, height: 480))
+            newWindow.onWillClose = { [weak self] in self?.unpinCharacter() }
+            let hostingController = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
+            newWindow.contentViewController = hostingController
+            clientWindow = newWindow
+            return newWindow
+        }()
+
+        if let primaryWindow {
+            let center = CGPoint(x: primaryWindow.frame.midX, y: primaryWindow.frame.midY)
+            window.setFrameOrigin(NSPoint(x: center.x + 80, y: center.y))
         }
-        bubbleView.onCancel = { [weak self] in
-            bubbleWindow.closeAndRestoreFocus()
-            self?.unpinCharacter()
-        }
-        bubbleView.showInput()
-        bubbleWindow.showAndActivate()
+        window.showAndActivate()
     }
 
     /// No-op if already pinned (repeated Option+Shift+Space while the bubble

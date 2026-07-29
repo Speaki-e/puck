@@ -517,6 +517,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
             controller.transition(to: .walk)
         case .climbToCeiling:
+            // ClimbToCeilingState falls back to .fall on its own if there's no
+            // wall underfoot, but that costs one visible frame of the climb
+            // clip flashing before it drops -- byeolki: "이거 화면에 있는
+            // 벽? 통해서만 올라갈 수 있게 해줘 그냥 아무 지형에서
+            // 올라가버리냐". Checking here avoids ever entering the state
+            // without a wall to begin with.
+            guard let body = characterBody,
+                  WindowSupport.windowBeingClimbed(at: body.position, in: overlayLocalWindows(excluding: nil)) != nil else {
+                walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+                controller.transition(to: .walk)
+                return
+            }
             controller.transition(to: .climbToCeiling)
         case .stay:
             break

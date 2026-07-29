@@ -17,7 +17,7 @@ final class EventRouterTests: XCTestCase {
     }
 
     func test_toolCall_codeEditor_transitionsToType() {
-        let reaction = EventRouter.reaction(for: .toolCall(tool: "code_editor", detail: nil))
+        let reaction = EventRouter.reaction(for: .toolCall(id: "t1", tool: "code_editor", args: nil, detail: nil))
         XCTAssertEqual(reaction, EventReaction(stateTransition: .type))
     }
 
@@ -30,7 +30,7 @@ final class EventRouterTests: XCTestCase {
         // Nothing to compare the very first path against -- entering Type
         // isn't itself a "change".
         let reaction = EventRouter.reaction(
-            for: .toolCall(tool: "code_editor", detail: .object(["path": .string("src/main.ts")])),
+            for: .toolCall(id: "t1", tool: "code_editor", args: nil, detail: .object(["path": .string("src/main.ts")])),
             previousCodeEditorPath: nil
         )
         XCTAssertEqual(reaction, EventReaction(stateTransition: .type, jump: false))
@@ -38,7 +38,7 @@ final class EventRouterTests: XCTestCase {
 
     func test_toolCall_codeEditor_samePathAsBefore_doesNotJump() {
         let reaction = EventRouter.reaction(
-            for: .toolCall(tool: "code_editor", detail: .object(["path": .string("src/main.ts")])),
+            for: .toolCall(id: "t1", tool: "code_editor", args: nil, detail: .object(["path": .string("src/main.ts")])),
             previousCodeEditorPath: "src/main.ts"
         )
         XCTAssertEqual(reaction, EventReaction(stateTransition: .type, jump: false))
@@ -46,7 +46,7 @@ final class EventRouterTests: XCTestCase {
 
     func test_toolCall_codeEditor_differentPathThanBefore_jumps() {
         let reaction = EventRouter.reaction(
-            for: .toolCall(tool: "code_editor", detail: .object(["path": .string("src/other.ts")])),
+            for: .toolCall(id: "t1", tool: "code_editor", args: nil, detail: .object(["path": .string("src/other.ts")])),
             previousCodeEditorPath: "src/main.ts"
         )
         XCTAssertEqual(reaction, EventReaction(stateTransition: .type, jump: true))
@@ -54,29 +54,29 @@ final class EventRouterTests: XCTestCase {
 
     func test_toolCall_runShell_neverJumpsRegardlessOfPreviousPath() {
         let reaction = EventRouter.reaction(
-            for: .toolCall(tool: "run_shell", detail: nil),
+            for: .toolCall(id: "t1", tool: "run_shell", args: nil, detail: nil),
             previousCodeEditorPath: "src/main.ts"
         )
         XCTAssertEqual(reaction, EventReaction(stateTransition: .point, jump: false))
     }
 
     func test_toolCall_runShell_transitionsToPoint() {
-        let reaction = EventRouter.reaction(for: .toolCall(tool: "run_shell", detail: nil))
+        let reaction = EventRouter.reaction(for: .toolCall(id: "t1", tool: "run_shell", args: nil, detail: nil))
         XCTAssertEqual(reaction, EventReaction(stateTransition: .point))
     }
 
     func test_toolCall_runAppleScript_transitionsToPoint() {
-        let reaction = EventRouter.reaction(for: .toolCall(tool: "run_applescript", detail: nil))
+        let reaction = EventRouter.reaction(for: .toolCall(id: "t1", tool: "run_applescript", args: nil, detail: nil))
         XCTAssertEqual(reaction, EventReaction(stateTransition: .point))
     }
 
     func test_toolResult_failure_reactsWithTaskFailSFX() {
-        let reaction = EventRouter.reaction(for: .toolResult(ok: false))
+        let reaction = EventRouter.reaction(for: .toolResult(id: "t1", ok: false, data: nil, error: nil, detail: nil))
         XCTAssertEqual(reaction, EventReaction(stateTransition: .reactClick, sfxKey: "task_fail", emotion: "sad"))
     }
 
     func test_toolResult_success_isNoOp() {
-        let reaction = EventRouter.reaction(for: .toolResult(ok: true))
+        let reaction = EventRouter.reaction(for: .toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil))
         XCTAssertEqual(reaction, EventReaction())
     }
 

@@ -129,9 +129,9 @@ final class BridgeMessageRouterTests: XCTestCase {
             if reactions.count == 3 { allThreeReceived.fulfill() }
         }
 
-        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
-        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("a.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
-        router.handle(.event(.toolCall(tool: "code_editor", detail: .object(["path": .string("b.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
+        router.handle(.event(.toolCall(id: "t1", tool: "code_editor", args: nil, detail: .object(["path": .string("a.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
+        router.handle(.event(.toolCall(id: "t1", tool: "code_editor", args: nil, detail: .object(["path": .string("a.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
+        router.handle(.event(.toolCall(id: "t1", tool: "code_editor", args: nil, detail: .object(["path": .string("b.ts")])), workspaceId: "default", sessionId: "default"), reply: { _ in })
 
         wait(for: [allThreeReceived], timeout: 2)
         XCTAssertEqual(reactions.map(\.jump), [false, false, true])

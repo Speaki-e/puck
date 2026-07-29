@@ -58,10 +58,10 @@ final class ManifestSFXKeyCoverageTests: XCTestCase {
     private func allEventRouterSFXKeys() -> Set<String> {
         let events: [BridgeEvent] = [
             .agentThinking,
-            .toolCall(tool: "code_editor", detail: nil),
-            .toolCall(tool: "run_shell", detail: nil),
-            .toolResult(ok: true),
-            .toolResult(ok: false),
+            .toolCall(id: "t1", tool: "code_editor", args: nil, detail: nil),
+            .toolCall(id: "t1", tool: "run_shell", args: nil, detail: nil),
+            .toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil),
+            .toolResult(id: "t1", ok: false, data: nil, error: nil, detail: nil),
             .awaitApproval(summary: "", approvalId: ""),
             .agentDone(ok: true, summary: ""),
             .agentDone(ok: false, summary: ""),

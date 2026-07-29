@@ -39,6 +39,18 @@ final class CharacterBody {
         }
     }
 
+    /// A one-shot launch impulse in px/sec, consumed by the next state that
+    /// can act on it (only FallState today, which reads it on its first frame
+    /// and clears it). Set by ReactDragState when the pet is thrown: the
+    /// throw's speed has to outlive the drag state that measured it, and this
+    /// is the only thing both states already share. Zero means a plain drop,
+    /// so every other route into Fall is unaffected.
+    ///
+    /// Deliberately NOT a live velocity the FSM integrates every frame -- the
+    /// states are kinematic by design ("물리엔진 없음", plan/02_pet-app.md F3)
+    /// and only Fall does anything with acceleration.
+    var launchVelocity: CGPoint = .zero
+
     /// F3 ceiling-crawling (2026-07-29): true while CeilingState/ClimbToCeilingState
     /// own the character. Same no-op-on-unchanged guard as facing.
     var isUpsideDown: Bool = false {
@@ -47,6 +59,11 @@ final class CharacterBody {
             avatar.setUpsideDown(isUpsideDown)
         }
     }
+
+    /// The pet's visible outline relative to its position — forwarded from
+    /// the avatar so the FSM never talks to the renderer directly, the same
+    /// rule every other property here follows.
+    var visualBounds: CGRect { avatar.visualBounds }
 
     func play(clip: String, loop: Bool) {
         avatar.play(clip: clip, loop: loop)

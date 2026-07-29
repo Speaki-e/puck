@@ -62,6 +62,37 @@ final class SpriteAvatarTests: XCTestCase {
         return try AvatarLoader.load(manifestData: Data(json.utf8))
     }
 
+    // MARK: - Implicit animations
+
+    /// A CALayer that isn't a view's backing layer animates position/transform
+    /// implicitly, 0.25s per assignment. The FSM assigns 60 times a second, so
+    /// what renders is a value perpetually easing toward a target that already
+    /// moved -- the sprite trails the pet and slides past where it stopped
+    /// (byeolki: "전체적으로 펫이 움직이는 방식이 너무 비정상적이고 부드럽지
+    /// 못해"). Every per-frame property has to opt out, or the frame loop's
+    /// output gets smoothed behind its back.
+    func test_spriteLayer_hasImplicitAnimationsDisabled() throws {
+        try writePNG(named: "idle", color: .red)
+
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory,
+            loadResult: try makeLoadResult(),
+            parent: CALayer()
+        )
+
+        // Asserted on the actions dictionary rather than action(forKey:):
+        // the lookup only resolves to a real animation once the layer is in a
+        // live render tree, so off-screen it reports nil either way and would
+        // pass just as happily with the opt-out missing.
+        let actions = avatar.spriteLayer.actions ?? [:]
+        for property in ["position", "transform", "contents", "bounds"] {
+            XCTAssertTrue(
+                actions[property] is NSNull,
+                "\(property) must be mapped to NSNull so it never animates implicitly"
+            )
+        }
+    }
+
     // MARK: - Retina rasterization
 
     /// A hand-made CALayer defaults to contentsScale 1.0 regardless of the

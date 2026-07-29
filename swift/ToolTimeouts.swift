@@ -1,0 +1,49 @@
+//
+//  ToolTimeouts.swift
+//  protocol
+//
+//  Per-tool timeout mirror (docs/tools.md, plan/01_protocol.md section 4).
+//  Reference implementation -- pet-app copies this file. Mirrors the
+//  `timeoutSec` field of every entry in src/types/tools.ts.
+//
+//  Only the timeouts are mirrored, not the whole registry: `timeout_sec` is
+//  the one registry field a tool_dispatch *receiver* needs but the wire does
+//  not carry (docs/socket.md -- the sender owns the real timeout, the
+//  receiver only needs a bound that is not tighter than the registry's).
+//  Executor/approval/params stay TS-only because no Swift-side consumer
+//  reads them.
+//
+//  Update this file together with src/types/tools.ts and docs/tools.md on any
+//  timeout change (see repo root README, change management rules).
+//
+
+import Foundation
+
+enum ToolTimeouts {
+    /// Applied to any tool absent from `bySeconds` -- an unknown tool is
+    /// rejected before dispatch anyway, so this only covers a registry entry
+    /// that shipped in TS before this mirror caught up.
+    static let defaultSeconds: TimeInterval = 15
+
+    /// tool name -> `timeoutSec` from src/types/tools.ts.
+    static let bySeconds: [String: TimeInterval] = [
+        // pet-app executor
+        "launch_app": 15,
+        "list_running_apps": 5,
+        "get_frontmost_window": 5,
+        "find_ui_element": 15,
+        "point_at": 30,
+        "click_element": 15,
+        "run_shell": 60,
+        "run_applescript": 60,
+        // workspace executor
+        "code_editor": 600,
+        "open_in_editor": 10,
+        "read_file": 10,
+    ]
+
+    /// The registry timeout for `tool`, or `defaultSeconds` if unlisted.
+    static func seconds(for tool: String) -> TimeInterval {
+        bySeconds[tool] ?? defaultSeconds
+    }
+}

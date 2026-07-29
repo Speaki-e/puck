@@ -27,6 +27,11 @@ arguments all use this space (**not** AppKit's bottom-left origin).
 
 ## Response (`tool_result.data`) shapes
 
+`timeout_sec` is not carried on the wire (see [socket.md](socket.md): the *sender* owns the
+timeout). A receiver still needs a bound that is not tighter than the registry's, so Swift
+consumers read [`../swift/ToolTimeouts.swift`](../swift/ToolTimeouts.swift), a mirror of this
+column. Change a timeout here and in `src/types/tools.ts` and that mirror together.
+
 The table above is the normative param/executor/approval/timeout contract; this section
 fills in a gap the table doesn't cover — what each tool's success payload actually looks
 like. Most tools return an object or `null`. One does not:

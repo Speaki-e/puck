@@ -193,7 +193,8 @@ needs to tell them apart:
   `run_cancel` (whichever role originates them) go to the `workspace` connection; channel 2's
   events plus `workspace_create`, `session_create`, `editor_view_ready`, and
   `editor_view_unavailable` go to every `gui` connection.
-- pet-app also pins the on-screen character (F3 Pinned state) while at least one `gui`
-  connection is open, and unpins it once the last one disconnects — this replaces the old
-  in-process "client window opened/closed" callback from when the chat window and the pet
-  shared a process.
+- pet-app does *not* pin the character off this handshake: PetAgentClient is a Dock-resident
+  app expected to stay running continuously, so tying the pin to "is a gui connected" would
+  freeze the pet for as long as PetAgentClient is alive, not just while its window is actually
+  in use. Pinning stays local to pet-app's own quick-capture bubble (Option+Shift+Space),
+  which is the one truly momentary chat-adjacent interaction pet-app can observe directly.

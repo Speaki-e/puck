@@ -67,7 +67,6 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertTrue(bounce.didBounce)
         XCTAssertLessThan(bounce.velocity, 0, "heading back the other way")
         XCTAssertEqual(bounce.velocity, -800 * ScreenBounds.restitution, accuracy: 0.001, "having lost energy")
         XCTAssertEqual(bounce.position.x, 940, "reflected back inside by how far it overshot")
@@ -81,7 +80,6 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertTrue(bounce.didBounce)
         XCTAssertEqual(bounce.velocity, 600 * ScreenBounds.restitution, accuracy: 0.001)
         XCTAssertEqual(bounce.position.x, 70)
     }
@@ -94,13 +92,13 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertFalse(bounce.didBounce)
         XCTAssertEqual(bounce.velocity, 800)
         XCTAssertEqual(bounce.position.x, 500)
     }
 
-    /// A slow nudge into the wall should settle against it. Bouncing at any
-    /// speed leaves the pet buzzing on the edge in ever-smaller hops.
+    /// A slow nudge into the wall should settle against it (velocity 0).
+    /// Bouncing at any speed leaves the pet buzzing on the edge in
+    /// ever-smaller hops.
     func test_bounce_belowTheMinimumSpeed_restsAgainstTheEdge() {
         let bounce = ScreenBounds.bounceHorizontally(
             position: CGPoint(x: 955, y: 0),
@@ -109,7 +107,6 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertFalse(bounce.didBounce)
         XCTAssertEqual(bounce.velocity, 0)
         XCTAssertEqual(bounce.position.x, 950, "resting exactly on the limit")
     }
@@ -150,7 +147,6 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertTrue(bounce.didBounce)
         XCTAssertGreaterThan(bounce.velocity, 0, "now heading back down")
         XCTAssertEqual(bounce.velocity, 700 * ScreenBounds.restitution, accuracy: 0.001)
         XCTAssertEqual(bounce.position.y, 130, "reflected back down by its overshoot")
@@ -164,8 +160,8 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertFalse(bounce.didBounce, "coming down is a landing, not a ceiling hit")
-        XCTAssertEqual(bounce.velocity, 400)
+        XCTAssertEqual(bounce.velocity, 400, "coming down is a landing, not a ceiling hit")
+        XCTAssertEqual(bounce.position.y, 110, "and it is left where it was")
     }
 
     func test_ceiling_ignoresAPetBelowTheCeiling() {
@@ -176,7 +172,6 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertFalse(bounce.didBounce)
         XCTAssertEqual(bounce.velocity, -700)
     }
 
@@ -192,7 +187,6 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertTrue(bounce.didBounce, "a 300pt-tall pet is already at the ceiling at y=290")
     }
 
     func test_ceiling_belowTheMinimumSpeed_stopsAtTheCeiling() {
@@ -203,7 +197,6 @@ final class ScreenBoundsTests: XCTestCase {
             in: area
         )
 
-        XCTAssertFalse(bounce.didBounce)
         XCTAssertEqual(bounce.velocity, 0)
         XCTAssertEqual(bounce.position.y, 120)
     }

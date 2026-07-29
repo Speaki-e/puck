@@ -34,7 +34,7 @@ final class BouncePresetTests: XCTestCase {
     }
 
     func test_preset_mapsUnhandledClipsToNone() {
-        for clip in ["climb", "fall", "type", "listen", "react_drag", "not_a_real_clip"] {
+        for clip in ["fall", "type", "listen", "react_drag", "not_a_real_clip"] {
             XCTAssertEqual(BouncePreset.preset(for: clip), .none, "expected .none for \(clip)")
         }
     }
@@ -174,5 +174,67 @@ final class BouncePresetTests: XCTestCase {
         let transform = BouncePreset.kick.transform(elapsed: boundary, intensity: 1.0)
         XCTAssertEqual(transform.scaleX, 1.0, accuracy: 0.001)
         XCTAssertEqual(transform.scaleY, 1.0, accuracy: 0.001)
+    }
+}
+
+/// The climb waddle (byeolki: "위로 올라갈때 귀엽게 올라가게 해봐", 2026-07-29).
+final class ClimbBouncePresetTests: XCTestCase {
+    private let preset = BouncePreset.climb
+
+    func test_climbClipUsesTheWaddle() {
+        XCTAssertEqual(BouncePreset.preset(for: "climb"), .climb)
+    }
+
+    /// Rotation is the whole effect — a scale-only waddle reads as the sprite
+    /// being squeezed rather than the pet leaning.
+    func test_rocksBothWaysOverOneCycle() {
+        let quarter = preset.transform(elapsed: 0.125, intensity: 1) // sin peak
+        let threeQuarter = preset.transform(elapsed: 0.375, intensity: 1) // sin trough
+
+        XCTAssertGreaterThan(quarter.rotation, 0, "leaning one way")
+        XCTAssertLessThan(threeQuarter.rotation, 0, "and the other")
+        XCTAssertEqual(quarter.rotation, -threeQuarter.rotation, accuracy: 0.0001, "symmetrically")
+    }
+
+    func test_leanStaysGentle() {
+        for step in 0...40 {
+            let rotation = preset.transform(elapsed: Double(step) * 0.02, intensity: 1).rotation
+
+            XCTAssertLessThanOrEqual(abs(rotation), 8 * .pi / 180 + 0.0001, "never leans more than 8 degrees")
+        }
+    }
+
+    func test_intensityScalesTheLean() {
+        let full = preset.transform(elapsed: 0.125, intensity: 1).rotation
+        let half = preset.transform(elapsed: 0.125, intensity: 0.5).rotation
+
+        XCTAssertEqual(half, full / 2, accuracy: 0.0001)
+    }
+
+    func test_zeroIntensityIsCompletelyStill() {
+        XCTAssertEqual(preset.transform(elapsed: 0.125, intensity: 0), .identity)
+    }
+
+    /// The squash runs at twice the rocking rate: shortest at both extremes
+    /// of the lean, tallest passing through upright. Matched frequencies
+    /// would make one side droop instead.
+    func test_squashPeaksAtBothExtremesOfTheLean() {
+        let upright = preset.transform(elapsed: 0, intensity: 1)
+        let leaningRight = preset.transform(elapsed: 0.125, intensity: 1)
+        let leaningLeft = preset.transform(elapsed: 0.375, intensity: 1)
+
+        XCTAssertEqual(upright.scaleY, 1, accuracy: 0.0001, "tallest passing through upright")
+        XCTAssertLessThan(leaningRight.scaleY, upright.scaleY)
+        XCTAssertEqual(leaningLeft.scaleY, leaningRight.scaleY, accuracy: 0.0001, "equally short both ways")
+    }
+
+    /// Every other preset must stay purely a scale transform.
+    func test_otherPresetsDoNotRotate() {
+        for other in [BouncePreset.none, .idle, .walk, .land, .pop, .kick, .wiggle] {
+            for step in 0...20 {
+                let rotation = other.transform(elapsed: Double(step) * 0.05, intensity: 1).rotation
+                XCTAssertEqual(rotation, 0, "\(other) must not rotate")
+            }
+        }
     }
 }

@@ -52,6 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private let reactDragState = ReactDragState()
     // Double-tap "petting" interaction (2026-07-29, more interactions).
     private let pettingState = PettingState()
+    private let spinState = SpinState()
+    /// Recognises the cursor being rubbed over the pet's head. Owned here
+    /// rather than by ClickThroughController so that type stays about hit
+    /// testing, matching how gesture -> FSM mapping already works.
+    private var headPetDetector = HeadPetDetector()
     // F3 ceiling-crawling (2026-07-29): WanderScheduler's .climbToCeiling outcome.
     private let climbToCeilingState = ClimbToCeilingState()
     private let ceilingState = CeilingState()
@@ -287,7 +292,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             (.fall, fallState), (.land, landState), (.moveTo, moveToState),
             (.point, pointState), (.type, typeState), (.listen, listenState),
             (.reactClick, reactClickState), (.reactDrag, reactDragState),
-            (.petting, pettingState),
+            (.petting, pettingState), (.spin, spinState),
             (.chaseBall, chaseBallState), (.juggleBall, juggleBallState), (.kickBall, kickBallState),
             (.climbToCeiling, climbToCeilingState), (.ceiling, ceilingState),
         ] {
@@ -364,6 +369,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             hitboxSize: avatarHitboxSize
         )
         clickThrough.onGesture = { [weak self] gesture in self?.handlePetGesture(gesture) }
+        clickThrough.onCursorMoved = { [weak self] cursor, overHead in
+            self?.handleCursorMoved(cursor, overHead: overHead)
+        }
         clickThrough.startMonitoring()
         clickThroughController = clickThrough
     }
@@ -454,6 +462,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // re-attaching, clicking the pet silently stops working after a display
         // change.
         clickThrough.onGesture = { [weak self] gesture in self?.handlePetGesture(gesture) }
+        clickThrough.onCursorMoved = { [weak self] cursor, overHead in
+            self?.handleCursorMoved(cursor, overHead: overHead)
+        }
         clickThrough.startMonitoring()
         clickThroughController = clickThrough
     }
@@ -512,9 +523,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
             controller.transition(to: .walk)
         case .climbNearestWindow:
-            // Needs F4's window list to choose a window; until Climb is wired
-            // to it, roam instead of standing still.
-            walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+            // Walk to the nearest climbable window's side; WalkState's own
+            // blockingWindow check takes it from there and hands off to Climb.
+            // Falls back to roaming when there's nothing to climb, rather
+            // than standing still.
+            walkState.target = characterBody.flatMap { body in
+                WindowSupport.nearestClimbTarget(
+                    from: body.position,
+                    in: overlayLocalWindows(excluding: nil),
+                    roamableTop: controller.roamableArea.minY,
+                    avatarHeight: avatarHitboxSize.height
+                )
+            } ?? Self.randomRoamPoint(in: controller.roamableArea)
             controller.transition(to: .walk)
         case .climbToCeiling:
             // ClimbToCeilingState falls back to .fall on its own if there's no
@@ -535,9 +555,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
+    /// How much of each side of the screen wander targets stay out of, as a
+    /// fraction of its width. Targeting the literal edges meant a good share
+    /// of wanders ended with the pet pressed into a corner, where it then sat
+    /// until the next timer -- and screen-edge containment holds it there
+    /// exactly, so it reads as being stuck rather than as having wandered
+    /// (byeolki: "펫이 너무 구석이 박히고"). It can still be *carried* or
+    /// thrown into a corner; it just won't choose one.
+    static let roamEdgeMargin: CGFloat = 0.08
+
     private static func randomRoamPoint(in area: CGRect) -> CGPoint {
         guard area.width > 0 else { return .zero }
-        return CGPoint(x: CGFloat.random(in: area.minX...area.maxX), y: area.maxY)
+        let margin = area.width * roamEdgeMargin
+        return CGPoint(x: CGFloat.random(in: (area.minX + margin)...(area.maxX - margin)), y: area.maxY)
     }
 
     // MARK: - Frame loop (F3)
@@ -567,6 +597,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
                     roamableArea: controller.roamableArea
                 )
             }
+            // Stroking ends when the cursor stops moving, which by definition
+            // sends no events -- so it has to be noticed on a tick.
+            self.apply(self.headPetDetector.tick(now: CACurrentMediaTime()))
+
             // F1's idle downshift: a resting pet doesn't need 60fps.
             let isResting = self.characterController?.currentState === self.idleState
             self.frameClock.setFramesPerSecond(self.idleFrameRate.framesPerSecond(idle: isResting, dt: dt))
@@ -672,6 +706,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
         case .dragEnded:
             reactDragState.release()
+        }
+    }
+
+    /// Stroking the pet's head makes it happy, and letting go sets it
+    /// twirling (byeolki: "마우스 포인터로 펫 머리 위를 쓰담 쓰담 하면 기분
+    /// 좋은 표정 + 쓰담쓰담 끝나면 일정 시간동안 빙글 빙글 돌기", 2026-07-29).
+    private func handleCursorMoved(_ cursor: CGPoint, overHead: Bool) {
+        apply(headPetDetector.cursorMoved(to: cursor, overHead: overHead, now: CACurrentMediaTime()))
+    }
+
+    private func apply(_ update: HeadPetDetector.Update) {
+        guard let controller = characterController else { return }
+        switch update {
+        case .began:
+            // Never interrupt the pet being carried: a drag is the user's
+            // hand already, and the cursor necessarily moves over the head
+            // while dragging it around.
+            guard controller.currentState !== reactDragState else { return }
+            controller.transition(to: .petting)
+            // After the transition -- enter() clears the flag.
+            pettingState.beginStroking()
+            avatar?.showEmotion("happy")
+        case .ended:
+            pettingState.endStroking()
+        case .unchanged:
+            break
         }
     }
 

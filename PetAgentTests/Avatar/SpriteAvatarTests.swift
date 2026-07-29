@@ -234,9 +234,15 @@ final class SpriteAvatarTests: XCTestCase {
     func test_setFacingLeft_flipsLayerHorizontally() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()
-        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+        let clock = TestClock()
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer(), now: clock.now
+        )
 
         avatar.setFacing(.left)
+        // Past the end of the turn: the settled value is what matters here.
+        clock.advance(FlipAnimation.duration)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 0)
 
         XCTAssertEqual(avatar.spriteLayer.affineTransform().a, -1, accuracy: 0.0001)
     }
@@ -244,20 +250,83 @@ final class SpriteAvatarTests: XCTestCase {
     func test_setFacingRight_isIdentityScaleX() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()
-        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+        let clock = TestClock()
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer(), now: clock.now
+        )
 
         avatar.setFacing(.left)
+        clock.advance(FlipAnimation.duration)
         avatar.setFacing(.right)
+        clock.advance(FlipAnimation.duration)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 0)
 
         XCTAssertEqual(avatar.spriteLayer.affineTransform().a, 1, accuracy: 0.0001)
+    }
+
+    // MARK: - Turning (byeolki: "종이 뒤집어지는 모션")
+
+    /// The turn has to be recomputed from elapsed time on every frame, not
+    /// handed to Core Animation: applyTransform rewrites the layer transform
+    /// each frame for the procedural bounce, so an attached animation would
+    /// be overwritten immediately.
+    func test_turning_narrowsToEdgeOnPartWayThrough() throws {
+        try writePNG(named: "idle", color: .red)
+        let clock = TestClock()
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory, loadResult: try makeLoadResult(), parent: CALayer(), now: clock.now
+        )
+
+        avatar.setFacing(.left)
+        clock.advance(FlipAnimation.duration / 2)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 0)
+
+        XCTAssertEqual(avatar.spriteLayer.affineTransform().a, 0, accuracy: 0.0001, "edge-on at the halfway point")
+    }
+
+    func test_turning_startsAtFullWidthFacingTheOldWay() throws {
+        try writePNG(named: "idle", color: .red)
+        let clock = TestClock()
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory, loadResult: try makeLoadResult(), parent: CALayer(), now: clock.now
+        )
+
+        avatar.setFacing(.left)
+
+        XCTAssertEqual(avatar.spriteLayer.affineTransform().a, 1, accuracy: 0.0001, "the turn has not started yet")
+    }
+
+    /// Turning back mid-turn must resume from the width currently on screen,
+    /// not snap out to full width and start over.
+    func test_turningBackMidTurn_resumesFromTheCurrentWidth() throws {
+        try writePNG(named: "idle", color: .red)
+        let clock = TestClock()
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory, loadResult: try makeLoadResult(), parent: CALayer(), now: clock.now
+        )
+
+        avatar.setFacing(.left)
+        clock.advance(FlipAnimation.duration / 2) // edge-on
+        avatar.setFacing(.right)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 0)
+
+        XCTAssertEqual(avatar.spriteLayer.affineTransform().a, 0, accuracy: 0.0001, "still edge-on, no snap")
+
+        clock.advance(FlipAnimation.duration)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 0)
+        XCTAssertEqual(avatar.spriteLayer.affineTransform().a, 1, accuracy: 0.0001, "and settles facing right")
     }
 
     func test_updateBounce_combinesWithFacing() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()
-        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+        let clock = TestClock()
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer(), now: clock.now
+        )
 
         avatar.setFacing(.left)
+        clock.advance(FlipAnimation.duration)
         avatar.updateBounce(clip: "land", elapsed: 0, intensity: 1.0) // land at t=0 -> scaleX 1.3, scaleY 0.7
 
         let transform = avatar.spriteLayer.affineTransform()
@@ -399,9 +468,13 @@ final class SpriteAvatarTests: XCTestCase {
     func test_setUpsideDown_combinesWithFacingLeft() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()
-        let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
+        let clock = TestClock()
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer(), now: clock.now
+        )
 
         avatar.setFacing(.left)
+        clock.advance(FlipAnimation.duration) // let the turn settle
         avatar.setUpsideDown(true)
 
         let transform = avatar.spriteLayer.affineTransform()
@@ -423,5 +496,136 @@ final class SpriteAvatarTests: XCTestCase {
 
         XCTAssertFalse(oldParent.sublayers?.contains(avatar.spriteLayer) ?? false)
         XCTAssertTrue(newParent.sublayers?.contains(avatar.spriteLayer) ?? false)
+    }
+}
+
+/// A hand-cranked clock, so the turn animation can be tested at exact points
+/// along its 0.12s without any waiting or flakiness.
+final class TestClock {
+    private var current: TimeInterval = 1000
+
+    func now() -> TimeInterval { current }
+
+    func advance(_ seconds: TimeInterval) {
+        current += seconds
+    }
+}
+
+/// The rainbow tint is applied by masking a colour layer with the sprite, and
+/// nothing but rendering can tell you whether that actually landed on the
+/// artwork -- the preset's hue number being right says nothing about the
+/// compositing being wired up. So this renders the layer for real.
+final class SpriteAvatarTintTests: XCTestCase {
+    private var packageDirectory: URL!
+
+    override func setUpWithError() throws {
+        packageDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: packageDirectory, withIntermediateDirectories: true)
+
+        // A solid white square, so any colour in the output came from the tint.
+        let size = CGSize(width: 8, height: 8)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        image.unlockFocus()
+        let tiff = try XCTUnwrap(image.tiffRepresentation)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff))
+        let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        try png.write(to: packageDirectory.appendingPathComponent("idle.png"))
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: packageDirectory)
+        super.tearDown()
+    }
+
+    private func makeAvatar() throws -> SpriteAvatar {
+        let json = """
+        {"schema_version":1,"name":"t","type":"sprites","scale":1.0,
+         "hitbox":{"width":8,"height":8},"clips":{"idle":"idle"},"sounds":{}}
+        """
+        let parent = CALayer()
+        parent.contentsScale = 1
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory,
+            loadResult: try AvatarLoader.load(manifestData: Data(json.utf8)),
+            parent: parent
+        )
+        avatar.play(clip: "idle", loop: false)
+        return avatar
+    }
+
+    /// Average colour of the rendered sprite.
+    private func render(_ avatar: SpriteAvatar) throws -> (r: Int, g: Int, b: Int) {
+        let side = 8
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        try pixels.withUnsafeMutableBytes { buffer in
+            let context = try XCTUnwrap(CGContext(
+                data: buffer.baseAddress,
+                width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            avatar.spriteLayer.render(in: context)
+        }
+        var totals = (0, 0, 0)
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            totals.0 += Int(pixels[index])
+            totals.1 += Int(pixels[index + 1])
+            totals.2 += Int(pixels[index + 2])
+        }
+        let count = side * side
+        return (totals.0 / count, totals.1 / count, totals.2 / count)
+    }
+
+    func test_untintedSpriteKeepsItsOwnColours() throws {
+        let avatar = try makeAvatar()
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 1)
+
+        let colour = try render(avatar)
+
+        XCTAssertEqual(colour.r, colour.g, accuracy: 6, "white art should render neutral")
+        XCTAssertEqual(colour.g, colour.b, accuracy: 6)
+    }
+
+    func test_theSpinTintsTheArtworkRed() throws {
+        let avatar = try makeAvatar()
+        // Elapsed 0 is the first half turn — hue 0, red.
+        avatar.updateBounce(clip: "spin", elapsed: 0, intensity: 1)
+
+        let colour = try render(avatar)
+
+        XCTAssertGreaterThan(colour.r, colour.g + 30, "not noticeably red")
+        XCTAssertGreaterThan(colour.r, colour.b + 30)
+    }
+
+    /// Different points in the spin must give different colours, or the
+    /// rainbow never actually reaches the screen.
+    func test_laterInTheSpinTheTintIsADifferentColour() throws {
+        let avatar = try makeAvatar()
+        avatar.updateBounce(clip: "spin", elapsed: 0, intensity: 1)
+        let first = try render(avatar)
+
+        // Far enough in to be several half-turns along.
+        avatar.updateBounce(clip: "spin", elapsed: SpinState.duration * 0.5, intensity: 1)
+        let later = try render(avatar)
+
+        XCTAssertTrue(
+            first.r != later.r || first.g != later.g || first.b != later.b,
+            "the tint never changed on screen"
+        )
+    }
+
+    /// Leaving the spin has to put the pet back to its own colours.
+    func test_leavingTheSpinClearsTheTint() throws {
+        let avatar = try makeAvatar()
+        avatar.updateBounce(clip: "spin", elapsed: 0, intensity: 1)
+        avatar.updateBounce(clip: "idle", elapsed: 0, intensity: 1)
+
+        let colour = try render(avatar)
+
+        XCTAssertEqual(colour.r, colour.g, accuracy: 6, "tint outlived the spin")
     }
 }

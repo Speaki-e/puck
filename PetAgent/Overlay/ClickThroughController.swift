@@ -29,6 +29,12 @@ final class ClickThroughController {
     /// `updateCharacter(screenPosition:)` is given.
     var onGesture: ((PetGesture) -> Void)?
 
+    /// Every cursor sample over the overlay, with whether it landed on the
+    /// pet's head. Petting is recognised from plain movement rather than
+    /// clicks, so it can't come through `onGesture` -- and the recognising
+    /// itself lives outside this type, which only knows about hit testing.
+    var onCursorMoved: ((CGPoint, Bool) -> Void)?
+
     init(window: NSWindow) {
         self.window = window
         window.ignoresMouseEvents = true
@@ -100,13 +106,21 @@ final class ClickThroughController {
     }
 
     private func handleMouseMoved() {
+        let cursor = NSEvent.mouseLocation
         let allow = Self.shouldAllowClicks(
-            cursorPosition: NSEvent.mouseLocation,
+            cursorPosition: cursor,
             characterScreenPosition: characterScreenPosition,
             hitboxSize: hitboxSize,
             isUpsideDown: isUpsideDown
         )
         window?.ignoresMouseEvents = !allow
+
+        let head = Self.headRect(
+            characterScreenPosition: characterScreenPosition,
+            hitboxSize: hitboxSize,
+            isUpsideDown: isUpsideDown
+        )
+        onCursorMoved?(cursor, head.contains(cursor))
     }
 
     /// Pure hit test. Both points must already be in the same coordinate
@@ -152,5 +166,35 @@ final class ClickThroughController {
             height: paddedHeight
         )
         return rect.contains(cursorPosition)
+    }
+
+    /// Fraction of the character's height, measured down from the top, that
+    /// counts as its head for petting. The art is a chibi with a very large
+    /// head, so this is generous — but it stops short of the body, because
+    /// "쓰담쓰담" on the pet's feet isn't petting.
+    static let headFraction: CGFloat = 0.45
+
+    /// The head's rectangle, in the same AppKit global space as
+    /// `shouldAllowClicks`. No hit-test padding: petting should require
+    /// actually being on the pet, unlike grabbing it.
+    static func headRect(
+        characterScreenPosition: CGPoint,
+        hitboxSize: CGSize,
+        isUpsideDown: Bool = false
+    ) -> CGRect {
+        guard hitboxSize != .zero else { return .zero }
+        let headHeight = hitboxSize.height * headFraction
+        // Y grows upward here, and the body extends up from the feet -- so the
+        // head is the TOP slice, unless the pet is hanging from the ceiling
+        // and its head is the bottom one.
+        let originY = isUpsideDown
+            ? characterScreenPosition.y - hitboxSize.height
+            : characterScreenPosition.y + hitboxSize.height - headHeight
+        return CGRect(
+            x: characterScreenPosition.x - hitboxSize.width / 2,
+            y: originY,
+            width: hitboxSize.width,
+            height: headHeight
+        )
     }
 }

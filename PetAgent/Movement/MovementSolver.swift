@@ -85,6 +85,18 @@ enum MovementSolver {
         return Step(position: moved, hasArrived: false)
     }
 
+    /// `velocity` with its magnitude capped at `maxThrowSpeed`, keeping its
+    /// direction. Capped along the throw's own direction rather than per
+    /// axis, so clamping a hard diagonal slows it without also bending where
+    /// it goes.
+    static func cappedThrow(_ velocity: CGPoint, maxSpeed: CGFloat = maxThrowSpeed) -> CGPoint {
+        let speed = hypot(velocity.x, velocity.y)
+        guard speed > maxSpeed else { return velocity }
+
+        let scale = maxSpeed / speed
+        return CGPoint(x: velocity.x * scale, y: velocity.y * scale)
+    }
+
     /// Which way the character should face to head toward `target`, or nil for
     /// purely vertical motion (climbing must not flip it).
     static func facing(from position: CGPoint, toward target: CGPoint) -> AvatarFacing? {

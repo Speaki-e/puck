@@ -27,6 +27,10 @@ final class TestStateWorld {
     private(set) var requestedTransitions: [StateKind] = []
     var roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
     var avatarHeight: CGFloat = 0
+    /// A pet with real extent by default: the screen-edge limits every
+    /// containment/bounce test exercises are measured from this, and a zero
+    /// rect would silently put them back on the old centre-point behaviour.
+    var visualBounds = CGRect(x: -50, y: -120, width: 100, height: 120)
     var walkSpeed: CGFloat = MovementSolver.walkSpeed
     var landingY: CGFloat = 500
     var windows: [WindowInfo] = []
@@ -40,6 +44,7 @@ final class TestStateWorld {
             body: body,
             roamableArea: roamableArea,
             avatarHeight: avatarHeight,
+            visualBounds: visualBounds,
             walkSpeed: walkSpeed,
             windows: windows,
             landingY: { [landingY] _ in landingY },

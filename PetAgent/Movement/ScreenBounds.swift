@@ -34,8 +34,6 @@ enum ScreenBounds {
         /// The velocity after the bounce — reversed and damped if an edge was
         /// hit, unchanged otherwise.
         var velocity: CGFloat
-        /// Whether an edge was actually hit this frame.
-        var didBounce: Bool
     }
 
     /// Clamps `position` so `visualBounds` stays inside `area`, without any
@@ -64,16 +62,20 @@ enum ScreenBounds {
         let leftLimit = area.minX - visualBounds.minX
         let rightLimit = area.maxX - visualBounds.maxX
         guard leftLimit <= rightLimit else {
-            return Bounce(position: CGPoint(x: leftLimit, y: position.y), velocity: 0, didBounce: false)
+            return Bounce(position: CGPoint(x: leftLimit, y: position.y), velocity: 0)
         }
 
+        let limit: CGFloat
         if position.x < leftLimit, velocity < 0 {
-            return reflected(position: position, at: leftLimit, velocity: velocity)
+            limit = leftLimit
+        } else if position.x > rightLimit, velocity > 0 {
+            limit = rightLimit
+        } else {
+            return Bounce(position: position, velocity: velocity)
         }
-        if position.x > rightLimit, velocity > 0 {
-            return reflected(position: position, at: rightLimit, velocity: velocity)
-        }
-        return Bounce(position: position, velocity: velocity, didBounce: false)
+
+        let reflected = reflect(position.x, at: limit, velocity: velocity)
+        return Bounce(position: CGPoint(x: reflected.coordinate, y: position.y), velocity: reflected.velocity)
     }
 
     /// One frame's worth of upward travel bounced off the top of the screen.
@@ -93,37 +95,32 @@ enum ScreenBounds {
         // sits at position.y + visualBounds.minY (a negative offset).
         let topLimit = area.minY - visualBounds.minY
         guard velocity < 0, position.y < topLimit else {
-            return Bounce(position: position, velocity: velocity, didBounce: false)
+            return Bounce(position: position, velocity: velocity)
         }
-        return reflected(position: position, at: topLimit, velocity: velocity, axis: .vertical)
+
+        let reflected = reflect(position.y, at: topLimit, velocity: velocity)
+        return Bounce(position: CGPoint(x: position.x, y: reflected.coordinate), velocity: reflected.velocity)
     }
 
-    private enum Axis { case horizontal, vertical }
-
-    private static func reflected(position: CGPoint, at limit: CGFloat, velocity: CGFloat, axis: Axis = .horizontal) -> Bounce {
-        let pinned = axis == .horizontal
-            ? CGPoint(x: limit, y: position.y)
-            : CGPoint(x: position.x, y: limit)
-
+    /// The bounce itself, on whichever single axis is hitting an edge — the
+    /// arithmetic is one-dimensional, so the callers own the CGPoint and this
+    /// stays free of any left/right/up/down special cases.
+    private static func reflect(
+        _ coordinate: CGFloat,
+        at limit: CGFloat,
+        velocity: CGFloat
+    ) -> (coordinate: CGFloat, velocity: CGFloat) {
         let speed = abs(velocity) * restitution
         guard speed >= minimumBounceSpeed else {
             // Out of energy: rest against the edge rather than buzzing on it.
             // Off the ceiling that means dropping away from it immediately,
             // which gravity does on the very next frame.
-            return Bounce(position: pinned, velocity: 0, didBounce: false)
+            return (limit, 0)
         }
         // Reflected about the edge, so a frame that overshot deep past the
         // wall comes back out as far as it went in -- landing exactly on the
         // limit instead would swallow part of the movement and make a fast
         // bounce visibly lose ground.
-        let reflectedPosition = axis == .horizontal
-            ? CGPoint(x: 2 * limit - position.x, y: position.y)
-            : CGPoint(x: position.x, y: 2 * limit - position.y)
-
-        return Bounce(
-            position: reflectedPosition,
-            velocity: velocity < 0 ? speed : -speed,
-            didBounce: true
-        )
+        return (2 * limit - coordinate, velocity < 0 ? speed : -speed)
     }
 }

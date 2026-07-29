@@ -90,16 +90,16 @@ final class CharacterController {
     }
 
     func update(dt: TimeInterval) {
-        var context = StateContext(
+        let context = StateContext(
             body: body,
             roamableArea: roamableArea,
             avatarHeight: avatarHeight,
+            visualBounds: body.visualBounds,
             walkSpeed: walkSpeed,
             windows: windows(),
             landingY: landingY,
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }
         )
-        context.visualBounds = body.visualBounds
         currentState.update(dt: dt, context: context)
 
         // The backstop for "펫이 화면 밖으로 나가지 못하게": states that bounce

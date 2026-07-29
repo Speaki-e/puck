@@ -70,7 +70,7 @@ final class ReactDragState: StateHandler {
             hasRequestedFall = true
             // Hand the throw to Fall. Let go of a still cursor and this is
             // zero, i.e. the plain straight-down drop it always was.
-            context.body.launchVelocity = throwVelocity()
+            context.body.launchVelocity = MovementSolver.cappedThrow(cursorVelocity)
             // Dropped where it was let go, not wherever the cursor went next.
             context.requestTransition(.fall)
             return
@@ -112,16 +112,5 @@ final class ReactDragState: StateHandler {
             x: cursorVelocity.x + (sample.x - cursorVelocity.x) * weight,
             y: cursorVelocity.y + (sample.y - cursorVelocity.y) * weight
         )
-    }
-
-    /// The tracked cursor velocity, capped at `maxThrowSpeed`. Capped along
-    /// the throw's own direction rather than per-axis, so clamping a hard
-    /// diagonal throw slows it without also bending where it goes.
-    private func throwVelocity() -> CGPoint {
-        let speed = hypot(cursorVelocity.x, cursorVelocity.y)
-        guard speed > MovementSolver.maxThrowSpeed else { return cursorVelocity }
-
-        let scale = MovementSolver.maxThrowSpeed / speed
-        return CGPoint(x: cursorVelocity.x * scale, y: cursorVelocity.y * scale)
     }
 }

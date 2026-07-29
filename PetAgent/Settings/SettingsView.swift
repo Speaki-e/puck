@@ -33,6 +33,7 @@ struct SettingsView: View {
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
     @State private var avoidClimbingFocusedWindow: Bool
+    @State private var toyName: String
     @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
 
@@ -48,6 +49,7 @@ struct SettingsView: View {
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
         _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
         _toyScale = State(initialValue: store.toyScale)
+        _toyName = State(initialValue: store.toy.name)
     }
 
     private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
@@ -123,6 +125,15 @@ struct SettingsView: View {
         .padding()
     }
 
+    /// Toy names are catalogue data, but their labels are translated text --
+    /// this is the one place the two meet.
+    private static func label(for toy: Toy) -> L10nKey {
+        switch toy.name {
+        case ToyCatalogue.wand.name: return .toyWand
+        default: return .toyPumpkin
+        }
+    }
+
     private var movementTab: some View {
         Form {
             Toggle(text(.avoidClimbingLabel), isOn: $avoidClimbingFocusedWindow)
@@ -134,6 +145,12 @@ struct SettingsView: View {
                     .monospacedDigit()
                     .frame(width: 48, alignment: .trailing)
             }
+            Picker(text(.toyLabel), selection: $toyName) {
+                ForEach(ToyCatalogue.all, id: \.name) { toy in
+                    Text(text(Self.label(for: toy))).tag(toy.name)
+                }
+            }
+            .onChange(of: toyName) { store.toy = ToyCatalogue.toy(named: $0) }
             HStack {
                 Slider(value: $toyScale, in: 0.5...3.0) { Text(text(.toySizeLabel)) }
                     .onChange(of: toyScale) { store.toyScale = $0 }

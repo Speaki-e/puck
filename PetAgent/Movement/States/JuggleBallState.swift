@@ -45,8 +45,14 @@ final class JuggleBallState: StateHandler {
     /// Comfortably longer than a throw's arc, so ordinary play never trips it.
     static let patience: TimeInterval = 1.5
 
+    /// How the current toy is played with. Set before entering; see
+    /// ToyPlayStyle. A spin-style toy is simply held overhead for the same
+    /// `playDuration`, so all the timing below is shared and only the manner
+    /// of play differs.
+    var style: ToyPlayStyle = .throwAndCatch
+
     /// Fired on entry and after each catch -- AppDelegate throws the toy up
-    /// over the pet's head in response.
+    /// over the pet's head in response. Not used by spin-style toys.
     var onThrow: (() -> Void)?
 
     /// Time since the toy last left the pet's hands. Not counted while the
@@ -62,6 +68,7 @@ final class JuggleBallState: StateHandler {
         totalElapsed = 0
         holdElapsed = nil
         oneShot.reset()
+        guard style == .throwAndCatch else { return }
         onThrow?()
     }
 
@@ -74,6 +81,15 @@ final class JuggleBallState: StateHandler {
     func update(dt: TimeInterval, context: StateContext) {
         guard !oneShot.hasFired else { return }
         totalElapsed += dt
+
+        // A spun toy never leaves the pet, so there is nothing to catch and
+        // nothing that can fail to come back -- it just ends when the pet has
+        // had enough, with the same throw-away as everything else.
+        guard style == .throwAndCatch else {
+            guard totalElapsed >= Self.playDuration else { return }
+            oneShot.fire(.kickBall, using: context.requestTransition)
+            return
+        }
 
         if let elapsed = holdElapsed {
             let held = elapsed + dt

@@ -32,6 +32,9 @@ enum BallPhase: Equatable {
     /// wherever the hand puts it (byeolki: "호박도 펫처럼 커서로 집을 수
     /// 있게", 2026-07-29), the same model ReactDrag uses for the pet.
     case held
+    /// Held by the PET rather than the cursor -- spinning over its head.
+    /// Physics is suspended for the same reason `held` suspends it.
+    case carried
     /// Kicked away -- flying off under gravity until its lifetime elapses or
     /// it exits the roamable area.
     case kicked
@@ -85,8 +88,8 @@ enum BallPhysics {
         case .resting:
             return state // waits for kick(_:direction:) to move it into .kicked
 
-        case .held:
-            return state // the cursor owns it; nothing else may move it
+        case .held, .carried:
+            return state // someone is holding it; nothing else may move it
 
         case .kicked:
             let newVerticalVelocity = state.verticalVelocity + gravity * CGFloat(dt)

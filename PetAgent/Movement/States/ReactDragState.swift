@@ -35,28 +35,21 @@ final class ReactDragState: StateHandler {
     /// owns the mouse monitor; nil means it hasn't moved since the grab.
     var cursorPosition: CGPoint?
 
-    /// How quickly the smoothed cursor velocity forgets older frames, 1/sec.
-    /// Roughly an 80ms window: long enough that one stuttering frame can't
-    /// decide the throw, short enough that only the final flick counts and
-    /// not the leisurely dragging that came before it.
-    private static let velocitySmoothingRate: CGFloat = 12
-
     private var isReleased = false
     private var oneShot = OneShotTransition()
     /// Where the pet sat relative to the cursor when it was grabbed. Held for
     /// the whole drag so the grabbed point stays under the cursor.
     private var grabOffset: CGPoint?
-    /// Smoothed cursor velocity, px/sec — the throw's speed if released now.
-    private var cursorVelocity: CGPoint = .zero
-    private var previousCursorPosition: CGPoint?
+    /// The throw's speed if released now. Shared with the toy's drag so the
+    /// same flick launches both at the same speed.
+    private var cursorVelocity = CursorVelocityTracker()
 
     func enter() {
         isReleased = false
         oneShot.reset()
         cursorPosition = nil
         grabOffset = nil
-        cursorVelocity = .zero
-        previousCursorPosition = nil
+        cursorVelocity.reset()
     }
 
     /// The mouse came up — stop following and let go on the next frame.
@@ -69,14 +62,14 @@ final class ReactDragState: StateHandler {
             guard !oneShot.hasFired else { return }
             // Hand the throw to Fall. Let go of a still cursor and this is
             // zero, i.e. the plain straight-down drop it always was.
-            context.body.launchVelocity = MovementSolver.cappedThrow(cursorVelocity)
+            context.body.launchVelocity = MovementSolver.cappedThrow(cursorVelocity.velocity)
             // Dropped where it was let go, not wherever the cursor went next.
             oneShot.fire(.fall, using: context.requestTransition)
             return
         }
 
         guard let cursorPosition else { return }
-        trackCursorVelocity(to: cursorPosition, dt: dt)
+        cursorVelocity.track(to: cursorPosition, dt: dt)
 
         // First frame of the grab: remember where the pet sat relative to the
         // cursor and don't move it at all, so grabbing never jumps it.
@@ -94,22 +87,4 @@ final class ReactDragState: StateHandler {
         context.body.position = target
     }
 
-    /// Exponential moving average of the cursor's velocity. Frame deltas on
-    /// their own are far too jumpy to throw with -- the cursor routinely
-    /// stalls for a frame mid-drag, and releasing on one of those would drop
-    /// the pet straight down after an obvious hard flick.
-    private func trackCursorVelocity(to cursorPosition: CGPoint, dt: TimeInterval) {
-        defer { previousCursorPosition = cursorPosition }
-        guard let previousCursorPosition, dt > 0 else { return }
-
-        let sample = CGPoint(
-            x: (cursorPosition.x - previousCursorPosition.x) / CGFloat(dt),
-            y: (cursorPosition.y - previousCursorPosition.y) / CGFloat(dt)
-        )
-        let weight = 1 - exp(-Self.velocitySmoothingRate * CGFloat(dt))
-        cursorVelocity = CGPoint(
-            x: cursorVelocity.x + (sample.x - cursorVelocity.x) * weight,
-            y: cursorVelocity.y + (sample.y - cursorVelocity.y) * weight
-        )
-    }
 }

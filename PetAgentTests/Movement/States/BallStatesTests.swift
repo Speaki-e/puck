@@ -223,3 +223,59 @@ final class KickBallStateTests: XCTestCase {
         XCTAssertEqual(world.requestedTransitions, [.idle])
     }
 }
+
+/// A spin-style toy is played with differently but for the same length of
+/// time (byeolki: "지팡이는 펫 머리 위에서 회전되게", 2026-07-29).
+final class JuggleBallSpinStyleTests: XCTestCase {
+    private func spinning() -> JuggleBallState {
+        let state = JuggleBallState()
+        state.style = .spinOverhead
+        return state
+    }
+
+    /// Nothing is thrown: the toy never leaves the pet.
+    func test_aSpinToyIsNeverThrownUp() {
+        let state = spinning()
+        var throwCount = 0
+        state.onThrow = { throwCount += 1 }
+
+        state.enter()
+
+        XCTAssertEqual(throwCount, 0)
+    }
+
+    /// And with nothing in the air, the "it never came back" timeout must not
+    /// cut play short -- that's the failure this style would fall into if it
+    /// shared the throw-and-catch path.
+    func test_aSpinToyIsNotEndedByThePatienceTimeout() {
+        let world = TestStateWorld()
+        let state = spinning()
+        state.enter()
+
+        world.run(state, seconds: JuggleBallState.patience + 0.5)
+
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "gave up on a toy that never left")
+    }
+
+    func test_aSpinToyEndsAfterThePlayDuration() {
+        let world = TestStateWorld()
+        let state = spinning()
+        state.enter()
+
+        world.run(state, seconds: JuggleBallState.playDuration - 0.2)
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "stopped early")
+
+        world.run(state, seconds: 0.4)
+        XCTAssertEqual(world.requestedTransitions, [.kickBall], "should put it down the same way")
+    }
+
+    func test_aSpinToyEndsOnlyOnce() {
+        let world = TestStateWorld()
+        let state = spinning()
+        state.enter()
+
+        world.run(state, seconds: JuggleBallState.playDuration + 3)
+
+        XCTAssertEqual(world.requestedTransitions.count, 1)
+    }
+}

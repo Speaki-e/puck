@@ -1,6 +1,6 @@
 {
   "name": "@speaki-e/protocol",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Speaki-e desktop pet + agent system: shared socket/tool/avatar contract for pet-app, workspace, and ai-module.",
   "license": "UNLICENSED",
   "private": true,

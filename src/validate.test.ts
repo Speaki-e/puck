@@ -270,3 +270,12 @@ test("accepts approval_response and run_cancel", () => {
 test("rejects approval_response with a non-boolean approved", () => {
   assert.equal(isBridgeMessage({ type: "approval_response", approval_id: "a1", approved: "yes" }), false);
 });
+
+test("accepts client_hello for both roles", () => {
+  assert.equal(isBridgeMessage({ type: "client_hello", role: "workspace" }), true);
+  assert.equal(isBridgeMessage({ type: "client_hello", role: "gui" }), true);
+});
+
+test("rejects client_hello with an unknown role", () => {
+  assert.equal(isBridgeMessage({ type: "client_hello", role: "robot" }), false);
+});

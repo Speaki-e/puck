@@ -40,6 +40,9 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
   if (!isRecord(value)) return false;
 
   switch (value.type) {
+    case "client_hello":
+      return value.role === "workspace" || value.role === "gui";
+
     case "tool_dispatch":
       return (
         typeof value.id === "string" &&

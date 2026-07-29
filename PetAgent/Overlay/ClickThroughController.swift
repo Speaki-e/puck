@@ -123,18 +123,33 @@ final class ClickThroughController {
     /// extends *downward* from the attachment point instead -- the same
     /// SpriteAvatar.setScreenPosition flip this mirrors on the click-test
     /// side. Missing this made a visibly-hanging pet unclickable.
+    ///
+    /// Extra margin added on every side beyond the manifest hitbox (2026-07-29,
+    /// byeolki: "히트박스가 너무 작아서 잘 안 잡힘") -- the dummy avatar
+    /// renders at ~130x133px, and requiring pixel-perfect precision on a
+    /// sprite that small made grabbing it feel unreliable. A zero-size
+    /// hitbox is still never clickable -- that's an unconfigured/loading
+    /// avatar, not a small one, and padding shouldn't manufacture a
+    /// clickable area out of nothing.
+    static let hitTestPadding: CGFloat = 40
+
     static func shouldAllowClicks(
         cursorPosition: CGPoint,
         characterScreenPosition: CGPoint,
         hitboxSize: CGSize,
         isUpsideDown: Bool = false
     ) -> Bool {
-        let originY = isUpsideDown ? characterScreenPosition.y - hitboxSize.height : characterScreenPosition.y
+        guard hitboxSize != .zero else { return false }
+        let paddedWidth = hitboxSize.width + hitTestPadding * 2
+        let paddedHeight = hitboxSize.height + hitTestPadding * 2
+        let originY = isUpsideDown
+            ? characterScreenPosition.y - hitboxSize.height - hitTestPadding
+            : characterScreenPosition.y - hitTestPadding
         let rect = CGRect(
-            x: characterScreenPosition.x - hitboxSize.width / 2,
+            x: characterScreenPosition.x - paddedWidth / 2,
             y: originY,
-            width: hitboxSize.width,
-            height: hitboxSize.height
+            width: paddedWidth,
+            height: paddedHeight
         )
         return rect.contains(cursorPosition)
     }

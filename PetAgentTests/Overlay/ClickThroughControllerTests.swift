@@ -48,12 +48,25 @@ final class ClickThroughControllerTests: XCTestCase {
         )
     }
 
-    func test_cursorBelowTheGroundPoint_doesNotAllowClicks() {
-        // Below the character's feet -- there's nothing there to click.
-        let belowFeet = CGPoint(x: groundPoint.x, y: groundPoint.y - 1)
+    /// Padding (2026-07-29, byeolki: "히트박스가 너무 작아서 잘 안 잡힘")
+    /// makes clicking near the feet forgiving instead of needing
+    /// pixel-perfect precision on a sprite that renders quite small.
+    func test_cursorSlightlyBelowTheGroundPoint_allowsClicks() {
+        let slightlyBelow = CGPoint(x: groundPoint.x, y: groundPoint.y - 1)
+        XCTAssertTrue(
+            ClickThroughController.shouldAllowClicks(
+                cursorPosition: slightlyBelow,
+                characterScreenPosition: groundPoint,
+                hitboxSize: hitboxSize
+            )
+        )
+    }
+
+    func test_cursorFarBelowTheGroundPoint_beyondPadding_doesNotAllowClicks() {
+        let farBelow = CGPoint(x: groundPoint.x, y: groundPoint.y - ClickThroughController.hitTestPadding - 1)
         XCTAssertFalse(
             ClickThroughController.shouldAllowClicks(
-                cursorPosition: belowFeet,
+                cursorPosition: farBelow,
                 characterScreenPosition: groundPoint,
                 hitboxSize: hitboxSize
             )
@@ -82,8 +95,21 @@ final class ClickThroughControllerTests: XCTestCase {
         )
     }
 
-    func test_cursorJustOutsideHitboxEdges_doesNotAllowClicks() {
-        let justOutside = CGPoint(x: groundPoint.x + 61, y: groundPoint.y + 141)
+    func test_cursorJustInsideThePaddedEdges_allowsClicks() {
+        let padding = ClickThroughController.hitTestPadding
+        let justInside = CGPoint(x: groundPoint.x + hitboxSize.width / 2 + padding - 1, y: groundPoint.y + hitboxSize.height + padding - 1)
+        XCTAssertTrue(
+            ClickThroughController.shouldAllowClicks(
+                cursorPosition: justInside,
+                characterScreenPosition: groundPoint,
+                hitboxSize: hitboxSize
+            )
+        )
+    }
+
+    func test_cursorJustOutsideThePaddedEdges_doesNotAllowClicks() {
+        let padding = ClickThroughController.hitTestPadding
+        let justOutside = CGPoint(x: groundPoint.x + hitboxSize.width / 2 + padding + 1, y: groundPoint.y + hitboxSize.height + padding + 1)
         XCTAssertFalse(
             ClickThroughController.shouldAllowClicks(
                 cursorPosition: justOutside,
@@ -125,7 +151,9 @@ final class ClickThroughControllerTests: XCTestCase {
 
     func test_cursorAboveTheCeilingPoint_doesNotAllowClicksWhenUpsideDown() {
         let ceilingPoint = CGPoint(x: 500, y: 900)
-        let aboveCeiling = CGPoint(x: ceilingPoint.x, y: ceilingPoint.y + 1)
+        // Beyond the padding too -- padding is forgiving in every direction,
+        // so a point just 1px above the ceiling point is now inside it.
+        let aboveCeiling = CGPoint(x: ceilingPoint.x, y: ceilingPoint.y + ClickThroughController.hitTestPadding + 1)
         XCTAssertFalse(
             ClickThroughController.shouldAllowClicks(
                 cursorPosition: aboveCeiling,

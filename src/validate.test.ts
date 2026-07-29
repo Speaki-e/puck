@@ -32,10 +32,20 @@ test("rejects a tool_result with an unknown error code", () => {
   assert.equal(isBridgeMessage({ type: "tool_result", id: "t1", ok: false, error: "not_a_real_code" }), false);
 });
 
-test("accepts each event kind", () => {
-  assert.equal(isBridgeMessage({ type: "event", event: "agent_thinking" }), true);
-  assert.equal(isBridgeMessage({ type: "event", event: "tool_call", tool: "code_editor", detail: { path: "src/main.ts" } }), true);
-  assert.equal(isBridgeMessage({ type: "event", event: "tool_result", ok: true }), true);
+test("accepts each event kind, all of which carry workspace_id/session_id (2026-07-29)", () => {
+  assert.equal(isBridgeMessage({ type: "event", event: "agent_thinking", workspace_id: "default", session_id: "default" }), true);
+  assert.equal(
+    isBridgeMessage({
+      type: "event",
+      event: "tool_call",
+      tool: "code_editor",
+      detail: { path: "src/main.ts" },
+      workspace_id: "default",
+      session_id: "default",
+    }),
+    true,
+  );
+  assert.equal(isBridgeMessage({ type: "event", event: "tool_result", ok: true, workspace_id: "default", session_id: "default" }), true);
   assert.equal(
     isBridgeMessage({
       type: "event",
@@ -47,11 +57,21 @@ test("accepts each event kind", () => {
     }),
     true,
   );
-  assert.equal(isBridgeMessage({ type: "event", event: "agent_done", ok: true, summary: "3 tests passed" }), true);
+  assert.equal(
+    isBridgeMessage({ type: "event", event: "agent_done", ok: true, summary: "3 tests passed", workspace_id: "default", session_id: "default" }),
+    true,
+  );
+});
+
+test("rejects an event missing workspace_id/session_id", () => {
+  assert.equal(isBridgeMessage({ type: "event", event: "agent_thinking" }), false);
 });
 
 test("rejects an event with an unknown event name", () => {
-  assert.equal(isBridgeMessage({ type: "event", event: "not_a_real_event" }), false);
+  assert.equal(
+    isBridgeMessage({ type: "event", event: "not_a_real_event", workspace_id: "default", session_id: "default" }),
+    false,
+  );
 });
 
 test("accepts valid user_input for both sources", () => {

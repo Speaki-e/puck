@@ -60,7 +60,8 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
         (value.detail === undefined || typeof value.detail === "string")
       );
 
-    case "event":
+    case "event": {
+      if (typeof value.workspace_id !== "string" || typeof value.session_id !== "string") return false;
       switch (value.event) {
         case "agent_thinking":
           return true;
@@ -72,17 +73,13 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
         case "tool_result":
           return typeof value.ok === "boolean";
         case "await_approval":
-          return (
-            typeof value.summary === "string" &&
-            typeof value.approval_id === "string" &&
-            typeof value.workspace_id === "string" &&
-            typeof value.session_id === "string"
-          );
+          return typeof value.summary === "string" && typeof value.approval_id === "string";
         case "agent_done":
           return typeof value.ok === "boolean" && typeof value.summary === "string";
         default:
           return false;
       }
+    }
 
     case "user_input":
       return (

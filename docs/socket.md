@@ -67,17 +67,21 @@ agent tries to call a pet-app executor tool, it gets back an immediate
 ### 2. State events (workspace -> pet-app, drives pet reactions)
 
 ```json
-{"type":"event","event":"agent_thinking"}
-{"type":"event","event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"}}
-{"type":"event","event":"tool_result","ok":true}
+{"type":"event","event":"agent_thinking","workspace_id":"default","session_id":"default"}
+{"type":"event","event":"tool_call","tool":"code_editor","detail":{"path":"src/main.ts"},"workspace_id":"default","session_id":"default"}
+{"type":"event","event":"tool_result","ok":true,"workspace_id":"default","session_id":"default"}
 {"type":"event","event":"await_approval","summary":"requesting to run rm -rf ./dist","approval_id":"a1","workspace_id":"w1","session_id":"s2"}
-{"type":"event","event":"agent_done","ok":true,"summary":"3 tests passed"}
+{"type":"event","event":"agent_done","ok":true,"summary":"3 tests passed","workspace_id":"default","session_id":"default"}
 ```
 
-- `await_approval`'s `approval_id`/`workspace_id`/`session_id` (2026-07-29) exist because
-  the approval UI now lives in pet-app's client window rather than workspace's own
-  renderer — resolving it has to round-trip this socket via `approval_response` (channel 6),
-  so the event needs enough to route that response back to the right pending `resolve`.
+- `workspace_id`/`session_id` (2026-07-29) are on every event, not just `await_approval` —
+  once more than one chat session can be open (channel 4), pet-app needs to know which
+  session's timeline an incoming event belongs to, or it has no way to route
+  `agent_thinking`/`tool_call`/`tool_result`/`agent_done` to the right one.
+- `await_approval`'s `approval_id` additionally exists because the approval UI now lives in
+  pet-app's client window rather than workspace's own renderer — resolving it has to
+  round-trip this socket via `approval_response` (channel 6), so the event needs enough to
+  route that response back to the right pending `resolve`.
 
 ### 3. User input (pet-app -> workspace)
 

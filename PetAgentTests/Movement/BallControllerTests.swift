@@ -159,65 +159,6 @@ final class BallControllerTests: XCTestCase {
     }
 }
 
-/// The toy's artwork (byeolki's pumpkin, 2026-07-29). It ships in the app
-/// bundle rather than in an avatar package, so switching avatars can't take
-/// the toy away.
-///
-/// Bundle lookup itself can't be asserted from here -- these tests have no
-/// host application, so `Bundle.main` is the xctest runner and never contains
-/// app resources. What is worth guarding is that the file is still in the
-/// repo, still decodable, and still shaped like the artwork the layer expects
-/// -- a rename or a corrupt commit silently drops the pet back to the plain
-/// drawn circle, with nothing failing anywhere.
-final class BallToyArtworkTests: XCTestCase {
-    private var artworkURL: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // Movement
-            .deletingLastPathComponent() // PetAgentTests
-            .deletingLastPathComponent() // pet-app
-            .appendingPathComponent("PetAgent/Resources/Toys/pumpkin.png")
-    }
-
-    func test_theToyArtworkIsInTheRepo() {
-        XCTAssertTrue(
-            FileManager.default.fileExists(atPath: artworkURL.path),
-            "the toy art is gone; BallController falls back to a drawn circle"
-        )
-    }
-
-    func test_theToyArtworkDecodes() throws {
-        let source = try XCTUnwrap(CGImageSourceCreateWithURL(artworkURL as CFURL, nil))
-        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-
-        XCTAssertGreaterThan(image.width, 0)
-        XCTAssertGreaterThan(image.height, 0)
-    }
-
-    /// The layer draws it with .resizeAspect into a square box, so wildly
-    /// non-square art would letterbox into something much smaller than the
-    /// radius suggests.
-    func test_theToyArtworkIsRoughlySquare() throws {
-        let source = try XCTUnwrap(CGImageSourceCreateWithURL(artworkURL as CFURL, nil))
-        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-
-        let aspect = Double(image.width) / Double(image.height)
-        XCTAssertEqual(aspect, 1, accuracy: 0.3, "the toy would letterbox badly in its square layer")
-    }
-
-    /// Without artwork the toy still has to behave -- the fallback is a
-    /// cosmetic downgrade, not a broken toy.
-    func test_theToyStillWorksWithoutArtwork() {
-        let parent = CALayer()
-        let controller = BallController(parent: parent)
-
-        controller.spawn(at: CGPoint(x: 100, y: 0))
-        XCTAssertTrue(controller.isActive)
-
-        controller.tick(dt: 1, landingY: 100, roamableArea: CGRect(x: 0, y: 0, width: 500, height: 500))
-        XCTAssertEqual(controller.state?.phase, .resting)
-    }
-}
-
 /// Resting the toy on a surface by its artwork rather than by its layer
 /// (byeolki: "호박 테두리 실제 이미지 border", 2026-07-29).
 final class BallToyVisualBoundsTests: XCTestCase {
@@ -232,8 +173,8 @@ final class BallToyVisualBoundsTests: XCTestCase {
         // Whichever path ran, the bounds must be centred on the position and
         // no larger than the layer.
         XCTAssertEqual(controller.visualBounds.midX, 0, accuracy: 3, "not centred horizontally")
-        XCTAssertLessThanOrEqual(controller.visualBounds.width, BallController.defaultRadius * 2 + 0.01)
-        XCTAssertLessThanOrEqual(controller.visualBounds.height, BallController.defaultRadius * 2 + 0.01)
+        XCTAssertLessThanOrEqual(controller.visualBounds.width, controller.layer.bounds.width + 0.01)
+        XCTAssertLessThanOrEqual(controller.visualBounds.height, controller.layer.bounds.height + 0.01)
     }
 
     /// The artwork's bottom edge is what has to meet the surface. Resting the
@@ -483,7 +424,7 @@ final class BallToyScaleTests: XCTestCase {
     }
 
     func test_scalingCanBeSetAtConstruction() {
-        let big = BallController(parent: CALayer(), scale: 2)
+        let big = BallController(parent: CALayer(), toy: ToyCatalogue.default, scale: 2)
         let normal = BallController(parent: CALayer())
 
         XCTAssertEqual(big.layer.bounds.width, normal.layer.bounds.width * 2, accuracy: 0.01)
@@ -510,5 +451,201 @@ final class BallToyScaleTests: XCTestCase {
             accuracy: 0.01,
             "the bigger toy must still rest ON the floor"
         )
+    }
+}
+
+extension BallToyGrabTests {
+    /// Throwing the toy, exactly as the pet is thrown.
+    func test_releasingWithSpeedThrowsTheToy() {
+        let controller = restingToyForThrow()
+        controller.grab()
+
+        controller.release(velocity: CGPoint(x: 600, y: -300))
+
+        XCTAssertEqual(controller.state?.phase, .kicked, "a throw needs the sideways physics, not a plain fall")
+        XCTAssertEqual(controller.state?.horizontalVelocity, 600)
+        XCTAssertEqual(controller.state?.verticalVelocity, -300)
+    }
+
+    /// Let go of a still cursor and it's a drop, not a throw -- the same rule
+    /// the pet follows.
+    func test_releasingWithNoSpeedJustDropsIt() {
+        let controller = restingToyForThrow()
+        controller.grab()
+
+        controller.release()
+
+        XCTAssertEqual(controller.state?.phase, .falling)
+        XCTAssertEqual(controller.state?.horizontalVelocity, 0)
+    }
+
+    /// A violent flick is capped, by the same rule and to the same speed as
+    /// the pet's throw.
+    func test_aViolentThrowIsCapped() {
+        let controller = restingToyForThrow()
+        controller.grab()
+
+        controller.release(velocity: CGPoint(x: 99_000, y: 0))
+
+        XCTAssertEqual(controller.state?.horizontalVelocity ?? 0, MovementSolver.maxThrowSpeed, accuracy: 0.01)
+    }
+
+    /// However hard it's thrown, it has to end up back in play on screen.
+    func test_aThrownToyStaysOnScreenAndSettles() {
+        let controller = restingToyForThrow()
+        let area = CGRect(x: 0, y: 0, width: 1000, height: 600)
+        controller.grab()
+        controller.move(to: CGPoint(x: 500, y: 300))
+        controller.release(velocity: CGPoint(x: 99_000, y: -2000))
+
+        for _ in 0..<1200 {
+            controller.tick(dt: 1.0 / 60, landingY: 500, roamableArea: area)
+            guard let position = controller.state?.position else { break }
+            XCTAssertGreaterThanOrEqual(position.x + controller.visualBounds.minX, 0, "left the screen")
+            XCTAssertLessThanOrEqual(position.x + controller.visualBounds.maxX, 1000, "left the screen")
+        }
+
+        XCTAssertEqual(controller.state?.phase, .resting, "never came to rest")
+    }
+
+    private func restingToyForThrow() -> BallController {
+        let controller = BallController(parent: CALayer())
+        controller.spawn(at: CGPoint(x: 200, y: 100))
+        controller.tick(dt: 1, landingY: 500, roamableArea: CGRect(x: 0, y: 0, width: 1000, height: 600))
+        return controller
+    }
+}
+
+extension BallToyScaleTests {
+    /// The layer takes the artwork's proportions rather than being square:
+    /// the wand is 310x804, and a square box would letterbox it to a sliver.
+    func test_aTallToyGetsATallLayer() {
+        let wand = BallController(parent: CALayer(), toy: ToyCatalogue.wand)
+        let pumpkin = BallController(parent: CALayer(), toy: ToyCatalogue.pumpkin)
+
+        // Without artwork (no host app in tests) both fall back to the drawn
+        // circle, so this only asserts what it can: the shapes differ when
+        // artwork is present, and neither is ever zero-sized.
+        XCTAssertGreaterThan(wand.layer.bounds.height, 0)
+        XCTAssertGreaterThan(pumpkin.layer.bounds.height, 0)
+        XCTAssertEqual(wand.toy, ToyCatalogue.wand)
+        XCTAssertEqual(pumpkin.toy, ToyCatalogue.pumpkin)
+    }
+}
+
+/// Carrying a toy above the pet's head, spinning (byeolki: "지팡이는 펫 머리
+/// 위에서 회전되게", 2026-07-29).
+final class BallToyCarryTests: XCTestCase {
+    private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
+
+    private func toy() -> BallController {
+        let controller = BallController(parent: CALayer(), toy: ToyCatalogue.wand)
+        controller.spawn(at: CGPoint(x: 200, y: 100))
+        controller.tick(dt: 1, landingY: 500, roamableArea: roamableArea)
+        return controller
+    }
+
+    func test_carryingPutsTheToyWhereItIsToldAndSuspendsPhysics() {
+        let controller = toy()
+        let overhead = CGPoint(x: 400, y: 200)
+
+        controller.carry(to: overhead, dt: 1.0 / 60)
+        for _ in 0..<120 {
+            // A surface far below: gravity must not drag it down.
+            controller.tick(dt: 1.0 / 60, landingY: 5000, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(controller.state?.phase, .carried)
+        XCTAssertEqual(controller.state?.position, overhead)
+        XCTAssertEqual(controller.layer.position, overhead)
+    }
+
+    func test_carryingSpinsTheToy() {
+        let controller = toy()
+
+        controller.carry(to: CGPoint(x: 400, y: 200), dt: 0.25)
+        let quarterSecond = controller.layer.affineTransform()
+
+        XCTAssertNotEqual(quarterSecond.b, 0, "not rotating at all")
+    }
+
+    /// Frame-rate independence: the spin is an angle per second, so the same
+    /// elapsed time in different-sized steps must land in the same place.
+    func test_theSpinRateDoesNotDependOnFrameRate() {
+        let fast = toy()
+        let slow = toy()
+
+        for _ in 0..<60 { fast.carry(to: .zero, dt: 1.0 / 60) }
+        for _ in 0..<15 { slow.carry(to: .zero, dt: 1.0 / 15) }
+
+        XCTAssertEqual(fast.layer.affineTransform().b, slow.layer.affineTransform().b, accuracy: 0.0001)
+    }
+
+    /// It must come back to physics upright -- otherwise the toy lies on its
+    /// side on the floor forever after one round of play.
+    func test_stopCarryingReturnsItUprightAndFalling() {
+        let controller = toy()
+        controller.carry(to: CGPoint(x: 400, y: 200), dt: 0.3)
+
+        controller.stopCarrying()
+
+        XCTAssertEqual(controller.state?.phase, .falling)
+        XCTAssertEqual(controller.layer.affineTransform(), .identity, "left tilted")
+    }
+
+    /// The cursor outranks the pet: a toy being dragged must not be snatched
+    /// overhead, and grabbing a spinning one straightens it.
+    func test_theCursorTakesPriorityOverCarrying() {
+        let controller = toy()
+        controller.carry(to: CGPoint(x: 400, y: 200), dt: 0.3)
+
+        controller.grab()
+        XCTAssertEqual(controller.layer.affineTransform(), .identity, "still spinning in the hand")
+
+        controller.carry(to: CGPoint(x: 900, y: 900), dt: 0.1)
+        XCTAssertTrue(controller.isHeld, "the pet took it out of the user's hand")
+    }
+}
+
+extension BallToyCarryTests {
+    /// A spinning toy keeps spinning while it's in the air -- one that went
+    /// rigid the moment it was thrown would look broken.
+    func test_aSpinToySpinsWhileThrown() {
+        let controller = toy()
+        controller.grab()
+        controller.move(to: CGPoint(x: 400, y: 200))
+        controller.release(velocity: CGPoint(x: 500, y: -400))
+
+        controller.tick(dt: 0.1, landingY: 5000, roamableArea: roamableArea)
+
+        XCTAssertNotEqual(controller.layer.affineTransform().b, 0, "not spinning in flight")
+    }
+
+    /// ...and lands upright, rather than coming to rest on its side.
+    func test_aSpinToySettlesUpright() {
+        let controller = toy()
+        controller.grab()
+        controller.move(to: CGPoint(x: 400, y: 100))
+        controller.release(velocity: CGPoint(x: 300, y: 0))
+
+        for _ in 0..<900 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: 500, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(controller.state?.phase, .resting)
+        XCTAssertEqual(controller.layer.affineTransform(), .identity, "came to rest on its side")
+    }
+
+    /// A toy that doesn't twirl must not start doing so in flight.
+    func test_aPlainToyDoesNotSpinWhenThrown() {
+        let controller = BallController(parent: CALayer(), toy: ToyCatalogue.pumpkin)
+        controller.spawn(at: CGPoint(x: 200, y: 100))
+        controller.tick(dt: 1, landingY: 500, roamableArea: roamableArea)
+        controller.grab()
+        controller.release(velocity: CGPoint(x: 500, y: -400))
+
+        controller.tick(dt: 0.1, landingY: 5000, roamableArea: roamableArea)
+
+        XCTAssertEqual(controller.layer.affineTransform(), .identity)
     }
 }

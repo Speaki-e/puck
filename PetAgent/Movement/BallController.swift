@@ -41,37 +41,50 @@ final class BallController {
     /// The artwork's opaque box and pixel size, kept so a size change can
     /// recompute `visualBounds` without scanning the image's alpha again.
     private var measurement: (opaquePixels: CGRect, imagePixelSize: CGSize)?
-    /// The radius the toy would have at scale 1, so repeated slider changes
+    /// Accumulated spin, radians. Reset whenever the toy stops being carried
+    /// so it never comes back to physics lying on its side.
+    private var spinAngle: CGFloat = 0
+    /// The toy's unscaled on-screen size, so repeated slider changes
     /// recompute from this rather than compounding -- the same trap
     /// SpriteAvatar.updateScale documents for the pet.
-    private let baseRadius: CGFloat
+    private let baseSize: CGSize
+    /// Which toy this is. Exposed so callers can tell whether a rebuild is
+    /// needed when the setting changes.
+    let toy: Toy
 
     var isActive: Bool { state != nil }
 
     /// Big enough to read as a pumpkin rather than a dot, small enough that
     /// the pet can still be seen behind it while kicking it about.
-    static let defaultRadius: CGFloat = 22
+    /// Size of the drawn-circle fallback, which has no artwork to take
+    /// proportions from.
+    static let fallbackSize = CGSize(width: 44, height: 44)
 
-    init(parent: CALayer, radius: CGFloat = BallController.defaultRadius, scale: Double = 1) {
-        baseRadius = radius
-        let scaled = radius * CGFloat(scale)
-        layer.bounds = CGRect(x: 0, y: 0, width: scaled * 2, height: scaled * 2)
-        if let image = Self.loadToyImage() {
+    init(parent: CALayer, toy: Toy = ToyCatalogue.default, scale: Double = 1) {
+        self.toy = toy
+
+        if let image = Self.loadArtwork(for: toy) {
+            // The layer takes the ARTWORK's proportions, so nothing is
+            // letterboxed and the drawn toy fills its own box exactly.
+            let aspect = CGFloat(image.width) / CGFloat(image.height)
+            baseSize = CGSize(width: toy.height * aspect, height: toy.height)
+            layer.bounds = CGRect(origin: .zero, size: Self.scaled(baseSize, by: scale))
             layer.contents = image
-            // The artwork isn't square; fit it rather than stretching it into
-            // the layer's box.
             layer.contentsGravity = .resizeAspect
             layer.contentsScale = parent.contentsScale
             measurement = Self.measure(image)
             visualBounds = Self.visualBounds(for: measurement, layerSize: layer.bounds.size)
         } else {
             // The original drawn circle, kept as the fallback.
-            layer.cornerRadius = radius
+            baseSize = Self.fallbackSize
+            let size = Self.scaled(baseSize, by: scale)
+            layer.bounds = CGRect(origin: .zero, size: size)
+            layer.cornerRadius = size.width / 2
             layer.backgroundColor = NSColor.white.cgColor
             layer.borderColor = NSColor.black.cgColor
             layer.borderWidth = 1.5
             // A drawn circle fills its box exactly.
-            visualBounds = CGRect(x: -scaled, y: -scaled, width: scaled * 2, height: scaled * 2)
+            visualBounds = CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height)
         }
         layer.isHidden = true
         // Ticked every frame like the pet is, so the same rule applies: no
@@ -81,6 +94,8 @@ final class BallController {
     }
 
     func spawn(at position: CGPoint) {
+        spinAngle = 0
+        layer.setAffineTransform(.identity)
         state = BallState(position: position, phase: .falling)
         layer.position = position
         layer.isHidden = false
@@ -104,6 +119,7 @@ final class BallController {
         )
         state = next
         layer.position = next.position
+        applyInFlightSpin(for: next.phase, dt: dt)
 
         if wasFalling, next.phase == .resting {
             onLanded?(next.position)
@@ -119,6 +135,8 @@ final class BallController {
 
     /// Picks the toy up: physics stops until it is let go.
     func grab() {
+        spinAngle = 0
+        layer.setAffineTransform(.identity)
         guard var current = state else { return }
         current.phase = .held
         current.verticalVelocity = 0
@@ -135,10 +153,71 @@ final class BallController {
         layer.position = position
     }
 
-    /// Lets go: the toy falls from wherever it was dropped and lands normally.
-    func release() {
-        guard var current = state, current.phase == .held else { return }
+    /// Carries the toy above the pet's head, spinning it. Called every frame
+    /// while the pet is playing with a spin-style toy: the position follows
+    /// the pet (it can still be nudged around by anything that moves the pet)
+    /// and the angle accumulates, so the spin rate doesn't depend on the
+    /// frame rate.
+    func carry(to position: CGPoint, dt: TimeInterval) {
+        guard var current = state, current.phase != .held else { return }
+        current.phase = .carried
+        current.position = position
+        current.horizontalVelocity = 0
+        current.verticalVelocity = 0
+        state = current
+
+        spinAngle += Self.spinRate * CGFloat(dt)
+        layer.position = position
+        layer.setAffineTransform(CGAffineTransform(rotationAngle: spinAngle))
+    }
+
+    /// Hands the toy back to physics, upright again.
+    func stopCarrying() {
+        spinAngle = 0
+        layer.setAffineTransform(.identity)
+        guard var current = state, current.phase == .carried else { return }
         current.phase = .falling
+        state = current
+    }
+
+    /// A toy that twirls overhead also twirls while it's in the air -- a
+    /// spinning wand that goes rigid the moment it's thrown looks broken.
+    /// It settles upright when it lands, so it never comes to rest on its
+    /// side (byeolki: "지팡이도 다른 장난감처럼 던져지고 막 그렇게 되게",
+    /// 2026-07-29).
+    private func applyInFlightSpin(for phase: BallPhase, dt: TimeInterval) {
+        guard toy.play == .spinOverhead else { return }
+
+        switch phase {
+        case .kicked, .falling:
+            spinAngle += Self.spinRate * CGFloat(dt)
+            layer.setAffineTransform(CGAffineTransform(rotationAngle: spinAngle))
+        case .resting, .gone:
+            guard spinAngle != 0 else { return }
+            spinAngle = 0
+            layer.setAffineTransform(.identity)
+        case .held, .carried:
+            break // whoever is holding it owns the angle
+        }
+    }
+
+    /// Turns per second, as radians. Brisk enough to read as twirling rather
+    /// than drifting, slow enough that the artwork doesn't blur into a smear.
+    static let spinRate: CGFloat = 2 * .pi * 1.2
+
+    /// Lets go. With a `velocity` the toy is thrown and flies with it
+    /// (byeolki: "호박도 펫처럼 잡아 던질 수 있게", 2026-07-29); at rest it
+    /// just drops. Thrown, it uses the same `.kicked` motion a kick does, so
+    /// it bounces off the walls, ceiling and floor and settles -- there is no
+    /// separate "thrown by the user" physics to keep in step.
+    func release(velocity: CGPoint = .zero) {
+        guard var current = state, current.phase == .held else { return }
+        let thrown = MovementSolver.cappedThrow(velocity)
+        current.horizontalVelocity = thrown.x
+        current.verticalVelocity = thrown.y
+        // Falling is the vertical-only path; a throw needs the sideways one.
+        current.phase = thrown == .zero ? .falling : .kicked
+        current.kickedElapsed = 0
         state = current
     }
 
@@ -198,12 +277,13 @@ final class BallController {
     /// the outline follows -- everything that keeps the toy out of the floor
     /// and off the walls is measured from it.
     func updateScale(_ scale: Double) {
-        let scaled = baseRadius * CGFloat(scale)
-        layer.bounds = CGRect(x: 0, y: 0, width: scaled * 2, height: scaled * 2)
+        let size = Self.scaled(baseSize, by: scale)
+        layer.bounds = CGRect(origin: .zero, size: size)
         if measurement != nil {
-            visualBounds = Self.visualBounds(for: measurement, layerSize: layer.bounds.size)
+            visualBounds = Self.visualBounds(for: measurement, layerSize: size)
         } else {
-            visualBounds = CGRect(x: -scaled, y: -scaled, width: scaled * 2, height: scaled * 2)
+            layer.cornerRadius = size.width / 2
+            visualBounds = CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height)
         }
         // A resized toy resting on a surface would otherwise be left half
         // buried in it (or hovering) until something moved it again.
@@ -231,15 +311,22 @@ final class BallController {
         )
     }
 
-    /// The bundled toy artwork, or nil if it isn't there.
-    private static func loadToyImage() -> CGImage? {
+    private static func scaled(_ size: CGSize, by scale: Double) -> CGSize {
+        CGSize(width: size.width * CGFloat(scale), height: size.height * CGFloat(scale))
+    }
+
+    /// A toy's bundled artwork, or nil if it isn't there.
+    private static func loadArtwork(for toy: Toy) -> CGImage? {
         guard
-            let url = Bundle.main.url(forResource: "pumpkin", withExtension: "png", subdirectory: "Toys")
-                ?? Bundle.main.url(forResource: "pumpkin", withExtension: "png"),
+            let url = Bundle.main.url(
+                forResource: toy.name,
+                withExtension: "png",
+                subdirectory: "Toys/\(toy.name)"
+            ),
             let source = CGImageSourceCreateWithURL(url as CFURL, nil),
             let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else {
-            AppLogger.shared.log(.error, "Ball toy artwork missing; falling back to a drawn circle")
+            AppLogger.shared.log(.error, "Artwork for toy \(toy.name) missing; falling back to a drawn circle")
             return nil
         }
         return image

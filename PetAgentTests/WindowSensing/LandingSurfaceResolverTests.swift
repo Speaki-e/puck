@@ -87,6 +87,34 @@ final class LandingSurfaceResolverTests: XCTestCase {
         XCTAssertEqual(y, 300)
     }
 
+    /// A window whose top edge doesn't leave a full avatar-height of headroom
+    /// (near-fullscreen/maximized) is excluded from landing entirely -- the
+    /// same rule WalkState.blockingWindow already applies when *climbing*
+    /// into one, but this is the choke point for every OTHER way the pet
+    /// ends up somewhere (a drop, falling off the ceiling, anything routed
+    /// through Fall) -- byeolki: "그런 창들은 위에 못 올라가게 해줘".
+    func test_windowTooTallToStandOnWithoutClipping_isNotACandidate() {
+        let win = window(CGRect(x: 0, y: 50, width: 800, height: 1000)) // top edge only 50px below the screen top
+
+        let y = LandingSurfaceResolver.landingY(
+            atX: 50, fallingFromY: 0, windows: [win], screenBottomY: 1080,
+            roamableTop: 0, avatarHeight: 140
+        )
+
+        XCTAssertEqual(y, 1080, "should fall through to the floor, not land on a window that would clip it")
+    }
+
+    func test_windowWithEnoughHeadroom_isStillACandidate() {
+        let win = window(CGRect(x: 0, y: 300, width: 800, height: 700))
+
+        let y = LandingSurfaceResolver.landingY(
+            atX: 50, fallingFromY: 0, windows: [win], screenBottomY: 1080,
+            roamableTop: 0, avatarHeight: 140
+        )
+
+        XCTAssertEqual(y, 300)
+    }
+
     func test_noWindowsAtAll_fallsThroughToScreenBottom() {
         let y = LandingSurfaceResolver.landingY(atX: 50, fallingFromY: 0, windows: [], screenBottomY: 1080)
 

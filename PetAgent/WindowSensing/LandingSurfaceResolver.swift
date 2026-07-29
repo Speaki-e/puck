@@ -18,15 +18,24 @@ enum LandingSurfaceResolver {
     ///     (i.e. not yet passed while falling) are considered.
     ///   - windows: layer-0 windows in front-to-back Z order (index 0 = frontmost).
     ///   - screenBottomY: fallback surface if no window qualifies.
+    ///   - roamableTop/avatarHeight (F3, 2026-07-29): a window whose top edge
+    ///     doesn't leave a full avatar height of headroom above it
+    ///     (near-fullscreen/maximized) is excluded entirely -- standing on it
+    ///     would clip the character's head off the top of the screen.
+    ///     Defaults keep every existing caller's behavior unchanged unless
+    ///     they opt in (mirrors WindowSupport.blockingWindow's same guard).
     static func landingY(
         atX x: CGFloat,
         fallingFromY currentY: CGFloat,
         windows: [WindowInfo],
-        screenBottomY: CGFloat
+        screenBottomY: CGFloat,
+        roamableTop: CGFloat = -.greatestFiniteMagnitude,
+        avatarHeight: CGFloat = 0
     ) -> CGFloat {
         let candidates = windows.indices.compactMap { index -> CGFloat? in
             let window = windows[index]
             guard window.frame.minX <= x, x <= window.frame.maxX else { return nil }
+            guard window.frame.minY - roamableTop >= avatarHeight else { return nil }
 
             let topEdgeY = window.frame.minY
             guard topEdgeY >= currentY else { return nil }

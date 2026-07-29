@@ -9,7 +9,37 @@
     "height": 133
   },
   "clips": {
-    "idle": "idle"
+    "idle": "starry-eyed",
+    "walk": "humming",
+    "climb": "determined",
+    "fall": "yikes",
+    "land": "dazed",
+    "point": "eureka",
+    "type": "in-the-zone",
+    "listen": "all-ears",
+    "react_click": "startled",
+    "react_drag": "flustered",
+    "kick": "giddy",
+    "pet": "melting",
+    "spin": "melting"
+  },
+  "emotions": {
+    "happy": "beaming",
+    "thinking": "pondering",
+    "sad": "welling-up",
+    "angry": "grumpy",
+    "love": "smitten",
+    "wink": "cheeky",
+    "laugh": "giggly",
+    "cry": "sobbing",
+    "worried": "fretting",
+    "excited": "thrilled",
+    "surprised": "agape",
+    "relieved": "phew",
+    "content": "serene",
+    "cheerful": "sunny",
+    "shy": "bashful",
+    "shadow": "spooked"
   },
   "sounds": {
     "walk": "sounds/footstep.wav",

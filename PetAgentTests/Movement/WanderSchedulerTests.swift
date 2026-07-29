@@ -13,14 +13,32 @@ import XCTest
 final class WanderSchedulerTests: XCTestCase {
     /// Every other test here injects its own interval, so without this the
     /// value the app actually ships with is covered by nothing.
-    func test_defaultInterval_keepsThePetVisiblyActive() {
-        XCTAssertEqual(WanderScheduler.defaultInterval, 5)
+    func test_defaultIntervalRange_isLivelyWithoutBeingConstantMotion() {
+        XCTAssertEqual(WanderScheduler.defaultIntervalRange, 8...15)
+    }
 
-        // And the default initializer really uses it -- the provider default
-        // and the constant can drift apart otherwise.
-        let scheduler = WanderScheduler(outcomeProvider: { .walkToRandomPoint })
-        XCTAssertNil(scheduler.tick(dt: WanderScheduler.defaultInterval - 0.1))
-        XCTAssertEqual(scheduler.tick(dt: 0.1), .walkToRandomPoint)
+    /// The provider default and the constant can drift apart, and a fixed
+    /// interval makes the pet metronomic -- so pin that the shipped default
+    /// both draws from the range and actually varies.
+    func test_defaultInitializer_drawsVaryingIntervalsFromTheRange() {
+        let range = WanderScheduler.defaultIntervalRange
+        var firedAt: [TimeInterval] = []
+
+        for _ in 0..<40 {
+            let scheduler = WanderScheduler(outcomeProvider: { .walkToRandomPoint })
+            var elapsed: TimeInterval = 0
+            while scheduler.tick(dt: 0.1) == nil {
+                elapsed += 0.1
+                if elapsed > range.upperBound + 1 { break }
+            }
+            firedAt.append(elapsed)
+        }
+
+        for interval in firedAt {
+            XCTAssertGreaterThanOrEqual(interval, range.lowerBound - 0.1)
+            XCTAssertLessThanOrEqual(interval, range.upperBound)
+        }
+        XCTAssertGreaterThan(Set(firedAt).count, 1, "a fixed interval would make the pet metronomic")
     }
 
     func test_tick_returnsNil_beforeIntervalElapses() {

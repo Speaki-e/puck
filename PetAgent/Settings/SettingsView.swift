@@ -33,6 +33,7 @@ struct SettingsView: View {
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
     @State private var avoidClimbingFocusedWindow: Bool
+    @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
 
     init(store: SettingsStore, initialTab: Tab = .general, onAvatarScaleChanged: ((Double) -> Void)? = nil) {
@@ -46,6 +47,7 @@ struct SettingsView: View {
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
         _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
+        _toyScale = State(initialValue: store.toyScale)
     }
 
     private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
@@ -129,6 +131,13 @@ struct SettingsView: View {
                 Slider(value: $walkSpeedMultiplier, in: 0.25...3.0) { Text(text(.speedLabel)) }
                     .onChange(of: walkSpeedMultiplier) { store.walkSpeedMultiplier = $0 }
                 Text(String(format: "%.2fx", walkSpeedMultiplier))
+                    .monospacedDigit()
+                    .frame(width: 48, alignment: .trailing)
+            }
+            HStack {
+                Slider(value: $toyScale, in: 0.5...3.0) { Text(text(.toySizeLabel)) }
+                    .onChange(of: toyScale) { store.toyScale = $0 }
+                Text(String(format: "%.2fx", toyScale))
                     .monospacedDigit()
                     .frame(width: 48, alignment: .trailing)
             }

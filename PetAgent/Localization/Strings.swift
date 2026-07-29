@@ -28,7 +28,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case volumeLabel, muteLabel, autoMuteLabel
 
-    case avoidClimbingLabel, speedLabel
+    case avoidClimbingLabel, speedLabel, toySizeLabel
 
     case avatarsHeader, importAvatarButton, importPanelPrompt
     case sizeHeader
@@ -85,6 +85,7 @@ enum Strings {
             .korean: "포커스된 창 위로는 올라가지 않기",
         ],
         .speedLabel: [.english: "Speed", .korean: "이동 속도"],
+        .toySizeLabel: [.english: "Toy size", .korean: "장난감 크기"],
 
         .avatarsHeader: [.english: "Avatars", .korean: "아바타"],
         .importAvatarButton: [.english: "Import Avatar Package…", .korean: "아바타 패키지 가져오기…"],

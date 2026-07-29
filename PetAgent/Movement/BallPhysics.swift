@@ -12,6 +12,13 @@
 //  testable on its own -- BallController (or whatever drives it per frame)
 //  only decides *when* to call this and what to render.
 //
+//  2026-07-29: the toy is permanent. It used to be a decorative fling that
+//  expired after 1.2s, and separately a head-bonk was meant to make it
+//  disappear -- byeolki asked for it to stay ("던지고 사라지지 않게 계속
+//  남아있게"), so a kick now always ends by coming to rest somewhere, ready
+//  to be chased again. `.gone` survives only as a safety valve for a toy with
+//  no surface anywhere below it.
+//
 
 import CoreGraphics
 import Foundation
@@ -21,6 +28,10 @@ enum BallPhase: Equatable {
     case falling
     /// Landed, waiting for the pet to kick it.
     case resting
+    /// Picked up by the cursor. Physics is suspended entirely -- the toy is
+    /// wherever the hand puts it (byeolki: "호박도 펫처럼 커서로 집을 수
+    /// 있게", 2026-07-29), the same model ReactDrag uses for the pet.
+    case held
     /// Kicked away -- flying off under gravity until its lifetime elapses or
     /// it exits the roamable area.
     case kicked
@@ -33,22 +44,30 @@ struct BallState: Equatable {
     var verticalVelocity: CGFloat = 0
     var horizontalVelocity: CGFloat = 0
     var phase: BallPhase = .falling
-    /// Seconds since entering `.kicked` -- only used to decide when a kicked
-    /// ball counts as "gone" (no landing/window tracking for the fling itself).
+    /// Seconds since entering `.kicked`. Kept for diagnostics; nothing ends a
+    /// kick on time any more (see BallPhysics's header).
     var kickedElapsed: TimeInterval = 0
 }
 
 enum BallPhysics {
     static let gravity = MovementSolver.gravity
-    /// A kicked ball flying longer than this is considered gone, regardless
-    /// of where it ended up -- a decorative fling doesn't need to be tracked
-    /// forever.
-    static let kickedLifetime: TimeInterval = 1.2
     /// How far outside roamableArea still counts as "worth simulating" before
     /// a kicked ball is considered gone.
     static let outOfBoundsMargin: CGFloat = 200
 
-    static func step(_ state: BallState, dt: TimeInterval, landingY: CGFloat, roamableArea: CGRect) -> BallState {
+    /// `visualBounds` is the toy's visible outline relative to its position,
+    /// so it bounces off a wall when its artwork meets it rather than when
+    /// its centre does -- the same rule the pet uses (byeolki: "그 호박도
+    /// 펫처럼 화면밖으로 못나가고 튕기게", 2026-07-29). Zero means a
+    /// point-sized toy, which is what the drawn-circle fallback and the
+    /// existing tests assume.
+    static func step(
+        _ state: BallState,
+        dt: TimeInterval,
+        landingY: CGFloat,
+        roamableArea: CGRect,
+        visualBounds: CGRect = .zero
+    ) -> BallState {
         switch state.phase {
         case .falling:
             let fall = MovementSolver.fallStep(
@@ -58,7 +77,7 @@ enum BallPhysics {
                 landingY: landingY
             )
             var next = state
-            next.position = fall.position
+            next.position = ScreenBounds.contain(fall.position, visualBounds: visualBounds, in: roamableArea)
             next.verticalVelocity = fall.velocity
             next.phase = fall.hasLanded ? .resting : .falling
             return next
@@ -66,19 +85,66 @@ enum BallPhysics {
         case .resting:
             return state // waits for kick(_:direction:) to move it into .kicked
 
+        case .held:
+            return state // the cursor owns it; nothing else may move it
+
         case .kicked:
             let newVerticalVelocity = state.verticalVelocity + gravity * CGFloat(dt)
-            let newPosition = CGPoint(
+            let travelled = CGPoint(
                 x: state.position.x + state.horizontalVelocity * CGFloat(dt),
                 y: state.position.y + newVerticalVelocity * CGFloat(dt)
             )
+
+            // Off the sides, then off the ceiling -- the same two edges the
+            // pet bounces off when thrown, and the same restitution, so a
+            // kicked toy and a thrown pet behave alike.
+            let sideways = ScreenBounds.bounceHorizontally(
+                position: travelled,
+                velocity: state.horizontalVelocity,
+                visualBounds: visualBounds,
+                in: roamableArea
+            )
+            let ceiling = ScreenBounds.bounceOffCeiling(
+                position: sideways.position,
+                velocity: newVerticalVelocity,
+                visualBounds: visualBounds,
+                in: roamableArea
+            )
+
             var next = state
-            next.position = newPosition
-            next.verticalVelocity = newVerticalVelocity
+            next.position = ceiling.position
+            next.horizontalVelocity = sideways.velocity
+            next.verticalVelocity = ceiling.velocity
             next.kickedElapsed = state.kickedElapsed + dt
 
-            let outOfBounds = !roamableArea.insetBy(dx: -outOfBoundsMargin, dy: -outOfBoundsMargin).contains(newPosition)
-            next.phase = (next.kickedElapsed >= kickedLifetime || outOfBounds) ? .gone : .kicked
+            // ...and off the floor. Without this a kicked toy ignored the
+            // surface entirely and dropped straight through it and off the
+            // bottom of the screen -- which is what "화면 밖으로 나가는데"
+            // was: the sides and ceiling were closed, the floor wasn't.
+            if next.position.y >= landingY, next.verticalVelocity > 0 {
+                let speed = next.verticalVelocity * ScreenBounds.restitution
+                if speed >= ScreenBounds.minimumBounceSpeed {
+                    next.position.y = 2 * landingY - next.position.y
+                    next.verticalVelocity = -speed
+                } else {
+                    // Out of bounce: settle on the surface. An ordinary kick
+                    // ends here, back in play for the pet to chase again.
+                    next.position.y = landingY
+                    next.verticalVelocity = 0
+                    next.horizontalVelocity = 0
+                    next.phase = .resting
+                    return next
+                }
+            }
+
+            // Nothing times out: the toy stays on the desk once thrown
+            // (byeolki: "던지고 사라지지 않게 계속 남아있게"). The bounds
+            // check is the one remaining way it can end, and with all four
+            // edges now closed it only fires when there is no surface under
+            // it at all -- a safety valve, not a rule of play.
+            let outOfBounds = !roamableArea.insetBy(dx: -outOfBoundsMargin, dy: -outOfBoundsMargin)
+                .contains(next.position)
+            next.phase = outOfBounds ? .gone : .kicked
             return next
 
         case .gone:

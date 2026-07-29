@@ -16,6 +16,7 @@ final class SettingsStore {
         static let autoMuteOnFocus = "PetAgent.autoMuteOnFocus"
         static let avoidClimbingFocusedWindow = "PetAgent.avoidClimbingFocusedWindow"
         static let walkSpeedMultiplier = "PetAgent.walkSpeedMultiplier"
+        static let toyScale = "PetAgent.toyScale"
         static let speechLocale = "PetAgent.speechLocale"
         static let language = "PetAgent.language"
         static let appearance = "PetAgent.appearance"
@@ -94,6 +95,20 @@ final class SettingsStore {
             onWalkSpeedMultiplierChanged?(newValue)
         }
     }
+
+    /// Size of the ball toy, as a multiple of its built-in radius (byeolki:
+    /// "호박 크기도 조절 가능 하게", 2026-07-29). Lives here rather than in
+    /// the avatar manifest because the toy is bundled with the app, not with
+    /// an avatar -- swapping avatars must not resize or remove it.
+    var toyScale: Double {
+        get { defaults.object(forKey: Keys.toyScale) as? Double ?? 1.0 }
+        set {
+            defaults.set(newValue, forKey: Keys.toyScale)
+            onToyScaleChanged?(newValue)
+        }
+    }
+
+    var onToyScaleChanged: ((Double) -> Void)?
 
     var language: AppLanguage {
         get {

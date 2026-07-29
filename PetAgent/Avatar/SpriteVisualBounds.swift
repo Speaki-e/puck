@@ -53,6 +53,15 @@ enum SpriteVisualBounds {
         )
     }
 
+    /// The same rectangle expressed relative to the *centre* of the layer --
+    /// the anchor a layer positioned by `layer.position` actually uses. The
+    /// ball toy is placed that way (its physics position is its middle),
+    /// where the character is placed by its feet.
+    static func relativeToCenter(opaquePixels: CGRect, imagePixelSize: CGSize, layerSize: CGSize) -> CGRect {
+        inLayer(opaquePixels: opaquePixels, imagePixelSize: imagePixelSize, layerSize: layerSize)
+            .offsetBy(dx: -layerSize.width / 2, dy: -layerSize.height / 2)
+    }
+
     /// The same rectangle expressed relative to the character's ground point
     /// — the position the FSM moves around, at the bottom-center of the layer.
     /// Movement only ever needs this form: add the pet's position to get the

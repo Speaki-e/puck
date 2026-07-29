@@ -5,7 +5,7 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-07-29 · **Tests:** 466 passing (`xcodebuild test`) · **`main`:** `f3e4586`
+**Last updated:** 2026-07-29 · **Tests:** 475 passing (`xcodebuild test`) · **`main`:** `e54fce8`
 
 **M-A is closed.** The pet renders from committed assets, wanders on its own, walks up and along windows, falls when they go away, and reacts to being clicked and dragged. All PRs including #9 (`feat/pet-interaction`) are merged into `main`.
 
@@ -406,3 +406,5 @@ code-level follow-through, plus the matching change in the `protocol` repo
 Updated `plan/02_pet-app.md`'s transition table and F12 section to match (also folded in `ClimbToCeiling`/`Ceiling`/`Petting` to the state list, which an earlier same-day change had left out of sync).
 
 466 tests passing (19 new: 6 double-tap detection, 3 wiggle bounce math, 2 `PettingState` timing, 2 `BallPhysics.juggle`, 2 `BallController.juggle()`, 4 `JuggleBallState`). Rebuilt, relaunched, confirmed no regression.
+
+**2026-07-29: a thrown ball bonks the character's head instead of falling through it (byeolki: "축구공을 소환하면 캐릭터 머리로 떨어져서 통 튀어서 없어지게 해줘").** A thrown ball's fall only ever checked against `LandingSurfaceResolver` (windows + the floor) -- the character itself was never a collidable surface, so a ball thrown directly above the pet fell straight through it to whatever was underneath. New pure `BallHeadCollision.landingY(ballX:characterPosition:avatarSize:)` returns the head's Y if the ball's X is currently within the avatar's width, nil otherwise; the frame loop now feeds `ball.tick` the *nearer* of the normal floor/window landing and this head landing. `BallController.onLanded` checks whether the landed Y matches the head (vs. floor/window) and, if so, immediately calls `kick(direction:)` in a random left/right direction and returns -- no resting, no `ChaseBall` gate -- so it bonks off and disappears via the same kicked-lifetime/out-of-bounds cleanup `KickBall` already relies on. A ball thrown away from the pet is completely unaffected -- it still falls to the floor/window, rests, and is eligible for the full `ChaseBall -> JuggleBall -> KickBall` flow from the previous entry, so nothing built earlier today became dead code. 475 tests passing (4 new for `BallHeadCollision`'s pure geometry). Rebuilt, relaunched, confirmed no regression.

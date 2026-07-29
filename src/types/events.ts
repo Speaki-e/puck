@@ -60,23 +60,134 @@ export interface ToolResult {
   detail?: string;
 }
 
-/** workspace -> pet-app: state events that drive the pet's reactions. */
+/**
+ * workspace -> pet-app: state events that drive the pet's reactions.
+ *
+ * await_approval's approval_id/workspace_id/session_id (2026-07-29) exist because
+ * the approval UI itself now lives in pet-app's F13 client window rather than
+ * workspace's own renderer -- resolving it has to round-trip the socket via
+ * ApprovalResponse, so the event needs enough to route that response back to
+ * the right pending `resolve` (plan/01_protocol.md 3.6).
+ */
 export type BridgeEvent =
   | { event: "agent_thinking" }
   | { event: "tool_call"; tool: string; detail?: JSONValue }
   | { event: "tool_result"; ok: boolean }
-  | { event: "await_approval"; summary: string }
+  | { event: "await_approval"; summary: string; approval_id: string; workspace_id: string; session_id: string }
   | { event: "agent_done"; ok: boolean; summary: string };
 
 export type BridgeEventMessage = { type: "event" } & BridgeEvent;
 
 export type UserInputSource = "voice" | "text";
 
-/** pet-app -> workspace: voice/text command input. */
+/** An image attached to a user_input (e.g. F14 drag capture). */
+export interface Attachment {
+  type: "image";
+  /** Local temp file path on the same machine -- not base64, to keep the socket message small. */
+  path: string;
+}
+
+/**
+ * pet-app -> workspace: voice/text command input.
+ *
+ * workspace_id/session_id (2026-07-29, plan/01_protocol.md 3.4) default to
+ * "default" when omitted -- existing single-workspace/single-session
+ * consumers are unaffected.
+ */
 export interface UserInput {
   type: "user_input";
   text: string;
   source: UserInputSource;
+  workspace_id?: string;
+  session_id?: string;
+  attachments?: Attachment[];
+}
+
+/**
+ * pet-app -> workspace: request a new workspace (project folder or pure-chat).
+ * Confirmed by WorkspaceCreate, which is the one that actually assigns
+ * workspace_id (2026-07-29, plan/01_protocol.md 3.4).
+ */
+export interface WorkspaceCreateRequest {
+  type: "workspace_create_request";
+  name: string;
+  /** Omitted for a pure-chat workspace -- code_editor and the editor view are unavailable for it. */
+  project_path?: string;
+}
+
+/** workspace -> pet-app: confirms a workspace now exists. */
+export interface WorkspaceCreate {
+  type: "workspace_create";
+  workspace_id: string;
+  name: string;
+  project_path?: string;
+}
+
+/**
+ * Who created a session: `user` via the sidebar's "new chat", or `agent` when
+ * it branched a casual conversation into a task session on its own judgement
+ * (ai-module's open_task_session tool, plan/04_ai-module.md 3.7).
+ */
+export type SessionOrigin = "user" | "agent";
+
+/**
+ * pet-app -> workspace: request a new chat session under a workspace.
+ * Confirmed by SessionCreate, which assigns session_id.
+ */
+export interface SessionCreateRequest {
+  type: "session_create_request";
+  workspace_id: string;
+  title: string;
+}
+
+/** workspace -> pet-app: confirms a session now exists. */
+export interface SessionCreate {
+  type: "session_create";
+  workspace_id: string;
+  session_id: string;
+  title: string;
+  origin: SessionOrigin;
+}
+
+/**
+ * workspace -> pet-app: the embeddable editor view bundle (file tree + Monaco)
+ * for this workspace is being served at `url`, for pet-app's WKWebView to
+ * load (plan/01_protocol.md 3.5). This traffic never crosses this socket
+ * itself -- url points at workspace's own local loopback server.
+ */
+export interface EditorViewReady {
+  type: "editor_view_ready";
+  workspace_id: string;
+  url: string;
+}
+
+export type EditorViewUnavailableReason = "no_project_path";
+
+/** workspace -> pet-app: no editor view for this workspace (e.g. no project_path bound). */
+export interface EditorViewUnavailable {
+  type: "editor_view_unavailable";
+  workspace_id: string;
+  reason: EditorViewUnavailableReason;
+}
+
+/**
+ * pet-app -> workspace: resolve a pending await_approval by id. Unknown or
+ * already-resolved ids are ignored (idempotent) -- see plan/01_protocol.md 3.6.
+ */
+export interface ApprovalResponse {
+  type: "approval_response";
+  approval_id: string;
+  approved: boolean;
+}
+
+/**
+ * pet-app -> workspace: abort the in-flight run() for a session -- the whole
+ * conversation turn, a different level from ToolCancel (which abandons one
+ * tool dispatch). See plan/01_protocol.md 3.6.
+ */
+export interface RunCancel {
+  type: "run_cancel";
+  session_id: string;
 }
 
 /** Every JSON Lines message on the socket, discriminated by `type`. */
@@ -85,4 +196,12 @@ export type BridgeMessage =
   | ToolCancel
   | ToolResult
   | BridgeEventMessage
-  | UserInput;
+  | UserInput
+  | WorkspaceCreateRequest
+  | WorkspaceCreate
+  | SessionCreateRequest
+  | SessionCreate
+  | EditorViewReady
+  | EditorViewUnavailable
+  | ApprovalResponse
+  | RunCancel;

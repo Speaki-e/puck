@@ -2,7 +2,7 @@
  * ai-module interface (protocol docs/agent-interface.md, plan/01_protocol.md section 5).
  */
 
-import type { JSONValue, ToolErrorCode } from "./events.js";
+import type { Attachment, JSONValue, ToolErrorCode } from "./events.js";
 
 export interface Frame {
   x: number;
@@ -22,6 +22,12 @@ export interface Context {
   openWindows?: WindowInfo[];
   editorOpenFiles?: string[];
   recentActions?: string[];
+  /**
+   * project_path of the workspace the current session belongs to (2026-07-29).
+   * Auto-injected by the caller so code_editor calls don't need the model to
+   * specify it every time.
+   */
+  projectPath?: string;
 }
 
 /**
@@ -59,6 +65,13 @@ export interface AgentCallbacks {
     detail?: string,
   ): void;
   onApprovalRequired(summary: string, resolve: (approved: boolean) => void): void;
+  /**
+   * Fires when the agent calls open_task_session on its own judgement
+   * (2026-07-29, plan/04_ai-module.md 3.7). The caller (workspace) converts
+   * this into a session_create(origin=agent) socket event so pet-app's
+   * sidebar picks it up.
+   */
+  onSessionCreated(sessionId: string, title: string): void;
   onDone(ok: boolean, summary: string): void;
 }
 
@@ -72,13 +85,22 @@ export interface ToolExecutor {
  * executor) and API key/model injected at construction time -- ai-module
  * does not persist either. CLI testing substitutes a mock ToolExecutor.
  *
+ * `sessionId` (2026-07-29): the caller invokes run() once per session, and
+ * ai-module keeps each session's history separate under this key -- memory
+ * never bleeds between sessions (plan/04_ai-module.md 3.4).
+ *
+ * `attachments` (2026-07-29, optional): images attached to this turn (e.g.
+ * F14 drag capture).
+ *
  * `signal`: user-initiated abort. On abort, ai-module stops streaming, sends
  * tool_cancel via petAppProxy for any in-flight pet-app executor call, then
  * resolves via onDone(false, "aborted").
  */
 export type AgentRun = (
   command: string,
+  sessionId: string,
   context: Context,
   callbacks: AgentCallbacks,
+  attachments?: Attachment[],
   signal?: AbortSignal,
 ) => Promise<void>;

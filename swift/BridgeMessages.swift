@@ -37,16 +37,52 @@ struct ToolResult: Equatable {
     }
 }
 
-/// workspace -> pet-app: state events driving the pet's reactions (protocol 3.2)
+/// workspace -> pet-app: state events driving the pet's reactions (protocol 3.2).
+///
+/// awaitApproval's approvalId/workspaceId/sessionId (2026-07-29) exist because the
+/// approval UI itself now lives in pet-app's F13 client window rather than workspace's
+/// own renderer -- resolving it has to round-trip the socket via ApprovalResponse
+/// (protocol 3.6), so the event needs enough to route that response to the right
+/// pending resolve.
 enum BridgeEvent: Equatable {
     case agentThinking
     case toolCall(tool: String, detail: JSONValue?)
     case toolResult(ok: Bool)
-    case awaitApproval(summary: String)
+    case awaitApproval(summary: String, approvalId: String, workspaceId: String, sessionId: String)
     case agentDone(ok: Bool, summary: String)
 }
 
-/// pet-app -> workspace: voice/text command input (protocol 3.3)
+/// An image attached to a user_input (e.g. pet-app's F14 drag capture).
+struct Attachment: Equatable {
+    /// Local temp file path on the same machine -- not base64, to keep the socket message small.
+    let path: String
+}
+
+extension Attachment: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case type, path
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        guard type == "image" else {
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "unknown attachment type \(type)")
+        }
+        self.path = try container.decode(String.self, forKey: .path)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode("image", forKey: .type)
+        try container.encode(path, forKey: .path)
+    }
+}
+
+/// pet-app -> workspace: voice/text command input (protocol 3.3).
+///
+/// workspaceId/sessionId (2026-07-29, protocol 3.4) default to "default" when absent --
+/// existing single-workspace/single-session consumers are unaffected.
 struct UserInput: Equatable {
     enum Source: String, Codable {
         case voice
@@ -55,6 +91,30 @@ struct UserInput: Equatable {
 
     let text: String
     let source: Source
+    let workspaceId: String?
+    let sessionId: String?
+    let attachments: [Attachment]?
+
+    init(text: String, source: Source, workspaceId: String? = nil, sessionId: String? = nil, attachments: [Attachment]? = nil) {
+        self.text = text
+        self.source = source
+        self.workspaceId = workspaceId
+        self.sessionId = sessionId
+        self.attachments = attachments
+    }
+}
+
+/// Who created a session: user via the sidebar's "new chat", or agent when it branched
+/// a casual conversation into a task session on its own judgement (protocol 4,
+/// plan/04_ai-module.md 3.7).
+enum SessionOrigin: String, Codable {
+    case user
+    case agent
+}
+
+/// workspace -> pet-app: no editor view for a workspace (e.g. no project_path bound), protocol 3.5.
+enum EditorViewUnavailableReason: String, Codable {
+    case noProjectPath = "no_project_path"
 }
 
 /// Top-level type for every JSON Lines message on the socket, discriminated by "type".
@@ -67,6 +127,36 @@ enum BridgeMessage: Equatable {
     case toolResult(ToolResult)
     case event(BridgeEvent)
     case userInput(UserInput)
+
+    // --- sessions/workspaces (2026-07-29, protocol 3.4) ---
+
+    /// pet-app -> workspace: request a new workspace (project folder or pure-chat).
+    /// Confirmed by workspaceCreate, which assigns workspaceId.
+    case workspaceCreateRequest(name: String, projectPath: String?)
+    /// workspace -> pet-app: confirms a workspace now exists.
+    case workspaceCreate(workspaceId: String, name: String, projectPath: String?)
+    /// pet-app -> workspace: request a new chat session under a workspace.
+    /// Confirmed by sessionCreate, which assigns sessionId.
+    case sessionCreateRequest(workspaceId: String, title: String)
+    /// workspace -> pet-app: confirms a session now exists.
+    case sessionCreate(workspaceId: String, sessionId: String, title: String, origin: SessionOrigin)
+
+    // --- editor view (2026-07-29, protocol 3.5) ---
+
+    /// workspace -> pet-app: the embeddable editor view bundle for this workspace is
+    /// being served at url, for pet-app's WKWebView to load. This traffic never crosses
+    /// bridge.sock itself -- url points at workspace's own local loopback server.
+    case editorViewReady(workspaceId: String, url: String)
+    case editorViewUnavailable(workspaceId: String, reason: EditorViewUnavailableReason)
+
+    // --- approval response / run cancel (2026-07-29, protocol 3.6) ---
+
+    /// pet-app -> workspace: resolve a pending awaitApproval by id. Unknown/already-resolved
+    /// ids are ignored (idempotent).
+    case approvalResponse(approvalId: String, approved: Bool)
+    /// pet-app -> workspace: abort the in-flight run() for a session -- the whole
+    /// conversation turn, a different level from toolCancel (which abandons one tool dispatch).
+    case runCancel(sessionId: String)
 }
 
 extension BridgeMessage: Codable {
@@ -76,6 +166,14 @@ extension BridgeMessage: Codable {
         case toolResult = "tool_result"
         case event = "event"
         case userInput = "user_input"
+        case workspaceCreateRequest = "workspace_create_request"
+        case workspaceCreate = "workspace_create"
+        case sessionCreateRequest = "session_create_request"
+        case sessionCreate = "session_create"
+        case editorViewReady = "editor_view_ready"
+        case editorViewUnavailable = "editor_view_unavailable"
+        case approvalResponse = "approval_response"
+        case runCancel = "run_cancel"
     }
 
     private enum EventKey: String, Codable {
@@ -88,6 +186,17 @@ extension BridgeMessage: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case type, id, tool, args, ok, data, error, event, detail, summary, text, source
+        case workspaceId = "workspace_id"
+        case sessionId = "session_id"
+        case attachments
+        case name
+        case projectPath = "project_path"
+        case title
+        case origin
+        case url
+        case reason
+        case approvalId = "approval_id"
+        case approved
     }
 
     init(from decoder: Decoder) throws {
@@ -131,7 +240,14 @@ extension BridgeMessage: Codable {
             case .toolResult:
                 self = .event(.toolResult(ok: try container.decode(Bool.self, forKey: .ok)))
             case .awaitApproval:
-                self = .event(.awaitApproval(summary: try container.decode(String.self, forKey: .summary)))
+                self = .event(
+                    .awaitApproval(
+                        summary: try container.decode(String.self, forKey: .summary),
+                        approvalId: try container.decode(String.self, forKey: .approvalId),
+                        workspaceId: try container.decode(String.self, forKey: .workspaceId),
+                        sessionId: try container.decode(String.self, forKey: .sessionId)
+                    )
+                )
             case .agentDone:
                 self = .event(
                     .agentDone(
@@ -145,9 +261,60 @@ extension BridgeMessage: Codable {
             self = .userInput(
                 UserInput(
                     text: try container.decode(String.self, forKey: .text),
-                    source: try container.decode(UserInput.Source.self, forKey: .source)
+                    source: try container.decode(UserInput.Source.self, forKey: .source),
+                    workspaceId: try container.decodeIfPresent(String.self, forKey: .workspaceId),
+                    sessionId: try container.decodeIfPresent(String.self, forKey: .sessionId),
+                    attachments: try container.decodeIfPresent([Attachment].self, forKey: .attachments)
                 )
             )
+
+        case .workspaceCreateRequest:
+            self = .workspaceCreateRequest(
+                name: try container.decode(String.self, forKey: .name),
+                projectPath: try container.decodeIfPresent(String.self, forKey: .projectPath)
+            )
+
+        case .workspaceCreate:
+            self = .workspaceCreate(
+                workspaceId: try container.decode(String.self, forKey: .workspaceId),
+                name: try container.decode(String.self, forKey: .name),
+                projectPath: try container.decodeIfPresent(String.self, forKey: .projectPath)
+            )
+
+        case .sessionCreateRequest:
+            self = .sessionCreateRequest(
+                workspaceId: try container.decode(String.self, forKey: .workspaceId),
+                title: try container.decode(String.self, forKey: .title)
+            )
+
+        case .sessionCreate:
+            self = .sessionCreate(
+                workspaceId: try container.decode(String.self, forKey: .workspaceId),
+                sessionId: try container.decode(String.self, forKey: .sessionId),
+                title: try container.decode(String.self, forKey: .title),
+                origin: try container.decode(SessionOrigin.self, forKey: .origin)
+            )
+
+        case .editorViewReady:
+            self = .editorViewReady(
+                workspaceId: try container.decode(String.self, forKey: .workspaceId),
+                url: try container.decode(String.self, forKey: .url)
+            )
+
+        case .editorViewUnavailable:
+            self = .editorViewUnavailable(
+                workspaceId: try container.decode(String.self, forKey: .workspaceId),
+                reason: try container.decode(EditorViewUnavailableReason.self, forKey: .reason)
+            )
+
+        case .approvalResponse:
+            self = .approvalResponse(
+                approvalId: try container.decode(String.self, forKey: .approvalId),
+                approved: try container.decode(Bool.self, forKey: .approved)
+            )
+
+        case .runCancel:
+            self = .runCancel(sessionId: try container.decode(String.self, forKey: .sessionId))
         }
     }
 
@@ -185,9 +352,12 @@ extension BridgeMessage: Codable {
             case .toolResult(let ok):
                 try container.encode(EventKey.toolResult, forKey: .event)
                 try container.encode(ok, forKey: .ok)
-            case .awaitApproval(let summary):
+            case .awaitApproval(let summary, let approvalId, let workspaceId, let sessionId):
                 try container.encode(EventKey.awaitApproval, forKey: .event)
                 try container.encode(summary, forKey: .summary)
+                try container.encode(approvalId, forKey: .approvalId)
+                try container.encode(workspaceId, forKey: .workspaceId)
+                try container.encode(sessionId, forKey: .sessionId)
             case .agentDone(let ok, let summary):
                 try container.encode(EventKey.agentDone, forKey: .event)
                 try container.encode(ok, forKey: .ok)
@@ -198,6 +368,51 @@ extension BridgeMessage: Codable {
             try container.encode(TypeKey.userInput, forKey: .type)
             try container.encode(input.text, forKey: .text)
             try container.encode(input.source, forKey: .source)
+            try container.encodeIfPresent(input.workspaceId, forKey: .workspaceId)
+            try container.encodeIfPresent(input.sessionId, forKey: .sessionId)
+            try container.encodeIfPresent(input.attachments, forKey: .attachments)
+
+        case .workspaceCreateRequest(let name, let projectPath):
+            try container.encode(TypeKey.workspaceCreateRequest, forKey: .type)
+            try container.encode(name, forKey: .name)
+            try container.encodeIfPresent(projectPath, forKey: .projectPath)
+
+        case .workspaceCreate(let workspaceId, let name, let projectPath):
+            try container.encode(TypeKey.workspaceCreate, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
+            try container.encode(name, forKey: .name)
+            try container.encodeIfPresent(projectPath, forKey: .projectPath)
+
+        case .sessionCreateRequest(let workspaceId, let title):
+            try container.encode(TypeKey.sessionCreateRequest, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
+            try container.encode(title, forKey: .title)
+
+        case .sessionCreate(let workspaceId, let sessionId, let title, let origin):
+            try container.encode(TypeKey.sessionCreate, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
+            try container.encode(sessionId, forKey: .sessionId)
+            try container.encode(title, forKey: .title)
+            try container.encode(origin, forKey: .origin)
+
+        case .editorViewReady(let workspaceId, let url):
+            try container.encode(TypeKey.editorViewReady, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
+            try container.encode(url, forKey: .url)
+
+        case .editorViewUnavailable(let workspaceId, let reason):
+            try container.encode(TypeKey.editorViewUnavailable, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
+            try container.encode(reason, forKey: .reason)
+
+        case .approvalResponse(let approvalId, let approved):
+            try container.encode(TypeKey.approvalResponse, forKey: .type)
+            try container.encode(approvalId, forKey: .approvalId)
+            try container.encode(approved, forKey: .approved)
+
+        case .runCancel(let sessionId):
+            try container.encode(TypeKey.runCancel, forKey: .type)
+            try container.encode(sessionId, forKey: .sessionId)
         }
     }
 }

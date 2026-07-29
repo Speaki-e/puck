@@ -15,8 +15,9 @@ than hardcoding a copy.
 | run_shell | `command` | pet-app | required (whitelist exceptions) | 60 | Run a shell command, returns stdout/stderr/exit code |
 | run_applescript | `script` | pet-app | required | 60 | Run an AppleScript |
 | code_editor | `task` (natural language), `project_path` | workspace | uses ACP's internal approval flow | 600 | Delegate a coding task to Claude Code, returns a summary |
-| open_in_editor | `path` | workspace | not required | 10 | Open a file as a Monaco tab |
+| open_in_editor | `path` | workspace | not required | 10 | Open a file as a tab in the embedded editor view |
 | read_file | `path` | workspace | not required | 10 | Return a file's contents (read-only) |
+| open_task_session | `title`, `brief` | ai-module (never dispatched) | not required | n/a | Branch a casual conversation into a new task session on the agent's own judgement |
 
 ## `frame` coordinate convention
 
@@ -49,6 +50,7 @@ like. Most tools return an object or `null`. One does not:
 | code_editor | TBD — workspace hasn't shipped this yet |
 | open_in_editor | TBD — workspace hasn't shipped this yet |
 | read_file | TBD — workspace hasn't shipped this yet |
+| open_task_session | `null`. Never crosses `tool_dispatch`/`tool_result` on the wire — see the note below. |
 
 The three `workspace`-executed tools are marked TBD because the workspace repo has no
 implementation yet as of this writing — don't treat those response shapes as settled
@@ -62,3 +64,9 @@ them.
 - `click_element`'s description must include the fallback guidance: it does not work on
   system permission dialogs, so fall back to `point_at` plus a prompt for the user to click
   manually in that case.
+- `open_task_session` (2026-07-29) is the one entry in this table with no real dispatch: its
+  `executor: "ai-module"` marks a tool ai-module's own tool-use loop handles inline rather
+  than sending over the socket. It has no timeout (`timeoutSec: 0` is a placeholder, not a
+  real value) and no `tool_result` — its effect surfaces only via the `onSessionCreated`
+  callback ([`agent-interface.md`](./agent-interface.md)) and the resulting `session_create`
+  socket event ([`socket.md`](./socket.md) channel 4).

@@ -4,13 +4,19 @@ Source of truth: [`../src/types/agent-interface.ts`](../src/types/agent-interfac
 This document explains it; the types are normative.
 
 ```typescript
-run(command: string, context: Context, callbacks: AgentCallbacks, signal?: AbortSignal): Promise<void>
+run(command: string, sessionId: string, context: Context, callbacks: AgentCallbacks, attachments?: Attachment[], signal?: AbortSignal): Promise<void>
 
 interface Context {
   frontmostApp?: string
   openWindows?: WindowInfo[]
   editorOpenFiles?: string[]
   recentActions?: string[]
+  projectPath?: string
+}
+
+interface Attachment {
+  type: "image"
+  path: string
 }
 
 interface AgentCallbacks {
@@ -18,6 +24,7 @@ interface AgentCallbacks {
   onToolCallStart(id: string, tool: string, args: object): void
   onToolResult(id: string, ok: boolean, data?: object, error?: string, detail?: string): void
   onApprovalRequired(summary: string, resolve: (approved: boolean) => void): void
+  onSessionCreated(sessionId: string, title: string): void
   onDone(ok: boolean, summary: string): void
 }
 
@@ -37,6 +44,17 @@ interface ToolExecutor {
 - `signal` (`AbortSignal`): the user-initiated abort path. On abort, ai-module stops
   streaming, sends `tool_cancel` via `petAppProxy` for any in-flight pet-app executor call,
   then finishes via `onDone(false, "aborted")`.
+- `sessionId` (2026-07-29): the caller invokes `run()` once per session and ai-module keeps
+  each session's conversation history under this key — a session's memory never bleeds into
+  another's (plan/04_ai-module.md 3.4). `Context.projectPath` is auto-filled from the
+  session's workspace, so the model doesn't need to repeat it on every `code_editor` call.
+- `attachments` (2026-07-29, optional): images attached to this turn (e.g. pet-app's drag
+  capture, F14).
+- `onSessionCreated` (2026-07-29): fires when the agent calls the `open_task_session` tool on
+  its own judgement (see [`tools.md`](./tools.md)). The caller converts this into a
+  `session_create(origin=agent)` socket event ([`socket.md`](./socket.md) channel 4) so
+  pet-app's sidebar picks up the new session. All subsequent turns of this conversation are
+  recorded under the new `sessionId`.
 
 ## `ToolExecutionResult` vs the wire `ToolResult`
 

@@ -4,13 +4,25 @@
 //
 //  F3 test · owner: 박해영 (Haeyoung Park)
 //  Deterministic timer-accumulation behavior of WanderScheduler (interval/outcome
-//  providers injected so the random 8-30s wander timer is testable).
+//  providers injected so the wander timer is testable).
 //
 
 import XCTest
 @testable import PetAgent
 
 final class WanderSchedulerTests: XCTestCase {
+    /// Every other test here injects its own interval, so without this the
+    /// value the app actually ships with is covered by nothing.
+    func test_defaultInterval_keepsThePetVisiblyActive() {
+        XCTAssertEqual(WanderScheduler.defaultInterval, 5)
+
+        // And the default initializer really uses it -- the provider default
+        // and the constant can drift apart otherwise.
+        let scheduler = WanderScheduler(outcomeProvider: { .walkToRandomPoint })
+        XCTAssertNil(scheduler.tick(dt: WanderScheduler.defaultInterval - 0.1))
+        XCTAssertEqual(scheduler.tick(dt: 0.1), .walkToRandomPoint)
+    }
+
     func test_tick_returnsNil_beforeIntervalElapses() {
         let scheduler = WanderScheduler(nextIntervalProvider: { 10 }, outcomeProvider: { .walkToRandomPoint })
 

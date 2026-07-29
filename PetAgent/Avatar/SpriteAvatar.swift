@@ -44,6 +44,14 @@ final class SpriteAvatar: AvatarPlayable {
         let scale = loadResult.manifest.scale
         spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
         spriteLayer.contentsGravity = .resizeAspect
+        // A hand-made CALayer defaults to contentsScale 1.0 no matter which
+        // display it ends up on -- only a view's own backing layer gets the
+        // window's scale for free. At 1.0 on a 2x screen the sprite rasterizes
+        // at half its physical resolution and is upscaled: soft, and its
+        // bitmap snaps to the coarser 1x pixel grid, so a walk advancing
+        // ~1.5pt per frame renders as stair-stepped jitter. SpriteLayerView
+        // keeps the parent's value current across display changes.
+        spriteLayer.contentsScale = parent.contentsScale
         parent.addSublayer(spriteLayer)
     }
 
@@ -148,6 +156,10 @@ final class SpriteAvatar: AvatarPlayable {
     /// sprite is left attached to an orphaned layer (mirrors USDZAvatar.reparent).
     func reparent(to newParent: CALayer) {
         spriteLayer.removeFromSuperlayer()
+        // Reparenting is exactly when the pet can cross between a 1x and a 2x
+        // display (the rebuild happens *because* the display setup changed),
+        // so the rasterization scale has to follow it to the new screen.
+        spriteLayer.contentsScale = newParent.contentsScale
         newParent.addSublayer(spriteLayer)
     }
 

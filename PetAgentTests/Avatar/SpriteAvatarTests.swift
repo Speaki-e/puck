@@ -62,6 +62,49 @@ final class SpriteAvatarTests: XCTestCase {
         return try AvatarLoader.load(manifestData: Data(json.utf8))
     }
 
+    // MARK: - Retina rasterization
+
+    /// A hand-made CALayer defaults to contentsScale 1.0 regardless of the
+    /// display it ends up on -- only a view's own backing layer gets the
+    /// window's scale for free. Left at 1.0 on a 2x screen the sprite is
+    /// rasterized at half the physical resolution and upscaled: visibly soft,
+    /// and because the bitmap is aligned to the coarser 1x pixel grid, a walk
+    /// that advances ~1.5pt per frame renders as stair-stepped jitter instead
+    /// of smooth motion.
+    func test_spriteLayer_inheritsParentContentsScale_soItRasterizesAtRetinaResolution() throws {
+        try writePNG(named: "idle", color: .red)
+        let parent = CALayer()
+        parent.contentsScale = 2
+
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory,
+            loadResult: try makeLoadResult(),
+            parent: parent
+        )
+
+        XCTAssertEqual(avatar.spriteLayer.contentsScale, 2)
+    }
+
+    /// OverlayWindowController rebuilds every window/view on a display change,
+    /// so reparenting is exactly when the pet can move between a 1x and a 2x
+    /// screen -- the scale has to follow it there.
+    func test_reparent_adoptsTheNewParentsContentsScale() throws {
+        try writePNG(named: "idle", color: .red)
+        let onex = CALayer()
+        onex.contentsScale = 1
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory,
+            loadResult: try makeLoadResult(),
+            parent: onex
+        )
+
+        let retina = CALayer()
+        retina.contentsScale = 2
+        avatar.reparent(to: retina)
+
+        XCTAssertEqual(avatar.spriteLayer.contentsScale, 2)
+    }
+
     func test_play_setsLayerContentsFromThePNGFile() throws {
         try writePNG(named: "idle", color: .red)
         let loadResult = try makeLoadResult()

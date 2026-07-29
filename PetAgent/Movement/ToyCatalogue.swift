@@ -48,9 +48,10 @@ struct Toy: Equatable {
 enum ToyCatalogue {
     /// Round and chunky; the original toy.
     static let pumpkin = Toy(name: "pumpkin", height: 44, play: .throwAndCatch)
-    /// Tall and thin, so it needs more height than the pumpkin to read as
-    /// anything at all.
-    static let wand = Toy(name: "wand", height: 76, play: .spinOverhead)
+    /// Tall and thin -- 0.27 as wide as it is tall once straightened -- so it
+    /// needs considerably more height than the pumpkin to have any presence
+    /// at all. At this height it draws about 24pt across.
+    static let wand = Toy(name: "wand", height: 88, play: .spinOverhead)
 
     static let all: [Toy] = [pumpkin, wand]
 

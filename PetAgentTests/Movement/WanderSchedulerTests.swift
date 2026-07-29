@@ -63,6 +63,38 @@ final class WanderSchedulerTests: XCTestCase {
         XCTAssertEqual(scheduler.tick(dt: 1), .climbToCeiling)
     }
 
+    /// F12 multi-toy (2026-07-30): a toy already resting on the floor only ever
+    /// got played with if it happened to land while the pet was free, so
+    /// anything the pet had walked away from stayed abandoned. This is the draw
+    /// that goes back for it.
+    func test_tick_firesPlayWithToyOutcome_onceIntervalElapses() {
+        let scheduler = WanderScheduler(nextIntervalProvider: { 10 }, outcomeProvider: { .playWithToy })
+
+        XCTAssertNil(scheduler.tick(dt: 9))
+        XCTAssertEqual(scheduler.tick(dt: 1), .playWithToy)
+    }
+
+    /// The shipped weights, which every other test here injects around. Checked
+    /// as a distribution rather than exactly: the point is that no outcome is
+    /// unreachable and that playing with a toy is a minority draw, not that the
+    /// numbers are precise.
+    func test_weightedRandomOutcome_reachesEveryOutcome() {
+        var counts: [WanderScheduler.Outcome: Int] = [:]
+
+        for _ in 0..<4000 {
+            counts[WanderScheduler.weightedRandomOutcome(), default: 0] += 1
+        }
+
+        for outcome in [
+            WanderScheduler.Outcome.walkToRandomPoint, .climbNearestWindow, .climbToCeiling, .playWithToy, .stay,
+        ] {
+            XCTAssertGreaterThan(counts[outcome] ?? 0, 0, "\(outcome) is unreachable")
+        }
+        // Walking stays the most common thing the pet does.
+        XCTAssertEqual(counts.max(by: { $0.value < $1.value })?.key, .walkToRandomPoint)
+        XCTAssertLessThan(counts[.playWithToy] ?? 0, counts[.walkToRandomPoint] ?? 0)
+    }
+
     func test_tick_resetsElapsedAndPicksNextInterval() {
         var intervals: [TimeInterval] = [10, 3]
         let scheduler = WanderScheduler(

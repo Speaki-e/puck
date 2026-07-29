@@ -65,6 +65,11 @@ final class CharacterBody {
     /// rule every other property here follows.
     var visualBounds: CGRect { avatar.visualBounds }
 
+    /// Whether a point (relative to `position`) lands on the drawn character.
+    func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool {
+        avatar.hitTest(point, tolerance: tolerance)
+    }
+
     func play(clip: String, loop: Bool) {
         avatar.play(clip: clip, loop: loop)
     }

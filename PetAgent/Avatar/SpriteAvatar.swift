@@ -12,6 +12,7 @@
 //  static image comes from updateBounce (BouncePreset), not from this file.
 //
 
+import AppKit
 import CoreGraphics
 import Foundation
 import QuartzCore
@@ -24,15 +25,28 @@ final class SpriteAvatar: AvatarPlayable {
     /// so repeated Settings slider changes don't compound.
     private let hitbox: AvatarManifest.Hitbox
     let spriteLayer = CALayer()
+    /// A flat colour washed over the character while a preset asks for a tint
+    /// (the rainbow flips). Masked by the sprite itself, so it colours the
+    /// artwork and not the transparent box around it. Hidden -- and costing
+    /// nothing -- the rest of the time.
+    private let tintLayer = CALayer()
+    private let tintMaskLayer = CALayer()
     private var loadedImages: [String: CGImage] = [:]
-    /// Cached per decoded image — scanning a 1200px sprite's alpha is far too
-    /// slow to redo on every access, and the result never changes.
-    private var opaquePixelBounds: [ObjectIdentifier: CGRect?] = [:]
-    /// Whatever `spriteLayer.contents` currently holds. Kept alongside rather
-    /// than read back off the layer: `contents` is `Any?`, and Swift rejects
-    /// a conditional cast back to a CoreFoundation type as never-failing.
-    private var currentImage: CGImage?
+    /// The showing image's opaque pixel box and its size, measured once when
+    /// the image is swapped in. Only the *scan* is cached: mapping it into
+    /// layer coordinates is a handful of arithmetic and is redone on read, so
+    /// resizing the layer (Settings' size slider) needs no invalidation.
+    private var currentMeasurement: (opaquePixels: CGRect, imagePixelSize: CGSize)?
     private var facing: AvatarFacing = .right
+    /// When the current left/right turn began, or nil if the pet has never
+    /// turned. See FlipAnimation.
+    private var flipStartedAt: TimeInterval?
+    /// The angle the current turn started from. Where it is heading is
+    /// always the angle of `facing`, and how long it takes always follows
+    /// from the two, so neither is stored.
+    private var flipFromAngle: CGFloat = 0
+    /// Injectable so the turn can be tested without waiting in real time.
+    private let now: () -> TimeInterval
     private var currentBounce = BounceTransform.identity
     private var isUpsideDown = false
     /// Derived from the clip name passed to updateBounce, not a separate
@@ -43,13 +57,22 @@ final class SpriteAvatar: AvatarPlayable {
     /// see setUpsideDown's doc comment.
     private var lastPosition: CGPoint = .zero
 
-    init(avatarDirectory: URL, loadResult: AvatarLoadResult, parent: CALayer) {
+    init(
+        avatarDirectory: URL,
+        loadResult: AvatarLoadResult,
+        parent: CALayer,
+        now: @escaping () -> TimeInterval = { CACurrentMediaTime() }
+    ) {
         self.avatarDirectory = avatarDirectory
         self.loadResult = loadResult
         self.hitbox = loadResult.manifest.hitbox
+        self.now = now
 
         let scale = loadResult.manifest.scale
         spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
+        // SpriteVisualBounds re-derives this exact gravity to work out where
+        // the artwork sits inside the layer -- changing it here without
+        // changing it there silently makes every screen-edge limit wrong.
         spriteLayer.contentsGravity = .resizeAspect
         // A hand-made CALayer defaults to contentsScale 1.0 no matter which
         // display it ends up on -- only a view's own backing layer gets the
@@ -62,6 +85,20 @@ final class SpriteAvatar: AvatarPlayable {
         // The FSM drives this layer every frame; Core Animation must not
         // interpolate between those frames on top of it.
         spriteLayer.disableImplicitAnimations()
+
+        // A sublayer, so it inherits every transform applied to the sprite --
+        // the tint flips and squashes with the character rather than sitting
+        // still behind it.
+        tintLayer.frame = spriteLayer.bounds
+        tintLayer.isHidden = true
+        tintLayer.disableImplicitAnimations()
+        tintMaskLayer.frame = spriteLayer.bounds
+        tintMaskLayer.contentsGravity = spriteLayer.contentsGravity
+        tintMaskLayer.contentsScale = spriteLayer.contentsScale
+        tintMaskLayer.disableImplicitAnimations()
+        tintLayer.mask = tintMaskLayer
+        spriteLayer.addSublayer(tintLayer)
+
         parent.addSublayer(spriteLayer)
     }
 
@@ -71,8 +108,7 @@ final class SpriteAvatar: AvatarPlayable {
         // showing rather than blanking the pet -- same "don't strand the
         // caller with nothing" reasoning USDZAvatar's animation-less-file path uses.
         guard let image = loadedImage(named: fileName) else { return }
-        spriteLayer.contents = image
-        currentImage = image
+        show(image)
     }
 
     func stop() {
@@ -107,6 +143,10 @@ final class SpriteAvatar: AvatarPlayable {
 
     func setFacing(_ facing: AvatarFacing) {
         guard facing != self.facing else { return }
+        // Turning again mid-turn continues from the angle currently on
+        // screen rather than snapping back to full width and starting over.
+        flipFromAngle = currentFlipAngle
+        flipStartedAt = now()
         self.facing = facing
         applyTransform()
     }
@@ -146,6 +186,8 @@ final class SpriteAvatar: AvatarPlayable {
     /// in setScreenPosition depends on this height.
     func updateScale(_ scale: Double) {
         spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
+        tintLayer.frame = spriteLayer.bounds
+        tintMaskLayer.frame = spriteLayer.bounds
     }
 
     /// Settings' emotion mapping / EventRouter-driven mood swap. Silent
@@ -158,8 +200,7 @@ final class SpriteAvatar: AvatarPlayable {
         else {
             return
         }
-        spriteLayer.contents = image
-        currentImage = image
+        show(image)
     }
 
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
@@ -170,18 +211,39 @@ final class SpriteAvatar: AvatarPlayable {
         spriteLayer.removeFromSuperlayer()
         // Reparenting is exactly when the pet can cross between a 1x and a 2x
         // display (the rebuild happens *because* the display setup changed),
-        // so the rasterization scale has to follow it to the new screen.
+        // so the rasterization scale has to follow it to the new screen. The
+        // tint mask rasterizes the same artwork and needs the same scale, or
+        // the colour sits slightly off the character's outline.
         spriteLayer.contentsScale = newParent.contentsScale
+        tintMaskLayer.contentsScale = newParent.contentsScale
         newParent.addSublayer(spriteLayer)
     }
 
+    /// The turn angle to draw at right now: the settled angle for the current
+    /// facing, or a partway one while a turn is playing.
+    private var currentFlipAngle: CGFloat {
+        let target = FlipAnimation.angle(facing: facing)
+        guard let flipStartedAt else { return target }
+        return FlipAnimation.angle(
+            elapsed: now() - flipStartedAt,
+            from: flipFromAngle,
+            to: target,
+            duration: FlipAnimation.duration(from: flipFromAngle, to: target)
+        )
+    }
+
     private func applyTransform() {
-        let flipX: CGFloat = facing == .left ? -1 : 1
+        let flipX = FlipAnimation.horizontalScale(atAngle: currentFlipAngle)
         let flipY: CGFloat = isUpsideDown ? -1 : 1
         var transform = CGAffineTransform(scaleX: CGFloat(currentBounce.scaleX) * flipX, y: CGFloat(currentBounce.scaleY) * flipY)
         if isClimbing {
             transform = transform.rotated(by: .pi / 2)
         }
+        // After the climb turn, so the preset's rocking is relative to
+        // however the sprite is already oriented rather than to the screen --
+        // a climbing pet leans off its own upright, not off vertical.
+        transform = transform.rotated(by: CGFloat(currentBounce.rotation))
+        applyTint(currentBounce.tintHue)
         spriteLayer.setAffineTransform(transform)
     }
 
@@ -189,31 +251,60 @@ final class SpriteAvatar: AvatarPlayable {
     /// gives a wider outline. Falls back to the layer box (the pre-existing
     /// behaviour) when nothing has been drawn yet or the image is blank.
     var visualBounds: CGRect {
-        let layerSize = spriteLayer.bounds.size
-        guard
-            let image = currentImage,
-            let opaque = opaquePixels(of: image)
-        else {
-            return CGRect(x: -layerSize.width / 2, y: -layerSize.height, width: layerSize.width, height: layerSize.height)
-        }
-
+        guard let currentMeasurement else { return layerBox }
         return SpriteVisualBounds.relativeToGroundPoint(
-            opaquePixels: opaque,
-            imagePixelSize: CGSize(width: image.width, height: image.height),
-            layerSize: layerSize
+            opaquePixels: currentMeasurement.opaquePixels,
+            imagePixelSize: currentMeasurement.imagePixelSize,
+            layerSize: spriteLayer.bounds.size
         )
     }
 
-    /// Scanning every pixel is far too slow to repeat per frame, and an
-    /// image's opaque box never changes once loaded.
-    private func opaquePixels(of image: CGImage) -> CGRect? {
-        let key = ObjectIdentifier(image)
-        if let cached = opaquePixelBounds[key] {
-            return cached
+    /// The whole layer, ground-point relative -- what the outline was before
+    /// it was measured from the artwork.
+    private var layerBox: CGRect {
+        let size = spriteLayer.bounds.size
+        return CGRect(x: -size.width / 2, y: -size.height, width: size.width, height: size.height)
+    }
+
+    /// The single place the layer's image changes, so the outline is measured
+    /// exactly once per swap instead of being recomputed by the frame loop.
+    private func show(_ image: CGImage) {
+        spriteLayer.contents = image
+        // The mask has to follow the artwork, or a tint applied while one
+        // clip is showing would keep the previous clip's silhouette.
+        tintMaskLayer.contents = image
+        measureVisualBounds(of: image)
+    }
+
+    /// `hue` in 0...1, or nil for the artwork's own colours.
+    private func applyTint(_ hue: Double?) {
+        guard let hue else {
+            tintLayer.isHidden = true
+            return
         }
-        let measured = OpaquePixelBounds.of(image)
-        opaquePixelBounds[key] = measured
-        return measured
+        tintLayer.isHidden = false
+        tintLayer.backgroundColor = NSColor(
+            hue: CGFloat(hue),
+            saturation: Self.tintSaturation,
+            brightness: 1,
+            alpha: Self.tintAlpha
+        ).cgColor
+    }
+
+    /// Strong enough to read as "the pet turned red", weak enough that the
+    /// face still shows through -- a fully opaque wash turns it into a
+    /// silhouette and loses the expression the flips are celebrating.
+    private static let tintSaturation: CGFloat = 0.9
+    private static let tintAlpha: CGFloat = 0.55
+
+    /// The alpha scan -- the expensive half. Kept off the frame loop by
+    /// running only here, on the image swap.
+    private func measureVisualBounds(of image: CGImage) {
+        guard let opaque = OpaquePixelBounds.of(image) else {
+            currentMeasurement = nil
+            return
+        }
+        currentMeasurement = (opaque, CGSize(width: image.width, height: image.height))
     }
 
     /// Only caches on a successful load -- caching a failure would make a

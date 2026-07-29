@@ -96,9 +96,10 @@ final class FallState: StateHandler {
     /// rebounds when its artwork touches the edge rather than when its centre
     /// reaches it — half the pet would already be off-screen by then.
     private func carriedSideways(from position: CGPoint, in context: StateContext, dt: TimeInterval) -> CGPoint {
-        guard horizontalVelocity != 0 else {
-            return ScreenBounds.contain(position, visualBounds: context.visualBounds, in: context.roamableArea)
-        }
+        // A plain drop needs no clamping here: CharacterController applies
+        // ScreenBounds.contain after every state update, and that is the one
+        // authoritative definition of "inside the screen".
+        guard horizontalVelocity != 0 else { return position }
 
         let travelled = CGPoint(x: position.x + horizontalVelocity * CGFloat(dt), y: position.y)
         let bounce = ScreenBounds.bounceHorizontally(

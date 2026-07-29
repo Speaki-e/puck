@@ -38,7 +38,7 @@ struct StateContext {
     /// a screen edge instead of when its centre does — byeolki: "이 펫 에셋의
     /// 태두리를 사각형으로 정확히 잡고 그 태두리 기반으로 화면경계에서 튕기게"
     /// (2026-07-29).
-    var visualBounds: CGRect = .zero
+    let visualBounds: CGRect
 
     /// px/sec for Walk/Climb/WalkOnTop/MoveTo/Ceiling -- MovementSolver.walkSpeed
     /// scaled by Settings' movement-speed slider (byeolki's request, 2026-07-29).

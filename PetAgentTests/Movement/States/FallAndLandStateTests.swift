@@ -149,18 +149,22 @@ final class FallStateTests: XCTestCase {
         let state = FallState()
         state.enter()
 
-        var highest = CGFloat.greatestFiniteMagnitude
+        // The pet's HEAD is what meets the ceiling, so the limit is its
+        // outline's top offset above the position -- not the position itself.
+        let headroom = -world.visualBounds.minY
+        var highestHead = CGFloat.greatestFiniteMagnitude
         for _ in 0..<60 {
             world.run(state, seconds: 1.0 / 60)
-            highest = min(highest, world.body.position.y)
-            XCTAssertGreaterThanOrEqual(world.body.position.y, 0, "never above the top of the screen")
+            let head = world.body.position.y - headroom
+            highestHead = min(highestHead, head)
+            XCTAssertGreaterThanOrEqual(head, 0, "never above the top of the screen")
         }
 
         // Never lands exactly on 0: a frame at 3000px/sec covers 50px, and the
         // frame that would have crossed the ceiling is reflected back down
         // instead. Getting within one frame of travel is "reached it".
-        XCTAssertLessThan(highest, 50, "it did reach the ceiling")
-        XCTAssertGreaterThan(world.body.position.y, highest, "and came back down from it")
+        XCTAssertLessThan(highestHead, 50, "it did reach the ceiling")
+        XCTAssertGreaterThan(world.body.position.y - headroom, highestHead, "and came back down from it")
     }
 
     func test_aThrowNeverLeavesTheScreen() {
@@ -173,10 +177,10 @@ final class FallStateTests: XCTestCase {
 
         for _ in 0..<120 { // two seconds of bouncing around
             world.run(state, seconds: 1.0 / 60)
-            XCTAssertTrue(
-                (0...1000).contains(world.body.position.x),
-                "left the screen at x=\(world.body.position.x)"
-            )
+            // The whole outline, not just the position, has to stay inside.
+            let outline = world.visualBounds.offsetBy(dx: world.body.position.x, dy: 0)
+            XCTAssertGreaterThanOrEqual(outline.minX, 0, "artwork left the screen on the left")
+            XCTAssertLessThanOrEqual(outline.maxX, 1000, "artwork left the screen on the right")
         }
     }
 

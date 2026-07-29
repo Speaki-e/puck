@@ -14,11 +14,21 @@
 
 import Foundation
 
-/// A scale-only transform (no position offset -- squash-and-stretch on scale
-/// alone already reads as "bounce" without needing a separate bob offset).
+/// One frame of a preset's procedural motion. Started out scale-only --
+/// squash-and-stretch alone already reads as "bounce" -- and has since grown
+/// the two things that genuinely cannot be expressed as a scale: `rotation`
+/// (the climb waddle) and `tintHue` (the rainbow flips). Both stay neutral
+/// for every preset that doesn't use them, so presets only ever describe
+/// what they actually do.
 struct BounceTransform: Equatable {
     let scaleX: Double
     let scaleY: Double
+    /// Radians, applied on top of whatever orientation the sprite already
+    /// has (including the 90 degrees a climbing sprite is turned by).
+    var rotation: Double = 0
+    /// Hue in 0...1 to wash the character in, or nil for its own colours.
+    /// Only the artwork is tinted, never the space around it.
+    var tintHue: Double?
 
     static let identity = BounceTransform(scaleX: 1, scaleY: 1)
 }
@@ -33,12 +43,18 @@ enum BouncePreset: Equatable {
     case kick
     /// "pet" (double-tap petting reaction, 2026-07-29).
     case wiggle
+    /// The waddle a climbing pet does on its way up (2026-07-29).
+    case climb
+    /// The flips after being petted (2026-07-29).
+    case spin
 
-    /// Which preset a clip name uses. Clips with no bounce behavior (climb,
-    /// fall, type, listen, react_drag, and anything unrecognized) get `.none`.
+    /// Which preset a clip name uses. Clips with no bounce behavior (fall,
+    /// type, listen, react_drag, and anything unrecognized) get `.none`.
     static func preset(for clip: String) -> BouncePreset {
         switch clip {
         case "idle": return .idle
+        case "climb": return .climb
+        case "spin": return .spin
         case "walk": return .walk
         case "land": return .land
         case "point", "react_click": return .pop
@@ -46,6 +62,32 @@ enum BouncePreset: Equatable {
         case "pet": return .wiggle
         default: return .none
         }
+    }
+
+    /// The rainbow, in order, one colour per half turn (byeolki: "뒤집힐 때
+    /// 색갈을 무지개 차례대로", 2026-07-29), so the pet's front and back are
+    /// never the same colour and each flip reveals the next one.
+    ///
+    /// The caller offsets the angle by a quarter turn before dividing,
+    /// because the boundaries of `angle / .pi` are where the sprite is fully
+    /// face-on or back-on -- recolouring there happens in plain view. Edge-on
+    /// (width zero) is a quarter turn away from those, and that is the only
+    /// moment a colour change is invisible.
+    ///
+    /// Hues rather than named colours so the tint stays a single number the
+    /// renderer can apply without a colour table.
+    static let rainbowHues: [Double] = [
+        0.0,    // red
+        0.083,  // orange
+        0.167,  // yellow
+        0.333,  // green
+        0.583,  // blue
+        0.708,  // indigo
+        0.792,  // violet
+    ]
+
+    static func rainbowHue(halfTurn: Int) -> Double {
+        rainbowHues[max(halfTurn, 0) % rainbowHues.count]
     }
 
     /// `elapsed`: seconds since the current clip started playing.
@@ -113,6 +155,62 @@ enum BouncePreset: Equatable {
                 let s = intensity * sin(localT * .pi)
                 return BounceTransform(scaleX: 1 - s * 0.2, scaleY: 1 + s * 0.3)
             }
+
+        case .climb:
+            // Rocking side to side on the way up, like something small
+            // hauling itself up one side at a time (byeolki: "위로 올라갈때
+            // 귀엽게 올라가게 해봐", 2026-07-29). Rotation is the whole
+            // effect -- a scale-only version of this reads as the sprite
+            // being squeezed, not as the pet leaning.
+            //
+            // The vertical squash rides at DOUBLE the rocking frequency, so
+            // the pet is shortest at both extremes of the rock and tallest as
+            // it passes through upright -- it looks like it's compressing to
+            // plant each side and stretching to reach with the other. Matching
+            // frequencies instead would just make one side droop.
+            let period = 0.5
+            let phase = sin(2 * .pi * elapsed / period)
+            let lean = 8 * .pi / 180 * intensity
+            let reach = 0.05 * intensity
+            return BounceTransform(
+                scaleX: 1,
+                scaleY: 1 - reach * abs(phase),
+                rotation: lean * phase
+            )
+
+        case .spin:
+            // Turning about its own vertical axis -- the pet flips over like
+            // a sheet of paper, several times (byeolki: "회전이 아니라
+            // 뒤집는거를 원함", 2026-07-29). Deliberately NOT an in-plane
+            // rotation: that tips the pet over sideways, which reads as it
+            // falling rather than as a happy little spin.
+            //
+            // Same projection FlipAnimation uses for a single turn, and
+            // reusing it keeps one definition of what a turning sprite looks
+            // like -- the scale multiplies straight into the facing flip
+            // SpriteAvatar already applies.
+            //
+            // A whole number of turns, so the pet always ends face-on however
+            // the duration divides into the rate. The easing is applied to
+            // how far round it is, never to the angle itself: damping the
+            // angle (the obvious-looking `angle * (1 - p * p)`) is not
+            // monotonic -- it peaks partway through and returns to zero, so
+            // the pet visibly winds up and then unwinds backwards.
+            let turns = 3.0
+            let progress = min(elapsed / SpinState.duration, 1)
+            let easedOut = 1 - (1 - progress) * (1 - progress) // fast, then coasting to a stop
+            let angle = 2 * .pi * turns * easedOut
+
+            // A small squash as it passes edge-on, fading out with the spin,
+            // so it reads as the pet throwing itself round rather than an
+            // image being scaled by software.
+            let settle = 1 - progress
+            return BounceTransform(
+                scaleX: Double(FlipAnimation.horizontalScale(atAngle: angle)),
+                scaleY: 1 - 0.06 * intensity * settle * abs(sin(angle)),
+                rotation: 0,
+                tintHue: Self.rainbowHue(halfTurn: Int((angle + .pi / 2) / .pi))
+            )
 
         case .wiggle:
             // A joyful side-to-side shake, several quick pulses, decaying to

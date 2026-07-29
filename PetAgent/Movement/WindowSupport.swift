@@ -38,6 +38,52 @@ enum WindowSupport {
         }
     }
 
+    /// A point to walk to that will put the pet against the nearest climbable
+    /// window's side, so `blockingWindow` picks it up and Walk hands off to
+    /// Climb (2026-07-29, byeolki: "너무 바닥에 붙어있는데 어느정도 위로 기어
+    /// 올라가도 됨").
+    ///
+    /// The wander scheduler's `.climbNearestWindow` outcome had never been
+    /// implemented -- it fell through to a plain random walk -- so a quarter
+    /// of every wander decision quietly kept the pet on the floor, and the
+    /// only climbs that ever happened were the accidental ones where a random
+    /// walk target happened to lie past a window edge.
+    ///
+    /// Returns nil when nothing nearby can be climbed, which the caller
+    /// should treat as "wander normally" rather than as an error.
+    static func nearestClimbTarget(
+        from position: CGPoint,
+        in windows: [WindowInfo],
+        roamableTop: CGFloat = -.greatestFiniteMagnitude,
+        avatarHeight: CGFloat = 0
+    ) -> CGPoint? {
+        // How far past the edge to aim. Walking *to* the edge exactly leaves
+        // the pet a rounding error short of it on some frames, and the climb
+        // never triggers.
+        let overshoot: CGFloat = 4
+
+        let edges = windows
+            .filter { window in
+                // Only windows the pet's own height can reach the side of...
+                position.y >= window.frame.minY && position.y <= window.frame.maxY
+            }
+            .filter { window in
+                // ...and only ones with room to stand on top afterwards.
+                window.frame.minY - roamableTop >= avatarHeight
+            }
+            .flatMap { [$0.frame.minX, $0.frame.maxX] }
+            // Already standing at this edge: pick a different one rather than
+            // walking a zero-length path and re-deciding a moment later.
+            .filter { abs($0 - position.x) > edgeTolerance }
+
+        guard let nearest = edges.min(by: { abs($0 - position.x) < abs($1 - position.x) }) else { return nil }
+
+        return CGPoint(
+            x: nearest > position.x ? nearest + overshoot : nearest - overshoot,
+            y: position.y
+        )
+    }
+
     /// The window edge a pet walking from `position` toward `target` runs into
     /// first, if any — the trigger for Walk -> Climb.
     ///

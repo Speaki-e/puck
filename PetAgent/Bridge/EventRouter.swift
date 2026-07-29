@@ -28,6 +28,9 @@ enum StateKind: Equatable, CaseIterable {
     case listen
     case reactClick
     case reactDrag
+    /// The twirl after the user finishes petting the pet's head (2026-07-29).
+    /// Never reachable from a socket event -- see EventRouter.reaction(for:).
+    case spin
     /// F12 (2026-07-29, optional ball-toy interaction): chase a thrown ball,
     /// then kick it away. Never reachable from a socket event -- see
     /// EventRouter.reaction(for:), which has no case producing these.

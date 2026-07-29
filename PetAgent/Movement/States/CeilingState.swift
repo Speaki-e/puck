@@ -55,15 +55,22 @@ final class CeilingState: StateHandler {
             return
         }
 
-        var nextX = context.body.position.x + direction * context.walkSpeed * CGFloat(dt)
-        if nextX >= context.roamableArea.maxX {
-            nextX = context.roamableArea.maxX
-            direction = -1
-        } else if nextX <= context.roamableArea.minX {
-            nextX = context.roamableArea.minX
-            direction = 1
+        // Turns around where the pet's artwork meets the edge, not where its
+        // centre does -- ScreenBounds owns that limit for every state, so a
+        // ceiling crawl reverses at the same place a walk stops. Measuring it
+        // here instead used to turn the pet with half of it off-screen, which
+        // CharacterController's containment backstop then pulled back on the
+        // same frame: the turn and the render disagreed.
+        let travelled = CGPoint(
+            x: context.body.position.x + direction * context.walkSpeed * CGFloat(dt),
+            y: context.roamableArea.minY
+        )
+        let contained = ScreenBounds.contain(travelled, visualBounds: context.visualBounds, in: context.roamableArea)
+        if contained.x != travelled.x {
+            direction = -direction
         }
+
         context.body.facing = direction > 0 ? .right : .left
-        context.body.position = CGPoint(x: nextX, y: context.roamableArea.minY)
+        context.body.position = contained
     }
 }

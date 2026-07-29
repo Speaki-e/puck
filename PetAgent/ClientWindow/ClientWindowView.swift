@@ -31,23 +31,11 @@ struct ClientWindowView: View {
     var body: some View {
         HStack(spacing: 0) {
             ClientSidebarView(store: store)
-                .frame(width: 220)
 
             Divider()
 
             VStack(spacing: 0) {
-                Picker("", selection: $mode) {
-                    ForEach(MainAreaMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .padding(8)
-                // project_path 없는 워크스페이스는 에디터 뷰가 없으니 그 상태에선
-                // 채팅 뷰로 강제 — F13: "project_path 없는 워크스페이스는 에디터
-                // 버튼이 비활성화".
-                .disabled(activeWorkspace?.projectPath == nil)
+                header
 
                 Divider()
 
@@ -66,6 +54,7 @@ struct ClientWindowView: View {
                     }
                 }
             }
+            .background(ClientTheme.Colors.contentBackground)
         }
         .frame(minWidth: 640, minHeight: 420)
         .onChange(of: store.activeWorkspaceId) {
@@ -73,5 +62,34 @@ struct ClientWindowView: View {
             // rather than showing a stale editor for the previous workspace.
             if activeWorkspace?.projectPath == nil { mode = .chat }
         }
+    }
+
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(activeSession?.title ?? "")
+                    .font(ClientTheme.Typography.workspaceName)
+                Text(activeWorkspace?.name ?? "")
+                    .font(.caption)
+                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+            }
+            Spacer()
+            Picker("", selection: $mode) {
+                ForEach(MainAreaMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 160)
+            // project_path 없는 워크스페이스는 에디터 뷰가 없으니 그 상태에선
+            // 채팅 뷰로 강제 — F13: "project_path 없는 워크스페이스는 에디터
+            // 버튼이 비활성화".
+            .disabled(activeWorkspace?.projectPath == nil)
+        }
+        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+        .padding(.top, 14)
+        .padding(.bottom, ClientTheme.Metrics.spacingMedium)
+        .background(VisualEffectBackground(material: .headerView))
     }
 }

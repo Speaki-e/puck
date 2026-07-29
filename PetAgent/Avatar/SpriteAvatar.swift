@@ -28,6 +28,9 @@ final class SpriteAvatar: AvatarPlayable {
     private var facing: AvatarFacing = .right
     private var currentBounce = BounceTransform.identity
     private var isUpsideDown = false
+    /// Derived from the clip name passed to updateBounce, not a separate
+    /// AvatarPlayable method -- see updateBounce's doc comment.
+    private var isClimbing = false
     /// The last logical position passed to setScreenPosition, so
     /// setUpsideDown can immediately recompute the rendered offset for it --
     /// see setUpsideDown's doc comment.
@@ -89,8 +92,14 @@ final class SpriteAvatar: AvatarPlayable {
         applyTransform()
     }
 
+    /// F3 wall-climbing (2026-07-29, byeolki: "벽 타는 것도 사진 돌려서
+    /// 올라가게 해주고"): rotates the sprite 90deg while the "climb" clip is
+    /// playing -- ClimbState (a window's side) and ClimbToCeilingState (open
+    /// air, toward the ceiling) both use it, so both get the rotation for
+    /// free with no per-state wiring.
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {
         currentBounce = BouncePreset.preset(for: clip).transform(elapsed: elapsed, intensity: intensity)
+        isClimbing = clip == "climb"
         applyTransform()
     }
 
@@ -145,9 +154,11 @@ final class SpriteAvatar: AvatarPlayable {
     private func applyTransform() {
         let flipX: CGFloat = facing == .left ? -1 : 1
         let flipY: CGFloat = isUpsideDown ? -1 : 1
-        spriteLayer.setAffineTransform(
-            CGAffineTransform(scaleX: CGFloat(currentBounce.scaleX) * flipX, y: CGFloat(currentBounce.scaleY) * flipY)
-        )
+        var transform = CGAffineTransform(scaleX: CGFloat(currentBounce.scaleX) * flipX, y: CGFloat(currentBounce.scaleY) * flipY)
+        if isClimbing {
+            transform = transform.rotated(by: .pi / 2)
+        }
+        spriteLayer.setAffineTransform(transform)
     }
 
     /// Only caches on a successful load -- caching a failure would make a

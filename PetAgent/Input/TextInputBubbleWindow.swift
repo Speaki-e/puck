@@ -11,7 +11,7 @@
 
 import AppKit
 
-final class TextInputBubbleWindow: NSWindow {
+final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
     private(set) var previouslyFrontmostApp: NSRunningApplication?
     /// Injectable for tests -- real NSWorkspace frontmost-app state can't be
     /// relied on to change inside a test runner the way it does in a live app.
@@ -29,9 +29,39 @@ final class TextInputBubbleWindow: NSWindow {
         hasShadow = true
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // Drag it anywhere by its blurred background (byeolki: "드래그해서
+        // 위치도 옮길 수 있게", 2026-07-30). Dragging by the text itself still
+        // selects text, as it does in any field.
+        isMovableByWindowBackground = true
+        delegate = self
+    }
+
+    /// True once the user has dragged the panel somewhere, after which the
+    /// caller stops placing it -- being yanked back to the default spot on
+    /// every open is the whole point of moving it.
+    private(set) var wasMovedByUser = false
+
+    func windowDidMove(_ notification: Notification) {
+        // The caller positions the panel while it is hidden, so only a move
+        // that happens on screen can be the user's own drag.
+        guard isVisible else { return }
+        wasMovedByUser = true
     }
 
     override var canBecomeKey: Bool { true }
+
+    /// Clicking away dismisses the panel, the way Spotlight's does. The
+    /// caller supplies this rather than the window closing itself, because
+    /// dismissing also has to unpin the pet.
+    var onDismiss: (() -> Void)?
+
+    override func resignKey() {
+        super.resignKey()
+        // closeAndRestoreFocus() activates the previous app, which resigns key
+        // again -- without this the dismissal would run twice.
+        guard isVisible else { return }
+        onDismiss?()
+    }
 
     /// Remembers whichever app is frontmost right now, then takes focus.
     /// Skips recapturing while already visible: this window itself would be
@@ -45,7 +75,29 @@ final class TextInputBubbleWindow: NSWindow {
             return
         }
         previouslyFrontmostApp = frontmostAppProvider()
+        // PetAgent is LSUIElement/.accessory, and a background app's window
+        // can be "key" without the app being active -- the keystrokes still
+        // go to whatever app is frontmost, so the bubble appeared but typing
+        // landed somewhere else (byeolki: "단축키 입력하면 바로 입력 모드로
+        // 가게"). Activating is what actually hands the keyboard over;
+        // closeAndRestoreFocus() gives it back afterwards.
+        NSApp.activate(ignoringOtherApps: true)
+        // Spotlight fades in rather than popping. Short enough not to be in
+        // the way of typing immediately.
+        alphaValue = 0
         makeKeyAndOrderFront(nil)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            animator().alphaValue = 1
+        }
+    }
+
+    /// Hides the bubble *without* restoring focus -- for submit, where focus
+    /// is about to go to PetAgentClient's window instead of back to the app
+    /// the user invoked the bubble from (2026-07-30).
+    func closeAndYieldFocus() {
+        orderOut(nil)
+        previouslyFrontmostApp = nil
     }
 
     /// Hides the bubble and restores focus to whatever was frontmost before `showAndActivate()`.

@@ -13,39 +13,25 @@
 import SwiftUI
 
 enum ClientTheme {
-    /// A distinct lime-green accent (byeolki: "컬러는 #A2E048 이런 류 색
-    /// 써서") instead of the system's default blue -- this app has a
-    /// character in it, the UI shouldn't look like a plain settings pane.
-    /// Kept as one fixed value across light/dark: it's bright/saturated
-    /// enough to read on both a near-white and a near-black surface, unlike
-    /// the semantic NSColor tokens below (which do need to vary by mode and
-    /// get that for free from AppKit's dynamic providers).
+    /// **No accent color** -- byeolki (2026-07-30): "포인트 색상을 일단
+    /// 삭제". The lime #A2E048 that used to fill the user bubble, the send
+    /// button, selected rows and the approve button is gone; what those
+    /// surfaces are made of now is Liquid Glass (see GlassSurface), and what
+    /// distinguishes them is elevation and weight rather than hue. The only
+    /// colors left are semantic status ones (a failed tool result has to be
+    /// red whatever the palette is).
     enum Colors {
-        static let accent = Color(red: 0xA2 / 255.0, green: 0xE0 / 255.0, blue: 0x48 / 255.0)
-        static let accentSoft = accent.opacity(0.16)
-        /// #A2E048 is light/high-luminance -- white text on a solid fill of
-        /// it fails contrast. Anything filled with `accent` (the user bubble,
-        /// the send button, the approve button) uses this instead of white.
-        static let onAccent = Color.black.opacity(0.82)
-
         /// Sidebar/toolbar chrome uses VisualEffectBackground (real
         /// NSVisualEffectView vibrancy), not a flat color here -- a flat
         /// Color reads as a plain settings pane no matter what tone it is.
         static let contentBackground = Color(nsColor: .textBackgroundColor)
 
-        static let userBubble = accent
-        static let userBubbleText = onAccent
-        static let assistantBubble = Color(nsColor: .controlBackgroundColor)
-        static let assistantBubbleText = Color.primary
-
-        static let cardBackground = Color(nsColor: .controlBackgroundColor)
-        static let cardBorder = Color(nsColor: .separatorColor)
-
-        static let approvalBackground = Color.orange.opacity(0.14)
-        static let approvalBorder = Color.orange.opacity(0.4)
+        static let bubbleText = Color.primary
 
         static let success = Color.green
         static let failure = Color.red
+        /// Approval is a state that must interrupt, so it keeps a hue.
+        static let warning = Color.orange
         static let secondaryText = Color.secondary
     }
 
@@ -67,6 +53,16 @@ enum ClientTheme {
         static let bubbleCornerRadius: CGFloat = 16
         static let cardCornerRadius: CGFloat = 10
         static let rowCornerRadius: CGFloat = 8
-        static let maxBubbleWidthRatio: CGFloat = 0.72
+    }
+
+    /// The shapes glass is cut to. Spelled once here rather than
+    /// `RoundedRectangle(cornerRadius:style:)` at every call site -- the
+    /// corner style has to match across surfaces or the window stops looking
+    /// like one material.
+    enum Shapes {
+        static let bubble = RoundedRectangle(cornerRadius: Metrics.bubbleCornerRadius, style: .continuous)
+        static let card = RoundedRectangle(cornerRadius: Metrics.cardCornerRadius, style: .continuous)
+        static let row = RoundedRectangle(cornerRadius: Metrics.rowCornerRadius, style: .continuous)
+        static let panel = RoundedRectangle(cornerRadius: 28, style: .continuous)
     }
 }

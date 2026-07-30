@@ -51,6 +51,20 @@ merge conflicts).
 6. Running the `workspace` repo alongside it connects them over a local Unix
    socket (`~/Library/Application Support/PetAgent/bridge.sock`).
 
+### Day-to-day: `scripts/install.sh`
+
+Running the Debug build straight out of DerivedData is fine, but it is
+**ad-hoc signed**, and macOS ties TCC grants to the code signature — so every
+rebuild silently revokes Accessibility and the global hotkey stops working
+until you re-grant it by hand.
+
+`./scripts/install.sh` builds both apps signed with your Apple Development
+certificate (any free personal team will do; the team ID is read from the
+keychain, or from `DEVELOPMENT_TEAM` if you set it), installs them into
+`/Applications`, and relaunches. The signature is then stable across
+rebuilds: **grant Accessibility once to `/Applications/PetAgent.app`** and
+every later `./scripts/install.sh` keeps it.
+
 To just build/test from the CLI:
 `xcodebuild -project PetAgent.xcodeproj -scheme PetAgent build` /
 `xcodebuild -project PetAgent.xcodeproj -scheme PetAgent test`.

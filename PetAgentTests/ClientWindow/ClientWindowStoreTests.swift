@@ -132,4 +132,38 @@ final class ClientWindowStoreTests: XCTestCase {
 
         XCTAssertEqual(transport.broadcasted, [.userInput(UserInput(text: "go on", source: .text, workspaceId: "w2", sessionId: "s9"))])
     }
+
+    /// byeolki (2026-07-30): text typed into pet-app's quick-capture bubble
+    /// has to show up here. It arrives as a user_input with no workspace/
+    /// session (the bubble knows nothing about either), which means the
+    /// default workspace's casual session.
+    func test_showUserMessage_withoutIds_landsInTheDefaultCasualSession() {
+        let (store, _) = makeStore()
+
+        XCTAssertTrue(store.showUserMessage("사파리 켜줘", workspaceId: nil, sessionId: nil))
+
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.timeline.count, 1)
+        XCTAssertEqual(store.activeWorkspaceId, "default")
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
+    func test_showUserMessage_switchesToTheSessionItWasSentTo() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+
+        XCTAssertTrue(store.showUserMessage("hi", workspaceId: "w2", sessionId: "default"))
+
+        XCTAssertEqual(store.activeWorkspaceId, "w2")
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
+    /// Same rule as handleChatEvent: an unknown session is dropped, not
+    /// fabricated -- PetAgentClient keys "should I bring the window up?" off
+    /// this, and an empty window popping open for a dropped message is worse
+    /// than nothing.
+    func test_showUserMessage_forAnUnknownSession_isDropped() {
+        let (store, _) = makeStore()
+
+        XCTAssertFalse(store.showUserMessage("hi", workspaceId: "nope", sessionId: "nope"))
+    }
 }

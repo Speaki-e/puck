@@ -4,21 +4,15 @@
 //
 //  F13 · owner: 박해영 (Haeyoung Park)
 //  The "Claude Desktop"-style client window: sidebar (workspace switcher +
-//  session list) on the left, chat <-> embedded editor view on the right
+//  session list) on the left, the chat transcript on the right
 //  (plan/02_pet-app.md F13). Docked beside the pinned character when summoned
 //  via Option+Shift+Space.
 //
 
 import SwiftUI
 
-private enum MainAreaMode: String, CaseIterable {
-    case chat = "채팅"
-    case editor = "에디터"
-}
-
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
-    @State private var mode: MainAreaMode = .chat
 
     private var activeWorkspace: ClientWorkspace? {
         store.workspaces.first { $0.id == store.activeWorkspaceId }
@@ -29,68 +23,64 @@ struct ClientWindowView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        // HSplitView, not HStack + Divider: the divider is then a real
+        // draggable splitter (byeolki: "그 사이드 바나 그런 거 전부 조절
+        // 가능하게 늘리고 줄이고"). It's AppKit's NSSplitView underneath, so
+        // the drag behaviour is the system's, not something hand-rolled.
+        HSplitView {
             ClientSidebarView(store: store)
 
-            Divider()
-
-            VStack(spacing: 0) {
+            ZStack(alignment: .top) {
+                mainArea
+                // The header floats *over* the content rather than sitting in
+                // a bar above it: glass has to have something behind it to
+                // refract, and a divider-separated strip gives it nothing.
                 header
-
-                Divider()
-
-                switch mode {
-                case .chat:
-                    if let activeSession {
-                        ChatView(session: activeSession, store: store)
-                    } else {
-                        Spacer()
-                    }
-                case .editor:
-                    if let url = activeWorkspace?.editorViewURL {
-                        EditorWebView(url: url)
-                    } else {
-                        EditorUnavailableView()
-                    }
-                }
             }
-            .background(ClientTheme.Colors.contentBackground)
+            .frame(minWidth: 420)
+            // A material, not a flat color -- every glass surface in this
+            // pane is reading from what's behind it.
+            .background(VisualEffectBackground(material: .contentBackground))
         }
         .frame(minWidth: 640, minHeight: 420)
         .preferredColorScheme(store.appearance.colorScheme)
-        .onChange(of: store.activeWorkspaceId) {
-            // Switching to a workspace with no editor view falls back to chat
-            // rather than showing a stale editor for the previous workspace.
-            if activeWorkspace?.projectPath == nil { mode = .chat }
+    }
+
+    /// Chat only. The embedded editor view (EditorWebView) is its own track
+    /// and isn't hosted anywhere yet -- byeolki (2026-07-30): "에디터는 따로
+    /// 할거라 토글 빼".
+    @ViewBuilder
+    private var mainArea: some View {
+        if let activeSession {
+            ChatView(session: activeSession, store: store, topInset: Self.headerHeight)
+        } else {
+            Spacer()
         }
     }
 
+    /// How far the content has to be pushed down to clear the floating
+    /// header (its own height plus the window's transparent titlebar strip).
+    private static let headerHeight: CGFloat = 64
+
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(activeSession?.title ?? "")
-                    .font(ClientTheme.Typography.workspaceName)
-                Text(activeWorkspace?.name ?? "")
-                    .font(.caption)
-                    .foregroundStyle(ClientTheme.Colors.secondaryText)
-            }
-            Spacer()
-            Picker("", selection: $mode) {
-                ForEach(MainAreaMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+        GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
+            HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(activeSession?.title ?? "")
+                        .font(ClientTheme.Typography.workspaceName)
+                    Text(activeWorkspace?.name ?? "")
+                        .font(.caption)
+                        .foregroundStyle(ClientTheme.Colors.secondaryText)
                 }
+                // No glass behind the title (byeolki, 2026-07-30): a label
+                // that never moves or reacts doesn't need a surface, and it
+                // read as a floating chip for no reason.
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+
+                Spacer(minLength: 0)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 160)
-            // project_path 없는 워크스페이스는 에디터 뷰가 없으니 그 상태에선
-            // 채팅 뷰로 강제 — F13: "project_path 없는 워크스페이스는 에디터
-            // 버튼이 비활성화".
-            .disabled(activeWorkspace?.projectPath == nil)
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         }
-        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-        .padding(.top, 14)
-        .padding(.bottom, ClientTheme.Metrics.spacingMedium)
-        .background(VisualEffectBackground(material: .headerView))
+        .padding(.top, 28) // clears the transparent titlebar / traffic lights
     }
 }

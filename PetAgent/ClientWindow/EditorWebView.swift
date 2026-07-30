@@ -38,6 +38,5 @@ struct EditorUnavailableView: View {
                 .foregroundStyle(ClientTheme.Colors.secondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ClientTheme.Colors.contentBackground)
     }
 }

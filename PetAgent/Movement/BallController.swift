@@ -300,8 +300,13 @@ final class BallController {
 
     /// Launches a resting ball away in `direction` -- a no-op if it's still
     /// falling or already kicked, so a stray call can't relaunch it mid-flight.
+    ///
+    /// A carried toy counts too: a spun wand is still overhead when the pet
+    /// gets bored, and without this it was dropped on the spot instead of
+    /// being thrown away like every other toy (byeolki: "지팡이 돌리다가
+    /// 멈추면 대충 던지게", 2026-07-30).
     func kick(direction: AvatarFacing) {
-        guard let current = state, current.phase == .resting else { return }
+        guard let current = state, current.phase == .resting || current.phase == .carried else { return }
         state = BallPhysics.kick(current, direction: direction)
     }
 

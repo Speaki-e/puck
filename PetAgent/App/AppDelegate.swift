@@ -89,6 +89,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// Every toy that's out, and which one the pet is playing with. The FSM
     /// states above still only ever deal with one toy -- `toyBox.focused`.
     private var toyBox: ToyBox?
+    /// When the pet last finished playing. Play used to restart the instant
+    /// the thrown toy settled, so a toy left out meant the pet did nothing
+    /// else ever again (byeolki: "장난감을 너무 많이 가지고 놀진 않게 약간
+    /// 시간을 가지게", 2026-07-30).
+    private var toyPlayEndedAt: TimeInterval?
+    /// How long the pet goes without picking a toy up again. Long enough for
+    /// a wander or two in between, short enough that a toy put out for it
+    /// doesn't feel ignored.
+    static let toyPlayCooldown: TimeInterval = 20
+    /// Had enough of toys for the moment.
+    private var isRestingFromToys: Bool {
+        guard let toyPlayEndedAt else { return false }
+        return CACurrentMediaTime() - toyPlayEndedAt < Self.toyPlayCooldown
+    }
     /// The toy the cursor picked up, decided once on mouse-down. Held for the
     /// whole gesture for the same reason ClickThroughController holds its
     /// subject: the toy moves while being dragged, so re-testing per event
@@ -597,7 +611,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             // LANDED -- so a toy the pet had kicked away and walked off from
             // was abandoned for good. Falls back to roaming when nothing is
             // out or nothing has settled yet, same as the climbs do.
-            guard let box = toyBox,
+            guard !isRestingFromToys,
+                  let box = toyBox,
                   let name = ToyInterestPolicy.next(
                       from: box.candidates,
                       lastPlayed: box.lastPlayedName,
@@ -1254,8 +1269,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             }
 
             // Idle/Walk-only gate (F3's priority rule): the pet must not
-            // abandon an agent-driven task to go chase a ball.
-            guard let controller = self.characterController,
+            // abandon an agent-driven task to go chase a ball. And not the
+            // toy it just threw away, until it has had a break from toys --
+            // otherwise the throw's own landing starts the next game.
+            guard !self.isRestingFromToys,
+                  let controller = self.characterController,
                   controller.currentState === self.idleState || controller.currentState === self.walkState
             else { return }
             self.startPlaying(with: toy)
@@ -1270,7 +1288,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             )
         }
         kickBallState.onEnter = { [weak self] in
-            self?.toyBox?.focused?.kick(direction: self?.characterBody?.facing ?? .right)
+            guard let self else { return }
+            // The throw-away IS the end of the game, for every toy and both
+            // play styles, so this is the one place the break starts from.
+            self.toyPlayEndedAt = CACurrentMediaTime()
+            self.toyBox?.focused?.kick(direction: self.characterBody?.facing ?? .right)
         }
         toyBox = box
     }
@@ -1308,6 +1330,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private func toggleToy(_ toy: Toy) {
         guard let box = toyBox else { return }
         box.toggle(toy, at: windowLocalPoint(fromGlobalAppKit: NSEvent.mouseLocation))
+        // Handing the pet a toy on purpose beats its break -- being ignored
+        // right after clicking the menu just reads as broken.
+        toyPlayEndedAt = nil
         // From what's actually out, not from what the toggle was asked to do.
         menuBarController?.setToysOut(box.outToyNames)
     }

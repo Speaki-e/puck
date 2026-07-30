@@ -560,6 +560,17 @@ final class BallToyCarryTests: XCTestCase {
         XCTAssertEqual(controller.layer.position, overhead)
     }
 
+    /// Play ending has to throw the spun toy away, not drop it where it hung.
+    func test_kick_whileCarried_throwsItAway() {
+        let controller = toy()
+        controller.carry(to: CGPoint(x: 400, y: 200), dt: 1.0 / 60)
+
+        controller.kick(direction: .right)
+
+        XCTAssertEqual(controller.state?.phase, .kicked)
+        XCTAssertGreaterThan(controller.state?.horizontalVelocity ?? 0, 0)
+    }
+
     func test_carryingSpinsTheToy() {
         let controller = toy()
 

@@ -17,6 +17,9 @@ enum PetAgentClientApp {
         let delegate = AppDelegate()
         application.delegate = delegate
         application.setActivationPolicy(.regular)
+        // No nib, so nothing supplies a main menu -- and with no menu, every
+        // standard shortcut (Cmd+Q/W/M, Cmd+C/V in the chat field) is dead.
+        application.mainMenu = ClientMainMenu.make()
         application.run()
     }
 }

@@ -52,6 +52,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             clientWindowStore.handleChatEvent(event, workspaceId: workspaceId, sessionId: sessionId)
         case .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
             clientWindowStore.handleClientUpdate(message)
+        case .userInput(let input):
+            // Mirrored from pet-app's quick-capture bubble: typing there has
+            // to bring this window up with the text already in the chat
+            // (byeolki, 2026-07-30). Only shows the window if the message
+            // actually landed in a session -- an unknown workspace/session
+            // would pop an empty window for nothing.
+            if clientWindowStore.showUserMessage(input.text, workspaceId: input.workspaceId, sessionId: input.sessionId) {
+                showWindow()
+            }
         default:
             break // relayed to this connection only ever as one of the above (protocol 3.7)
         }
@@ -59,8 +68,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showWindow() {
         let window = window ?? {
-            let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 720, height: 480))
-            newWindow.contentViewController = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
+            // 720x480 was cramped for a sidebar + transcript + editor pane
+            // (byeolki: "기본으로 보여지는 창의 크기를 좀 키워줘"), and at
+            // origin (0,0) it opened in the bottom-left corner.
+            let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 1100, height: 740))
+            let hosting = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
+            // NSHostingController defaults to sizingOptions
+            // .preferredContentSize, i.e. it keeps pushing the SwiftUI
+            // fitting size onto the window -- which is why the window opened
+            // at whatever the layout happened to fit in (~884x651, then
+            // 700x471) no matter what contentRect or setContentSize said.
+            hosting.sizingOptions = []
+            newWindow.contentViewController = hosting
+            newWindow.setContentSize(CGSize(width: 1100, height: 740))
+            newWindow.minSize = CGSize(width: 760, height: 520)
+            newWindow.center()
             self.window = newWindow
             return newWindow
         }()

@@ -251,10 +251,39 @@ final class BridgeServerTests: XCTestCase {
         guiClient.cancel()
     }
 
-    /// AppDelegate pins the on-screen character (F3 Pinned state) while a
-    /// chat client is attached, and unpins it once the last one disconnects
-    /// -- this replaces the old in-process "client window opened/closed"
-    /// callback from when the chat window and the pet shared a process.
+    /// The quick-capture bubble's text is mirrored to PetAgentClient with
+    /// send(_:to: .gui) (2026-07-30) -- broadcast() deliberately doesn't
+    /// reach it, and a gui connection on its own must not make the pet
+    /// believe workspace is up (F6's offline bubble depends on that).
+    func test_sendToGUI_reachesTheGUIConnectionAndDoesNotCountAsAWorkspaceClient() {
+        let guiReceived = expectation(description: "gui connection received the mirrored user_input")
+        let guiPresent = expectation(description: "server registered the gui role")
+        server.onGUIPresenceChanged = { present in if present { guiPresent.fulfill() } }
+
+        let guiClient = makeClient()
+        let guiBuffer = ReceiveBuffer()
+        guiClient.stateUpdateHandler = { state in
+            if case .ready = state { self.send(.clientHello(role: .gui), on: guiClient) }
+        }
+        receiveOne(on: guiClient, into: guiBuffer) { message in
+            guard case .userInput(let input) = message else { return }
+            XCTAssertEqual(input.text, "사파리 켜줘")
+            guiReceived.fulfill()
+        }
+        guiClient.start(queue: .main)
+        wait(for: [guiPresent], timeout: 5)
+
+        XCTAssertFalse(server.hasConnectedClients, "a gui client can't act on user input")
+        XCTAssertFalse(server.broadcast(.userInput(UserInput(text: "사파리 켜줘", source: .text))), "broadcast has no workspace to reach")
+        XCTAssertTrue(server.send(.userInput(UserInput(text: "사파리 켜줘", source: .text)), to: .gui))
+
+        wait(for: [guiReceived], timeout: 5)
+        guiClient.cancel()
+    }
+
+    /// AppDelegate uses this to flush a mirrored bubble submission that had
+    /// nowhere to go yet, once PetAgentClient (which it launched a moment
+    /// earlier) finishes connecting.
     func test_onGUIPresenceChanged_firesOnFirstConnectAndLastDisconnect() {
         var presenceEvents: [Bool] = []
         let connected = expectation(description: "gui presence became true")

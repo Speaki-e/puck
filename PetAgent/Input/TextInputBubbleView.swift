@@ -21,13 +21,35 @@ final class TextInputBubbleView: NSVisualEffectView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        // Spotlight's own look, as closely as AppKit gives it for free
+        // (byeolki: "이거 spotlight 느낌으로 만들어줘", 2026-07-30): one wide
+        // translucent slab holding one line of large text, and nothing else --
+        // the leading glyph this had at first just read as clutter ("그 왼쪽에
+        // 띄운 이상한 심볼 삭제", 2026-07-30).
         material = .hudWindow
         blendingMode = .behindWindow
         state = .active
         wantsLayer = true
-        layer?.cornerRadius = 12
+        layer?.cornerRadius = Self.cornerRadius
+        layer?.masksToBounds = true
+        // A layer corner radius rounds the CONTENTS; the behind-window blur is
+        // drawn to the view's own shape and stayed a full rectangle, so the
+        // panel read as a rounded box sitting on a square backdrop (byeolki:
+        // "완전 직사각형 배경 위에 둥근 사각형이 나온듯한 느낌", 2026-07-30).
+        // Only maskImage reshapes the blur itself.
+        maskImage = Self.roundedMask(radius: Self.cornerRadius)
+        // The hairline that keeps the panel from dissolving into a light
+        // desktop -- Spotlight has one, and without it the blur alone leaves
+        // no edge at all over pale backgrounds.
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
         configureTextField()
     }
+
+    /// Spotlight's panel proportions -- wide, one row tall, softly rounded.
+    static let panelSize = CGSize(width: 640, height: 64)
+    static let cornerRadius: CGFloat = 20
+    private static let horizontalInset: CGFloat = 20
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
@@ -64,14 +86,36 @@ final class TextInputBubbleView: NSVisualEffectView {
         textField.isBordered = false
         textField.drawsBackground = false
         textField.focusRingType = .none
+        // Big enough to be the only thing in the panel, like Spotlight's.
+        textField.font = .systemFont(ofSize: 24, weight: .regular)
+        textField.placeholderString = Self.placeholder
         textField.delegate = self
         textField.translatesAutoresizingMaskIntoConstraints = false
         addSubview(textField)
         NSLayoutConstraint.activate([
-            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
+            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),
             textField.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
+    }
+
+    /// Hardcoded Korean, like the "워크스페이스가 꺼져 있어요" notice this same
+    /// bubble shows -- bubble copy doesn't go through Strings yet.
+    private static let placeholder = "무엇을 도와드릴까요?"
+
+    /// A rounded rectangle just big enough to hold both corners, stretched
+    /// across whatever size the panel ends up -- the cap insets keep the
+    /// corners crisp instead of scaling them with the panel.
+    private static func roundedMask(radius: CGFloat) -> NSImage {
+        let side = radius * 2 + 1
+        let image = NSImage(size: CGSize(width: side, height: side), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
     }
 }
 

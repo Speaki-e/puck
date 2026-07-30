@@ -24,13 +24,23 @@ struct AppLogLine: Encodable {
 /// Thin file-I/O wrapper — not unit tested beyond what AppLogLine's plain
 /// Encodable conformance already guarantees.
 final class AppLogger {
-    static let shared = AppLogger()
+    static let shared = AppLogger(directory: isRunningTests ? testLogDirectory : defaultLogDirectory)
 
     static let defaultLogDirectory: URL = {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("PetAgent", isDirectory: true)
             .appendingPathComponent("logs", isDirectory: true)
     }()
+
+    /// The test bundle exercises SpriteAvatar, CharacterController and the
+    /// rest with throwaway fixtures, and every failure they log went into the
+    /// *real* diagnostics log -- "Failed to load avatar sprite at /var/.../
+    /// walk.png" and "unregistered StateKind walk" appeared there on every
+    /// `xcodebuild test`, indistinguishable from something the running app
+    /// had hit. Tests write to a temp directory instead.
+    private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private static let testLogDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PetAgentTestLogs", isDirectory: true)
 
     private let directory: URL
     private let queue = DispatchQueue(label: "PetAgent.AppLogger")

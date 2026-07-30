@@ -13,6 +13,9 @@ import SwiftUI
 struct ChatView: View {
     @ObservedObject var session: ChatSession
     let store: ClientWindowStore
+    /// Room left at the top for the window's floating header, which is drawn
+    /// over this view rather than above it.
+    var topInset: CGFloat = 0
 
     @State private var draftText = ""
     @State private var showDisconnectedBanner = false
@@ -31,9 +34,13 @@ struct ChatView: View {
                                 .id(entry.id)
                         }
                     }
-                    .padding(ClientTheme.Metrics.spacingLarge)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
+                    .padding(.bottom, ClientTheme.Metrics.spacingLarge)
+                    .padding(.top, topInset + ClientTheme.Metrics.spacingMedium)
                 }
-                .background(ClientTheme.Colors.contentBackground)
+                .overlay {
+                    if session.timeline.isEmpty { EmptyTranscript() }
+                }
                 .onChange(of: session.timeline.count) {
                     guard let lastId = session.timeline.last?.id else { return }
                     withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
@@ -46,41 +53,45 @@ struct ChatView: View {
                 }
             }
 
-            Divider()
             inputBar
         }
     }
 
+    /// A glass capsule floating over the transcript rather than a bar
+    /// welded to the bottom edge -- the Apple-style treatment, and the one
+    /// place the window most needs to read as its own app.
     private var inputBar: some View {
-        HStack(spacing: ClientTheme.Metrics.spacingMedium) {
-            TextField("메시지를 입력하세요", text: $draftText, onCommit: send)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
-                .background(ClientTheme.Colors.assistantBubble)
-                .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.cardCornerRadius, style: .continuous))
+        GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
+            HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                TextField("메시지를 입력하세요", text: $draftText, onCommit: send)
+                    .textFieldStyle(.plain)
+                    .font(ClientTheme.Typography.messageBody)
 
-            if session.isRunning {
-                Button(action: { store.cancelActiveRun() }) {
-                    Image(systemName: "stop.fill")
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(Circle().fill(ClientTheme.Colors.failure))
+                if session.isRunning {
+                    Button(action: { store.cancelActiveRun() }) {
+                        Image(systemName: "stop.fill")
+                            .foregroundStyle(ClientTheme.Colors.failure)
+                            .padding(7)
+                            .glassControl(in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button(action: send) {
+                        Image(systemName: "arrow.up")
+                            .foregroundStyle(.primary)
+                            .padding(7)
+                            .glassControl(in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .buttonStyle(.plain)
-            } else {
-                Button(action: send) {
-                    Image(systemName: "arrow.up")
-                        .foregroundStyle(ClientTheme.Colors.onAccent)
-                        .padding(8)
-                        .background(Circle().fill(ClientTheme.Colors.accent))
-                }
-                .buttonStyle(.plain)
-                .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            .padding(.leading, ClientTheme.Metrics.spacingLarge)
+            .padding(.trailing, ClientTheme.Metrics.spacingSmall)
+            .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+            .glassSurface(in: Capsule())
         }
         .padding(ClientTheme.Metrics.spacingMedium)
-        .background(VisualEffectBackground(material: .headerView))
     }
 
     private func send() {
@@ -93,14 +104,37 @@ struct ChatView: View {
     }
 }
 
+/// A new session opens onto a large empty pane; without this it reads as a
+/// rendering failure rather than "say something".
+private struct EmptyTranscript: View {
+    var body: some View {
+        VStack(spacing: ClientTheme.Metrics.spacingMedium) {
+            // The pumpkin is the app's mark (byeolki, 2026-07-30: "호박을
+            // 로고로 쓰고 싶어") -- it's also the app icon, and the toy the
+            // pet plays with.
+            Image("PumpkinLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
+            Text("무엇을 도와드릴까요?")
+                .font(ClientTheme.Typography.summary)
+                .foregroundStyle(ClientTheme.Colors.secondaryText)
+        }
+        .padding(ClientTheme.Metrics.spacingLarge * 1.5)
+        .glassSurface(in: ClientTheme.Shapes.panel)
+        .allowsHitTesting(false)
+    }
+}
+
 private struct DisconnectedBanner: View {
     var body: some View {
-        Text("워크스페이스가 꺼져 있어요")
+        Label("워크스페이스가 꺼져 있어요", systemImage: "bolt.horizontal.circle")
             .font(ClientTheme.Typography.sectionHeader)
-            .foregroundStyle(.white)
+            .foregroundStyle(ClientTheme.Colors.failure)
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+            .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+            .glassSurface(in: Capsule())
             .padding(ClientTheme.Metrics.spacingSmall)
-            .frame(maxWidth: .infinity)
-            .background(ClientTheme.Colors.failure)
     }
 }
 
@@ -112,33 +146,34 @@ private struct ApprovalBanner: View {
         VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingSmall) {
             Label(summary, systemImage: "exclamationmark.triangle.fill")
                 .font(ClientTheme.Typography.messageBody)
-                .foregroundStyle(.orange)
+                .foregroundStyle(ClientTheme.Colors.warning)
             HStack {
-                // Not .buttonStyle(.borderedProminent).tint(accent) --
-                // macOS picks a white label for a tinted prominent button,
-                // and #A2E048 is too light for white text to read on.
+                // Weight, not hue, is what marks the default action now.
                 Button("허용") { onRespond(true) }
                     .buttonStyle(.plain)
+                    .fontWeight(.semibold)
                     .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
                     .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                    .background(ClientTheme.Colors.accent)
-                    .foregroundStyle(ClientTheme.Colors.onAccent)
-                    .clipShape(Capsule())
+                    .glassControl(in: Capsule())
                 Button("거부") { onRespond(false) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .foregroundStyle(ClientTheme.Colors.failure)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                    .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+                    .glassControl(in: Capsule())
             }
         }
         .padding(ClientTheme.Metrics.spacingMedium)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ClientTheme.Colors.approvalBackground)
-        .overlay(Rectangle().frame(height: 1).foregroundStyle(ClientTheme.Colors.approvalBorder), alignment: .top)
+        .glassSurface(in: ClientTheme.Shapes.card)
+        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
     }
 }
 
-/// A left/right-aligned bubble shared by user + assistant text rows -- the
-/// one visual cue that most makes this read as a chat app rather than a log
-/// viewer.
+/// Only the user's side gets a bubble, and it's glass rather than a colored
+/// fill (there is no accent color any more). The agent's text sits directly
+/// on the page like it does in Mail or Notes -- with both sides bubbled and
+/// no hue to tell them apart, the transcript read as two identical columns.
 private struct MessageBubble: View {
     let text: String
     let isUser: Bool
@@ -148,18 +183,18 @@ private struct MessageBubble: View {
             if isUser { Spacer(minLength: 0) }
             Text(text)
                 .font(ClientTheme.Typography.messageBody)
+                .foregroundStyle(ClientTheme.Colors.bubbleText)
                 .textSelection(.enabled)
-                .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
-                .background(isUser ? ClientTheme.Colors.userBubble : ClientTheme.Colors.assistantBubble)
-                .foregroundStyle(isUser ? ClientTheme.Colors.userBubbleText : ClientTheme.Colors.assistantBubbleText)
-                .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.bubbleCornerRadius, style: .continuous))
+                .padding(.horizontal, isUser ? ClientTheme.Metrics.spacingMedium : 0)
+                .padding(.vertical, isUser ? ClientTheme.Metrics.spacingSmall + 2 : 0)
+                .glassSurface(in: ClientTheme.Shapes.bubble, isEnabled: isUser)
                 .frame(maxWidth: 420, alignment: isUser ? .trailing : .leading)
             if !isUser { Spacer(minLength: 0) }
         }
         .frame(maxWidth: .infinity)
     }
 }
+
 
 private struct ChatTimelineEntryRow: View {
     let entry: ChatTimelineEntry
@@ -185,12 +220,7 @@ private struct ChatTimelineEntryRow: View {
                     .font(ClientTheme.Typography.toolLabel)
             }
             .padding(ClientTheme.Metrics.spacingMedium)
-            .background(ClientTheme.Colors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.cardCornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: ClientTheme.Metrics.cardCornerRadius, style: .continuous)
-                    .strokeBorder(ClientTheme.Colors.cardBorder, lineWidth: 1)
-            )
+            .glassSurface(in: ClientTheme.Shapes.card)
 
         case .toolResult(_, let ok, let data, let error, let detail):
             HStack(alignment: .top, spacing: ClientTheme.Metrics.spacingSmall) {
@@ -206,13 +236,12 @@ private struct ChatTimelineEntryRow: View {
                 }
             }
             .padding(ClientTheme.Metrics.spacingMedium)
-            .background(ClientTheme.Colors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.cardCornerRadius, style: .continuous))
+            .glassSurface(in: ClientTheme.Shapes.card)
 
         case .approvalRequested(_, _, let summary):
             Label(summary, systemImage: "hand.raised.fill")
                 .font(ClientTheme.Typography.mono)
-                .foregroundStyle(.orange)
+                .foregroundStyle(ClientTheme.Colors.warning)
 
         case .done(let ok, let summary):
             Label(summary, systemImage: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")

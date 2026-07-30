@@ -20,57 +20,20 @@ struct ClientSidebarView: View {
             // .fullSizeContentView + a transparent titlebar so the sidebar's
             // own background runs to the top of the window.
             Color.clear.frame(height: 28)
-            sectionHeader("워크스페이스")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(store.workspaces) { workspace in
-                        WorkspaceRow(workspace: workspace, isActive: workspace.id == store.activeWorkspaceId) {
-                            store.activeWorkspaceId = workspace.id
-                            store.activeSessionId = ClientWindowStore.defaultSessionId
-                        }
-                    }
-                    Button {
-                        showingNewWorkspaceSheet = true
-                    } label: {
-                        Label("워크스페이스 추가", systemImage: "plus")
-                            .font(ClientTheme.Typography.sessionTitle)
-                            .foregroundStyle(ClientTheme.Colors.secondaryText)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                    .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                }
-                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+
+            // The workspace list and the session list are a split too, so a
+            // long list of either can be given the room it needs
+            // (byeolki: "전부 조절 가능하게").
+            VSplitView {
+                workspaceSection
+                sessionSection
             }
-            .frame(maxHeight: 160)
-
-            Divider()
-
-            Button {
-                store.requestNewSession(title: "새 채팅", in: store.activeWorkspaceId)
-            } label: {
-                Label("새 채팅", systemImage: "square.and.pencil")
-                    .font(ClientTheme.Typography.workspaceName)
-                    .foregroundStyle(ClientTheme.Colors.accent)
-            }
-            .buttonStyle(.plain)
-            .padding(ClientTheme.Metrics.spacingMedium)
-
-            sectionHeader("세션")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(store.sessions(in: store.activeWorkspaceId)) { session in
-                        SessionRow(session: session, isActive: session.id == store.activeSessionId) {
-                            store.activeSessionId = session.id
-                        }
-                    }
-                }
-                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-            }
-
-            Spacer()
         }
-        .frame(width: ClientTheme.Metrics.sidebarWidth)
+        // HSplitView ignores idealWidth when it lays out the first time and
+        // gives a flexible child close to its max, so the max is what
+        // actually decides how wide the sidebar opens -- kept near the old
+        // fixed 232 rather than at a width the sidebar has no use for.
+        .frame(minWidth: 180, idealWidth: ClientTheme.Metrics.sidebarWidth, maxWidth: 280)
         .background(VisualEffectBackground(material: .sidebar))
         .sheet(isPresented: $showingNewWorkspaceSheet) {
             NewWorkspaceSheet(
@@ -81,6 +44,78 @@ struct ClientSidebarView: View {
                 onCancel: { showingNewWorkspaceSheet = false }
             )
         }
+    }
+
+    private var workspaceSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader("워크스페이스")
+            ScrollView {
+                // One container per list: adjacent glass rows are then blended
+                // by the system instead of stacking as separate slabs.
+                GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(store.workspaces) { workspace in
+                            WorkspaceRow(workspace: workspace, isActive: workspace.id == store.activeWorkspaceId) {
+                                store.activeWorkspaceId = workspace.id
+                                store.activeSessionId = ClientWindowStore.defaultSessionId
+                            }
+                        }
+                        Button {
+                            showingNewWorkspaceSheet = true
+                        } label: {
+                            Label("워크스페이스 추가", systemImage: "plus")
+                                .font(ClientTheme.Typography.sessionTitle)
+                                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                        .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+                    }
+                }
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            }
+        }
+        // Capped rather than .infinity: VSplitView splits free space evenly
+        // between children that can both grow, which handed the (usually
+        // one-item) workspace list half the sidebar. Still draggable inside
+        // this range.
+        .frame(minHeight: 90, maxHeight: 260)
+    }
+
+    private var sessionSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                store.requestNewSession(title: "새 채팅", in: store.activeWorkspaceId)
+            } label: {
+                Label("새 채팅", systemImage: "square.and.pencil")
+                    .font(ClientTheme.Typography.workspaceName)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
+                    .contentShape(Capsule())
+                    .glassControl(in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+            .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+
+            sectionHeader("세션")
+            ScrollView {
+                GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(store.sessions(in: store.activeWorkspaceId)) { session in
+                            SessionRow(session: session, isActive: session.id == store.activeSessionId) {
+                                store.activeSessionId = session.id
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: 140, maxHeight: .infinity)
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -102,7 +137,7 @@ private struct WorkspaceRow: View {
         Button(action: onSelect) {
             HStack(spacing: ClientTheme.Metrics.spacingSmall) {
                 Image(systemName: workspace.projectPath == nil ? "bubble.left.and.bubble.right.fill" : "folder.fill")
-                    .foregroundStyle(isActive ? ClientTheme.Colors.accent : ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(isActive ? Color.primary : ClientTheme.Colors.secondaryText)
                     .frame(width: 18)
                 Text(workspace.name)
                     .font(ClientTheme.Typography.workspaceName)
@@ -111,7 +146,7 @@ private struct WorkspaceRow: View {
                 if isActive {
                     Image(systemName: "checkmark")
                         .font(.caption)
-                        .foregroundStyle(ClientTheme.Colors.accent)
+                        .foregroundStyle(ClientTheme.Colors.secondaryText)
                 }
             }
             .contentShape(Rectangle())
@@ -119,8 +154,8 @@ private struct WorkspaceRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-        .background(isActive ? ClientTheme.Colors.accentSoft : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius, style: .continuous))
+        // Selection is a raised glass surface now, not an accent-tinted fill.
+        .glassSurface(in: ClientTheme.Shapes.row, isEnabled: isActive)
     }
 }
 
@@ -134,7 +169,7 @@ private struct SessionRow: View {
             HStack(spacing: ClientTheme.Metrics.spacingSmall) {
                 Image(systemName: "message.fill")
                     .font(.caption)
-                    .foregroundStyle(isActive ? ClientTheme.Colors.accent : ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(isActive ? Color.primary : ClientTheme.Colors.secondaryText)
                     .frame(width: 18)
                 Text(session.title)
                     .font(ClientTheme.Typography.sessionTitle)
@@ -149,8 +184,8 @@ private struct SessionRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-        .background(isActive ? ClientTheme.Colors.accentSoft : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius, style: .continuous))
+        // Selection is a raised glass surface now, not an accent-tinted fill.
+        .glassSurface(in: ClientTheme.Shapes.row, isEnabled: isActive)
     }
 }
 
@@ -180,19 +215,13 @@ private struct NewWorkspaceSheet: View {
             HStack {
                 Spacer()
                 Button("취소", action: onCancel)
-                // Not .borderedProminent.tint(accent) -- see ChatView's
-                // approval banner for why (white-on-#A2E048 contrast).
                 Button("추가") { onCreate(name, projectPath) }
                     .buttonStyle(.plain)
+                    .fontWeight(.semibold)
+                    .opacity(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
                     .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
                     .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                    .background(
-                        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? ClientTheme.Colors.accent.opacity(0.4)
-                            : ClientTheme.Colors.accent
-                    )
-                    .foregroundStyle(ClientTheme.Colors.onAccent)
-                    .clipShape(Capsule())
+                    .glassControl(in: Capsule())
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
@@ -209,3 +238,4 @@ private struct NewWorkspaceSheet: View {
         projectPath = url.path
     }
 }
+

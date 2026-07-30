@@ -1002,6 +1002,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         server.onMalformedLine = {
             AppLogger.shared.log(.warning, "BridgeServer: dropped a malformed line from a client")
         }
+        server.onGUIPresenceChanged = { [weak self] hasGUI in
+            guard hasGUI else { return }
+            // Fires on BridgeServer's own queue, and send() takes that queue
+            // synchronously -- hop off it before sending, or it deadlocks.
+            DispatchQueue.main.async {
+                guard let self, let pending = self.pendingClientMirror else { return }
+                self.pendingClientMirror = nil
+                self.bridgeServer?.send(pending, to: .gui)
+            }
+        }
         server.onMessage = { message, connection in
             // Delivered on BridgeServer's background queue. The router hops to
             // main before touching anything (RealityKit, NSWorkspace,
@@ -1044,7 +1054,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private func showAgentSummaryBubble(_ summary: String) {
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
+        // Reassigned every time, not just set once: the bubble window is
+        // shared, so an input session's dismissal (which unpins the pet) would
+        // otherwise still be attached when a notice shows.
         bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleWindow.onDismiss = { bubbleWindow.closeAndRestoreFocus() }
         bubbleView.showMessage(summary)
         bubbleWindow.showAndActivate()
         // Longer than the 2.5s "workspace offline" notice -- a summary is
@@ -1127,6 +1141,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
+    /// byeolki (2026-07-30): "입력창에 내용을 작성하면 창이 새로 열리면서
+    /// ... 입력한 내용이 보여지게". The bubble stays the lightweight capture
+    /// it is; what it submits goes to workspace as usual *and* is mirrored to
+    /// PetAgentClient, which brings its window up showing the text. Closing
+    /// or quitting that window changes nothing here -- it's a separate
+    /// process, and the pet doesn't observe its presence.
+    private func submitFromInputBubble(_ text: String) {
+        sendUserInput(text: text, source: .text)
+        openClientApp()
+
+        let mirror = BridgeMessage.userInput(UserInput(text: text, source: .text))
+        if bridgeServer?.send(mirror, to: .gui) != true {
+            // PetAgentClient wasn't running (openClientApp just launched it,
+            // or it is still reconnecting) -- hold the text until its
+            // connection shows up, or it would be dropped silently and the
+            // window would open empty.
+            pendingClientMirror = mirror
+        }
+    }
+
+    /// Flushed by BridgeServer.onGUIPresenceChanged; only ever the most
+    /// recent submission, since an older one being delivered late alongside
+    /// it would be noise, not history.
+    private var pendingClientMirror: BridgeMessage?
+
     /// F6 (2026-07-30 재정정): F13 클라이언트 창이 PetAgentClient라는 별도
     /// 앱으로 분리되면서, 이 핫키는 다시 원래의 가벼운 퀵 캡처 말풍선만
     /// 담당한다 -- 무거운 전체 창을 열 이유가 없어졌음.
@@ -1136,16 +1175,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         pinCharacter()
 
         bubbleView.onSubmit = { [weak self] text in
+            // Focus goes to PetAgentClient below, not back to the app the
+            // user invoked the bubble from -- restoring it first would flash
+            // that app forward for a frame.
+            bubbleWindow.closeAndYieldFocus()
+            self?.unpinCharacter()
+            self?.submitFromInputBubble(text)
+        }
+        let dismiss = { [weak self] in
             bubbleWindow.closeAndRestoreFocus()
             self?.unpinCharacter()
-            self?.sendUserInput(text: text, source: .text)
         }
-        bubbleView.onCancel = { [weak self] in
-            bubbleWindow.closeAndRestoreFocus()
-            self?.unpinCharacter()
-        }
-        bubbleView.showInput()
+        bubbleView.onCancel = dismiss
+        // Clicking away is the other way out of a Spotlight panel.
+        bubbleWindow.onDismiss = dismiss
         bubbleWindow.showAndActivate()
+        // After showAndActivate, not before: makeFirstResponder on a window
+        // that isn't key yet doesn't put the caret in the field, so the panel
+        // came up needing a click before it would take a keystroke.
+        bubbleView.showInput()
     }
 
     /// F13 (2026-07-30): the client window is now PetAgentClient.app, a
@@ -1176,6 +1224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
         bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleWindow.onDismiss = { bubbleWindow.closeAndRestoreFocus() }
         bubbleView.showMessage("워크스페이스가 꺼져 있어요")
         bubbleWindow.showAndActivate()
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak bubbleWindow] in
@@ -1184,19 +1233,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     }
 
     private func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
-        guard let window = primaryWindow else { return nil }
+        guard let screen = primaryWindow?.screen ?? NSScreen.main else { return nil }
 
+        let size = TextInputBubbleView.panelSize
         let bubbleWindow = textInputBubbleWindow ?? {
-            let newWindow = TextInputBubbleWindow(contentRect: CGRect(x: 0, y: 0, width: 240, height: 40))
+            let newWindow = TextInputBubbleWindow(contentRect: CGRect(origin: .zero, size: size))
             textInputBubbleWindow = newWindow
             return newWindow
         }()
 
-        let bubbleView = TextInputBubbleView(frame: CGRect(x: 0, y: 0, width: 240, height: 40))
+        let bubbleView = TextInputBubbleView(frame: CGRect(origin: .zero, size: size))
+        bubbleWindow.setContentSize(size)
         bubbleWindow.contentView = bubbleView
 
-        let center = CGPoint(x: window.frame.midX, y: window.frame.midY)
-        bubbleWindow.setFrameOrigin(NSPoint(x: center.x - 120, y: center.y))
+        // Where Spotlight puts itself: centred across, a bit above the middle
+        // of the screen -- dead centre reads as an alert, and this leaves room
+        // for the eye to land on it.
+        let frame = screen.visibleFrame
+        if !bubbleWindow.wasMovedByUser {
+            bubbleWindow.setFrameOrigin(NSPoint(
+                x: frame.midX - size.width / 2,
+                y: frame.minY + frame.height * 0.62
+            ))
+        }
         return (bubbleWindow, bubbleView)
     }
 

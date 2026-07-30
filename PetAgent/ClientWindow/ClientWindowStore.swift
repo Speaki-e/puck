@@ -128,6 +128,27 @@ final class ClientWindowStore: ObservableObject {
         sender.send(text: text, source: source, workspaceId: activeWorkspaceId, sessionId: activeSessionId, attachments: attachments)
     }
 
+    /// Shows text the user typed *somewhere else* (pet-app's quick-capture
+    /// bubble, mirrored over the socket as user_input) in this window's chat,
+    /// and switches to the session it was sent to -- byeolki, 2026-07-30:
+    /// "입력창에 내용을 작성하면 창이 새로 열리면서 ... 입력한 내용이
+    /// 보여지게". Messages sent from this window's own input bar are echoed
+    /// by ChatView instead; those never come back over the socket.
+    ///
+    /// - Returns: whether it landed in an existing session (an unknown
+    ///   workspace/session is dropped rather than fabricated, same rule as
+    ///   handleChatEvent).
+    @discardableResult
+    func showUserMessage(_ text: String, workspaceId: String?, sessionId: String?) -> Bool {
+        let workspaceId = workspaceId ?? Self.defaultWorkspaceId
+        let sessionId = sessionId ?? Self.defaultSessionId
+        guard let session = session(workspaceId: workspaceId, sessionId: sessionId) else { return false }
+        session.appendUserMessage(text)
+        activeWorkspaceId = workspaceId
+        activeSessionId = sessionId
+        return true
+    }
+
     @discardableResult
     func respondToPendingApproval(in session: ChatSession, approved: Bool) -> UserInputDelivery? {
         guard let approvalId = session.pendingApproval?.approvalId else { return nil }

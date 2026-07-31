@@ -65,4 +65,32 @@ enum AppAppearance: String, Equatable, CaseIterable {
     static func resolved(fromDefaultsValue raw: String?) -> AppAppearance {
         raw.flatMap(AppAppearance.init(rawValue:)) ?? .system
     }
+
+    /// The key `crossProcessUserInfo` carries this value under, and
+    /// `resolved(fromCrossProcessUserInfo:)` reads it back from.
+    private static let crossProcessUserInfoKey = "appearance"
+
+    /// Carries the actual new value alongside `crossProcessChangeNotification`
+    /// -- byeolki, 2026-08-01: "셰이디에이전트에는 테마 변경에 대한 적용이
+    /// 안됨." The live-update path used to have ShaydiAgent re-read Shaydi's
+    /// UserDefaults domain in response to the notification, but
+    /// `UserDefaults.set()` isn't guaranteed to be visible to a second
+    /// process by the time a Darwin/distributed notification posted right
+    /// afterward is delivered and handled -- a real race, not just a
+    /// theoretical one. Sending the value directly removes ShaydiAgent's
+    /// dependency on that timing entirely for the live path (only its own
+    /// launch-time seed, before any notification has arrived, still reads
+    /// UserDefaults).
+    var crossProcessUserInfo: [AnyHashable: Any] {
+        [Self.crossProcessUserInfoKey: rawValue]
+    }
+
+    /// nil if `userInfo` carries no recognizable value at all (missing key,
+    /// or the notification came with none) -- distinguishing "nothing here"
+    /// from "system" lets the caller fall back to its own UserDefaults read
+    /// instead of silently treating a malformed notification as "system."
+    static func resolved(fromCrossProcessUserInfo userInfo: [AnyHashable: Any]?) -> AppAppearance? {
+        guard let raw = userInfo?[crossProcessUserInfoKey] as? String else { return nil }
+        return resolved(fromDefaultsValue: raw)
+    }
 }

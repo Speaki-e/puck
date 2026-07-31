@@ -202,8 +202,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         applyAppKitAppearance(settingsStore.appearance)
         settingsStore.onAppearanceChanged = { [weak self] appearance in
             self?.applyAppKitAppearance(appearance)
+            // userInfo carries the value itself (byeolki, 2026-08-01: "셰이디
+            // 에이전트에는 테마 변경에 대한 적용이 안됨") -- ShaydiAgent used
+            // to re-read this from UserDefaults on receipt, racing against
+            // whether the write above had actually propagated to cfprefsd
+            // yet. Sending it directly removes that race.
             DistributedNotificationCenter.default().postNotificationName(
-                AppAppearance.crossProcessChangeNotification, object: nil, userInfo: nil, deliverImmediately: true
+                AppAppearance.crossProcessChangeNotification,
+                object: nil,
+                userInfo: appearance.crossProcessUserInfo,
+                deliverImmediately: true
             )
         }
     }

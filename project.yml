@@ -1,4 +1,4 @@
-name: PetAgent
+name: Shaydi
 options:
   bundleIdPrefix: com.speaki-e
   deploymentTarget:
@@ -14,31 +14,31 @@ settings:
     DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
 
 targets:
-  PetAgent:
+  Shaydi:
     type: application
     platform: macOS
     sources:
-      - path: PetAgent
+      - path: Shaydi
         excludes:
           - Resources/Info.plist
-          - Resources/PetAgent.entitlements
+          - Resources/Shaydi.entitlements
           - Resources/Avatars
           - Resources/Toys
       # Folder reference, not a group: the avatar package must keep its
       # Avatars/<name>/{manifest.json,*.usdz,sounds/} layout inside the app
       # bundle. As a group, Xcode flattens every file into Resources/ and
       # AvatarInstaller has nothing structured to copy out.
-      - path: PetAgent/Resources/Avatars
+      - path: Shaydi/Resources/Avatars
         type: folder
         buildPhase: resources
       # Folder reference for the same reason as Avatars: each toy keeps its
       # own directory in the bundle, so ToyCatalogue can look artwork up by
       # toy name instead of relying on every file having a unique flat name.
-      - path: PetAgent/Resources/Toys
+      - path: Shaydi/Resources/Toys
         type: folder
         buildPhase: resources
     info:
-      path: PetAgent/Resources/Info.plist
+      path: Shaydi/Resources/Info.plist
       properties:
         LSUIElement: true
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
@@ -50,50 +50,50 @@ targets:
         NSAppleEventsUsageDescription: "Needs to control other apps to run the run_applescript tool."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PetAgent
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.Shaydi
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: PetAgent/Resources/PetAgent.entitlements
+        CODE_SIGN_ENTITLEMENTS: Shaydi/Resources/Shaydi.entitlements
     scheme:
       testTargets:
-        - PetAgentTests
+        - ShaydiTests
       commandLineArguments:
-        "-PetAgentUITestMode": false
+        "-ShaydiUITestMode": false
 
   # F13 (2026-07-30): the Claude-Desktop-style client window used to live
-  # in-process inside PetAgent; it's now this separate, regular (Dock-
+  # in-process inside Shaydi; it's now this separate, regular (Dock-
   # resident) app instead, so it gets a real Dock icon / Cmd+Tab / Spotlight
   # presence that an LSUIElement app can't have (byeolki: "별도의 앱으로
   # 해서 dock에 상시 표시"). It shares ClientWindow/Localization and the
-  # wire-protocol subset of Bridge/ directly from PetAgent's sources rather
+  # wire-protocol subset of Bridge/ directly from Shaydi's sources rather
   # than through a separate framework target -- at this project's size a
   # real framework would mean marking ~17 files' worth of types/members
   # `public` for no real benefit, so both targets just compile the same
   # source files independently.
-  PetAgentClient:
+  ShaydiAgent:
     type: application
     platform: macOS
     sources:
-      - path: PetAgentClient
+      - path: ShaydiAgent
         excludes:
           - Resources/Info.plist
-          - Resources/PetAgentClient.entitlements
-      - path: PetAgent/ClientWindow
-      - path: PetAgent/Localization
+          - Resources/ShaydiAgent.entitlements
+      - path: Shaydi/ClientWindow
+      - path: Shaydi/Localization
       # F15 (2026-07-31): the agent loop. Compiled into this app, not
-      # PetAgent -- the pet executes tools, the client decides which ones.
-      - path: PetAgent/Agent
-      - path: PetAgent/Tools/ToolRegistry.swift
-      - path: PetAgent/Tools/ToolTimeouts.swift
-      - path: PetAgent/Resources/Assets.xcassets
-      - path: PetAgent/Bridge/BridgeMessages.swift
-      - path: PetAgent/Bridge/JSONValue.swift
-      - path: PetAgent/Bridge/BridgeConnection.swift
-      - path: PetAgent/Bridge/BridgeSocketPath.swift
-      - path: PetAgent/Bridge/BridgeSocketClient.swift
-      - path: PetAgent/Bridge/UserInputSender.swift
-      - path: PetAgent/App/CompanionAppLauncher.swift
+      # Shaydi -- the pet executes tools, the client decides which ones.
+      - path: Shaydi/Agent
+      - path: Shaydi/Tools/ToolRegistry.swift
+      - path: Shaydi/Tools/ToolTimeouts.swift
+      - path: Shaydi/Resources/Assets.xcassets
+      - path: Shaydi/Bridge/BridgeMessages.swift
+      - path: Shaydi/Bridge/JSONValue.swift
+      - path: Shaydi/Bridge/BridgeConnection.swift
+      - path: Shaydi/Bridge/BridgeSocketPath.swift
+      - path: Shaydi/Bridge/BridgeSocketClient.swift
+      - path: Shaydi/Bridge/UserInputSender.swift
+      - path: Shaydi/App/CompanionAppLauncher.swift
     info:
-      path: PetAgentClient/Resources/Info.plist
+      path: ShaydiAgent/Resources/Info.plist
       properties:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         # Same pumpkin, stamped "client": two Dock icons from the same mark
@@ -101,25 +101,25 @@ targets:
         CFBundleIconName: AppIconClient
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PetAgentClient
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.ShaydiAgent
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIconClient
-        CODE_SIGN_ENTITLEMENTS: PetAgentClient/Resources/PetAgentClient.entitlements
+        CODE_SIGN_ENTITLEMENTS: ShaydiAgent/Resources/ShaydiAgent.entitlements
 
-  PetAgentTests:
+  ShaydiTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: PetAgentTests
+      - path: ShaydiTests
       # Compiled straight into the test bundle rather than reached through
-      # @testable import: it belongs to PetAgentClient, and adding it to the
-      # PetAgent target instead would change the pet's binary (and with it
+      # @testable import: it belongs to ShaydiAgent, and adding it to the
+      # Shaydi target instead would change the pet's binary (and with it
       # its ad-hoc signature, i.e. its Accessibility grant) for a file the
       # pet never uses.
-      - path: PetAgentClient/ClientMainMenu.swift
+      - path: ShaydiAgent/ClientMainMenu.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PetAgentTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.ShaydiTests
         # Xcode 26 refuses to code sign a test bundle with no Info.plist.
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
-      - target: PetAgent
+      - target: Shaydi

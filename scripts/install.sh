@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds PetAgent + PetAgentClient signed with your Apple Development
+# Builds Shaydi + ShaydiAgent signed with your Apple Development
 # certificate and installs both into /Applications.
 #
 # Why not just run the Debug build out of DerivedData: macOS ties TCC grants
@@ -8,7 +8,7 @@
 # and the global hotkey stopped working until it was re-granted by hand.
 # Signing with a real (even free, personal-team) Apple Development identity
 # keeps the signature stable, so the grant survives rebuilds. Grant it once
-# to /Applications/PetAgent.app and this script can then reinstall as often
+# to /Applications/Shaydi.app and this script can then reinstall as often
 # as it likes.
 #
 # DEVELOPMENT_TEAM is read from the environment if set, otherwise taken from
@@ -34,9 +34,9 @@ echo "note: signing with team ${DEVELOPMENT_TEAM}"
 xcodegen generate
 
 DERIVED=$(mktemp -d)
-for scheme in PetAgent PetAgentClient; do
+for scheme in Shaydi ShaydiAgent; do
     xcodebuild build \
-        -project PetAgent.xcodeproj \
+        -project Shaydi.xcodeproj \
         -scheme "$scheme" \
         -configuration Release \
         -destination 'platform=macOS' \
@@ -47,21 +47,21 @@ done
 
 # Quit before replacing: copying over a running bundle leaves the old process
 # running against files that no longer exist. Wait for them to actually go --
-# a fixed sleep raced the old PetAgent's shutdown, and the new one then found
+# a fixed sleep raced the old Shaydi's shutdown, and the new one then found
 # bridge.sock's lock file still held ("BridgeServer failed to start:
 # alreadyRunning") and came up with no socket at all.
-pkill -x PetAgentClient || true
-pkill -x PetAgent || true
+pkill -x ShaydiAgent || true
+pkill -x Shaydi || true
 for _ in $(seq 1 50); do
-    pgrep -x PetAgent > /dev/null || break
+    pgrep -x Shaydi > /dev/null || break
     sleep 0.2
 done
 
-for app in PetAgent PetAgentClient; do
+for app in Shaydi ShaydiAgent; do
     rm -rf "/Applications/$app.app"
     cp -R "$DERIVED/Build/Products/Release/$app.app" /Applications/
 done
 rm -rf "$DERIVED"
 
-open /Applications/PetAgent.app
-echo "installed: /Applications/PetAgent.app, /Applications/PetAgentClient.app"
+open /Applications/Shaydi.app
+echo "installed: /Applications/Shaydi.app, /Applications/ShaydiAgent.app"

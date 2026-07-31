@@ -75,11 +75,11 @@ done
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 if [ -x "$LSREGISTER" ]; then
     "$LSREGISTER" -dump 2>/dev/null \
-        | grep -oE "/[^ ]*/(PetAgent|PetAgentClient)\.app" \
+        | grep -oE "/[^ ]*/(Shaydi|ShaydiAgent)\.app" \
         | sort -u \
         | grep -v '^/Applications/' \
         | while IFS= read -r stale; do "$LSREGISTER" -u "$stale" 2>/dev/null || true; done
-    "$LSREGISTER" -f /Applications/PetAgent.app /Applications/PetAgentClient.app 2>/dev/null || true
+    "$LSREGISTER" -f /Applications/Shaydi.app /Applications/ShaydiAgent.app 2>/dev/null || true
 fi
 
 rm -rf "$DERIVED"

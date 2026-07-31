@@ -46,9 +46,13 @@ final class ClientWindowStore: ObservableObject {
     @Published var activeWorkspaceId: String
     @Published var activeSessionId: String
     /// byeolki: "화이트모드 다크모드 추가하고" -- fed into
-    /// ClientWindowView's .preferredColorScheme. AppDelegate seeds this from
-    /// SettingsStore.appearance and keeps it live via onAppearanceChanged,
-    /// since this is a separate SwiftUI hierarchy from the Settings window.
+    /// ClientWindowView's .preferredColorScheme. This process (ShaydiAgent)
+    /// has no SettingsStore of its own, so its AppDelegate seeds this by
+    /// reading Shaydi's UserDefaults domain directly
+    /// (`UserDefaults(suiteName: AppIdentity.shaydiBundleID)`) and keeps it
+    /// live via a DistributedNotificationCenter broadcast Shaydi posts on
+    /// every change (see AppAppearance.crossProcessChangeNotification) --
+    /// ordinary NotificationCenter/onAppearanceChanged don't cross processes.
     @Published var appearance: AppAppearance = .system
 
     init(sender: UserInputSender) {

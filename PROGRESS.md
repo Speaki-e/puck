@@ -5,7 +5,14 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 934 passing (`xcodebuild test`) · **`main`:** `e315d42`
+**Last updated:** 2026-08-01 · **Tests:** 941 passing (`xcodebuild test`) · **`main`:** `4065e47`
+
+**2026-08-01: fixed ShaydiAgent's client window never actually following the Settings' Light/Dark/System picker, and AppKit chrome (NSPopover, NSVisualEffectView materials) not tracking it either.** byeolki: "테마가 내가 아마 다크모드일텐데, 시스템모드랑 다크모드랑 생긴게 다른데? 그렇다고 화이트모드랑 시스템모드가 같진 않음."
+
+- Root cause #1: `ClientWindowStore.appearance` had a doc comment claiming "AppDelegate seeds this from SettingsStore.appearance and keeps it live via onAppearanceChanged" -- that wiring never actually existed. ShaydiAgent (the client window's process) has no `SettingsStore` at all and no access to Shaydi's `UserDefaults` domain by default, so `appearance` sat permanently at its `.system` default no matter what was picked in Settings.
+- Root cause #2: even within Shaydi's own process, `SettingsStore.onAppearanceChanged` was declared but never subscribed to by anything -- picking Dark/Light only ever recolored SwiftUI content via `.preferredColorScheme`; nothing set `NSApp.appearance`, so `NSPopover`'s own chrome and any `NSVisualEffectView` material kept following the *real* system appearance regardless of the override.
+- Fix: `AppAppearance` gained `defaultsKey` ("Shaydi.appearance", now the single source SettingsStore also reads/writes), `resolved(fromDefaultsValue:)` (shared parsing so the two processes can't disagree on what "unset" means), `nsApplicationAppearance` (maps to `.aqua`/`.darkAqua`/nil for `NSApp.appearance`), and `crossProcessChangeNotification`. Shaydi's `AppDelegate.setUpAppearance()` applies `NSApp.appearance` at launch and on every `onAppearanceChanged`, and broadcasts the change via `DistributedNotificationCenter` (ordinary `NotificationCenter` doesn't cross processes). ShaydiAgent's `AppDelegate.setUpAppearance()` reads `UserDefaults(suiteName: AppIdentity.shaydiBundleID)` directly (no App Group entitlement needed -- neither target is sandboxed) to seed `clientWindowStore.appearance` + `NSApp.appearance` at launch, and observes that same distributed notification to update both live.
+- Verified live cross-process sync by hand: wrote `Shaydi.appearance` via `defaults write` + posted the notification manually, watched the already-running ShaydiAgent's client window flip from dark to light instantly (both the SwiftUI content *and* the sidebar's glass material), then restored the original value the same way.
 
 **2026-08-01: the mute sulk stopped dragging the pet to center screen, and now has its own on/off switch.** byeolki: "mute 기능 처럼 어떤 설정 요소를 키거나 끄면 캐릭터가 가운데로 가서 제 목소리가 듣기 싫으신거에요? 약간 이런식으로 말하던거 있는데. 그거 그냥 캐릭터 이동 없이 현재 캐릭터에 뜨게 해주고, 이런거 설정 가능하도록 해줘."
 

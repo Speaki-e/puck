@@ -22,12 +22,19 @@ final class NotchWindowController {
     /// Injectable for tests -- a real NSScreen's frame can't be relied on to
     /// have a known value inside a test runner (same reasoning as
     /// TextInputBubbleWindow's frontmostAppProvider).
-    var screenVisibleFrameProvider: () -> CGRect? = { NSScreen.main?.visibleFrame }
+    ///
+    /// `.frame`, not `.visibleFrame` -- byeolki, 2026-08-01: "맥북 노치가
+    /// 메뉴막대 쪽에 있는데, 너가 만든거 위치는 걍 메뉴막대를 제외한 화면
+    /// 맨 위임 조정하고". The real notch sits AT the menu bar's stripe, not
+    /// below it; `.visibleFrame` excludes the menu bar and would leave this
+    /// pinned under it instead of overlapping the same row a real
+    /// notch/menu bar occupies.
+    var screenFrameProvider: () -> CGRect? = { NSScreen.main?.frame }
 
     private var screenChangeObserver: NSObjectProtocol?
 
     func start(contentView: NSView) {
-        guard let screenFrame = screenVisibleFrameProvider() else { return }
+        guard let screenFrame = screenFrameProvider() else { return }
 
         let window = NotchWindow(contentRect: NotchLayout.frame(
             screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: Self.collapsedSize
@@ -58,7 +65,7 @@ final class NotchWindowController {
     }
 
     private func reposition() {
-        guard let window, let screenFrame = screenVisibleFrameProvider() else { return }
+        guard let window, let screenFrame = screenFrameProvider() else { return }
         let size = isExpanded ? Self.expandedSize : Self.collapsedSize
         let frame = NotchLayout.frame(screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: size)
         // Not animated: the SwiftUI content already animates its own

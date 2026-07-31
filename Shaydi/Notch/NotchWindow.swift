@@ -28,7 +28,12 @@ final class NotchWindow: NSWindow {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        level = .floating
+        // .statusBar, not .floating -- byeolki, 2026-08-01: "맥북 노치가
+        // 메뉴막대 쪽에 있는데, 너가 만든거 위치는 걍 메뉴막대를 제외한 화면
+        // 맨 위임 조정하고". This is the same level NSStatusItem/menu extras
+        // use, so the pill actually draws at the menu bar's own stripe
+        // instead of merely floating above ordinary app windows below it.
+        level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         ignoresMouseEvents = false
     }

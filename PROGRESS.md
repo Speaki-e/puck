@@ -5,7 +5,14 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 941 passing (`xcodebuild test`) · **`main`:** `4065e47`
+**Last updated:** 2026-08-01 · **Tests:** 942 passing (`xcodebuild test`) · **`main`:** `72473ac`
+
+**2026-08-01: the notch now sits at the menu bar's own stripe, not below it.** byeolki: "맥북 노치가 메뉴막대 쪽에 있는데, 너가 만든거 위치는 걍 메뉴막대를 제외한 화면 맨 위임 조정하고" -- also clarifying the original ask was to port most of [boring.notch](https://github.com/TheBoredTeam/boring.notch)'s features (not just a generic pill), with toys added behind the expand.
+
+- `NotchWindowController.screenFrameProvider` (renamed from `screenVisibleFrameProvider`) now defaults to `NSScreen.main?.frame` instead of `.visibleFrame` -- the latter excludes the menu bar, which is exactly why the pill was floating in the empty stripe below it instead of overlapping the same row a real notch/menu bar occupies.
+- `NotchWindow.level` changed from `.floating` to `.statusBar` -- the level NSStatusItem/menu extras themselves use, so the pill actually draws at the menu bar's layer rather than merely above ordinary app windows beneath it.
+- Verified by hand: screenshotted the full menu bar row and confirmed the pill now sits flush alongside the Apple menu, app menu, and system status icons, where the previous build showed a visible gap between the menu bar and the pill.
+- boring.notch's fuller feature set (Now Playing media widget + visualizer, battery/charging indicator, complete HUD replacement for volume/brightness, file shelf with AirDrop, Bluetooth live activity, Calendar/Reminders) is still open -- reported back to byeolki as a menu of follow-up work rather than building all of it blind, since several of those (HUD replacement, Now Playing) need private-API techniques or non-trivial permission flows worth confirming priority on first.
 
 **2026-08-01: fixed ShaydiAgent's client window never actually following the Settings' Light/Dark/System picker, and AppKit chrome (NSPopover, NSVisualEffectView materials) not tracking it either.** byeolki: "테마가 내가 아마 다크모드일텐데, 시스템모드랑 다크모드랑 생긴게 다른데? 그렇다고 화이트모드랑 시스템모드가 같진 않음."
 

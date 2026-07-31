@@ -19,7 +19,7 @@ enum ShaydiAgentApp {
         application.setActivationPolicy(.regular)
         // No nib, so nothing supplies a main menu -- and with no menu, every
         // standard shortcut (Cmd+Q/W/M, Cmd+C/V in the chat field) is dead.
-        application.mainMenu = ClientMainMenu.make()
+        application.mainMenu = ClientMainMenu.make(appName: AppIdentity.clientDisplayName)
         application.run()
     }
 }

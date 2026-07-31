@@ -140,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // guard tripping on an already-running pet kills the whole test run.
         let processInfo = ProcessInfo.processInfo
         let isHostingTests = processInfo.environment["XCTestSessionIdentifier"] != nil
-        let peers = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.speaki-e.Shaydi")
+        let peers = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? AppIdentity.shaydiBundleID)
         if !isHostingTests, peers.contains(where: { $0.processIdentifier != processInfo.processIdentifier }) {
             NSApp.terminate(nil)
             return
@@ -151,7 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // byeolki: "둘이 같이 가야하는거임" -- ShaydiAgent (the F13 client
         // window, now a separate Dock-resident app) is useless without this
         // process hosting bridge.sock, so each launches the other.
-        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: "com.speaki-e.ShaydiAgent")
+        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.shaydiAgentBundleID)
 
         setUpMenuBar()
         setUpOverlayAndAvatar()
@@ -1387,7 +1387,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// separate Dock-resident process -- opening/focusing it is just
     /// activating that app, the same as clicking its Dock icon.
     private func openClientApp() {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.speaki-e.ShaydiAgent") else { return }
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: AppIdentity.shaydiAgentBundleID) else { return }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
     }
 

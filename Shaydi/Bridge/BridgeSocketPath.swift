@@ -13,6 +13,7 @@ import Foundation
 enum BridgeSocketPath {
     static let `default`: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("Shaydi", isDirectory: true).appendingPathComponent("bridge.sock")
+        return base.appendingPathComponent(AppIdentity.applicationSupportDirectoryName, isDirectory: true)
+            .appendingPathComponent("bridge.sock")
     }()
 }

@@ -28,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // byeolki: "둘이 같이 가야하는거임" -- launching either app brings up
         // the other, since this app is useless without Shaydi hosting
         // bridge.sock on the other end.
-        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: "com.speaki-e.Shaydi")
+        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.shaydiBundleID)
 
         bridgeClient.onMessage = { [weak self] message in
             DispatchQueue.main.async { self?.handle(message) }

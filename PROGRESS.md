@@ -5,7 +5,14 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 914 passing (`xcodebuild test`) · **`main`:** `212ef95`
+**Last updated:** 2026-08-01 · **Tests:** 915 passing (`xcodebuild test`) · **`main`:** `3c40c5d`
+
+**2026-08-01: centralized the app's identity, and a rename script, so the next name change doesn't take hours.** byeolki, after living through the PetAgent -> Shaydi rename: "다음에도 프로그램 명이 바뀔 수 있으니까 알아서 잘 config 설정 해놔. 나중에 바꿀때 오래걸리지 말구."
+
+- `AppIdentity` (new, shared file): the two bundle IDs, the `~/Library/Application Support/` directory name, and the two display-name strings each used to be a separate literal scattered across both targets (10 spots, not counting tests) -- now there's exactly one of each, referenced everywhere. `AppIdentityTests` asserts `AppIdentity.shaydiBundleID` actually matches the running bundle, so a future edit that updates project.yml but forgets this file (or vice versa) fails a test immediately instead of breaking `CompanionAppLauncher`'s cross-process lookup silently at runtime.
+- Deliberately *not* centralized: UserDefaults key prefixes (`"Shaydi.volume"` etc.) and `DispatchQueue` labels. Neither has any functional dependency on the app's actual name -- UserDefaults is already scoped by bundle id regardless of what's inside the key string, and the labels are Instruments-only identification. Leaving them as plain literals isn't a gap; centralizing them would just be indirection with nothing behind it.
+- What's still structurally unavoidable on a rename: Xcode target names, the on-disk directory names, and project.yml's own target/path/bundle-id entries -- xcodegen doesn't read Swift source, so a Swift constant can't parameterize those.
+- `scripts/rename-app.sh` (new): does the actual procedure in one command -- ordered sed sweep (longer name first, same lesson as the last rename), `git mv` for the three directories + entitlements + `@main` entry-point files, `xcodegen generate`, build, and the full test suite. Not run as part of this change (nothing to rename right now) -- written and ready for whenever there is.
 
 **2026-08-01: quick-capture panel moves to bottom-center, and F14 drag-capture attachments finally land.** byeolki: "option shift space를 하면 모달 뜨는걸 중앙 하단으로 변경하고, 마우스 드래그를 통해서 캡쳐 후 attachments를 삽입할 수 있도록 해줘." F14 had been sitting as the one deferred/optional task since the original plan doc's risk table (#136).
 

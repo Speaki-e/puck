@@ -18,8 +18,9 @@
 import Foundation
 
 enum L10nKey: String, CaseIterable, Hashable {
-    case settingsWindowTitle
-    case tabGeneral, tabSound, tabMovement, tabAvatar
+    /// Section headers in the menu bar panel. `tabAvatar` went with the tabs
+    /// themselves -- AvatarManagementView titles its own sections now.
+    case tabGeneral, tabSound, tabMovement
 
     case languageLabel
     case appearanceLabel, appearanceSystem, appearanceLight, appearanceDark
@@ -50,7 +51,9 @@ enum L10nKey: String, CaseIterable, Hashable {
     case updatedEmotionFormat
     case failedToSetEmotionFormat
 
-    case menuSettings, menuSwitchAvatar, menuToys, menuHide, menuShow, menuQuit
+    /// The panel's action rows. Settings and Switch Avatar are gone with the
+    /// NSMenu: the panel *is* settings, and it opens on the avatar section.
+    case menuToys, menuHide, menuShow, menuQuit
     /// F13 (2026-07-30): PetAgentClient is a separate Dock-resident app now
     /// -- this menu item activates/launches it, replacing the old
     /// Option+Shift+Space-opens-the-client-window behavior.
@@ -63,11 +66,9 @@ enum Strings {
     }
 
     private static let table: [L10nKey: [AppLanguage: String]] = [
-        .settingsWindowTitle: [.english: "PetAgent Settings", .korean: "PetAgent 설정"],
         .tabGeneral: [.english: "General", .korean: "일반"],
         .tabSound: [.english: "Sound", .korean: "사운드"],
         .tabMovement: [.english: "Movement", .korean: "이동"],
-        .tabAvatar: [.english: "Avatar", .korean: "아바타"],
 
         .languageLabel: [.english: "Language", .korean: "언어"],
         .appearanceLabel: [.english: "Appearance", .korean: "모양"],
@@ -152,8 +153,6 @@ enum Strings {
             .korean: "'%1$@' 설정 실패: %2$@",
         ],
 
-        .menuSettings: [.english: "Settings…", .korean: "설정…"],
-        .menuSwitchAvatar: [.english: "Switch Avatar…", .korean: "아바타 변경…"],
         .menuToys: [.english: "Toys", .korean: "장난감"],
         .menuHide: [.english: "Hide", .korean: "숨기기"],
         .menuShow: [.english: "Show", .korean: "보이기"],

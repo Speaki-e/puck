@@ -30,27 +30,6 @@ struct GlassGroup<Content: View>: View {
     }
 }
 
-/// A titled glass card -- the settings window's section unit. Form's grouped
-/// boxes were part of what read as the stock macOS settings pane the client
-/// window's redesign moved away from; this is the same surface the client's
-/// cards are made of.
-struct GlassCard<Content: View>: View {
-    var title: String
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingMedium) {
-            Text(title)
-                .font(ClientTheme.Typography.sectionHeader)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
-            content
-        }
-        .padding(ClientTheme.Metrics.spacingLarge)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassSurface(in: ClientTheme.Shapes.card)
-    }
-}
-
 extension View {
     /// A raised, translucent surface: chat bubbles, cards, the input bar.
     @ViewBuilder
@@ -74,37 +53,16 @@ extension View {
         }
     }
 
-    /// Glass only when `isEnabled` -- for rows, segments and bubbles that
-    /// are plain content until selected/owned, where the alternative is an
-    /// `if` around a modifier chain at every call site (there were three
-    /// private copies of this before).
+    /// Glass only when `isEnabled` -- for rows and bubbles that are plain
+    /// content until selected/owned, where the alternative is an `if` around
+    /// a modifier chain at every call site (there were three private copies
+    /// of this before).
     @ViewBuilder
     func glassSurface(in shape: some Shape, isEnabled: Bool) -> some View {
         if isEnabled {
             glassSurface(in: shape)
         } else {
             self
-        }
-    }
-
-    @ViewBuilder
-    func glassControl(in shape: some Shape, isEnabled: Bool) -> some View {
-        if isEnabled {
-            glassControl(in: shape)
-        } else {
-            self
-        }
-    }
-
-    /// The system's own glass button where it exists, the plain bordered one
-    /// where it doesn't -- for standalone action buttons (Import Avatar…,
-    /// Open System Settings…).
-    @ViewBuilder
-    func glassButton() -> some View {
-        if #available(macOS 26.0, *) {
-            buttonStyle(.glass)
-        } else {
-            buttonStyle(.bordered)
         }
     }
 }

@@ -35,7 +35,7 @@ final class StringsTests: XCTestCase {
     }
 
     func test_text_returnsTheExpectedStringForAKnownKey() {
-        XCTAssertEqual(Strings.text(.settingsWindowTitle, .english), "PetAgent Settings")
-        XCTAssertEqual(Strings.text(.settingsWindowTitle, .korean), "PetAgent 설정")
+        XCTAssertEqual(Strings.text(.menuQuit, .english), "Quit PetAgent")
+        XCTAssertEqual(Strings.text(.menuQuit, .korean), "PetAgent 종료")
     }
 }

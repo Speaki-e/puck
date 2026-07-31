@@ -31,13 +31,20 @@ struct HotkeyBindings: Equatable {
     var pushToTalk: HotkeyBinding
     var textInput: HotkeyBinding
     var characterSummon: HotkeyBinding
+    var toySummon1: HotkeyBinding
+    var toySummon2: HotkeyBinding
 
     /// Space = keyCode 49. PTT = Option+Space (hold), text input =
-    /// Option+Shift+Space, character summon = Option+Cmd+Space.
+    /// Option+Shift+Space, character summon = Option+Cmd+Space. Toy summons
+    /// mirror ToyCatalogue.all's fixed order: keyCode 18/19 ("1"/"2") +
+    /// Option+Shift summon toy[0]/toy[1] (byeolki, 2026-08-01: "option shift
+    /// 1, 2로 toy 소환 가능하게 해줘").
     static let defaults = HotkeyBindings(
         pushToTalk: HotkeyBinding(keyCode: 49, modifierFlags: [.maskAlternate]),
         textInput: HotkeyBinding(keyCode: 49, modifierFlags: [.maskAlternate, .maskShift]),
-        characterSummon: HotkeyBinding(keyCode: 49, modifierFlags: [.maskAlternate, .maskCommand])
+        characterSummon: HotkeyBinding(keyCode: 49, modifierFlags: [.maskAlternate, .maskCommand]),
+        toySummon1: HotkeyBinding(keyCode: 18, modifierFlags: [.maskAlternate, .maskShift]),
+        toySummon2: HotkeyBinding(keyCode: 19, modifierFlags: [.maskAlternate, .maskShift])
     )
 
     /// Pairs of binding names that collide (same key + relevant modifiers).
@@ -46,6 +53,8 @@ struct HotkeyBindings: Equatable {
             ("pushToTalk", pushToTalk),
             ("textInput", textInput),
             ("characterSummon", characterSummon),
+            ("toySummon1", toySummon1),
+            ("toySummon2", toySummon2),
         ]
 
         var found: [(String, String)] = []

@@ -23,6 +23,8 @@ final class SettingsStore {
         static let pushToTalk = "Shaydi.hotkey.pushToTalk"
         static let textInput = "Shaydi.hotkey.textInput"
         static let characterSummon = "Shaydi.hotkey.characterSummon"
+        static let toySummon1 = "Shaydi.hotkey.toySummon1"
+        static let toySummon2 = "Shaydi.hotkey.toySummon2"
         static let hasRequestedAccessibility = "Shaydi.hasRequestedAccessibility"
     }
 
@@ -145,13 +147,17 @@ final class SettingsStore {
             HotkeyBindings(
                 pushToTalk: binding(forKey: Keys.pushToTalk) ?? HotkeyBindings.defaults.pushToTalk,
                 textInput: binding(forKey: Keys.textInput) ?? HotkeyBindings.defaults.textInput,
-                characterSummon: binding(forKey: Keys.characterSummon) ?? HotkeyBindings.defaults.characterSummon
+                characterSummon: binding(forKey: Keys.characterSummon) ?? HotkeyBindings.defaults.characterSummon,
+                toySummon1: binding(forKey: Keys.toySummon1) ?? HotkeyBindings.defaults.toySummon1,
+                toySummon2: binding(forKey: Keys.toySummon2) ?? HotkeyBindings.defaults.toySummon2
             )
         }
         set {
             setBinding(newValue.pushToTalk, forKey: Keys.pushToTalk)
             setBinding(newValue.textInput, forKey: Keys.textInput)
             setBinding(newValue.characterSummon, forKey: Keys.characterSummon)
+            setBinding(newValue.toySummon1, forKey: Keys.toySummon1)
+            setBinding(newValue.toySummon2, forKey: Keys.toySummon2)
         }
     }
 

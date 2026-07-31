@@ -1257,6 +1257,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         manager.onPushToTalkUp = { [weak voiceController] in voiceController?.pushToTalkUp() }
         manager.onTextInputRequested = { [weak self] in self?.showTextInputBubble() }
         manager.onCharacterSummonRequested = { [weak self] in self?.summonCharacter() }
+        manager.onToySummon1Requested = { [weak self] in self?.summonToy(at: 0) }
+        manager.onToySummon2Requested = { [weak self] in self?.summonToy(at: 1) }
 
         if !manager.start() {
             AppLogger.shared.log(.warning, "GlobalHotkeyManager failed to start (Accessibility permission likely not granted)")
@@ -1631,5 +1633,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         toyPlayEndedAt = nil
         // From what's actually out, not from what the toggle was asked to do.
         return box.outToyNames
+    }
+
+    /// Option+Shift+1/2 (F6) summon ToyCatalogue.all[0]/[1] directly, reusing
+    /// toggleToy's on/off semantics -- byeolki, 2026-08-01: "option shift 1,
+    /// 2로 toy 소환 가능하게 해줘".
+    private func summonToy(at index: Int) {
+        guard ToyCatalogue.all.indices.contains(index) else { return }
+        toggleToy(ToyCatalogue.all[index])
     }
 }

@@ -52,6 +52,22 @@ final class HotkeyDecisionMakerTests: XCTestCase {
         XCTAssertEqual(action, .none)
     }
 
+    func test_keyDown_matchingToySummon1_returnsToySummon1Requested() {
+        let action = HotkeyDecisionMaker.decide(
+            eventType: .keyDown, keyCode: 18, flags: [.maskAlternate, .maskShift],
+            bindings: bindings, isPushToTalkActive: false
+        )
+        XCTAssertEqual(action, .toySummon1Requested)
+    }
+
+    func test_keyDown_matchingToySummon2_returnsToySummon2Requested() {
+        let action = HotkeyDecisionMaker.decide(
+            eventType: .keyDown, keyCode: 19, flags: [.maskAlternate, .maskShift],
+            bindings: bindings, isPushToTalkActive: false
+        )
+        XCTAssertEqual(action, .toySummon2Requested)
+    }
+
     func test_keyDown_unrelatedKey_returnsNone() {
         let action = HotkeyDecisionMaker.decide(
             eventType: .keyDown, keyCode: 0, flags: [],

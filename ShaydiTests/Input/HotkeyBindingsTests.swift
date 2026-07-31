@@ -47,6 +47,15 @@ final class HotkeyBindingsTests: XCTestCase {
         XCTAssertTrue(defaults.characterSummon.matches(keyCode: 49, modifierFlags: [.maskAlternate, .maskCommand]))
     }
 
+    func test_defaults_toySummons_areOptionShiftOneAndTwo() {
+        // keyCode 18 = "1", 19 = "2" -- Option+Shift+1 summons toy[0]
+        // (pumpkin), Option+Shift+2 summons toy[1] (wand).
+        let defaults = HotkeyBindings.defaults
+
+        XCTAssertTrue(defaults.toySummon1.matches(keyCode: 18, modifierFlags: [.maskAlternate, .maskShift]))
+        XCTAssertTrue(defaults.toySummon2.matches(keyCode: 19, modifierFlags: [.maskAlternate, .maskShift]))
+    }
+
     func test_defaults_haveNoConflicts() {
         XCTAssertTrue(HotkeyBindings.defaults.conflicts().isEmpty)
     }

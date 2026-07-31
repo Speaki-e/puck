@@ -5,7 +5,16 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 910 passing (`xcodebuild test`) · **`main`:** `73c673f`
+**Last updated:** 2026-08-01 · **Tests:** 914 passing (`xcodebuild test`) · **`main`:** `212ef95`
+
+**2026-08-01: quick-capture panel moves to bottom-center, and F14 drag-capture attachments finally land.** byeolki: "option shift space를 하면 모달 뜨는걸 중앙 하단으로 변경하고, 마우스 드래그를 통해서 캡쳐 후 attachments를 삽입할 수 있도록 해줘." F14 had been sitting as the one deferred/optional task since the original plan doc's risk table (#136).
+
+- The Option+Shift+Space panel's position changed from Spotlight's upper-middle spot to bottom-center, hovering just above the Dock (`AppDelegate.makeBubble()` -- `bottomModalMargin` off `screen.visibleFrame`'s bottom edge, which already excludes the Dock).
+- `ScreenRegionCapture` (new): shells out to `/usr/sbin/screencapture -i` rather than reimplementing drag-to-select -- the system's own crosshair overlay already handles the drag, Space-to-switch-to-window-capture, and Escape-to-cancel. Requires the Screen Recording permission (System Settings), granted the same ad hoc way Accessibility is.
+- `TextInputBubbleView` gained a trailing capture button and a leading thumbnail chip (only visible once something's captured -- the panel stays the same plain single line otherwise). Clicking the thumbnail removes the pending attachment; a fresh `showInput()` always resets it, so no attachment silently carries over between bubble sessions.
+- The captured file becomes a protocol `Attachment`, threaded through `submitFromInputBubble`/`sendUserInput` into the outgoing `UserInput.attachments` -- the wire format already supported this from F13's original design, it just had nothing populating it until now.
+- Known gap: ShaydiAgent's chat transcript doesn't render a thumbnail for a message mirrored from the bubble (`ClientWindowStore.showUserMessage` has no attachments param yet) -- the attachment still reaches the outgoing message/agent correctly, this is purely a "doesn't look attached in the transcript" cosmetic gap.
+- Not verified by hand: the actual interactive capture (needs Screen Recording permission grant + a real mouse drag), same sandbox limitation as every other human-interaction-gated feature this session.
 
 **2026-08-01: independent lifecycles for Shaydi and ShaydiAgent, and a left/right-click split on the status item.** byeolki spelled out the exact desired shape: launching either app brings up both; quitting Shaydi should only be reachable through its own menu bar icon (right-click -> hide/quit); quitting ShaydiAgent (window close, or Cmd+Q) must never take Shaydi down with it; and after ShaydiAgent quits, left-clicking Shaydi's menu bar icon should bring it back (in addition to just relaunching it).
 

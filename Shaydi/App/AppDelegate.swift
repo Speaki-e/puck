@@ -1272,13 +1272,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// window could *display* what was typed. Every input goes there now, and
     /// for the same reason a voice command previously reached nothing: the
     /// only listener it had was a workspace process that does not exist.
-    private func sendUserInput(text: String, source: UserInput.Source) {
-        let message = BridgeMessage.userInput(UserInput(text: text, source: source))
+    private func sendUserInput(text: String, source: UserInput.Source, attachments: [Attachment] = []) {
+        let message = BridgeMessage.userInput(
+            UserInput(text: text, source: source, attachments: attachments.isEmpty ? nil : attachments)
+        )
         let reachedClient = bridgeServer?.send(message, to: .gui) == true
         // Still offered to a workspace as well: if one ever attaches, the
         // protocol 3.3 channel is still its way in, and delivering to both is
         // harmless while only the client acts.
-        let reachedWorkspace = userInputSender.send(text: text, source: source) == .sent
+        let reachedWorkspace = userInputSender.send(text: text, source: source, attachments: attachments.isEmpty ? nil : attachments) == .sent
 
         guard !reachedClient else { return }
         // Held rather than dropped -- ShaydiAgent is launched alongside the
@@ -1298,11 +1300,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// ShaydiAgent, which brings its window up showing the text. Closing
     /// or quitting that window changes nothing here -- it's a separate
     /// process, and the pet doesn't observe its presence.
-    private func submitFromInputBubble(_ text: String) {
+    private func submitFromInputBubble(_ text: String, attachments: [Attachment] = []) {
         // Brought up first so the window is on its way while the text is
         // delivered; sendUserInput queues it if the connection isn't up yet.
         openClientApp()
-        sendUserInput(text: text, source: .text)
+        sendUserInput(text: text, source: .text, attachments: attachments)
     }
 
     /// Flushed by BridgeServer.onGUIPresenceChanged; only ever the most
@@ -1317,6 +1319,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
         pinCharacter()
+        // Fresh session, fresh state -- bubbleView itself is a brand-new
+        // instance per makeBubble() call, but this property lives on the
+        // delegate and would otherwise carry a stale attachment into a
+        // session whose (also fresh) view shows no thumbnail at all.
+        pendingBubbleAttachment = nil
 
         bubbleView.onSubmit = { [weak self] text in
             // Focus goes to ShaydiAgent below, not back to the app the
@@ -1324,20 +1331,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             // that app forward for a frame.
             bubbleWindow.closeAndYieldFocus()
             self?.unpinCharacter()
-            self?.submitFromInputBubble(text)
+            let attachment = self?.pendingBubbleAttachment
+            self?.pendingBubbleAttachment = nil
+            self?.submitFromInputBubble(text, attachments: attachment.map { [$0] } ?? [])
         }
         let dismiss = { [weak self] in
             bubbleWindow.closeAndRestoreFocus()
             self?.unpinCharacter()
+            self?.pendingBubbleAttachment = nil
         }
         bubbleView.onCancel = dismiss
         // Clicking away is the other way out of a Spotlight panel.
         bubbleWindow.onDismiss = dismiss
+        bubbleView.onAttachRequested = { [weak self, weak bubbleView] in
+            self?.startAttachmentCapture(bubbleView: bubbleView)
+        }
+        bubbleView.onRemoveAttachment = { [weak self, weak bubbleView] in
+            self?.pendingBubbleAttachment = nil
+            bubbleView?.setAttachmentThumbnail(nil)
+        }
         bubbleWindow.showAndActivate()
         // After showAndActivate, not before: makeFirstResponder on a window
         // that isn't key yet doesn't put the caret in the field, so the panel
         // came up needing a click before it would take a keystroke.
         bubbleView.showInput()
+    }
+
+    /// Set once a capture completes, cleared on submit/cancel/dismiss --
+    /// see showTextInputBubble(). At most one: the panel has room for a
+    /// single thumbnail, and multi-image messages aren't something the
+    /// quick-capture bubble needs to support.
+    private var pendingBubbleAttachment: Attachment?
+
+    /// F14 (byeolki, 2026-08-01: "마우스 드래그를 통해서 캡쳐 후
+    /// attachments를 삽입할 수 있도록 해줘"). Shells out to screencapture -i
+    /// rather than the bubble hiding itself first: the system's own capture
+    /// overlay draws on top of everything regardless, and hiding/reshowing
+    /// the panel around an async, human-paced drag risked exactly the
+    /// resignKey/refocus races closeAndRestoreFocus exists to avoid
+    /// elsewhere in this file.
+    private func startAttachmentCapture(bubbleView: TextInputBubbleView?) {
+        ScreenRegionCapture.capture { [weak self, weak bubbleView] url in
+            // The interactive capture takes focus system-wide; hand it back
+            // regardless of whether anything was actually captured.
+            NSApp.activate(ignoringOtherApps: true)
+            self?.textInputBubbleWindow?.makeKeyAndOrderFront(nil)
+
+            guard let url else { return } // Escape, or capture failed
+            self?.pendingBubbleAttachment = Attachment(path: url.path)
+            bubbleView?.setAttachmentThumbnail(NSImage(contentsOf: url))
+        }
     }
 
     /// F13 (2026-07-30): the client window is now ShaydiAgent.app, a
@@ -1372,10 +1415,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// rather than from the middle of the screen (byeolki, 2026-07-31:
     /// "말풍선이 펫한테서 나오게").
     ///
-    /// Only speech does this. The Option+Shift+Space input panel stays where
-    /// Spotlight puts itself -- it is a capture field the user aims at, it is
-    /// 640pt wide, and byeolki asked for that look specifically ("이거
-    /// spotlight 느낌으로 만들어줘", 2026-07-30).
+    /// Only speech does this. The Option+Shift+Space input panel stays put at
+    /// its own fixed spot (bottom-center, see makeBubble) -- it's a capture
+    /// field the user aims at, not something that should chase the pet
+    /// around the screen.
     ///
     /// `wasMovedByUser` is deliberately ignored: a bubble the user once
     /// dragged is still the pet's speech, and leaving it parked where the pet
@@ -1412,6 +1455,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     /// Close enough to read as attached, far enough not to cover the pet.
     private static let speechBubbleGap: CGFloat = 8
+    /// Gap between the quick-capture panel and the bottom of the visible
+    /// (Dock-excluded) screen area.
+    private static let bottomModalMargin: CGFloat = 60
 
     private func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
         guard let screen = primaryWindow?.screen ?? NSScreen.main else { return nil }
@@ -1427,14 +1473,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         bubbleWindow.setContentSize(size)
         bubbleWindow.contentView = bubbleView
 
-        // Where Spotlight puts itself: centred across, a bit above the middle
-        // of the screen -- dead centre reads as an alert, and this leaves room
-        // for the eye to land on it.
+        // Bottom-center (byeolki, 2026-08-01: "모달 뜨는걸 중앙 하단으로
+        // 변경") -- centred across, hovering just above the Dock.
+        // visibleFrame already excludes the Dock/menu bar, so this margin is
+        // just breathing room, not Dock clearance.
         let frame = screen.visibleFrame
         if !bubbleWindow.wasMovedByUser {
             bubbleWindow.setFrameOrigin(NSPoint(
                 x: frame.midX - size.width / 2,
-                y: frame.minY + frame.height * 0.62
+                y: frame.minY + Self.bottomModalMargin
             ))
         }
         return (bubbleWindow, bubbleView)

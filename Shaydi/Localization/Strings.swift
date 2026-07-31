@@ -35,6 +35,12 @@ enum L10nKey: String, CaseIterable, Hashable {
     case notchEnabledLabel
 
     case avatarsHeader, importAvatarButton, importPanelPrompt
+    /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
+    /// 해주고" -- picking a different installed avatar as a preset.
+    case avatarSelectButton
+    /// "아바타 패키지 형태도 사용자에게 알려줘야함" -- condensed from
+    /// docs/avatar-spec.md for end users, not the full creator-facing spec.
+    case avatarPackageFormatExplanation
     case sizeHeader
     case emotionsHeader, emotionsExplanation, mappedLabel, notMappedLabel
     case chooseImageButton, choosePanelPrompt
@@ -114,6 +120,11 @@ enum Strings {
 
         .avatarsHeader: [.english: "Avatars", .korean: "아바타"],
         .importAvatarButton: [.english: "Import Avatar Package…", .korean: "아바타 패키지 가져오기…"],
+        .avatarSelectButton: [.english: "Select", .korean: "선택"],
+        .avatarPackageFormatExplanation: [
+            .english: "An avatar package is a folder: manifest.json plus one transparent PNG per pose (idle is required; walk, climb, fall, etc. are recommended), and an optional sounds/ folder of .wav clips. Keep artwork around 1024px on its longest side and under ~500KB per image.",
+            .korean: "아바타 패키지는 폴더 하나입니다: manifest.json과 동작별 투명 배경 PNG(idle은 필수, walk·climb·fall 등은 권장), 그리고 선택적으로 .wav 파일이 담긴 sounds/ 폴더로 구성됩니다. 이미지는 긴 변 기준 1024px 내외, 파일당 약 500KB 이하를 권장합니다.",
+        ],
         .importPanelPrompt: [.english: "Import", .korean: "가져오기"],
         .sizeHeader: [.english: "Size", .korean: "크기"],
         .emotionsHeader: [.english: "Emotions", .korean: "감정 표현"],

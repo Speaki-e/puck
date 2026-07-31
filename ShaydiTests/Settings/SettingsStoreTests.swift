@@ -74,6 +74,22 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(received, false)
     }
 
+    // byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고"
+    func test_selectedAvatarName_defaultsToDummy() {
+        XCTAssertEqual(SettingsStore(defaults: defaults).selectedAvatarName, "dummy")
+    }
+
+    func test_settingSelectedAvatarName_firesOnSelectedAvatarChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: String?
+        store.onSelectedAvatarChanged = { received = $0 }
+
+        store.selectedAvatarName = "wizard"
+
+        XCTAssertEqual(received, "wizard")
+        XCTAssertEqual(store.selectedAvatarName, "wizard")
+    }
+
     func test_speechRecognitionLocaleIdentifier_defaultsToSystemLocale() {
         XCTAssertEqual(
             SettingsStore(defaults: defaults).speechRecognitionLocaleIdentifier,

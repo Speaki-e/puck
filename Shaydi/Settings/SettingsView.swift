@@ -135,7 +135,12 @@ struct SettingsView: View {
     }
 
     private var avatarSection: some View {
-        AvatarManagementView(language: language, onScaleChanged: onAvatarScaleChanged)
+        AvatarManagementView(
+            language: language,
+            onScaleChanged: onAvatarScaleChanged,
+            initialSelectedAvatarName: store.selectedAvatarName,
+            onSelectAvatar: { store.selectedAvatarName = $0 }
+        )
     }
 
     /// The reference's "아이템" grid. Ours is the toy box, which until now

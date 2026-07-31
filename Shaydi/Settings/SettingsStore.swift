@@ -27,6 +27,7 @@ final class SettingsStore {
         static let toySummon2 = "Shaydi.hotkey.toySummon2"
         static let isNotchEnabled = "Shaydi.isNotchEnabled"
         static let isMuteComplaintEnabled = "Shaydi.isMuteComplaintEnabled"
+        static let selectedAvatarName = "Shaydi.selectedAvatarName"
         static let hasRequestedAccessibility = "Shaydi.hasRequestedAccessibility"
     }
 
@@ -51,6 +52,10 @@ final class SettingsStore {
     /// something SettingsView can start/stop directly -- this is how turning
     /// it off in Settings actually tears the window down immediately.
     var onNotchEnabledChanged: ((Bool) -> Void)?
+    /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
+    /// 해주고" -- picking a different installed avatar in Settings has to
+    /// swap the *running* pet immediately, not just take effect next launch.
+    var onSelectedAvatarChanged: ((String) -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -114,6 +119,17 @@ final class SettingsStore {
     var isMuteComplaintEnabled: Bool {
         get { defaults.object(forKey: Keys.isMuteComplaintEnabled) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.isMuteComplaintEnabled) }
+    }
+
+    /// Which installed avatar (a folder name under AvatarCatalogue.avatars-
+    /// Directory) is currently active. "dummy" is the bundled default,
+    /// always seeded on first run (see AvatarInstaller).
+    var selectedAvatarName: String {
+        get { defaults.string(forKey: Keys.selectedAvatarName) ?? "dummy" }
+        set {
+            defaults.set(newValue, forKey: Keys.selectedAvatarName)
+            onSelectedAvatarChanged?(newValue)
+        }
     }
 
     /// Multiplies MovementSolver.walkSpeed for Walk/Climb/WalkOnTop/MoveTo/

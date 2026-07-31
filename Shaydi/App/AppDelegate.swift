@@ -349,18 +349,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             return
         }
 
-        let avatarsDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shaydi/Avatars", isDirectory: true)
-        let avatarDirectory = avatarsDirectory.appendingPathComponent("dummy", isDirectory: true)
-
         // First run has nothing in Application Support yet; seed the bundled
         // package so a fresh clone shows a pet instead of an empty screen.
         if let bundled = Bundle.main.url(forResource: "Avatars/dummy", withExtension: nil) {
-            let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: avatarsDirectory)
+            let outcome = AvatarInstaller.installIfNeeded(
+                bundledPackage: bundled,
+                intoAvatarsDirectory: AvatarCatalogue.avatarsDirectory
+            )
             AppLogger.shared.log(.info, "Bundled avatar install: \(outcome)")
         } else {
             AppLogger.shared.log(.warning, "No bundled avatar package in the app bundle")
         }
+
+        guard activateAvatar(named: settingsStore.selectedAvatarName, window: window, spriteView: spriteView) else { return }
+
+        settingsStore.onToyScaleChanged = { [weak self] scale in
+            self?.toyBox?.updateScale(scale)
+        }
+        settingsStore.onWalkSpeedMultiplierChanged = { [weak self] multiplier in
+            self?.characterController?.walkSpeed = MovementSolver.walkSpeed * multiplier
+        }
+        // byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
+        // 해주고" -- Settings' avatar picker writes this; activateAvatar
+        // tears down whatever's running and swaps the new package in live.
+        settingsStore.onSelectedAvatarChanged = { [weak self] name in self?.switchAvatar(to: name) }
+        // autoMuteOnFocus existed as a setting with nothing acting on it --
+        // FocusModeObserver was implemented but never instantiated anywhere.
+        // Reads self.sfxPlayer fresh each time (not captured), so it keeps
+        // working against whichever sfxPlayer is current after a later
+        // avatar switch replaces it -- capturing it directly here would go
+        // stale the same way onVolumeChanged/onMuteChanged would without
+        // being reassigned in activateAvatar.
+        let focusObserver = FocusModeObserver()
+        focusObserver.onChange = { [weak self] isFocusActive in
+            guard let self, self.settingsStore.autoMuteOnFocus else { return }
+            self.sfxPlayer?.isMuted = isFocusActive
+        }
+        focusObserver.startObserving()
+        focusModeObserver = focusObserver
+
+        // F12 (optional, lowest priority): ball-toy interaction. Lives on the
+        // same sprite layer as the avatar so it reparents on display changes
+        // the same way. Avatar-agnostic -- set up once here, not touched by
+        // activateAvatar/switchAvatar.
+        makeToyBox(on: spriteView.contentLayer)
+    }
+
+    /// (Re)builds the avatar/body/controller/sound stack for the avatar
+    /// installed under `name`, tearing down whatever was running before it.
+    /// Loads and validates the new package FIRST, before touching anything
+    /// live -- an invalid/missing preset must leave the current pet running,
+    /// not blank the screen. Returns false (leaving the previous avatar
+    /// untouched) if the load fails.
+    ///
+    /// Deliberately does NOT touch toyBox or focusObserver: both are
+    /// avatar-agnostic and set up exactly once, in setUpOverlayAndAvatar.
+    /// The FSM's StateHandler instances (idleState, walkState, ...) are
+    /// likewise reused as-is across a switch -- they take body/controller
+    /// through StateContext at call time rather than storing either at
+    /// construction (see e.g. IdleState.update(dt:context:)), so
+    /// re-registering them onto a fresh CharacterController is safe.
+    @discardableResult
+    private func activateAvatar(named name: String, window: NSWindow, spriteView: SpriteLayerView) -> Bool {
+        let avatarDirectory = AvatarCatalogue.avatarsDirectory.appendingPathComponent(name, isDirectory: true)
 
         let loadResult: AvatarLoadResult
         do {
@@ -369,9 +420,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             // Keep the specific reason (missing required clips, unsupported
             // schema version, undecodable manifest) — `try?` threw away the
             // distinction AvatarLoaderError exists to make.
-            AppLogger.shared.log(.error, "Failed to load dummy avatar at \(avatarDirectory.path): \(error)")
-            return
+            AppLogger.shared.log(.error, "Failed to load avatar '\(name)' at \(avatarDirectory.path): \(error)")
+            return false
         }
+
+        // Torn down only now that the replacement is known-good.
+        clickThroughController?.stopMonitoring()
+        avatar?.spriteLayer.removeFromSuperlayer()
 
         // manifest.hitbox scaled by manifest.scale -- must be computed before
         // controller.avatarHeight below, which the FSM's climb/land/wander
@@ -383,14 +438,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         baseHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
         avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
 
-        let avatar = SpriteAvatar(
+        let newAvatar = SpriteAvatar(
             avatarDirectory: avatarDirectory,
             loadResult: loadResult,
             parent: spriteView.contentLayer
         )
-        let initialPosition = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
-        avatar.setScreenPosition(initialPosition)
-        self.avatar = avatar
+        // Keeps the pet where it already stood across a switch rather than
+        // re-spawning it -- only the very first activation (no prior
+        // characterBody) has no "where it already stood" to keep.
+        let initialPosition = characterBody?.position ?? GroundedSpawnPosition.position(in: groundAwareSize(of: window))
+        newAvatar.setScreenPosition(initialPosition)
+        avatar = newAvatar
 
         let soundTable = SoundTable(avatarDirectory: avatarDirectory, sounds: loadResult.manifest.sounds)
         let sfxPlayer = SFXPlayer(soundTable: soundTable)
@@ -398,32 +456,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         sfxPlayer.isMuted = settingsStore.isMuted
         self.sfxPlayer = sfxPlayer
 
-        // Previously copied once at launch only -- Settings' Volume/Mute
-        // toggles had no live effect on a running session until restart.
+        // Reassigned every activation, not just once -- these close over
+        // sfxPlayer directly (weakly), which would otherwise go stale
+        // pointing at whichever avatar's sound player this replaced.
         settingsStore.onVolumeChanged = { [weak sfxPlayer] volume in sfxPlayer?.volume = volume }
         settingsStore.onMuteChanged = { [weak self, weak sfxPlayer] isMuted in
             sfxPlayer?.isMuted = isMuted
             guard isMuted, self?.settingsStore.isMuteComplaintEnabled == true else { return }
             self?.showMutedComplaint()
         }
-        settingsStore.onToyScaleChanged = { [weak self] scale in
-            self?.toyBox?.updateScale(scale)
-        }
-        settingsStore.onWalkSpeedMultiplierChanged = { [weak self] multiplier in
-            self?.characterController?.walkSpeed = MovementSolver.walkSpeed * multiplier
-        }
-        // autoMuteOnFocus existed as a setting with nothing acting on it --
-        // FocusModeObserver was implemented but never instantiated anywhere.
-        let focusObserver = FocusModeObserver()
-        focusObserver.onChange = { [weak self, weak sfxPlayer] isFocusActive in
-            guard let self, self.settingsStore.autoMuteOnFocus else { return }
-            sfxPlayer?.isMuted = isFocusActive
-        }
-        focusObserver.startObserving()
-        focusModeObserver = focusObserver
 
         let body = CharacterBody(
-            avatar: avatar,
+            avatar: newAvatar,
             position: initialPosition,
             bounceIntensity: loadResult.manifest.bounceIntensity ?? CharacterBody.defaultBounceIntensity
         )
@@ -474,16 +518,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         pointState.onEnter = { [weak self] in self?.beginPointingTimer() }
         characterController = controller
 
-        // F12 (optional, lowest priority): ball-toy interaction. Lives on the
-        // same sprite layer as the avatar so it reparents on display changes
-        // the same way.
-        makeToyBox(on: spriteView.contentLayer)
-
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
         // is the piece that uses it (click-through everywhere except over the
         // character), just never instantiated here. (avatarHitboxSize itself
         // is now computed earlier, above, before controller.avatarHeight needs it.)
         clickThroughController = makeClickThroughController(window: window, screenPosition: initialPosition)
+        return true
+    }
+
+    private func switchAvatar(to name: String) {
+        guard let window = primaryWindow, let spriteView = window.contentView as? SpriteLayerView else { return }
+        activateAvatar(named: name, window: window, spriteView: spriteView)
     }
 
     /// Shared by initial setup and `handleWindowsRebuilt` -- previously

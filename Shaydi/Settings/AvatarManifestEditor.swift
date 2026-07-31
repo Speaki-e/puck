@@ -22,14 +22,12 @@ enum AvatarManifestEditorError: Error {
 }
 
 enum AvatarManifestEditor {
-    /// Where AppDelegate loads the active avatar from. Hardcoded to "dummy"
-    /// because pet-app has no live avatar-switching yet -- "Switch Avatar…"
-    /// only imports packages into the Avatars folder, it doesn't change
-    /// which one is active. Settings edits this same directory pet-app is
-    /// actually running against.
-    static var currentAvatarDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shaydi/Avatars/dummy", isDirectory: true)
+    /// Where AppDelegate loads the active avatar from -- `name` is
+    /// `SettingsStore.selectedAvatarName` (byeolki, 2026-08-01: "아바타를
+    /// 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고"). Settings edits this same
+    /// directory pet-app is actually running against.
+    static func currentAvatarDirectory(named name: String) -> URL {
+        AvatarCatalogue.avatarsDirectory.appendingPathComponent(name, isDirectory: true)
     }
 
     static func loadManifest(directory: URL) throws -> AvatarManifest {

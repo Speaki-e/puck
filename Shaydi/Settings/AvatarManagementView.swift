@@ -27,12 +27,38 @@ struct AvatarManagementView: View {
     /// takes effect on next launch.
     var onScaleChanged: ((Double) -> Void)?
 
+    /// Which installed avatar is active when the panel opens. Seeds
+    /// `selectedAvatarName` below; the panel is rebuilt on every open (same
+    /// reasoning as SettingsView's initialToysOut), so this is a seed rather
+    /// than a source of truth -- SettingsStore.selectedAvatarName is that.
+    var initialSelectedAvatarName: String = "dummy"
+    /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
+    /// 해주고" -- picking a different installed avatar swaps the *running*
+    /// pet immediately, the same live-apply contract onScaleChanged already
+    /// has.
+    var onSelectAvatar: ((String) -> Void)?
+
     @State private var reportMessage = ""
     @State private var scale: Double = 1.0
     @State private var emotionKeys: [String] = AvatarManagementView.defaultEmotionKeys
     @State private var mappedEmotions: Set<String> = []
     @State private var newEmotionName: String = ""
     @State private var emotionMessage = ""
+    @State private var selectedAvatarName: String
+    @State private var installedAvatarNames: [String] = []
+
+    init(
+        language: AppLanguage,
+        onScaleChanged: ((Double) -> Void)? = nil,
+        initialSelectedAvatarName: String = "dummy",
+        onSelectAvatar: ((String) -> Void)? = nil
+    ) {
+        self.language = language
+        self.onScaleChanged = onScaleChanged
+        self.initialSelectedAvatarName = initialSelectedAvatarName
+        self.onSelectAvatar = onSelectAvatar
+        _selectedAvatarName = State(initialValue: initialSelectedAvatarName)
+    }
 
     private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
 
@@ -42,6 +68,21 @@ struct AvatarManagementView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
             SettingsSection(title: text(.avatarsHeader)) {
+                // The preset picker -- byeolki, 2026-08-01: "아바타를 프리셋
+                // 바꾸는거 마냥 바꿀 수 있게 해주고". Always at least "dummy"
+                // (AvatarInstaller seeds it on first run), so this list is
+                // never actually empty.
+                ForEach(installedAvatarNames, id: \.self) { name in
+                    SettingsRow(label: name) {
+                        if name == selectedAvatarName {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        } else {
+                            Button(text(.avatarSelectButton)) { selectAvatar(name) }
+                                .controlSize(.small)
+                        }
+                    }
+                }
                 SettingsActionRow(label: text(.importAvatarButton), systemImage: "square.and.arrow.down") {
                     importAvatar()
                 }
@@ -51,6 +92,13 @@ struct AvatarManagementView: View {
                         .foregroundStyle(ClientTheme.Colors.secondaryText)
                         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 }
+                // "아바타 패키지 형태도 사용자에게 알려줘야함" -- condensed
+                // from docs/avatar-spec.md, which is a repo-only doc an
+                // end user importing a package would never see otherwise.
+                Text(text(.avatarPackageFormatExplanation))
+                    .font(.footnote)
+                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 SettingsStackedRow(label: text(.sizeHeader), value: String(format: "%.2fx", scale)) {
                     Slider(value: $scale, in: 0.25...3.0)
                         .onChange(of: scale) { applyScale($0) }
@@ -100,11 +148,28 @@ struct AvatarManagementView: View {
                 }
             }
         }
-        .onAppear { loadCurrentManifest() }
+        .onAppear {
+            refreshInstalledAvatarNames()
+            loadCurrentManifest()
+        }
+    }
+
+    private func refreshInstalledAvatarNames() {
+        installedAvatarNames = AvatarCatalogue.installedAvatarNames()
+    }
+
+    private func selectAvatar(_ name: String) {
+        selectedAvatarName = name
+        onSelectAvatar?(name)
+        // The size slider and emotion list below are keyed to whichever
+        // avatar is selected -- without reloading, they'd keep showing the
+        // previous avatar's manifest after switching.
+        loadCurrentManifest()
     }
 
     private func loadCurrentManifest() {
-        guard let manifest = try? AvatarManifestEditor.loadManifest(directory: AvatarManifestEditor.currentAvatarDirectory) else {
+        let directory = AvatarManifestEditor.currentAvatarDirectory(named: selectedAvatarName)
+        guard let manifest = try? AvatarManifestEditor.loadManifest(directory: directory) else {
             return
         }
         scale = manifest.scale
@@ -115,7 +180,8 @@ struct AvatarManagementView: View {
     }
 
     private func applyScale(_ newScale: Double) {
-        guard (try? AvatarManifestEditor.updateScale(newScale, directory: AvatarManifestEditor.currentAvatarDirectory)) != nil else {
+        let directory = AvatarManifestEditor.currentAvatarDirectory(named: selectedAvatarName)
+        guard (try? AvatarManifestEditor.updateScale(newScale, directory: directory)) != nil else {
             return
         }
         onScaleChanged?(newScale)
@@ -145,7 +211,7 @@ struct AvatarManagementView: View {
             try AvatarManifestEditor.setEmotionImage(
                 named: emotion,
                 sourceFile: sourceURL,
-                directory: AvatarManifestEditor.currentAvatarDirectory
+                directory: AvatarManifestEditor.currentAvatarDirectory(named: selectedAvatarName)
             )
             mappedEmotions.insert(emotion)
             emotionMessage = String(format: text(.updatedEmotionFormat), emotion)
@@ -174,11 +240,6 @@ struct AvatarManagementView: View {
             return
         }
 
-        // Avatars/ itself may not exist yet on a fresh install (only the
-        // dummy avatar's own directory is guaranteed to be pre-seeded).
-        let avatarsDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shaydi/Avatars", isDirectory: true)
-
         // Previously reimplemented the copy-in here by hand, which silently
         // skipped AvatarInstaller's Git-LFS-pointer-file check -- an import
         // of a package with un-pulled LFS pointers reported false success
@@ -186,7 +247,7 @@ struct AvatarManagementView: View {
         // because the user explicitly chose to import over whatever's there.
         let outcome = AvatarInstaller.installIfNeeded(
             bundledPackage: sourceURL,
-            intoAvatarsDirectory: avatarsDirectory,
+            intoAvatarsDirectory: AvatarCatalogue.avatarsDirectory,
             overwriteExisting: true
         )
         switch outcome {
@@ -198,6 +259,10 @@ struct AvatarManagementView: View {
                     report.manifest.name,
                     report.missingRecommendedClipFiles.joined(separator: ", ")
                 )
+            // A freshly imported/overwritten package needs to show up in the
+            // preset list immediately -- it just landed on disk, not at the
+            // next time this panel happens to be rebuilt.
+            refreshInstalledAvatarNames()
         case .failed(let reason):
             reportMessage = String(format: text(.failedToInstallFormat), report.manifest.name, reason)
         case .alreadyPresent, .noBundledPackage:

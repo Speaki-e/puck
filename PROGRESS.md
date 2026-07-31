@@ -5,7 +5,13 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 918 passing (`xcodebuild test`) · **`main`:** `1fd19d6`
+**Last updated:** 2026-08-01 · **Tests:** 930 passing (`xcodebuild test`) · **`main`:** `f130381`
+
+**2026-08-01: a boring.notch-style Dynamic Island, with toy-summon buttons behind the expand.** byeolki: "boring notch처럼 일반적인 다이내믹 아일랜드를 다는데, 이 일반적인 다이내믹 아일랜드를 펼치면 toy를 소환 시킬 수 있는 버튼이 생기게 해줘." Generic, not tied to an actual camera notch -- it's a small floating pill pinned to the top-center of the main screen on every Mac, notch or no notch.
+
+- `Shaydi/Notch/` (new): `NotchLayout` (pure -- centers on `screenMidX`, pins the top edge to `topY` so collapsing/expanding only ever grows the window *downward*, never through the menu bar), `NotchWindow` (borderless, floats, joins all Spaces -- unlike `OverlayWindow` it accepts mouse events since the toy buttons need to be clickable, but like it, never becomes key/main), `NotchWindowController` (owns the one window, repositions on `NSApplication.didChangeScreenParametersNotification`), `NotchView` (SwiftUI: a thin capsule pill at rest, `.onHover` expands it into a row of toy buttons).
+- Reuses `toggleToy(_:)` verbatim, same as the Option+Shift+1/2 hotkeys and the Settings toy grid -- three different triggers, one `ToyBox` truth. `ToyPresentation` (new, extracted from `SettingsView`'s private `label(for:)`/`tint(for:)`) is now the single place a toy's display name/tint colour is decided, so the notch's buttons and Settings' grid can't disagree on what a toy is called or coloured.
+- Verified: build + full suite (930 tests, incl. `NotchLayoutTests`/`NotchWindowTests`/`NotchWindowControllerTests`) green, both apps launched clean, and a screenshot confirms the pill renders at the correct top-center position and z-order (floats above a full-height browser window). **Not verified by hand**: the hover-to-expand interaction itself -- synthetic `CGEvent` mouse-moved posts from an unsigned script aren't accepted without Input Monitoring permission, so this needs a real mouse hover to confirm, same caveat as F14's drag-capture.
 
 **2026-08-01: Option+Shift+1/2 summon the toys directly, no menu detour.** byeolki: "option shift 1, 2로 toy 소환 가능하게 해줘."
 

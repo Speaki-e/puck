@@ -145,9 +145,9 @@ struct SettingsView: View {
             ) {
                 ForEach(ToyCatalogue.all, id: \.name) { toy in
                     ToyTile(
-                        name: text(Self.label(for: toy)),
+                        name: text(ToyPresentation.label(for: toy)),
                         artwork: ToyThumbnail.image(for: toy, boundingSide: 64),
-                        tint: Self.tint(for: toy),
+                        tint: ToyPresentation.tint(for: toy),
                         isOut: toysOut.contains(toy.name)
                     ) {
                         guard let onToggleToy else { return }
@@ -325,20 +325,4 @@ struct SettingsView: View {
         .padding(ClientTheme.Metrics.spacingSmall)
     }
 
-    private static func label(for toy: Toy) -> L10nKey {
-        toy.name == ToyCatalogue.wand.name ? .toyWand : .toyPumpkin
-    }
-
-    /// The tile wash behind each toy, taken from the artwork's own colour --
-    /// this panel has no accent colour (see ClientTheme.Colors), and these
-    /// read as "that orange pumpkin" rather than as app branding. A toy added
-    /// to the catalogue without an entry here still gets a tile, just a grey
-    /// one.
-    private static func tint(for toy: Toy) -> Color {
-        switch toy.name {
-        case ToyCatalogue.pumpkin.name: return .orange
-        case ToyCatalogue.wand.name: return .purple
-        default: return .gray
-        }
-    }
 }

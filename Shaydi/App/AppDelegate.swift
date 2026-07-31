@@ -219,6 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private func setUpMenuBar() {
         let menuBar = MenuBarController()
         menuBar.makePopoverContent = { [weak self] in self?.makeSettingsPanel() }
+        menuBar.onOpenClient = { [weak self] in self?.openClientApp() }
         menuBarController = menuBar
     }
 

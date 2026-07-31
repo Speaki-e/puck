@@ -5,7 +5,13 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 915 passing (`xcodebuild test`) · **`main`:** `3c40c5d`
+**Last updated:** 2026-08-01 · **Tests:** 918 passing (`xcodebuild test`) · **`main`:** `1fd19d6`
+
+**2026-08-01: Option+Shift+1/2 summon the toys directly, no menu detour.** byeolki: "option shift 1, 2로 toy 소환 가능하게 해줘."
+
+- Two new fixed bindings in `HotkeyBindings` (keyCode 18/19 = "1"/"2", both Option+Shift), added to `HotkeyDecisionMaker.decide`/`HotkeyAction` and `GlobalHotkeyManager`'s closures alongside the existing PTT/text-input/character-summon combos -- same CGEvent-tap plumbing, no new mechanism.
+- `AppDelegate.summonToy(at:)` maps index 0/1 straight to `ToyCatalogue.all[0]`/`[1]` (pumpkin/wand) and calls the existing `toggleToy(_:)` -- reuses the same out/away toggle semantics the menu bar popover already uses, so a hotkey summon and a menu click can't leave `ToyBox` in different states.
+- Persisted through `SettingsStore.hotkeyBindings` like the other three bindings (round-trips via the existing generic test, no rebind UI exists for any of the five yet -- consistent with current state, not a new gap).
 
 **2026-08-01: centralized the app's identity, and a rename script, so the next name change doesn't take hours.** byeolki, after living through the PetAgent -> Shaydi rename: "다음에도 프로그램 명이 바뀔 수 있으니까 알아서 잘 config 설정 해놔. 나중에 바꿀때 오래걸리지 말구."
 

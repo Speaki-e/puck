@@ -21,6 +21,8 @@ enum HotkeyAction: Equatable {
     case pushToTalkUp
     case textInputRequested
     case characterSummonRequested
+    case toySummon1Requested
+    case toySummon2Requested
     case none
 }
 
@@ -44,6 +46,12 @@ enum HotkeyDecisionMaker {
             }
             if bindings.characterSummon.matches(keyCode: keyCode, modifierFlags: flags) {
                 return .characterSummonRequested
+            }
+            if bindings.toySummon1.matches(keyCode: keyCode, modifierFlags: flags) {
+                return .toySummon1Requested
+            }
+            if bindings.toySummon2.matches(keyCode: keyCode, modifierFlags: flags) {
+                return .toySummon2Requested
             }
             return .none
 
@@ -76,6 +84,8 @@ final class GlobalHotkeyManager {
     /// Fired on keyDown for the one-shot combos.
     var onTextInputRequested: (() -> Void)?
     var onCharacterSummonRequested: (() -> Void)?
+    var onToySummon1Requested: (() -> Void)?
+    var onToySummon2Requested: (() -> Void)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -157,6 +167,10 @@ final class GlobalHotkeyManager {
             onTextInputRequested?()
         case .characterSummonRequested:
             onCharacterSummonRequested?()
+        case .toySummon1Requested:
+            onToySummon1Requested?()
+        case .toySummon2Requested:
+            onToySummon2Requested?()
         case .none:
             break
         }

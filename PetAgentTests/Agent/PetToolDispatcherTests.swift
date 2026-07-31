@@ -147,4 +147,14 @@ final class AgentToolRegistryTests: XCTestCase {
             )
         }
     }
+
+    /// And the other direction, which is the one that actually bit: the
+    /// registry mirror shipped without `open_task_session` because it was
+    /// added upstream while this file was being written, and checking only
+    /// registry -> timeouts cannot see a tool the registry never listed.
+    func test_everyTimeoutEntryHasARegistryTool() {
+        for name in ToolTimeouts.bySeconds.keys {
+            XCTAssertNotNil(ToolRegistry.tool(named: name), "\(name) is in ToolTimeouts but missing from ToolRegistry")
+        }
+    }
 }

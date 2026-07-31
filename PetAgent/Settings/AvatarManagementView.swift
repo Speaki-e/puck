@@ -36,31 +36,33 @@ struct AvatarManagementView: View {
 
     private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
 
+    // Sections are GlassCards in the shared glass vocabulary (2026-07-31,
+    // byeolki: "전체적인 ui를 리퀴드 글라스 느낌으로"). No ScrollView of its
+    // own -- SettingsView scrolls every tab.
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(text(.avatarsHeader)).font(.headline)
+        VStack(spacing: ClientTheme.Metrics.spacingMedium) {
+            GlassCard(title: text(.avatarsHeader)) {
                 Button(text(.importAvatarButton)) { importAvatar() }
+                    .glassButton()
                 if !reportMessage.isEmpty {
                     Text(reportMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+            }
 
-                Divider()
-
-                Text(text(.sizeHeader)).font(.headline)
+            GlassCard(title: text(.sizeHeader)) {
                 HStack {
                     Slider(value: $scale, in: 0.25...3.0) { Text(text(.sizeHeader)) }
+                        .labelsHidden()
                         .onChange(of: scale) { applyScale($0) }
                     Text(String(format: "%.2fx", scale))
                         .monospacedDigit()
                         .frame(width: 48, alignment: .trailing)
                 }
+            }
 
-                Divider()
-
-                Text(text(.emotionsHeader)).font(.headline)
+            GlassCard(title: text(.emotionsHeader)) {
                 Text(text(.emotionsExplanation))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -85,7 +87,6 @@ struct AvatarManagementView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding()
         }
         .onAppear { loadCurrentManifest() }
     }

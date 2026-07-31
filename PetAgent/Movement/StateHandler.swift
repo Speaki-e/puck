@@ -21,6 +21,16 @@ protocol StateHandler: AnyObject {
     var clipKey: String { get }
     /// Whether the clip can loop (start/end pose match) — idle/walk/climb/type/listen/point etc.
     var loopsClip: Bool { get }
+    /// Lookup key into the manifest's `sounds`. Defaults to clipKey; states
+    /// whose sound depends on something the clip doesn't care about override
+    /// it (JuggleBall: which toy the pet is playing with).
+    var soundKey: String { get }
+    /// Whether the SFX loops. Defaults to false: every mapped sound today is
+    /// a spoken one-shot, and a line has an end -- defaulting this to
+    /// loopsClip made every looping-clip state with a voice line restart it
+    /// mid-sentence forever unless it remembered to opt out. A state with a
+    /// genuinely ambient cue (a footstep loop) overrides this to true.
+    var loopsSound: Bool { get }
     /// Whether transitioning into this state while it's already the current
     /// one should restart it (exit()+enter() again) rather than being a
     /// no-op. Reactive one-shot states (e.g. ReactClick) want a repeated
@@ -43,6 +53,8 @@ protocol StateHandler: AnyObject {
 
 extension StateHandler {
     var loopsClip: Bool { false }
+    var soundKey: String { clipKey }
+    var loopsSound: Bool { false }
     var restartsOnReentry: Bool { false }
     var preservesUpsideDown: Bool { false }
     func enter() {}

@@ -35,6 +35,15 @@ final class JuggleBallState: StateHandler {
     let clipKey = "kick" // reuses kick's bounce/clip -- a header-like pop, no dedicated clip in the manifest
     let loopsClip = false
 
+    /// Which toy the pet is about to play with, set by whoever starts the
+    /// game (AppDelegate.startPlaying). Only the SOUND is toy-specific: the
+    /// pet has a line for each toy ("호박이 좋아요"), while the motion is the
+    /// same pop for all of them. A toy with no `kick_<toy>` entry plays
+    /// nothing, per the table's standing "unmapped key = silence" rule.
+    var toyName: String?
+
+    var soundKey: String { toyName.map { "kick_\($0)" } ?? clipKey }
+
     /// How long the pet keeps playing before it has had enough.
     static let playDuration: TimeInterval = 6
     /// How long the toy sits on the pet's head between being caught and being

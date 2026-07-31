@@ -52,48 +52,87 @@ struct SettingsView: View {
 
     private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
 
+    // 2026-07-31 (byeolki: "전체적인 ui를 리퀴드 글라스 느낌으로"): the stock
+    // TabView + Form chrome was the last surface still reading as the default
+    // macOS settings pane. Same vocabulary as the client window now -- glass
+    // capsule tabs and GlassCard sections over behind-window vibrancy.
     var body: some View {
-        TabView(selection: $selectedTab) {
-            generalTab
-                .tabItem { Label(text(.tabGeneral), systemImage: "gearshape") }
-                .tag(Tab.general)
-            soundTab
-                .tabItem { Label(text(.tabSound), systemImage: "speaker.wave.2") }
-                .tag(Tab.sound)
-            movementTab
-                .tabItem { Label(text(.tabMovement), systemImage: "figure.walk") }
-                .tag(Tab.movement)
-            AvatarManagementView(language: language, onScaleChanged: onAvatarScaleChanged)
-                .tabItem { Label(text(.tabAvatar), systemImage: "person.crop.square") }
-                .tag(Tab.avatar)
+        VStack(spacing: ClientTheme.Metrics.spacingLarge) {
+            tabBar
+            ScrollView {
+                // One GlassGroup around the whole tab: each GlassCard's
+                // glassEffect is otherwise its own backdrop-sampling pass,
+                // and the container is also what blends adjacent glass as
+                // one material (see GlassGroup's doc).
+                GlassGroup {
+                    switch selectedTab {
+                    case .general: generalTab
+                    case .sound: soundTab
+                    case .movement: movementTab
+                    case .avatar:
+                        AvatarManagementView(language: language, onScaleChanged: onAvatarScaleChanged)
+                    }
+                }
+                .padding([.horizontal, .bottom], ClientTheme.Metrics.spacingLarge)
+            }
         }
-        .frame(width: 420, height: 380)
+        .padding(.top, ClientTheme.Metrics.spacingMedium)
+        .frame(width: 460, height: 480)
+        .background(VisualEffectBackground(material: .sidebar).ignoresSafeArea())
         .preferredColorScheme(appearance.colorScheme)
     }
 
+    private var tabBar: some View {
+        GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
+            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                tabButton(.general, icon: "gearshape", label: .tabGeneral)
+                tabButton(.sound, icon: "speaker.wave.2", label: .tabSound)
+                tabButton(.movement, icon: "figure.walk", label: .tabMovement)
+                tabButton(.avatar, icon: "person.crop.square", label: .tabAvatar)
+            }
+        }
+    }
+
+    private func tabButton(_ tab: Tab, icon: String, label: L10nKey) -> some View {
+        Button {
+            selectedTab = tab
+        } label: {
+            Label(text(label), systemImage: icon)
+                .font(ClientTheme.Typography.toolLabel)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .glassControl(in: Capsule(), isEnabled: selectedTab == tab)
+        .foregroundStyle(selectedTab == tab ? ClientTheme.Colors.bubbleText : ClientTheme.Colors.secondaryText)
+    }
+
     private var generalTab: some View {
-        Form {
-            Section(text(.languageLabel)) {
+        VStack(spacing: ClientTheme.Metrics.spacingMedium) {
+            GlassCard(title: text(.languageLabel)) {
                 Picker(text(.languageLabel), selection: $language) {
                     ForEach(AppLanguage.allCases, id: \.self) { option in
                         Text(option.displayName).tag(option)
                     }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .onChange(of: language) { store.language = $0 }
             }
             // byeolki: "화이트모드 다크모드 추가하고" -- an explicit override,
             // not just passively following the system (.system does that).
-            Section(text(.appearanceLabel)) {
+            GlassCard(title: text(.appearanceLabel)) {
                 Picker(text(.appearanceLabel), selection: $appearance) {
                     Text(text(.appearanceSystem)).tag(AppAppearance.system)
                     Text(text(.appearanceLight)).tag(AppAppearance.light)
                     Text(text(.appearanceDark)).tag(AppAppearance.dark)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .onChange(of: appearance) { store.appearance = $0 }
             }
-            Section(text(.accessibilityLabel)) {
+            GlassCard(title: text(.accessibilityLabel)) {
                 // The launch prompt only appears once, so this is the way back
                 // for anyone who dismissed it or revoked the grant later.
                 LabeledContent(text(.accessibilityLabel)) {
@@ -103,16 +142,16 @@ struct SettingsView: View {
                 Button(text(.openSystemSettingsButton)) {
                     AccessibilityPermission.openSystemSettings()
                 }
+                .glassButton()
                 Text(text(.accessibilityExplanation))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding()
     }
 
     private var soundTab: some View {
-        Form {
+        GlassCard(title: text(.tabSound)) {
             Slider(value: $volume, in: 0...1) { Text(text(.volumeLabel)) }
                 .onChange(of: volume) { store.volume = Float($0) }
             Toggle(text(.muteLabel), isOn: $isMuted)
@@ -120,11 +159,10 @@ struct SettingsView: View {
             Toggle(text(.autoMuteLabel), isOn: $autoMuteOnFocus)
                 .onChange(of: autoMuteOnFocus) { store.autoMuteOnFocus = $0 }
         }
-        .padding()
     }
 
     private var movementTab: some View {
-        Form {
+        GlassCard(title: text(.tabMovement)) {
             Toggle(text(.avoidClimbingLabel), isOn: $avoidClimbingFocusedWindow)
                 .onChange(of: avoidClimbingFocusedWindow) { store.avoidClimbingFocusedWindow = $0 }
             HStack {
@@ -142,6 +180,5 @@ struct SettingsView: View {
                     .frame(width: 48, alignment: .trailing)
             }
         }
-        .padding()
     }
 }

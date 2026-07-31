@@ -71,6 +71,11 @@ extension ToolHandler {
 final class ToolExecutor {
     private var handlers: [String: ToolHandler] = [:]
     private let logger: ToolExecutionLogging?
+
+    /// Called with the tool's name when a call fails for want of a
+    /// permission. Wired by AppDelegate to the pet's guidance behaviour;
+    /// unset everywhere else, including tests.
+    var onPermissionDenied: ((String) -> Void)?
     // Guards each dispatch's completeOnce check-and-set: the timeout closure
     // (DispatchQueue.global()) and a handler's own completion (often fired
     // from a background queue, e.g. RunShellHandler/RunAppleScriptHandler)
@@ -134,6 +139,12 @@ final class ToolExecutor {
             }
             guard shouldComplete else { return }
             logger?.log(.execEnd(id: request.id, ok: ok))
+            if error == .permissionDenied {
+                // The reply still goes back to the agent as normal; this is
+                // the pet's cue to go and ask for the permission on screen,
+                // where the user actually is (see PermissionGuidance).
+                self?.onPermissionDenied?(request.tool)
+            }
             completion(ToolResult(id: request.id, ok: ok, data: data, error: error?.protocolErrorCode, detail: error?.detail))
         }
 

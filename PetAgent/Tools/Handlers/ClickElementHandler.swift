@@ -15,9 +15,22 @@ import CoreGraphics
 final class ClickElementHandler: ToolHandler {
     let toolName = "click_element"
 
+    /// Injectable so the permission branch is testable without the real TCC
+    /// state of whoever runs the suite.
+    var isAccessibilityTrusted: () -> Bool = { AccessibilityPermission.isTrusted(prompt: false) }
+
     func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let frame = args.extractFrame() else {
             completion(.failure(.executionFailed("click_element requires a frame {x,y,width,height}")))
+            return
+        }
+
+        // Posting a synthetic event into another app needs Accessibility.
+        // Without it CGEvent.post silently does nothing, so the tool used to
+        // report success for a click that never happened -- and the agent
+        // would then tell the user it had clicked something.
+        guard isAccessibilityTrusted() else {
+            completion(.failure(.permissionDenied))
             return
         }
 

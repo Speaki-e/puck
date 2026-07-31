@@ -3,30 +3,44 @@
 //  PetAgent
 //
 //  Shared · owner: Sangwoo Kang / Haeyoung Park
-//  SwiftUI settings screen, embedded via NSHostingView (overlay itself stays pure AppKit)
+//  The menu bar panel: everything the app can be told to do, in one column.
 //
 //  2026-07-29 redesign (byeolki: "세팅 ui ux 좀 다시 설계해줘. 한국어
 //  언어모드도 만들어주고"): was a single long Form mixing sound, movement,
 //  and permission controls with no grouping beyond section headers, and
 //  Avatar management lived in an entirely separate window reachable only
-//  from a second menu-bar item. Restructured into a tabbed window (General
-//  /Sound/Movement/Avatar), matching macOS's own System Settings shape, with
-//  a language picker in General driving every string in the window live.
+//  from a second menu-bar item.
+//
+//  2026-07-31 (byeolki: "pokopet 설정창과 비슷하게", then "이 설정 이거 위에
+//  아이콘 누르면 바로 나오게 그 창을"): the tabbed GlassCard window that
+//  replaced it is gone in turn. The reference is pokoPet's menu bar popover
+//  -- one narrow scrolling column on a single translucent panel, plain
+//  sections, a tinted item grid, action rows at the foot -- and it drops
+//  straight from the status item, so this is no longer a window at all.
+//  Tabs went with it: the reference has none, and four tabs over twelve
+//  controls was chrome the content never needed.
 //
 
 import SwiftUI
 
 struct SettingsView: View {
-    /// AppDelegate's "Switch Avatar…" menu item jumps straight to `.avatar`
-    /// instead of opening a second window the way it used to.
-    enum Tab {
-        case general, sound, movement, avatar
-    }
-
     let store: SettingsStore
     var onAvatarScaleChanged: ((Double) -> Void)?
 
-    @State private var selectedTab: Tab
+    /// Which toys are out when the panel opens. The panel is rebuilt on every
+    /// open, so this is a seed rather than a source of truth -- the toy box
+    /// itself is that.
+    var initialToysOut: Set<String> = []
+    /// Returns the toys that are out *after* the toggle -- from what the toy
+    /// box actually did, not from what was asked.
+    var onToggleToy: ((Toy) -> Set<String>)?
+
+    /// The action rows the NSMenu used to hold.
+    var initialIsCharacterHidden: Bool = false
+    var onOpenClient: (() -> Void)?
+    var onToggleVisibility: (() -> Void)?
+    var onQuit: (() -> Void)?
+
     @State private var language: AppLanguage
     @State private var appearance: AppAppearance
     @State private var volume: Double
@@ -35,11 +49,35 @@ struct SettingsView: View {
     @State private var avoidClimbingFocusedWindow: Bool
     @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
+    @State private var toysOut: Set<String>
+    /// F15: what is typed into the key field before it is saved, and the
+    /// resolved configuration the status line reports on.
+    @State private var apiKeyDraft = ""
+    @State private var apiKeyMessage: String?
+    @State private var agentConfiguration = AgentConfiguration.load()
+    /// Tracked locally so the hide/show row relabels itself immediately --
+    /// the panel stays open after the toggle, and rebuilding it just to
+    /// change one word would dismiss whatever else the user was doing.
+    @State private var isCharacterHidden: Bool
 
-    init(store: SettingsStore, initialTab: Tab = .general, onAvatarScaleChanged: ((Double) -> Void)? = nil) {
+    init(
+        store: SettingsStore,
+        onAvatarScaleChanged: ((Double) -> Void)? = nil,
+        initialToysOut: Set<String> = [],
+        onToggleToy: ((Toy) -> Set<String>)? = nil,
+        initialIsCharacterHidden: Bool = false,
+        onOpenClient: (() -> Void)? = nil,
+        onToggleVisibility: (() -> Void)? = nil,
+        onQuit: (() -> Void)? = nil
+    ) {
         self.store = store
         self.onAvatarScaleChanged = onAvatarScaleChanged
-        _selectedTab = State(initialValue: initialTab)
+        self.initialToysOut = initialToysOut
+        self.onToggleToy = onToggleToy
+        self.initialIsCharacterHidden = initialIsCharacterHidden
+        self.onOpenClient = onOpenClient
+        self.onToggleVisibility = onToggleVisibility
+        self.onQuit = onQuit
         _language = State(initialValue: store.language)
         _appearance = State(initialValue: store.appearance)
         _volume = State(initialValue: Double(store.volume))
@@ -48,70 +86,186 @@ struct SettingsView: View {
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
         _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
         _toyScale = State(initialValue: store.toyScale)
+        _toysOut = State(initialValue: initialToysOut)
+        _isCharacterHidden = State(initialValue: initialIsCharacterHidden)
     }
 
     private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
 
-    // 2026-07-31 (byeolki: "전체적인 ui를 리퀴드 글라스 느낌으로"): the stock
-    // TabView + Form chrome was the last surface still reading as the default
-    // macOS settings pane. Same vocabulary as the client window now -- glass
-    // capsule tabs and GlassCard sections over behind-window vibrancy.
     var body: some View {
-        VStack(spacing: ClientTheme.Metrics.spacingLarge) {
-            tabBar
+        VStack(spacing: 0) {
+            header
+            Divider().opacity(0.5)
             ScrollView {
-                // One GlassGroup around the whole tab: each GlassCard's
-                // glassEffect is otherwise its own backdrop-sampling pass,
-                // and the container is also what blends adjacent glass as
-                // one material (see GlassGroup's doc).
-                GlassGroup {
-                    switch selectedTab {
-                    case .general: generalTab
-                    case .sound: soundTab
-                    case .movement: movementTab
-                    case .avatar:
-                        AvatarManagementView(language: language, onScaleChanged: onAvatarScaleChanged)
-                    }
+                VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
+                    avatarSection
+                    toySection
+                    agentSection
+                    soundSection
+                    movementSection
+                    generalSection
                 }
-                .padding([.horizontal, .bottom], ClientTheme.Metrics.spacingLarge)
+                .padding(ClientTheme.Metrics.spacingMedium)
             }
+            Divider().opacity(0.5)
+            actionSection
         }
-        .padding(.top, ClientTheme.Metrics.spacingMedium)
-        .frame(width: 460, height: 480)
-        .background(VisualEffectBackground(material: .sidebar).ignoresSafeArea())
+        .frame(width: MenuBarController.panelSize.width, height: MenuBarController.panelSize.height)
         .preferredColorScheme(appearance.colorScheme)
     }
 
-    private var tabBar: some View {
-        GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
-            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
-                tabButton(.general, icon: "gearshape", label: .tabGeneral)
-                tabButton(.sound, icon: "speaker.wave.2", label: .tabSound)
-                tabButton(.movement, icon: "figure.walk", label: .tabMovement)
-                tabButton(.avatar, icon: "person.crop.square", label: .tabAvatar)
+    /// The reference opens with its mark and name; ours is the pumpkin that
+    /// is already the app icon and the pet's toy.
+    private var header: some View {
+        HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+            Image("PumpkinLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 22, height: 22)
+            Text("PetAgent")
+                .font(ClientTheme.Typography.workspaceName)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+        .padding(.vertical, ClientTheme.Metrics.spacingMedium)
+    }
+
+    private var avatarSection: some View {
+        AvatarManagementView(language: language, onScaleChanged: onAvatarScaleChanged)
+    }
+
+    /// The reference's "아이템" grid. Ours is the toy box, which until now
+    /// was reachable only from the menu bar's submenu.
+    private var toySection: some View {
+        SettingsSection(title: text(.menuToys)) {
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: ClientTheme.Metrics.spacingMedium),
+                          GridItem(.flexible(), spacing: ClientTheme.Metrics.spacingMedium)],
+                spacing: ClientTheme.Metrics.spacingMedium
+            ) {
+                ForEach(ToyCatalogue.all, id: \.name) { toy in
+                    ToyTile(
+                        name: text(Self.label(for: toy)),
+                        artwork: ToyThumbnail.image(for: toy, boundingSide: 64),
+                        tint: Self.tint(for: toy),
+                        isOut: toysOut.contains(toy.name)
+                    ) {
+                        guard let onToggleToy else { return }
+                        toysOut = onToggleToy(toy)
+                    }
+                }
+            }
+            SettingsStackedRow(label: text(.toySizeLabel), value: String(format: "%.2fx", toyScale)) {
+                Slider(value: $toyScale, in: 0.5...3.0)
+                    .onChange(of: toyScale) { store.toyScale = $0 }
             }
         }
     }
 
-    private func tabButton(_ tab: Tab, icon: String, label: L10nKey) -> some View {
-        Button {
-            selectedTab = tab
-        } label: {
-            Label(text(label), systemImage: icon)
-                .font(ClientTheme.Typography.toolLabel)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .contentShape(Capsule())
+    /// F15 (2026-07-31, byeolki: "설정 같은데에서 api 키 넣을 수 있게").
+    /// The key goes to a .env both apps read -- this panel is PetAgent's, and
+    /// the agent that needs the key runs in PetAgentClient (see
+    /// AgentConfiguration.writableEnvFile for why not the Keychain).
+    private var agentSection: some View {
+        SettingsSection(title: text(.agentHeader)) {
+            SettingsStackedRow(label: text(.apiKeyLabel)) {
+                HStack {
+                    // SecureField, so a key isn't left legible on a screen
+                    // that gets shared or recorded.
+                    // Not in Strings: an OpenAI key prefix is the same string
+                    // in every language, and the table's test rejects entries
+                    // whose translations are identical.
+                    SecureField("sk-…", text: $apiKeyDraft)
+                        .textFieldStyle(.roundedBorder)
+                    Button(text(.apiKeySave)) { saveAPIKey(apiKeyDraft) }
+                        .controlSize(.small)
+                        .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if agentConfiguration.isConfigured {
+                        Button(text(.apiKeyClear)) { saveAPIKey(nil) }
+                            .controlSize(.small)
+                    }
+                }
+            }
+
+            Text(apiKeyStatus)
+                .font(.footnote)
+                .foregroundStyle(agentConfiguration.isConfigured ? ClientTheme.Colors.secondaryText : ClientTheme.Colors.warning)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+
+            Text(text(.apiKeyExplanation))
+                .font(.footnote)
+                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
         }
-        .buttonStyle(.plain)
-        .glassControl(in: Capsule(), isEnabled: selectedTab == tab)
-        .foregroundStyle(selectedTab == tab ? ClientTheme.Colors.bubbleText : ClientTheme.Colors.secondaryText)
     }
 
-    private var generalTab: some View {
-        VStack(spacing: ClientTheme.Metrics.spacingMedium) {
-            GlassCard(title: text(.languageLabel)) {
-                Picker(text(.languageLabel), selection: $language) {
+    private var apiKeyStatus: String {
+        if let message = apiKeyMessage { return message }
+        guard let source = agentConfiguration.keySource else { return text(.apiKeyMissing) }
+        return String(format: text(.apiKeySourceFormat), source.displayName)
+    }
+
+    /// Passing nil removes the assignment, which is how the Remove button
+    /// falls back to whatever other source (an env var, the project's .env)
+    /// was being shadowed.
+    private func saveAPIKey(_ key: String?) {
+        let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let target = AgentConfiguration.writableEnvFile
+        guard DotEnv.write(key: "OPENAI_API_KEY", value: trimmed?.isEmpty == false ? trimmed : nil, to: target) else {
+            apiKeyMessage = text(.apiKeySaveFailed)
+            return
+        }
+        apiKeyDraft = ""
+        // Re-read rather than assumed: the field only wins if nothing with
+        // higher precedence is already supplying a key, and saying "saved"
+        // while a stale env var keeps winning is the confusion keySource
+        // exists to prevent.
+        agentConfiguration = .load()
+        apiKeyMessage = trimmed?.isEmpty == false
+            ? String(format: text(.apiKeySavedFormat), target.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+            : nil
+    }
+
+    private var soundSection: some View {
+        SettingsSection(title: text(.tabSound)) {
+            SettingsStackedRow(label: text(.volumeLabel)) {
+                Slider(value: $volume, in: 0...1)
+                    .onChange(of: volume) { store.volume = Float($0) }
+            }
+            SettingsRow(label: text(.muteLabel)) {
+                Toggle("", isOn: $isMuted)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: isMuted) { store.isMuted = $0 }
+            }
+            SettingsRow(label: text(.autoMuteLabel)) {
+                Toggle("", isOn: $autoMuteOnFocus)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: autoMuteOnFocus) { store.autoMuteOnFocus = $0 }
+            }
+        }
+    }
+
+    private var movementSection: some View {
+        SettingsSection(title: text(.tabMovement)) {
+            SettingsRow(label: text(.avoidClimbingLabel)) {
+                Toggle("", isOn: $avoidClimbingFocusedWindow)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: avoidClimbingFocusedWindow) { store.avoidClimbingFocusedWindow = $0 }
+            }
+            SettingsStackedRow(label: text(.speedLabel), value: String(format: "%.2fx", walkSpeedMultiplier)) {
+                Slider(value: $walkSpeedMultiplier, in: 0.25...3.0)
+                    .onChange(of: walkSpeedMultiplier) { store.walkSpeedMultiplier = $0 }
+            }
+        }
+    }
+
+    private var generalSection: some View {
+        SettingsSection(title: text(.tabGeneral)) {
+            SettingsStackedRow(label: text(.languageLabel)) {
+                Picker("", selection: $language) {
                     ForEach(AppLanguage.allCases, id: \.self) { option in
                         Text(option.displayName).tag(option)
                     }
@@ -122,8 +276,8 @@ struct SettingsView: View {
             }
             // byeolki: "화이트모드 다크모드 추가하고" -- an explicit override,
             // not just passively following the system (.system does that).
-            GlassCard(title: text(.appearanceLabel)) {
-                Picker(text(.appearanceLabel), selection: $appearance) {
+            SettingsStackedRow(label: text(.appearanceLabel)) {
+                Picker("", selection: $appearance) {
                     Text(text(.appearanceSystem)).tag(AppAppearance.system)
                     Text(text(.appearanceLight)).tag(AppAppearance.light)
                     Text(text(.appearanceDark)).tag(AppAppearance.dark)
@@ -132,53 +286,59 @@ struct SettingsView: View {
                 .labelsHidden()
                 .onChange(of: appearance) { store.appearance = $0 }
             }
-            GlassCard(title: text(.accessibilityLabel)) {
-                // The launch prompt only appears once, so this is the way back
-                // for anyone who dismissed it or revoked the grant later.
-                LabeledContent(text(.accessibilityLabel)) {
-                    Text(AccessibilityPermission.isTrusted(prompt: false) ? text(.accessibilityGranted) : text(.accessibilityNotGranted))
-                        .foregroundStyle(.secondary)
-                }
-                Button(text(.openSystemSettingsButton)) {
-                    AccessibilityPermission.openSystemSettings()
-                }
-                .glassButton()
-                Text(text(.accessibilityExplanation))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            SettingsRow(label: text(.accessibilityLabel)) {
+                Text(AccessibilityPermission.isTrusted(prompt: false) ? text(.accessibilityGranted) : text(.accessibilityNotGranted))
+                    .font(.caption)
+                    .foregroundStyle(ClientTheme.Colors.secondaryText)
             }
+            // The launch prompt only appears once, so this is the way back
+            // for anyone who dismissed it or revoked the grant later.
+            SettingsActionRow(label: text(.openSystemSettingsButton), systemImage: "gearshape") {
+                AccessibilityPermission.openSystemSettings()
+            }
+            Text(text(.accessibilityExplanation))
+                .font(.footnote)
+                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
         }
     }
 
-    private var soundTab: some View {
-        GlassCard(title: text(.tabSound)) {
-            Slider(value: $volume, in: 0...1) { Text(text(.volumeLabel)) }
-                .onChange(of: volume) { store.volume = Float($0) }
-            Toggle(text(.muteLabel), isOn: $isMuted)
-                .onChange(of: isMuted) { store.isMuted = $0 }
-            Toggle(text(.autoMuteLabel), isOn: $autoMuteOnFocus)
-                .onChange(of: autoMuteOnFocus) { store.autoMuteOnFocus = $0 }
+    /// What the NSMenu used to be, now that the icon opens this panel
+    /// instead. Pinned below the scroll view rather than scrolled to: quit
+    /// has to be reachable without first scrolling past every setting.
+    private var actionSection: some View {
+        VStack(spacing: 0) {
+            SettingsActionRow(label: text(.menuOpenClient), systemImage: "bubble.left.and.bubble.right") {
+                onOpenClient?()
+            }
+            SettingsActionRow(
+                label: text(isCharacterHidden ? .menuShow : .menuHide),
+                systemImage: isCharacterHidden ? "eye" : "eye.slash"
+            ) {
+                isCharacterHidden.toggle()
+                onToggleVisibility?()
+            }
+            SettingsActionRow(label: text(.menuQuit), systemImage: "power") {
+                onQuit?()
+            }
         }
+        .padding(ClientTheme.Metrics.spacingSmall)
     }
 
-    private var movementTab: some View {
-        GlassCard(title: text(.tabMovement)) {
-            Toggle(text(.avoidClimbingLabel), isOn: $avoidClimbingFocusedWindow)
-                .onChange(of: avoidClimbingFocusedWindow) { store.avoidClimbingFocusedWindow = $0 }
-            HStack {
-                Slider(value: $walkSpeedMultiplier, in: 0.25...3.0) { Text(text(.speedLabel)) }
-                    .onChange(of: walkSpeedMultiplier) { store.walkSpeedMultiplier = $0 }
-                Text(String(format: "%.2fx", walkSpeedMultiplier))
-                    .monospacedDigit()
-                    .frame(width: 48, alignment: .trailing)
-            }
-            HStack {
-                Slider(value: $toyScale, in: 0.5...3.0) { Text(text(.toySizeLabel)) }
-                    .onChange(of: toyScale) { store.toyScale = $0 }
-                Text(String(format: "%.2fx", toyScale))
-                    .monospacedDigit()
-                    .frame(width: 48, alignment: .trailing)
-            }
+    private static func label(for toy: Toy) -> L10nKey {
+        toy.name == ToyCatalogue.wand.name ? .toyWand : .toyPumpkin
+    }
+
+    /// The tile wash behind each toy, taken from the artwork's own colour --
+    /// this panel has no accent colour (see ClientTheme.Colors), and these
+    /// read as "that orange pumpkin" rather than as app branding. A toy added
+    /// to the catalogue without an entry here still gets a tile, just a grey
+    /// one.
+    private static func tint(for toy: Toy) -> Color {
+        switch toy.name {
+        case ToyCatalogue.pumpkin.name: return .orange
+        case ToyCatalogue.wand.name: return .purple
+        default: return .gray
         }
     }
 }

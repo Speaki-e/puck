@@ -36,6 +36,12 @@ enum L10nKey: String, CaseIterable, Hashable {
     case chooseImageButton, choosePanelPrompt
     case customEmotionPlaceholder, addButton
 
+    /// "%1$@ of %2$@ mapped" -- the collapsed emotion list's summary.
+    case mappedCountFormat
+
+    // F15: the agent's API key, entered here rather than in a .env.
+    case agentHeader, apiKeyLabel, apiKeySave, apiKeyClear
+    case apiKeySavedFormat, apiKeySourceFormat, apiKeyMissing, apiKeySaveFailed, apiKeyExplanation
     case installedFormat
     case installedMissingRecommendedFormat
     case failedToInstallFormat
@@ -109,6 +115,23 @@ enum Strings {
         .customEmotionPlaceholder: [.english: "Custom emotion name", .korean: "사용자 지정 감정 이름"],
         .addButton: [.english: "Add", .korean: "추가"],
 
+        .mappedCountFormat: [
+            .english: "%1$@ of %2$@ mapped",
+            .korean: "%2$@개 중 %1$@개 매핑됨",
+        ],
+
+        .agentHeader: [.english: "Agent", .korean: "에이전트"],
+        .apiKeyLabel: [.english: "OpenAI API key", .korean: "OpenAI API 키"],
+        .apiKeySave: [.english: "Save", .korean: "저장"],
+        .apiKeyClear: [.english: "Remove", .korean: "삭제"],
+        .apiKeySavedFormat: [.english: "Saved to %1$@", .korean: "%1$@에 저장했어요"],
+        .apiKeySourceFormat: [.english: "In use, from %1$@", .korean: "사용 중 — 출처: %1$@"],
+        .apiKeyMissing: [.english: "No key set — the pet can't run commands yet.", .korean: "키가 없어요 — 아직 명령을 수행할 수 없습니다."],
+        .apiKeySaveFailed: [.english: "Couldn't write the key file.", .korean: "키 파일을 저장하지 못했어요."],
+        .apiKeyExplanation: [
+            .english: "Stored in a .env file readable only by you. An OPENAI_API_KEY environment variable, or a .env next to the project, takes precedence over this field.",
+            .korean: "본인만 읽을 수 있는 .env 파일에 저장됩니다. 환경변수 OPENAI_API_KEY나 프로젝트 폴더의 .env가 있으면 그쪽이 우선합니다.",
+        ],
         .installedFormat: [.english: "Installed '%1$@'.", .korean: "'%1$@' 설치 완료."],
         .installedMissingRecommendedFormat: [
             .english: "Installed '%1$@' — missing recommended clips (falls back to idle): %2$@",

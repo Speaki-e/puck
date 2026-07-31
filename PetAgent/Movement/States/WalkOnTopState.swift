@@ -37,6 +37,16 @@ final class WalkOnTopState: StateHandler {
         guard !oneShot.hasFired else { return }
 
         guard let window = WindowSupport.supportingWindow(under: context.body.position, in: context.windows) else {
+            // Logged because this is the one transition whose cause is
+            // invisible from the outside: the pet just drops, and whether that
+            // was "the window closed" (correct) or "the window list stopped
+            // reporting the window it is standing on" (a bug) cannot be told
+            // apart by watching. ClimbHandoffTests covers the geometry; this
+            // covers the live data those tests can't see.
+            let nearby = context.windows.prefix(6).map {
+                "[\(Int($0.frame.minX))..\(Int($0.frame.maxX)) top=\(Int($0.frame.minY)) \($0.ownerName)]"
+            }.joined(separator: " ")
+            AppLogger.shared.log(.warning, "WalkOnTop fell: pet=(\(Int(context.body.position.x)),\(Int(context.body.position.y))) windows=\(context.windows.count) \(nearby)")
             oneShot.fire(.fall, using: context.requestTransition)
             return
         }

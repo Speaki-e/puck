@@ -55,6 +55,7 @@
     "chatter_hide_and_seek": "sounds/hide-and-seek.wav",
     "chatter_mopping": "sounds/mopping.wav",
     "chatter_yay_yay": "sounds/yay-yay.wav",
+    "app_launch": "sounds/yay-yay-single.wav",
     "task_success": "sounds/yay.wav",
     "task_fail": "sounds/i-tried-hard.wav",
     "listen_start": "sounds/speaki-speaki.wav"

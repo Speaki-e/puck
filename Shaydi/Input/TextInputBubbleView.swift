@@ -14,15 +14,29 @@ import AppKit
 
 final class TextInputBubbleView: NSView {
     private let textField = NSTextField()
+    private let attachButton = NSButton()
+    private let thumbnailView = NSImageView()
     private var isShowingMessage = false
+    /// Toggled between the two, depending on whether a thumbnail is showing
+    /// -- see configureAttachmentViews().
+    private var textFieldLeadingWithoutThumbnail: NSLayoutConstraint!
+    private var textFieldLeadingWithThumbnail: NSLayoutConstraint!
 
     var onSubmit: ((String) -> Void)?
     var onCancel: (() -> Void)?
+    /// F14 (2026-08-01): the attach button was clicked -- the caller owns
+    /// actually running the capture (ScreenRegionCapture) and protocol
+    /// Attachment types; this view only ever shows/hides a thumbnail image.
+    var onAttachRequested: (() -> Void)?
+    /// The thumbnail itself is the remove control -- clicking it drops the
+    /// pending attachment, no separate close button needed.
+    var onRemoveAttachment: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         installBackground()
         configureTextField()
+        configureAttachmentViews()
     }
 
     /// Real Liquid Glass on macOS 26 (the AppKit side of the same gate
@@ -102,10 +116,12 @@ final class TextInputBubbleView: NSView {
         textField.maximumNumberOfLines = 0
         textField.alignment = .center
         textField.stringValue = text
+        attachButton.isHidden = true
         window?.makeFirstResponder(nil)
     }
 
-    /// Back to the editable input field.
+    /// Back to the editable input field. Fresh session, fresh state -- no
+    /// attachment carries over from whatever the bubble last showed.
     func showInput() {
         isShowingMessage = false
         textField.isEditable = true
@@ -115,6 +131,8 @@ final class TextInputBubbleView: NSView {
         textField.lineBreakMode = .byTruncatingTail
         textField.maximumNumberOfLines = 1
         textField.alignment = .natural
+        attachButton.isHidden = false
+        setAttachmentThumbnail(nil)
         textField.stringValue = ""
         window?.makeFirstResponder(textField)
     }
@@ -151,11 +169,77 @@ final class TextInputBubbleView: NSView {
         textField.delegate = self
         textField.translatesAutoresizingMaskIntoConstraints = false
         addSubview(textField)
+        textFieldLeadingWithoutThumbnail = textField.leadingAnchor.constraint(
+            equalTo: leadingAnchor, constant: Self.horizontalInset
+        )
         NSLayoutConstraint.activate([
-            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
-            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),
+            textFieldLeadingWithoutThumbnail,
             textField.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
+    }
+
+    /// F14 (2026-08-01, byeolki: "마우스 드래그를 통해서 캡쳐 후
+    /// attachments를 삽입할 수 있도록"): a trailing capture button, and a
+    /// leading thumbnail that only appears once something's been captured --
+    /// hidden by default so the panel stays the same plain single line it
+    /// was before this.
+    private func configureAttachmentViews() {
+        attachButton.bezelStyle = .regularSquare
+        attachButton.isBordered = false
+        attachButton.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "화면 영역 캡처")
+        attachButton.imageScaling = .scaleProportionallyUpOrDown
+        attachButton.contentTintColor = .secondaryLabelColor
+        attachButton.target = self
+        attachButton.action = #selector(handleAttachButton)
+        attachButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(attachButton)
+
+        thumbnailView.isHidden = true
+        thumbnailView.imageScaling = .scaleProportionallyUpOrDown
+        thumbnailView.wantsLayer = true
+        thumbnailView.layer?.cornerRadius = 6
+        thumbnailView.layer?.masksToBounds = true
+        thumbnailView.translatesAutoresizingMaskIntoConstraints = false
+        let removeGesture = NSClickGestureRecognizer(target: self, action: #selector(handleRemoveAttachment))
+        thumbnailView.addGestureRecognizer(removeGesture)
+        addSubview(thumbnailView)
+
+        textFieldLeadingWithThumbnail = textField.leadingAnchor.constraint(
+            equalTo: thumbnailView.trailingAnchor, constant: Self.horizontalInset / 2
+        )
+
+        NSLayoutConstraint.activate([
+            attachButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),
+            attachButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            attachButton.widthAnchor.constraint(equalToConstant: 22),
+            attachButton.heightAnchor.constraint(equalToConstant: 22),
+            textField.trailingAnchor.constraint(equalTo: attachButton.leadingAnchor, constant: -Self.horizontalInset / 2),
+
+            thumbnailView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
+            thumbnailView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            thumbnailView.widthAnchor.constraint(equalToConstant: Self.thumbnailSize),
+            thumbnailView.heightAnchor.constraint(equalToConstant: Self.thumbnailSize),
+        ])
+    }
+
+    static let thumbnailSize: CGFloat = 40
+
+    @objc private func handleAttachButton() {
+        onAttachRequested?()
+    }
+
+    @objc private func handleRemoveAttachment() {
+        onRemoveAttachment?()
+    }
+
+    /// The caller (AppDelegate) calls this once a capture completes (or is
+    /// removed) -- the view has no opinion on when that happens, only how to
+    /// show the result.
+    func setAttachmentThumbnail(_ image: NSImage?) {
+        thumbnailView.image = image
+        thumbnailView.isHidden = image == nil
+        textFieldLeadingWithoutThumbnail.isActive = image == nil
+        textFieldLeadingWithThumbnail.isActive = image != nil
     }
 
     /// Hardcoded Korean, like the "워크스페이스가 꺼져 있어요" notice this same

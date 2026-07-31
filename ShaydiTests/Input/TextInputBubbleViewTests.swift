@@ -102,4 +102,55 @@ final class TextInputBubbleViewTests: XCTestCase {
 
         XCTAssertEqual(submitted, "테스트 돌려줘")
     }
+
+    // MARK: - F14 attachment capture (2026-08-01)
+
+    func test_attachButton_firesOnAttachRequested() throws {
+        let view = makeView()
+        var requested = false
+        view.onAttachRequested = { requested = true }
+
+        let button = try XCTUnwrap(view.subviews.compactMap { $0 as? NSButton }.first)
+        button.performClick(nil)
+
+        XCTAssertTrue(requested)
+    }
+
+    func test_setAttachmentThumbnail_showsAndHidesTheThumbnail() throws {
+        let view = makeView()
+        let thumbnail = try XCTUnwrap(view.subviews.compactMap { $0 as? NSImageView }.first)
+        XCTAssertTrue(thumbnail.isHidden, "no attachment yet")
+
+        let image = NSImage(size: NSSize(width: 4, height: 4))
+        view.setAttachmentThumbnail(image)
+        XCTAssertFalse(thumbnail.isHidden)
+        XCTAssertEqual(thumbnail.image, image)
+
+        view.setAttachmentThumbnail(nil)
+        XCTAssertTrue(thumbnail.isHidden)
+    }
+
+    func test_clickingTheThumbnail_firesOnRemoveAttachment() throws {
+        let view = makeView()
+        view.setAttachmentThumbnail(NSImage(size: NSSize(width: 4, height: 4)))
+
+        var removed = false
+        view.onRemoveAttachment = { removed = true }
+
+        let thumbnail = try XCTUnwrap(view.subviews.compactMap { $0 as? NSImageView }.first)
+        let gesture = try XCTUnwrap(thumbnail.gestureRecognizers.first as? NSClickGestureRecognizer)
+        _ = NSApp.sendAction(try XCTUnwrap(gesture.action), to: gesture.target, from: gesture)
+
+        XCTAssertTrue(removed)
+    }
+
+    func test_showInput_resetsAnyPreviousAttachment() throws {
+        let view = makeView()
+        view.setAttachmentThumbnail(NSImage(size: NSSize(width: 4, height: 4)))
+
+        view.showInput()
+
+        let thumbnail = try XCTUnwrap(view.subviews.compactMap { $0 as? NSImageView }.first)
+        XCTAssertTrue(thumbnail.isHidden)
+    }
 }

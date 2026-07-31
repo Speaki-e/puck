@@ -5,7 +5,13 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 930 passing (`xcodebuild test`) · **`main`:** `f130381`
+**Last updated:** 2026-08-01 · **Tests:** 932 passing (`xcodebuild test`) · **`main`:** `fc546bb`
+
+**2026-08-01: an on/off switch for the notch, in Settings.** byeolki: "다이내믹 아일랜드 끄고 킬 수 있는 버튼 추가해줘."
+
+- `SettingsStore.isNotchEnabled` (new, defaults to true) follows the same live-callback pattern as volume/mute/walk-speed (`onNotchEnabledChanged`) rather than the plain poll-at-next-tick pattern movement options use -- the notch is a persistent `NSWindow` `AppDelegate` owns, so turning it off has to tear that window down immediately, not just skip creating it next launch.
+- `AppDelegate.setNotchEnabled(_:)`: off calls `NotchWindowController.stop()`; back on rebuilds a fresh `NotchView` from the toy box's current state and starts again -- same `NotchWindowController` instance throughout, so this isn't a second window class or a parallel code path.
+- New row in Settings' General section, right above Accessibility.
 
 **2026-08-01: a boring.notch-style Dynamic Island, with toy-summon buttons behind the expand.** byeolki: "boring notch처럼 일반적인 다이내믹 아일랜드를 다는데, 이 일반적인 다이내믹 아일랜드를 펼치면 toy를 소환 시킬 수 있는 버튼이 생기게 해줘." Generic, not tied to an actual camera notch -- it's a small floating pill pinned to the top-center of the main screen on every Mac, notch or no notch.
 

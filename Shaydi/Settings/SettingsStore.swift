@@ -25,6 +25,7 @@ final class SettingsStore {
         static let characterSummon = "Shaydi.hotkey.characterSummon"
         static let toySummon1 = "Shaydi.hotkey.toySummon1"
         static let toySummon2 = "Shaydi.hotkey.toySummon2"
+        static let isNotchEnabled = "Shaydi.isNotchEnabled"
         static let hasRequestedAccessibility = "Shaydi.hasRequestedAccessibility"
     }
 
@@ -45,6 +46,10 @@ final class SettingsStore {
     /// separate SwiftUI hierarchy from Settings, so it needs its own signal to
     /// pick up a live appearance change instead of only reading it at open time.
     var onAppearanceChanged: ((AppAppearance) -> Void)?
+    /// The notch (2026-08-01) is a persistent NSWindow AppDelegate owns, not
+    /// something SettingsView can start/stop directly -- this is how turning
+    /// it off in Settings actually tears the window down immediately.
+    var onNotchEnabledChanged: ((Bool) -> Void)?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -86,6 +91,17 @@ final class SettingsStore {
     var avoidClimbingFocusedWindow: Bool {
         get { defaults.object(forKey: Keys.avoidClimbingFocusedWindow) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.avoidClimbingFocusedWindow) }
+    }
+
+    /// On by default -- the notch is meant to always be there, like the
+    /// real menu bar. byeolki, 2026-08-01: "다이내믹 아일랜드 끄고 킬 수
+    /// 있는 버튼 추가해줘".
+    var isNotchEnabled: Bool {
+        get { defaults.object(forKey: Keys.isNotchEnabled) as? Bool ?? true }
+        set {
+            defaults.set(newValue, forKey: Keys.isNotchEnabled)
+            onNotchEnabledChanged?(newValue)
+        }
     }
 
     /// Multiplies MovementSolver.walkSpeed for Walk/Climb/WalkOnTop/MoveTo/

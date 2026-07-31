@@ -47,6 +47,7 @@ struct SettingsView: View {
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
     @State private var avoidClimbingFocusedWindow: Bool
+    @State private var isNotchEnabled: Bool
     @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
     @State private var toysOut: Set<String>
@@ -84,6 +85,7 @@ struct SettingsView: View {
         _isMuted = State(initialValue: store.isMuted)
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
+        _isNotchEnabled = State(initialValue: store.isNotchEnabled)
         _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
         _toyScale = State(initialValue: store.toyScale)
         _toysOut = State(initialValue: initialToysOut)
@@ -285,6 +287,14 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .onChange(of: appearance) { store.appearance = $0 }
+            }
+            // byeolki, 2026-08-01: "다이내믹 아일랜드 끄고 킬 수 있는 버튼
+            // 추가해줘" -- the toy-summon pill at the top of the screen.
+            SettingsRow(label: text(.notchEnabledLabel)) {
+                Toggle("", isOn: $isNotchEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: isNotchEnabled) { store.isNotchEnabled = $0 }
             }
             SettingsRow(label: text(.accessibilityLabel)) {
                 Text(AccessibilityPermission.isTrusted(prompt: false) ? text(.accessibilityGranted) : text(.accessibilityNotGranted))

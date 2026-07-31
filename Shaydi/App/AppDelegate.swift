@@ -275,13 +275,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// states.
     private func setUpNotch() {
         let controller = NotchWindowController()
+        notchWindowController = controller
+        settingsStore.onNotchEnabledChanged = { [weak self] isEnabled in self?.setNotchEnabled(isEnabled) }
+        if settingsStore.isNotchEnabled {
+            startNotch()
+        }
+    }
+
+    private func startNotch() {
+        guard let controller = notchWindowController else { return }
         let view = NotchView(
             initialToysOut: toyBox?.outToyNames ?? [],
             onToggleToy: { [weak self] toy in self?.toggleToy(toy) ?? [] },
             onExpandedChanged: { [weak controller] isExpanded in controller?.setExpanded(isExpanded) }
         )
         controller.start(contentView: NSHostingView(rootView: view))
-        notchWindowController = controller
+    }
+
+    /// Settings' toggle (byeolki, 2026-08-01: "다이내믹 아일랜드 끄고 킬 수
+    /// 있는 버튼 추가해줘") -- turning it off tears the window down
+    /// immediately rather than just skipping it on the next launch.
+    private func setNotchEnabled(_ isEnabled: Bool) {
+        guard let controller = notchWindowController else { return }
+        if isEnabled {
+            guard controller.window == nil else { return }
+            startNotch()
+        } else {
+            controller.stop()
+        }
     }
 
     // MARK: - Overlay + avatar (F1/F2/F3/F5)

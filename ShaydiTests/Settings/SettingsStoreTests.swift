@@ -48,6 +48,20 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(SettingsStore(defaults: defaults).avoidClimbingFocusedWindow)
     }
 
+    func test_isNotchEnabled_defaultsToTrue() {
+        XCTAssertTrue(SettingsStore(defaults: defaults).isNotchEnabled)
+    }
+
+    func test_settingIsNotchEnabled_firesOnNotchEnabledChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: Bool?
+        store.onNotchEnabledChanged = { received = $0 }
+
+        store.isNotchEnabled = false
+
+        XCTAssertEqual(received, false)
+    }
+
     func test_speechRecognitionLocaleIdentifier_defaultsToSystemLocale() {
         XCTAssertEqual(
             SettingsStore(defaults: defaults).speechRecognitionLocaleIdentifier,

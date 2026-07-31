@@ -31,6 +31,9 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case avoidClimbingLabel, speedLabel, toySizeLabel, toyPumpkin, toyWand
 
+    /// The top-of-screen notch/Dynamic Island (2026-08-01).
+    case notchEnabledLabel
+
     case avatarsHeader, importAvatarButton, importPanelPrompt
     case sizeHeader
     case emotionsHeader, emotionsExplanation, mappedLabel, notMappedLabel
@@ -102,6 +105,8 @@ enum Strings {
         .toySizeLabel: [.english: "Toy size", .korean: "장난감 크기"],
         .toyPumpkin: [.english: "Pumpkin", .korean: "호박"],
         .toyWand: [.english: "Wand", .korean: "지팡이"],
+
+        .notchEnabledLabel: [.english: "Dynamic Island", .korean: "다이내믹 아일랜드"],
 
         .avatarsHeader: [.english: "Avatars", .korean: "아바타"],
         .importAvatarButton: [.english: "Import Avatar Package…", .korean: "아바타 패키지 가져오기…"],

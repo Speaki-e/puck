@@ -22,7 +22,7 @@ final class ClientWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
-        title = "Shaydi"
+        title = AppIdentity.displayName
         isReleasedWhenClosed = false
         applyGlassChrome()
         delegate = self

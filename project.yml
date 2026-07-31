@@ -92,6 +92,7 @@ targets:
       - path: Shaydi/Bridge/BridgeSocketClient.swift
       - path: Shaydi/Bridge/UserInputSender.swift
       - path: Shaydi/App/CompanionAppLauncher.swift
+      - path: Shaydi/App/AppIdentity.swift
     info:
       path: ShaydiAgent/Resources/Info.plist
       properties:

@@ -51,7 +51,7 @@ final class MenuBarController {
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Shaydi")
+        statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: AppIdentity.displayName)
         statusItem.button?.target = self
         statusItem.button?.action = #selector(handleClick)
         // Left click alone triggers the button's action by default -- this

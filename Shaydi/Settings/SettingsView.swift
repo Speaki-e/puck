@@ -122,7 +122,7 @@ struct SettingsView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 22, height: 22)
-            Text("Shaydi")
+            Text(AppIdentity.displayName)
                 .font(ClientTheme.Typography.workspaceName)
             Spacer(minLength: 0)
         }

@@ -49,7 +49,7 @@ struct ToolExecutionLogLine: Encodable {
 final class ToolExecutionLogger: ToolExecutionLogging {
     static let defaultLogDirectory: URL = {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shaydi", isDirectory: true)
+            .appendingPathComponent(AppIdentity.applicationSupportDirectoryName, isDirectory: true)
             .appendingPathComponent("logs", isDirectory: true)
     }()
 

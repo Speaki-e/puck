@@ -70,7 +70,9 @@ final class TextInputBubbleView: NSView {
     /// Spotlight's panel proportions -- wide, one row tall, softly rounded.
     static let panelSize = CGSize(width: 640, height: 64)
     static let cornerRadius: CGFloat = 20
-    private static let horizontalInset: CGFloat = 20
+    static let horizontalInset: CGFloat = 20
+    /// Only used for speech sizing; the input panel's height is fixed.
+    static let verticalInset: CGFloat = 12
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
@@ -83,13 +85,22 @@ final class TextInputBubbleView: NSView {
         window?.makeFirstResponder(textField)
     }
 
-    /// Read-only notice mode — used for F6's "워크스페이스 꺼져있음" and, later,
-    /// agent_done summaries (EventReaction.bubbleText). Nothing can be typed
-    /// or submitted while a notice is showing.
+    /// Read-only notice mode — F6's "워크스페이스 꺼져있음", agent_done
+    /// summaries, the mute sulk. Nothing can be typed while a notice shows.
+    ///
+    /// This is the pet *speaking*, so it drops the Spotlight typography: the
+    /// bar's 24pt single line is right for a capture field the user is aiming
+    /// at, and wrong for a bubble the size of a sentence sitting over a
+    /// character's head (byeolki, 2026-07-31: "말풍선이 펫한테서 나오게").
     func showMessage(_ text: String) {
         isShowingMessage = true
         textField.isEditable = false
         textField.isSelectable = false
+        textField.font = Self.speechFont
+        textField.usesSingleLineMode = false
+        textField.lineBreakMode = .byWordWrapping
+        textField.maximumNumberOfLines = 0
+        textField.alignment = .center
         textField.stringValue = text
         window?.makeFirstResponder(nil)
     }
@@ -99,8 +110,35 @@ final class TextInputBubbleView: NSView {
         isShowingMessage = false
         textField.isEditable = true
         textField.isSelectable = true
+        textField.font = Self.inputFont
+        textField.usesSingleLineMode = true
+        textField.lineBreakMode = .byTruncatingTail
+        textField.maximumNumberOfLines = 1
+        textField.alignment = .natural
         textField.stringValue = ""
         window?.makeFirstResponder(textField)
+    }
+
+    /// Big enough to be the only thing in the Spotlight panel.
+    static let inputFont = NSFont.systemFont(ofSize: 24, weight: .regular)
+    /// Speech is read at a glance beside the pet, not aimed at.
+    static let speechFont = NSFont.systemFont(ofSize: 15, weight: .regular)
+
+    /// A speech bubble is the size of what was said. Wraps past
+    /// `speechMaxWidth` rather than growing into another Spotlight bar.
+    static let speechMaxWidth: CGFloat = 300
+
+    static func speechSize(for text: String) -> CGSize {
+        let available = speechMaxWidth - horizontalInset * 2
+        let bounds = (text as NSString).boundingRect(
+            with: CGSize(width: available, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: speechFont]
+        )
+        return CGSize(
+            width: min(speechMaxWidth, ceil(bounds.width) + horizontalInset * 2),
+            height: max(44, ceil(bounds.height) + verticalInset * 2)
+        )
     }
 
     private func configureTextField() {
@@ -108,7 +146,7 @@ final class TextInputBubbleView: NSView {
         textField.drawsBackground = false
         textField.focusRingType = .none
         // Big enough to be the only thing in the panel, like Spotlight's.
-        textField.font = .systemFont(ofSize: 24, weight: .regular)
+        textField.font = Self.inputFont
         textField.placeholderString = Self.placeholder
         textField.delegate = self
         textField.translatesAutoresizingMaskIntoConstraints = false

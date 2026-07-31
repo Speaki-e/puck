@@ -130,7 +130,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var stateBeforeListen: StateHandler?
 
     private var menuBarController: MenuBarController?
-    private var settingsWindow: NSWindow?
     private var textInputBubbleWindow: TextInputBubbleWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -219,14 +218,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     private func setUpMenuBar() {
         let menuBar = MenuBarController()
-        menuBar.onOpenSettings = { [weak self] in self?.showSettingsWindow() }
-        menuBar.onSwitchAvatar = { [weak self] in self?.showAvatarManagementWindow() }
-        menuBar.onOpenClient = { [weak self] in self?.openClientApp() }
-        menuBar.onToggleToy = { [weak self] toy in self?.toggleToy(toy) }
-        menuBar.onToggleVisibility = { [weak self] in self?.toggleCharacterVisibility() }
-        menuBar.onQuit = { NSApplication.shared.terminate(nil) }
-        menuBar.applyLanguage(settingsStore.language)
+        menuBar.makePopoverContent = { [weak self] in self?.makeSettingsPanel() }
         menuBarController = menuBar
+    }
+
+    /// The panel the status item drops (byeolki, 2026-07-31: "이 설정 이거
+    /// 위에 아이콘 누르면 바로 나오게"). Rebuilt per open so it reflects live
+    /// state -- which toys are out, whether the pet is hidden, whether
+    /// Accessibility has been granted since last time.
+    private func makeSettingsPanel() -> NSViewController {
+        let view = SettingsView(
+            store: settingsStore,
+            onAvatarScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) },
+            initialToysOut: toyBox?.outToyNames ?? [],
+            onToggleToy: { [weak self] toy in self?.toggleToy(toy) ?? [] },
+            initialIsCharacterHidden: isCharacterHidden,
+            onOpenClient: { [weak self] in
+                // Closed first: the client app comes forward, and leaving the
+                // panel floating over it reads as a stuck window.
+                self?.menuBarController?.closePopover()
+                self?.openClientApp()
+            },
+            onToggleVisibility: { [weak self] in self?.toggleCharacterVisibility() },
+            onQuit: { NSApplication.shared.terminate(nil) }
+        )
+        return NSHostingController(rootView: view)
     }
 
     /// byeolki's request, 2026-07-29: hide/show the pet without quitting the
@@ -242,41 +258,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
                 window.orderFrontRegardless()
             }
         }
-        menuBarController?.setVisibilityLabel(isHidden: isCharacterHidden)
-    }
-
-    /// Settings and avatar management used to be two separate windows
-    /// reachable from two separate menu items -- merged into one tabbed
-    /// window (byeolki's UI/UX redesign request, 2026-07-29). "Switch
-    /// Avatar…" now just opens this same window on the Avatar tab instead of
-    /// a second one.
-    private func showSettingsWindow(initialTab: SettingsView.Tab = .general) {
-        let view = SettingsView(
-            store: settingsStore,
-            initialTab: initialTab,
-            onAvatarScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) }
-        )
-        if let window = settingsWindow, let hosting = window.contentViewController as? NSHostingController<SettingsView> {
-            // Re-set rather than just re-showing the cached window: this is
-            // the only way to move an already-open window to a different
-            // initial tab (e.g. Settings is open on Sound, then "Switch
-            // Avatar…" is clicked).
-            hosting.rootView = view
-        } else {
-            let hostingController = NSHostingController(rootView: view)
-            let newWindow = NSWindow(contentViewController: hostingController)
-            newWindow.title = Strings.text(.settingsWindowTitle, settingsStore.language)
-            // Same chrome as ClientWindow (part of the Liquid Glass pass,
-            // 2026-07-31) -- one shared definition, see applyGlassChrome().
-            newWindow.applyGlassChrome()
-            settingsWindow = newWindow
-        }
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    private func showAvatarManagementWindow() {
-        showSettingsWindow(initialTab: .avatar)
     }
 
     // MARK: - Overlay + avatar (F1/F2/F3/F5)
@@ -359,13 +340,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
         settingsStore.onWalkSpeedMultiplierChanged = { [weak self] multiplier in
             self?.characterController?.walkSpeed = MovementSolver.walkSpeed * multiplier
-        }
-        // byeolki: "한국어 언어모드도 만들어주고" -- the menu bar's NSMenu
-        // titles are plain strings set once at construction, unlike SwiftUI's
-        // live-recomputed body, so they need an explicit push on change.
-        settingsStore.onLanguageChanged = { [weak self] language in
-            self?.menuBarController?.applyLanguage(language)
-            self?.settingsWindow?.title = Strings.text(.settingsWindowTitle, language)
         }
         // autoMuteOnFocus existed as a setting with nothing acting on it --
         // FocusModeObserver was implemented but never instantiated anywhere.
@@ -766,6 +740,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// Walks the pet over to a freshly launched app's window (M-1's visible
     /// half). The window doesn't exist the instant the app launches, so F4's
     /// list is polled briefly rather than read once.
+    /// The pet's "there you go" -- fired before the app opens, so the window
+    /// coming up half a second later looks like the pet did it (byeolki,
+    /// 2026-07-31: "약간 이 펫이 켜주는 느낌을 내고 싶은데").
+    ///
+    /// Point, not a bespoke state: it is the gesture the pet already uses for
+    /// "look at this", and the arm is up for the whole lead-in rather than for
+    /// one frame the way a jump alone would be. The jump rides on top of it
+    /// for the flourish, and `app_launch` is the sound protocol section 6
+    /// reserved for exactly this moment and nothing had ever played.
+    private func performSummonGesture() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.applyEventReaction(EventReaction(
+                stateTransition: .point,
+                sfxKey: "app_launch",
+                jump: true,
+                emotion: "excited"
+            ))
+        }
+    }
+
     private func sendPetToWindow(ownedBy pid: pid_t, attemptsRemaining: Int = 20) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             guard let self, let controller = self.characterController else { return }
@@ -990,6 +985,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         let executor = ToolExecutor(logger: ToolExecutionLogger())
         let launchApp = LaunchAppHandler()
+        launchApp.onLaunchRequested = { [weak self] in self?.performSummonGesture() }
         launchApp.onAppLaunched = { [weak self] pid in self?.sendPetToWindow(ownedBy: pid) }
         executor.register(launchApp)
         executor.register(ListRunningAppsHandler())
@@ -1086,12 +1082,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private func showNoticeBubble(_ message: String, for duration: TimeInterval, onExpire: (() -> Void)? = nil) {
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
-        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
-        bubbleWindow.onDismiss = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleView.onCancel = { bubbleWindow.closeAndYieldFocus() }
+        // Cleared, not reassigned: onDismiss fires from resignKey, and speech
+        // never takes key in the first place. Left pointing at an input
+        // session's dismissal it would also unpin the pet out from under a
+        // notice.
+        bubbleWindow.onDismiss = nil
         bubbleView.showMessage(message)
-        bubbleWindow.showAndActivate()
+        // Sized and placed *after* showMessage, which is what decides the
+        // typography the size is measured from.
+        anchorBubbleToPet(bubbleWindow, size: TextInputBubbleView.speechSize(for: message))
+        bubbleWindow.showSpeech()
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak bubbleWindow] in
-            bubbleWindow?.closeAndRestoreFocus()
+            bubbleWindow?.closeAndYieldFocus()
             onExpire?()
         }
     }
@@ -1197,11 +1200,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         hotkeyManager = manager
     }
 
+    /// Hands a command to whatever can act on it.
+    ///
+    /// F15 (2026-07-31): that now includes PetAgentClient, because the agent
+    /// moved there. Mirroring to the gui used to be the text bubble's private
+    /// business -- one line in submitFromInputBubble, purely so the client
+    /// window could *display* what was typed. Every input goes there now, and
+    /// for the same reason a voice command previously reached nothing: the
+    /// only listener it had was a workspace process that does not exist.
     private func sendUserInput(text: String, source: UserInput.Source) {
-        switch userInputSender.send(text: text, source: source) {
-        case .sent:
-            break
-        case .workspaceDisconnected:
+        let message = BridgeMessage.userInput(UserInput(text: text, source: source))
+        let reachedClient = bridgeServer?.send(message, to: .gui) == true
+        // Still offered to a workspace as well: if one ever attaches, the
+        // protocol 3.3 channel is still its way in, and delivering to both is
+        // harmless while only the client acts.
+        let reachedWorkspace = userInputSender.send(text: text, source: source) == .sent
+
+        guard !reachedClient else { return }
+        // Held rather than dropped -- PetAgentClient is launched alongside the
+        // pet (CompanionAppLauncher) and is most likely still connecting.
+        pendingClientMirror = message
+        if !reachedWorkspace {
             // F6: tell the user why nothing happened. Re-opening the input
             // bubble here (what this used to do) just looped — typing again
             // reopened it again, and the input was never delivered.
@@ -1216,17 +1235,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// or quitting that window changes nothing here -- it's a separate
     /// process, and the pet doesn't observe its presence.
     private func submitFromInputBubble(_ text: String) {
-        sendUserInput(text: text, source: .text)
+        // Brought up first so the window is on its way while the text is
+        // delivered; sendUserInput queues it if the connection isn't up yet.
         openClientApp()
-
-        let mirror = BridgeMessage.userInput(UserInput(text: text, source: .text))
-        if bridgeServer?.send(mirror, to: .gui) != true {
-            // PetAgentClient wasn't running (openClientApp just launched it,
-            // or it is still reconnecting) -- hold the text until its
-            // connection shows up, or it would be dropped silently and the
-            // window would open empty.
-            pendingClientMirror = mirror
-        }
+        sendUserInput(text: text, source: .text)
     }
 
     /// Flushed by BridgeServer.onGUIPresenceChanged; only ever the most
@@ -1291,6 +1303,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private func showWorkspaceOfflineBubble() {
         showNoticeBubble("워크스페이스가 꺼져 있어요", for: 2.5)
     }
+
+    /// Puts the bubble over the pet's head, so what it says comes from it
+    /// rather than from the middle of the screen (byeolki, 2026-07-31:
+    /// "말풍선이 펫한테서 나오게").
+    ///
+    /// Only speech does this. The Option+Shift+Space input panel stays where
+    /// Spotlight puts itself -- it is a capture field the user aims at, it is
+    /// 640pt wide, and byeolki asked for that look specifically ("이거
+    /// spotlight 느낌으로 만들어줘", 2026-07-30).
+    ///
+    /// `wasMovedByUser` is deliberately ignored: a bubble the user once
+    /// dragged is still the pet's speech, and leaving it parked where the pet
+    /// no longer is defeats the whole point.
+    private func anchorBubbleToPet(_ bubbleWindow: TextInputBubbleWindow, size: CGSize) {
+        bubbleWindow.setContentSize(size)
+
+        guard
+            let window = primaryWindow,
+            let screen = window.screen ?? NSScreen.main,
+            let body = characterBody
+        else {
+            return
+        }
+
+        let petPoint = globalAppKitPoint(fromWindowLocal: body.position, window: window)
+        // body.position is the pet's ground point, so its head is a hitbox up
+        // from there -- in AppKit's bottom-left space, up is +y.
+        let headY = petPoint.y + avatarHitboxSize.height
+        var origin = CGPoint(x: petPoint.x - size.width / 2, y: headY + Self.speechBubbleGap)
+
+        // Clamped, because a pet in a corner would otherwise put half its
+        // speech off the screen. Vertically it flips below the pet instead of
+        // being shoved down over its head.
+        let frame = screen.visibleFrame
+        origin.x = min(max(origin.x, frame.minX + 8), frame.maxX - size.width - 8)
+        if origin.y + size.height > frame.maxY - 8 {
+            origin.y = petPoint.y - size.height - Self.speechBubbleGap
+        }
+        origin.y = max(origin.y, frame.minY + 8)
+
+        bubbleWindow.setFrameOrigin(NSPoint(x: origin.x, y: origin.y))
+    }
+
+    /// Close enough to read as attached, far enough not to cover the pet.
+    private static let speechBubbleGap: CGFloat = 8
 
     private func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
         guard let screen = primaryWindow?.screen ?? NSScreen.main else { return nil }
@@ -1451,13 +1508,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// whatever's below it (F4's landing-surface logic, same as Fall), or
     /// takes it away if it was already out (byeolki: "그걸 눌러서
     /// 나오게하고 다시 눌러서 없애는", 2026-07-30).
-    private func toggleToy(_ toy: Toy) {
-        guard let box = toyBox else { return }
+    /// Returns the toys that are out afterwards -- the settings window's toy
+    /// grid seeds itself from the same answer the menu bar gets, so the two
+    /// switches for one toy box can't drift apart.
+    @discardableResult
+    private func toggleToy(_ toy: Toy) -> Set<String> {
+        guard let box = toyBox else { return [] }
         box.toggle(toy, at: windowLocalPoint(fromGlobalAppKit: NSEvent.mouseLocation))
         // Handing the pet a toy on purpose beats its break -- being ignored
         // right after clicking the menu just reads as broken.
         toyPlayEndedAt = nil
         // From what's actually out, not from what the toggle was asked to do.
-        menuBarController?.setToysOut(box.outToyNames)
+        return box.outToyNames
     }
 }

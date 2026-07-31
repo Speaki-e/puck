@@ -79,6 +79,11 @@ targets:
           - Resources/PetAgentClient.entitlements
       - path: PetAgent/ClientWindow
       - path: PetAgent/Localization
+      # F15 (2026-07-31): the agent loop. Compiled into this app, not
+      # PetAgent -- the pet executes tools, the client decides which ones.
+      - path: PetAgent/Agent
+      - path: PetAgent/Tools/ToolRegistry.swift
+      - path: PetAgent/Tools/ToolTimeouts.swift
       - path: PetAgent/Resources/Assets.xcassets
       - path: PetAgent/Bridge/BridgeMessages.swift
       - path: PetAgent/Bridge/JSONValue.swift

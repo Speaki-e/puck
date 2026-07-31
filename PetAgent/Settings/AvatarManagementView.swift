@@ -36,55 +36,67 @@ struct AvatarManagementView: View {
 
     private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
 
-    // Sections are GlassCards in the shared glass vocabulary (2026-07-31,
-    // byeolki: "전체적인 ui를 리퀴드 글라스 느낌으로"). No ScrollView of its
-    // own -- SettingsView scrolls every tab.
+    // Plain SettingsSections, not cards (2026-07-31, byeolki: "pokopet
+    // 설정창과 비슷하게") -- the window's panel is the only surface. No
+    // ScrollView of its own; SettingsView scrolls the whole column.
     var body: some View {
-        VStack(spacing: ClientTheme.Metrics.spacingMedium) {
-            GlassCard(title: text(.avatarsHeader)) {
-                Button(text(.importAvatarButton)) { importAvatar() }
-                    .glassButton()
+        VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
+            SettingsSection(title: text(.avatarsHeader)) {
+                SettingsActionRow(label: text(.importAvatarButton), systemImage: "square.and.arrow.down") {
+                    importAvatar()
+                }
                 if !reportMessage.isEmpty {
                     Text(reportMessage)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 }
-            }
-
-            GlassCard(title: text(.sizeHeader)) {
-                HStack {
-                    Slider(value: $scale, in: 0.25...3.0) { Text(text(.sizeHeader)) }
-                        .labelsHidden()
+                SettingsStackedRow(label: text(.sizeHeader), value: String(format: "%.2fx", scale)) {
+                    Slider(value: $scale, in: 0.25...3.0)
                         .onChange(of: scale) { applyScale($0) }
-                    Text(String(format: "%.2fx", scale))
-                        .monospacedDigit()
-                        .frame(width: 48, alignment: .trailing)
                 }
             }
 
-            GlassCard(title: text(.emotionsHeader)) {
+            SettingsSection(title: text(.emotionsHeader)) {
                 Text(text(.emotionsExplanation))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
-                ForEach(emotionKeys, id: \.self) { emotion in
-                    HStack {
-                        Text(emotion)
-                        Spacer()
-                        Text(mappedEmotions.contains(emotion) ? text(.mappedLabel) : text(.notMappedLabel))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Button(text(.chooseImageButton)) { chooseEmotionImage(for: emotion) }
+                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+                // Collapsed by default: the shipped avatar maps sixteen
+                // emotions, and sixteen always-open rows pushed the toy grid
+                // and every other section off the bottom of the window --
+                // the opposite of the compact reference this was matched to.
+                DisclosureGroup {
+                    VStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                        ForEach(emotionKeys, id: \.self) { emotion in
+                            SettingsRow(label: emotion) {
+                                Text(mappedEmotions.contains(emotion) ? text(.mappedLabel) : text(.notMappedLabel))
+                                    .font(.caption)
+                                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                                Button(text(.chooseImageButton)) { chooseEmotionImage(for: emotion) }
+                                    .controlSize(.small)
+                            }
+                        }
+                        HStack {
+                            TextField(text(.customEmotionPlaceholder), text: $newEmotionName)
+                                .textFieldStyle(.roundedBorder)
+                            Button(text(.addButton)) { addCustomEmotion() }
+                                .controlSize(.small)
+                                .disabled(newEmotionName.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                     }
+                    .padding(.top, ClientTheme.Metrics.spacingSmall)
+                } label: {
+                    Text(String(format: text(.mappedCountFormat), "\(mappedEmotions.count)", "\(emotionKeys.count)"))
+                        .font(ClientTheme.Typography.sessionTitle)
                 }
-                HStack {
-                    TextField(text(.customEmotionPlaceholder), text: $newEmotionName)
-                    Button(text(.addButton)) { addCustomEmotion() }
-                        .disabled(newEmotionName.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 if !emotionMessage.isEmpty {
                     Text(emotionMessage)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 }
             }
         }

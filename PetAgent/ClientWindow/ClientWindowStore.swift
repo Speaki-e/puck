@@ -30,6 +30,18 @@ final class ClientWindowStore: ObservableObject {
     private var sessionsByKey: [SessionKey: ChatSession] = [:]
     private var sessionOrder: [SessionKey] = []
 
+    /// F15 (2026-07-31): set when an agent runs in this process, which it now
+    /// does -- see AgentHost. A command then goes straight to it instead of
+    /// out as user_input, since user_input exists to hand the command to
+    /// *workspace's* agent and there is no workspace. Left nil in tests and
+    /// wherever no agent is attached, in which case the old socket path
+    /// stands.
+    var onUserCommand: ((_ text: String, _ workspaceId: String, _ sessionId: String) -> Void)?
+    /// Same reason: approval is resolved inside this process, not by a
+    /// workspace on the far side of the socket.
+    var onApprovalResolved: ((_ approvalId: String, _ approved: Bool) -> Void)?
+    var onRunCancelled: (() -> Void)?
+
     @Published private(set) var workspaces: [ClientWorkspace]
     @Published var activeWorkspaceId: String
     @Published var activeSessionId: String
@@ -125,7 +137,14 @@ final class ClientWindowStore: ObservableObject {
     /// Routes through whichever workspace/session is currently active.
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
-        sender.send(text: text, source: source, workspaceId: activeWorkspaceId, sessionId: activeSessionId, attachments: attachments)
+        if let onUserCommand {
+            onUserCommand(text, activeWorkspaceId, activeSessionId)
+            // Not `.workspaceDisconnected`: the agent is right here, so the
+            // "워크스페이스가 꺼져 있어요" banner would be a lie even though no
+            // workspace is connected.
+            return .sent
+        }
+        return sender.send(text: text, source: source, workspaceId: activeWorkspaceId, sessionId: activeSessionId, attachments: attachments)
     }
 
     /// Shows text the user typed *somewhere else* (pet-app's quick-capture
@@ -152,11 +171,19 @@ final class ClientWindowStore: ObservableObject {
     @discardableResult
     func respondToPendingApproval(in session: ChatSession, approved: Bool) -> UserInputDelivery? {
         guard let approvalId = session.pendingApproval?.approvalId else { return nil }
+        if let onApprovalResolved {
+            onApprovalResolved(approvalId, approved)
+            return .sent
+        }
         return sender.respondToApproval(approvalId: approvalId, approved: approved)
     }
 
     @discardableResult
     func cancelActiveRun() -> UserInputDelivery {
-        sender.cancelRun(sessionId: activeSessionId)
+        if let onRunCancelled {
+            onRunCancelled()
+            return .sent
+        }
+        return sender.cancelRun(sessionId: activeSessionId)
     }
 }

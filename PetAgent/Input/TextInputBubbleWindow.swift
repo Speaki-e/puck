@@ -92,6 +92,26 @@ final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
         }
     }
 
+    /// Shows the bubble as the pet *speaking*: visible, but it never becomes
+    /// key and never activates PetAgent.
+    ///
+    /// showAndActivate() is wrong for speech in both directions. Taking focus
+    /// interrupts whatever the user is typing for the sake of a message they
+    /// only need to read — and worse, it made speech invisible in practice:
+    /// `resignKey` dismisses this window, and a background LSUIElement app
+    /// that activates while another app is frontmost loses key almost
+    /// immediately, so the bubble closed in the same breath it opened.
+    func showSpeech() {
+        alphaValue = 0
+        // Regardless: PetAgent is .accessory and usually not the active app,
+        // which is exactly when the pet has something to say.
+        orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            animator().alphaValue = 1
+        }
+    }
+
     /// Hides the bubble *without* restoring focus -- for submit, where focus
     /// is about to go to PetAgentClient's window instead of back to the app
     /// the user invoked the bubble from (2026-07-30).

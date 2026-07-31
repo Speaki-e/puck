@@ -131,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     private var menuBarController: MenuBarController?
     private var textInputBubbleWindow: TextInputBubbleWindow?
+    private var notchWindowController: NotchWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Only ever one pet: a second launch (double-click, or a Debug build
@@ -155,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         setUpMenuBar()
         setUpOverlayAndAvatar()
+        setUpNotch()
         setUpWindowSensing()
         setUpToolExecutor()
         setUpBridgeServer()
@@ -172,6 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // recycles that PID onto any live process, start() refuses forever with
         // .alreadyRunning and nothing tells the user which file to delete.
         frameClock.stop()
+        notchWindowController?.stop()
         hotkeyManager?.stop()
         voiceInputController?.pushToTalkUp()
         bridgeServer?.stop()
@@ -259,6 +262,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
                 window.orderFrontRegardless()
             }
         }
+    }
+
+    // MARK: - Notch (boring.notch-style toy summon, 2026-08-01)
+
+    /// A generic top-of-screen "Dynamic Island", present on every Mac
+    /// regardless of whether it actually has a camera notch -- byeolki:
+    /// "boring notch처럼 일반적인 다이내믹 아일랜드를 다는데, 이 일반적인
+    /// 다이내믹 아일랜드를 펼치면 toy를 소환 시킬 수 있는 버튼이 생기게
+    /// 해줘." Reuses toggleToy(_:) verbatim -- a summon from the notch and a
+    /// toggle from the Settings toy grid can't leave ToyBox in different
+    /// states.
+    private func setUpNotch() {
+        let controller = NotchWindowController()
+        let view = NotchView(
+            initialToysOut: toyBox?.outToyNames ?? [],
+            onToggleToy: { [weak self] toy in self?.toggleToy(toy) ?? [] },
+            onExpandedChanged: { [weak controller] isExpanded in controller?.setExpanded(isExpanded) }
+        )
+        controller.start(contentView: NSHostingView(rootView: view))
+        notchWindowController = controller
     }
 
     // MARK: - Overlay + avatar (F1/F2/F3/F5)

@@ -82,8 +82,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: AppAppearance.crossProcessChangeNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
-            self?.applyAppearance(self?.currentAppearance() ?? .system)
+        ) { [weak self] notification in
+            // byeolki, 2026-08-01: "셰이디에이전트에는 테마 변경에 대한 적용이
+            // 안됨" -- re-reading Shaydi's UserDefaults domain here raced
+            // against whether that write had actually propagated by the time
+            // this notification arrived. The value now travels with the
+            // notification itself; re-reading UserDefaults is only the
+            // fallback for a notification that somehow arrived without one.
+            let appearance = AppAppearance.resolved(fromCrossProcessUserInfo: notification.userInfo)
+                ?? self?.currentAppearance()
+                ?? .system
+            self?.applyAppearance(appearance)
         }
     }
 

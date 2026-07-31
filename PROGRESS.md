@@ -5,7 +5,13 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 949 passing (`xcodebuild test`) · **`main`:** `e895d00`
+**Last updated:** 2026-08-01 · **Tests:** 951 passing (`xcodebuild test`) · **`main`:** `aae88c0`
+
+**2026-08-01: fixed a real race in the cross-process theme sync landed earlier today.** byeolki: "셰이디에이전트에는 테마 변경에 대한 적용이 안됨."
+
+- Root cause: ShaydiAgent's `DistributedNotificationCenter` observer re-read Shaydi's `UserDefaults` domain (`UserDefaults(suiteName: AppIdentity.shaydiBundleID)`) every time the notification fired. `UserDefaults.set()` isn't guaranteed to have propagated to cfprefsd -- the daemon that actually serves that read to a second process -- by the time a distributed notification posted immediately afterward is delivered and handled. Confirmed by hand: posting the notification with `userInfo` alone, *without* ever writing the new value to `UserDefaults` at all, still changed ShaydiAgent's live theme -- proving the old code's dependency on that write having already landed was the failure mode.
+- Fix: `AppAppearance.crossProcessUserInfo`/`resolved(fromCrossProcessUserInfo:)` (new) carry the actual value inside the notification itself. ShaydiAgent's observer now reads the value straight off the notification, falling back to the `UserDefaults` read only if a notification somehow arrives with none -- the live-update path no longer depends on cross-process `UserDefaults` visibility timing at all. The `UserDefaults` read stays as ShaydiAgent's own launch-time seed, where there's no race (Shaydi's prior writes are long since flushed by then).
+- Verified by hand: posted the exact notification a real appearance change would send, with `userInfo: ["appearance": "light"]` and the on-disk value deliberately left at `"dark"` -- ShaydiAgent's client window switched to light anyway, then restored to dark the same way.
 
 **2026-08-01: avatars switch live like presets, and the package format is now explained in-app.** byeolki: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고, 아바타 패키지 형태도 사용자에게 알려줘야함."
 

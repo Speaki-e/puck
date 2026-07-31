@@ -12,7 +12,7 @@
 
 import AppKit
 
-final class TextInputBubbleView: NSVisualEffectView {
+final class TextInputBubbleView: NSView {
     private let textField = NSTextField()
     private var isShowingMessage = false
 
@@ -21,29 +21,50 @@ final class TextInputBubbleView: NSVisualEffectView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        // Spotlight's own look, as closely as AppKit gives it for free
-        // (byeolki: "이거 spotlight 느낌으로 만들어줘", 2026-07-30): one wide
-        // translucent slab holding one line of large text, and nothing else --
-        // the leading glyph this had at first just read as clutter ("그 왼쪽에
-        // 띄운 이상한 심볼 삭제", 2026-07-30).
-        material = .hudWindow
-        blendingMode = .behindWindow
-        state = .active
-        wantsLayer = true
-        layer?.cornerRadius = Self.cornerRadius
-        layer?.masksToBounds = true
-        // A layer corner radius rounds the CONTENTS; the behind-window blur is
-        // drawn to the view's own shape and stayed a full rectangle, so the
-        // panel read as a rounded box sitting on a square backdrop (byeolki:
-        // "완전 직사각형 배경 위에 둥근 사각형이 나온듯한 느낌", 2026-07-30).
-        // Only maskImage reshapes the blur itself.
-        maskImage = Self.roundedMask(radius: Self.cornerRadius)
-        // The hairline that keeps the panel from dissolving into a light
-        // desktop -- Spotlight has one, and without it the blur alone leaves
-        // no edge at all over pale backgrounds.
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
+        installBackground()
         configureTextField()
+    }
+
+    /// Real Liquid Glass on macOS 26 (the AppKit side of the same gate
+    /// GlassSurface applies in SwiftUI), the Spotlight-style vibrant slab it
+    /// always had before that. The background is a sibling *below* the text
+    /// field, not its superview -- the field stays a direct subview so
+    /// first-responder wiring and tests keep finding it in `subviews`.
+    private func installBackground() {
+        let background: NSView
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            glass.cornerRadius = Self.cornerRadius
+            background = glass
+        } else {
+            // Spotlight's own look, as closely as AppKit gives it for free
+            // (byeolki: "이거 spotlight 느낌으로 만들어줘", 2026-07-30): one wide
+            // translucent slab holding one line of large text, and nothing else --
+            // the leading glyph this had at first just read as clutter ("그 왼쪽에
+            // 띄운 이상한 심볼 삭제", 2026-07-30).
+            let effect = NSVisualEffectView()
+            effect.material = .hudWindow
+            effect.blendingMode = .behindWindow
+            effect.state = .active
+            effect.wantsLayer = true
+            effect.layer?.cornerRadius = Self.cornerRadius
+            effect.layer?.masksToBounds = true
+            // A layer corner radius rounds the CONTENTS; the behind-window blur is
+            // drawn to the view's own shape and stayed a full rectangle, so the
+            // panel read as a rounded box sitting on a square backdrop (byeolki:
+            // "완전 직사각형 배경 위에 둥근 사각형이 나온듯한 느낌", 2026-07-30).
+            // Only maskImage reshapes the blur itself.
+            effect.maskImage = Self.roundedMask
+            // The hairline that keeps the panel from dissolving into a light
+            // desktop -- Spotlight has one, and without it the blur alone leaves
+            // no edge at all over pale backgrounds.
+            effect.layer?.borderWidth = 1
+            effect.layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
+            background = effect
+        }
+        background.frame = bounds
+        background.autoresizingMask = [.width, .height]
+        addSubview(background)
     }
 
     /// Spotlight's panel proportions -- wide, one row tall, softly rounded.
@@ -105,8 +126,10 @@ final class TextInputBubbleView: NSVisualEffectView {
 
     /// A rounded rectangle just big enough to hold both corners, stretched
     /// across whatever size the panel ends up -- the cap insets keep the
-    /// corners crisp instead of scaling them with the panel.
-    private static func roundedMask(radius: CGFloat) -> NSImage {
+    /// corners crisp instead of scaling them with the panel. Rendered once:
+    /// a fresh bubble view is built per show, and the mask never varies.
+    private static let roundedMask: NSImage = {
+        let radius = cornerRadius
         let side = radius * 2 + 1
         let image = NSImage(size: CGSize(width: side, height: side), flipped: false) { rect in
             NSColor.black.setFill()
@@ -116,7 +139,7 @@ final class TextInputBubbleView: NSVisualEffectView {
         image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
         image.resizingMode = .stretch
         return image
-    }
+    }()
 }
 
 extension TextInputBubbleView: NSTextFieldDelegate {

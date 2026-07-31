@@ -47,6 +47,11 @@ final class CharacterController {
     /// Refreshed from F4 every frame by the bootstrap wiring.
     var windows: () -> [WindowInfo] = { [] }
 
+    /// The unprompted "가끔씩" voice line while the pet is standing around.
+    /// Ticked only in Idle -- see IdleChatter. Its keys are filled in at
+    /// bootstrap from the avatar's own sounds table.
+    let idleChatter = IdleChatter()
+
     /// A state asking to be replaced. Applied after update() returns so a
     /// state never swaps itself out mid-frame.
     private var pendingTransition: StateKind?
@@ -65,7 +70,12 @@ final class CharacterController {
 
     func register(_ state: StateHandler, as kind: StateKind) {
         states[kind] = state
+        if kind == .idle { idleState = state }
     }
+
+    /// Cached at register time -- update(dt:) asks "is the pet idle?" every
+    /// frame, and the answer never changes after bootstrap.
+    private var idleState: StateHandler?
 
     /// Transition by kind — how states and EventRouter reactions ask, since
     /// neither holds concrete instances.
@@ -102,6 +112,13 @@ final class CharacterController {
         )
         currentState.update(dt: dt, context: context)
 
+        // Idle only: a line dropped mid-walk or mid-tool-run reads as the pet
+        // talking over itself, and the timer running down while it's busy
+        // would make one land the instant it settles.
+        if currentState === idleState, let key = idleChatter.tick(dt: dt) {
+            sfxPlayer.trigger(key, loop: false)
+        }
+
         // The backstop for "펫이 화면 밖으로 나가지 못하게": states that bounce
         // (Fall) or clamp deliberately have already had their say, and this
         // catches every other route out of the screen — a drag carried past
@@ -125,10 +142,10 @@ final class CharacterController {
             body.isUpsideDown = false
         }
         body.play(clip: currentState.clipKey, loop: currentState.loopsClip)
-        // Use clipKey (e.g. "walk"), not name (e.g. "Walk") — the manifest sounds
-        // table is keyed by lowercase clip/event names (protocol section 6), so
-        // triggering with the capitalized FSM state name would never match.
-        sfxPlayer.trigger(currentState.clipKey, loop: currentState.loopsClip)
+        // Use soundKey (defaults to clipKey, e.g. "walk"), not name (e.g. "Walk")
+        // — the manifest sounds table is keyed by lowercase clip/event names
+        // (protocol section 6), so the capitalized FSM state name never matches.
+        sfxPlayer.trigger(currentState.soundKey, loop: currentState.loopsSound)
         currentState.enter()
     }
 }

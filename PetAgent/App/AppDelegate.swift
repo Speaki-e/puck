@@ -134,6 +134,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var textInputBubbleWindow: TextInputBubbleWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Only ever one pet: a second launch (double-click, or a Debug build
+        // next to an installed copy -- same bundle id either way) quits
+        // itself instead of stacking a second character and menu bar item.
+        // Not under XCTest -- the test runner hosts this same app, and the
+        // guard tripping on an already-running pet kills the whole test run.
+        let processInfo = ProcessInfo.processInfo
+        let isHostingTests = processInfo.environment["XCTestSessionIdentifier"] != nil
+        let peers = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.speaki-e.PetAgent")
+        if !isHostingTests, peers.contains(where: { $0.processIdentifier != processInfo.processIdentifier }) {
+            NSApp.terminate(nil)
+            return
+        }
+
         requestPermissions()
 
         // byeolki: "둘이 같이 가야하는거임" -- PetAgentClient (the F13 client
@@ -253,6 +266,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             let hostingController = NSHostingController(rootView: view)
             let newWindow = NSWindow(contentViewController: hostingController)
             newWindow.title = Strings.text(.settingsWindowTitle, settingsStore.language)
+            // Same chrome as ClientWindow (part of the Liquid Glass pass,
+            // 2026-07-31) -- one shared definition, see applyGlassChrome().
+            newWindow.applyGlassChrome()
             settingsWindow = newWindow
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
@@ -324,7 +340,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         avatar.setScreenPosition(initialPosition)
         self.avatar = avatar
 
-        let sfxPlayer = SFXPlayer(soundTable: SoundTable(avatarDirectory: avatarDirectory, sounds: loadResult.manifest.sounds))
+        let soundTable = SoundTable(avatarDirectory: avatarDirectory, sounds: loadResult.manifest.sounds)
+        let sfxPlayer = SFXPlayer(soundTable: soundTable)
         sfxPlayer.volume = settingsStore.volume
         sfxPlayer.isMuted = settingsStore.isMuted
         self.sfxPlayer = sfxPlayer
@@ -332,7 +349,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // Previously copied once at launch only -- Settings' Volume/Mute
         // toggles had no live effect on a running session until restart.
         settingsStore.onVolumeChanged = { [weak sfxPlayer] volume in sfxPlayer?.volume = volume }
-        settingsStore.onMuteChanged = { [weak sfxPlayer] isMuted in sfxPlayer?.isMuted = isMuted }
+        settingsStore.onMuteChanged = { [weak self, weak sfxPlayer] isMuted in
+            sfxPlayer?.isMuted = isMuted
+            guard isMuted else { return }
+            self?.showMutedComplaint()
+        }
         settingsStore.onToyScaleChanged = { [weak self] scale in
             self?.toyBox?.updateScale(scale)
         }
@@ -376,6 +397,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         ] {
             controller.register(state, as: kind)
         }
+        controller.idleChatter.keys = soundTable.keys(withPrefix: "chatter_")
         controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
         controller.avatarHeight = avatarHitboxSize.height
         controller.walkSpeed = MovementSolver.walkSpeed * settingsStore.walkSpeedMultiplier
@@ -1052,19 +1074,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// comment already anticipated this exact use, found via spec
     /// cross-check), same pattern as showWorkspaceOfflineBubble.
     private func showAgentSummaryBubble(_ summary: String) {
-        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
-
-        // Reassigned every time, not just set once: the bubble window is
-        // shared, so an input session's dismissal (which unpins the pet) would
-        // otherwise still be attached when a notice shows.
-        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
-        bubbleWindow.onDismiss = { bubbleWindow.closeAndRestoreFocus() }
-        bubbleView.showMessage(summary)
-        bubbleWindow.showAndActivate()
         // Longer than the 2.5s "workspace offline" notice -- a summary is
         // meant to actually be read, not just glanced at.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak bubbleWindow] in
+        showNoticeBubble(summary, for: 5.0)
+    }
+
+    /// The one timed-notice path (agent summary, workspace offline, mute
+    /// sulk). Both handlers are reassigned on every show, not just set once:
+    /// the bubble window is shared, so an input session's dismissal (which
+    /// unpins the pet) would otherwise still be attached when a notice shows.
+    private func showNoticeBubble(_ message: String, for duration: TimeInterval, onExpire: (() -> Void)? = nil) {
+        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
+
+        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleWindow.onDismiss = { bubbleWindow.closeAndRestoreFocus() }
+        bubbleView.showMessage(message)
+        bubbleWindow.showAndActivate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak bubbleWindow] in
             bubbleWindow?.closeAndRestoreFocus()
+            onExpire?()
+        }
+    }
+
+    /// How long the pet sulks about being muted.
+    private static let mutedComplaintDuration: TimeInterval = 2
+
+    /// byeolki (2026-07-31): muting the pet mid-session gets a sulk -- the
+    /// angry face plus "제 목소리가 시끄러우신거에요?" for two seconds.
+    ///
+    /// It has to be a bubble rather than a line: the complaint is *about*
+    /// being muted, so playing it as audio is the one thing that can't work.
+    ///
+    /// Only on mute going ON, and only from the Settings toggle -- Focus's
+    /// auto-mute (which sets SFXPlayer directly, not the store) isn't the
+    /// user telling the pet to be quiet, so it doesn't get sulked at.
+    private func showMutedComplaint() {
+        guard let controller = characterController else { return }
+
+        // Front and centre, hanging in mid-air: wherever the pet happened to
+        // be, it drops what it was doing and gets in the way (byeolki: "강제로
+        // 펫을 화면의 중앙으로 가져와서", 2026-07-31). Pinned is what holds it
+        // there -- it runs no locomotion and no gravity, so the pet stays put
+        // for exactly as long as the complaint lasts.
+        moveCharacter(to: CGPoint(x: controller.roamableArea.midX, y: controller.roamableArea.midY))
+        // pinCharacter, not a raw .pinned transition -- it owns the
+        // stateBeforePin bookkeeping, so a hotkey pin overlapping the sulk
+        // can't corrupt that pairing. Transition first, then the emotion:
+        // entering a state plays that state's own clip, which would otherwise
+        // wipe the angry face immediately.
+        pinCharacter()
+        avatar?.showEmotion("angry")
+
+        showNoticeBubble("제 목소리가 시끄러우신거에요?", for: Self.mutedComplaintDuration) { [weak self] in
+            // Falling is also what puts the face back: entering Fall plays the
+            // fall clip, so the sulk ends without anyone having to remember
+            // which expression the pet was wearing before it. The pin
+            // bookkeeping is discarded rather than restored -- resuming a
+            // pre-sulk walk in mid-air would be wrong.
+            self?.stateBeforePin = nil
+            self?.characterController?.transition(to: .fall)
         }
     }
 
@@ -1221,15 +1289,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선".
     private func showWorkspaceOfflineBubble() {
-        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
-
-        bubbleView.onCancel = { bubbleWindow.closeAndRestoreFocus() }
-        bubbleWindow.onDismiss = { bubbleWindow.closeAndRestoreFocus() }
-        bubbleView.showMessage("워크스페이스가 꺼져 있어요")
-        bubbleWindow.showAndActivate()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak bubbleWindow] in
-            bubbleWindow?.closeAndRestoreFocus()
-        }
+        showNoticeBubble("워크스페이스가 꺼져 있어요", for: 2.5)
     }
 
     private func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
@@ -1265,13 +1325,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // isn't wired up here yet. For now this just re-centers the pet on
         // the primary display, standing on the ground.
         guard let window = primaryWindow else { return }
-        let position = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
-        // Through characterBody (see handleWindowsRebuilt's comment) so the
-        // frame-loop's hitbox tracking and any in-flight movement state stay
-        // consistent with where the pet actually renders.
-        characterBody?.position = position
+        moveCharacter(to: GroundedSpawnPosition.position(in: groundAwareSize(of: window)))
+    }
+
+    /// Teleports the pet -- through characterBody (see handleWindowsRebuilt's
+    /// comment) so the frame loop's hitbox tracking and any in-flight
+    /// movement state stay consistent with where the pet actually renders.
+    private func moveCharacter(to windowLocalPoint: CGPoint) {
+        guard let window = primaryWindow else { return }
+        characterBody?.position = windowLocalPoint
         clickThroughController?.updateCharacter(
-            screenPosition: globalAppKitPoint(fromWindowLocal: position, window: window),
+            screenPosition: globalAppKitPoint(fromWindowLocal: windowLocalPoint, window: window),
             hitboxSize: avatarHitboxSize
         )
     }
@@ -1377,6 +1441,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             petBounds: characterBody?.visualBounds ?? .zero
         )
         juggleBallState.style = toy.play
+        juggleBallState.toyName = toy.name
         controller.transition(to: .chaseBall)
     }
 

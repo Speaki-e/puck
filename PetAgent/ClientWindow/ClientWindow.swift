@@ -24,12 +24,7 @@ final class ClientWindow: NSWindow {
         )
         title = "PetAgent"
         isReleasedWhenClosed = false
-        // Lets the sidebar's own background run up under the traffic lights
-        // instead of a separate gray title bar strip -- the plain-titlebar
-        // look was part of what read as "default macOS settings pane"
-        // (byeolki: "맥 기본 설정창처럼 생겼네").
-        titlebarAppearsTransparent = true
-        titleVisibility = .hidden
+        applyGlassChrome()
         delegate = self
     }
 
@@ -42,5 +37,18 @@ final class ClientWindow: NSWindow {
 extension ClientWindow: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         onWillClose?()
+    }
+}
+
+extension NSWindow {
+    /// The house window chrome (client window, settings window): content runs
+    /// up under a transparent titlebar so the view's own vibrant background
+    /// reaches the traffic lights, instead of a separate gray titlebar strip
+    /// -- the plain-titlebar look was part of what read as "default macOS
+    /// settings pane" (byeolki: "맥 기본 설정창처럼 생겼네").
+    func applyGlassChrome() {
+        styleMask.insert(.fullSizeContentView)
+        titlebarAppearsTransparent = true
+        titleVisibility = .hidden
     }
 }

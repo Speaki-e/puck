@@ -45,15 +45,21 @@ struct ChatView: View {
                     guard let lastId = session.timeline.last?.id else { return }
                     withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
                 }
-            }
+                // safeAreaInset, not a VStack row below the scroll view: the
+                // transcript has to scroll *under* the glass capsule for the
+                // refraction to be visible at all.
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: 0) {
+                        if let pending = session.pendingApproval {
+                            ApprovalBanner(summary: pending.summary) { approved in
+                                store.respondToPendingApproval(in: session, approved: approved)
+                            }
+                        }
 
-            if let pending = session.pendingApproval {
-                ApprovalBanner(summary: pending.summary) { approved in
-                    store.respondToPendingApproval(in: session, approved: approved)
+                        inputBar
+                    }
                 }
             }
-
-            inputBar
         }
     }
 
@@ -78,6 +84,7 @@ struct ChatView: View {
                 } else {
                     Button(action: send) {
                         Image(systemName: "arrow.up")
+                            .fontWeight(.semibold)
                             .foregroundStyle(.primary)
                             .padding(7)
                             .glassControl(in: Circle())

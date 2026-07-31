@@ -13,13 +13,12 @@
 import SwiftUI
 
 enum ClientTheme {
-    /// **No accent color** -- byeolki (2026-07-30): "포인트 색상을 일단
-    /// 삭제". The lime #A2E048 that used to fill the user bubble, the send
-    /// button, selected rows and the approve button is gone; what those
-    /// surfaces are made of now is Liquid Glass (see GlassSurface), and what
-    /// distinguishes them is elevation and weight rather than hue. The only
-    /// colors left are semantic status ones (a failed tool result has to be
-    /// red whatever the palette is).
+    /// **No accent color** -- byeolki tried lime #A2E048 (deleted
+    /// 2026-07-30), then a pumpkin accent, then removed that too
+    /// (2026-07-31: "그냥 포인터 컬러 제거해줘"). Surfaces are Liquid Glass
+    /// (see GlassSurface) and what distinguishes them is elevation and
+    /// weight rather than hue. The only colors left are semantic status
+    /// ones (a failed tool result has to be red whatever the palette is).
     enum Colors {
         /// Sidebar/toolbar chrome uses VisualEffectBackground (real
         /// NSVisualEffectView vibrancy), not a flat color here -- a flat

@@ -20,4 +20,11 @@ struct SoundTable: Equatable {
         guard let relativePath = sounds[key] else { return nil }
         return avatarDirectory.appendingPathComponent(relativePath)
     }
+
+    /// Every mapped key starting with `prefix`, sorted so the set is stable
+    /// across launches. IdleChatter uses this to find out which chatter lines
+    /// this particular avatar carries instead of the app naming them itself.
+    func keys(withPrefix prefix: String) -> [String] {
+        sounds.keys.filter { $0.hasPrefix(prefix) }.sorted()
+    }
 }

@@ -81,6 +81,9 @@ final class SFXPlayer: SFXTriggering {
     /// Called when the active avatar changes (its sounds table differs).
     func updateSoundTable(_ soundTable: SoundTable) {
         self.soundTable = soundTable
+        // The old avatar's decoded audio is dead weight now; its URLs will
+        // never be asked for again.
+        bufferCache.removeAll()
     }
 
     func trigger(_ key: String, loop: Bool) {
@@ -105,17 +108,29 @@ final class SFXPlayer: SFXTriggering {
         }
     }
 
+    /// Decoded once per file, then reused. trigger() runs on the frame loop
+    /// (state entries, idle chatter), and a cold file open plus a full PCM
+    /// decode on every fall/land/click does not fit a 16ms frame budget.
+    private var bufferCache: [URL: AVAudioPCMBuffer] = [:]
+
     private func play(url: URL, loop: Bool, node: AVAudioPlayerNode) {
+        guard let buffer = buffer(for: url) else { return }
+        node.stop()
+        node.scheduleBuffer(buffer, at: nil, options: loop ? [.loops] : [], completionHandler: nil)
+        node.play()
+    }
+
+    private func buffer(for url: URL) -> AVAudioPCMBuffer? {
+        if let cached = bufferCache[url] { return cached }
         guard
             let file = try? AVAudioFile(forReading: url),
             let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
             (try? file.read(into: buffer)) != nil
         else {
-            return
+            return nil
         }
-        node.stop()
-        node.scheduleBuffer(buffer, at: nil, options: loop ? [.loops] : [], completionHandler: nil)
-        node.play()
+        bufferCache[url] = buffer
+        return buffer
     }
 
     private func fadeOutCurrentLoop() {

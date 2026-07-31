@@ -61,6 +61,27 @@ for app in Shaydi ShaydiAgent; do
     rm -rf "/Applications/$app.app"
     cp -R "$DERIVED/Build/Products/Release/$app.app" /Applications/
 done
+
+# Un-register the copies we just built before deleting them, and any other
+# copy of these bundle ids lying around (Xcode's own DerivedData, earlier runs
+# of this script).
+#
+# Why this matters: LaunchServices indexes every app bundle it sees, keyed by
+# bundle id, and both CompanionAppLauncher and `open -b` ask it -- not us --
+# which copy to launch. Left alone it accumulated 18 registrations pointing at
+# deleted mktemp dirs plus a live Xcode build, and picked whichever it liked:
+# the pet would launch a *stale* client, which is what made a fresh icon look
+# like it hadn't updated at all. /Applications has to be the only answer.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -dump 2>/dev/null \
+        | grep -oE "/[^ ]*/(PetAgent|PetAgentClient)\.app" \
+        | sort -u \
+        | grep -v '^/Applications/' \
+        | while IFS= read -r stale; do "$LSREGISTER" -u "$stale" 2>/dev/null || true; done
+    "$LSREGISTER" -f /Applications/PetAgent.app /Applications/PetAgentClient.app 2>/dev/null || true
+fi
+
 rm -rf "$DERIVED"
 
 open /Applications/Shaydi.app

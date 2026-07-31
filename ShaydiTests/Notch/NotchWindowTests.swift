@@ -25,10 +25,13 @@ final class NotchWindowTests: XCTestCase {
         XCTAssertEqual(window.backgroundColor, .clear)
     }
 
-    func test_floatsAboveNormalWindowsAndJoinsAllSpaces() {
+    // .statusBar, not .floating -- byeolki, 2026-08-01: the real notch sits
+    // AT the menu bar's own stripe, not merely above ordinary app windows.
+    // .statusBar is the level NSStatusItem/menu extras themselves use.
+    func test_floatsAtStatusBarLevelAndJoinsAllSpaces() {
         let window = makeWindow()
 
-        XCTAssertEqual(window.level, .floating)
+        XCTAssertEqual(window.level, .statusBar)
         XCTAssertTrue(window.collectionBehavior.contains(.canJoinAllSpaces))
         XCTAssertTrue(window.collectionBehavior.contains(.stationary))
         XCTAssertTrue(window.collectionBehavior.contains(.fullScreenAuxiliary))

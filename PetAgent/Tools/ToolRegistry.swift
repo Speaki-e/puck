@@ -32,6 +32,9 @@ enum ToolRegistry {
     enum Executor: String {
         case petApp = "pet-app"
         case workspace
+        /// Handled inline by the agent's own loop -- never dispatched over the
+        /// socket, so it has no timeout that means anything.
+        case aiModule = "ai-module"
     }
 
     /// A parameter's JSON type, as it appears in the tool's argument object.
@@ -100,6 +103,13 @@ enum ToolRegistry {
         ]),
         Tool(name: "read_file", executor: .workspace, requiresApproval: false, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
+        ]),
+        // ai-module executor -- branches the casual conversation into a task
+        // session. Never crosses the socket, which is why its registry
+        // timeout is a placeholder 0 rather than a duration.
+        Tool(name: "open_task_session", executor: .aiModule, requiresApproval: false, parameters: [
+            Parameter(name: "title", type: .string, isRequired: true),
+            Parameter(name: "brief", type: .string, isRequired: true),
         ]),
     ]
 

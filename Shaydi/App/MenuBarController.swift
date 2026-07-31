@@ -19,12 +19,28 @@
 
 import AppKit
 
+/// Which action a click on the status item icon performs -- byeolki,
+/// 2026-08-01: "Shaydi를 없애려면 메뉴막대에서 우클릭해서... ShaydiAgent를
+/// 좌클릭하면 나오게". Split so the common case (open the chat) is one
+/// click, while the pet's own controls (toys, hide, quit) sit one click
+/// further behind a right-click, where they don't get hit by accident.
+enum MenuBarClick: Equatable {
+    case openClient
+    case showPanel
+
+    init(eventType: NSEvent.EventType?) {
+        self = eventType == .rightMouseUp ? .showPanel : .openClient
+    }
+}
+
 final class MenuBarController {
     /// Built afresh on every open rather than cached: the panel shows live
     /// state (which toys are out, whether Accessibility has been granted
     /// since last time, the current language), none of which a retained view
     /// would pick up.
     var makePopoverContent: (() -> NSViewController?)?
+    /// Left-click -- opens ShaydiAgent directly, bypassing the panel.
+    var onOpenClient: (() -> Void)?
 
     /// Kept in step with SettingsView's own frame -- the popover and the view
     /// inside it have to agree or the panel opens clipped.
@@ -37,13 +53,25 @@ final class MenuBarController {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Shaydi")
         statusItem.button?.target = self
-        statusItem.button?.action = #selector(togglePopover)
+        statusItem.button?.action = #selector(handleClick)
+        // Left click alone triggers the button's action by default -- this
+        // is what makes routing right-click to the same handler possible.
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         // Closes when the user clicks away, like every other menu bar panel.
         popover.behavior = .transient
     }
 
-    /// Second click on the icon dismisses, matching how a menu behaved.
-    @objc private func togglePopover() {
+    @objc private func handleClick() {
+        switch MenuBarClick(eventType: NSApp.currentEvent?.type) {
+        case .showPanel:
+            togglePopover()
+        case .openClient:
+            onOpenClient?()
+        }
+    }
+
+    /// Second (right) click on the icon dismisses, matching how a menu behaved.
+    private func togglePopover() {
         guard let button = statusItem.button else { return }
         guard !popover.isShown else {
             popover.performClose(nil)

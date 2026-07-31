@@ -53,11 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// A regular Dock-resident app stays running with its Dock icon after
-    /// its one window closes (like Mail, Notes, ...) -- closing the window
-    /// is not the same as quitting.
+    /// byeolki, 2026-08-01: "ShaydiAgent를 끄는 건 그냥 창을 닫아버리든
+    /// 커맨드 큐를 하든 가능한데" -- closing the window quits the app, same
+    /// as Cmd+Q, rather than lingering in the Dock with no window the way
+    /// Mail/Notes do. This never touches Shaydi: CompanionAppLauncher only
+    /// runs at each app's own launch, not on the other's quit.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false
+        true
     }
 
     private func handle(_ message: BridgeMessage) {

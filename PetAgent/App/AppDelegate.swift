@@ -740,6 +740,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// Walks the pet over to a freshly launched app's window (M-1's visible
     /// half). The window doesn't exist the instant the app launches, so F4's
     /// list is polled briefly rather than read once.
+    /// A tool was blocked by a missing permission: put the system's own
+    /// request dialog on screen, and have the pet walk over and ask the user
+    /// to click it (byeolki, 2026-07-31).
+    ///
+    /// Pointing rather than clicking is not a shortcut -- macOS will not let
+    /// any app click a security dialog on the user's behalf, which
+    /// plan/02_pet-app.md F10 records as the hard limit of this whole
+    /// feature. Guiding *is* the interaction.
+    private func guideThroughPermission(deniedFor tool: String) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard PermissionGuidance.shouldGuide(tool: tool, isGranted: { permission in
+                switch permission {
+                case .accessibility: return AccessibilityPermission.isTrusted(prompt: false)
+                }
+            }) != nil else {
+                return
+            }
+            // Debounced: a run that calls find_ui_element three times would
+            // otherwise stack three prompts and three bubbles.
+            guard !self.isGuidingPermission else { return }
+            self.isGuidingPermission = true
+
+            let before = Set(self.overlayLocalWindows(excluding: nil).map(\.windowID))
+            // macOS's own dialog, not one of ours -- it is the only thing that
+            // can actually open the Accessibility pane with us pre-selected.
+            _ = AccessibilityPermission.isTrusted(prompt: true)
+            self.showNoticeBubble(
+                Strings.text(.permissionNeededBubble, self.settingsStore.language),
+                for: Self.permissionGuidanceDuration
+            ) { [weak self] in
+                self?.isGuidingPermission = false
+            }
+            self.pointAtNewWindow(excluding: before, attemptsRemaining: 12)
+        }
+    }
+
+    /// True from the moment guidance starts until its bubble expires.
+    private var isGuidingPermission = false
+
+    /// Long enough to read the request and find the dialog.
+    private static let permissionGuidanceDuration: TimeInterval = 6
+
+    /// Points the pet at whichever window appeared after `known` -- the
+    /// permission dialog, without having to know what macOS names it.
+    ///
+    /// Uses the F4 window list, which reads CGWindowList and needs no
+    /// permission at all. That matters here more than anywhere else in the
+    /// app: this runs precisely when the Accessibility-based lookup
+    /// (find_ui_element) is the thing that just failed.
+    private func pointAtNewWindow(excluding known: Set<CGWindowID>, attemptsRemaining: Int) {
+        guard attemptsRemaining > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self else { return }
+            guard let appeared = self.overlayLocalWindows(excluding: nil).first(where: { !known.contains($0.windowID) }) else {
+                self.pointAtNewWindow(excluding: known, attemptsRemaining: attemptsRemaining - 1)
+                return
+            }
+            self.pointAt(frame: appeared.frame) {}
+        }
+    }
+
     /// The pet's "there you go" -- fired before the app opens, so the window
     /// coming up half a second later looks like the pet did it (byeolki,
     /// 2026-07-31: "약간 이 펫이 켜주는 느낌을 내고 싶은데").
@@ -984,6 +1046,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         guard let windowListWatcher else { return }
 
         let executor = ToolExecutor(logger: ToolExecutionLogger())
+        executor.onPermissionDenied = { [weak self] tool in self?.guideThroughPermission(deniedFor: tool) }
         let launchApp = LaunchAppHandler()
         launchApp.onLaunchRequested = { [weak self] in self?.performSummonGesture() }
         launchApp.onAppLaunched = { [weak self] pid in self?.sendPetToWindow(ownedBy: pid) }

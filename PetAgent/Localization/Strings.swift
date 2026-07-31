@@ -40,6 +40,9 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// "%1$@ of %2$@ mapped" -- the collapsed emotion list's summary.
     case mappedCountFormat
 
+    /// What the pet says when it needs a permission it doesn't have.
+    case permissionNeededBubble
+
     // F15: the agent's API key, entered here rather than in a .env.
     case agentHeader, apiKeyLabel, apiKeySave, apiKeyClear
     case apiKeySavedFormat, apiKeySourceFormat, apiKeyMissing, apiKeySaveFailed, apiKeyExplanation
@@ -119,6 +122,11 @@ enum Strings {
         .mappedCountFormat: [
             .english: "%1$@ of %2$@ mapped",
             .korean: "%2$@개 중 %1$@개 매핑됨",
+        ],
+
+        .permissionNeededBubble: [
+            .english: "I need permission for that — could you allow it in the window I'm pointing at?",
+            .korean: "그거 하려면 권한이 필요해요. 제가 가리키는 창에서 허용해 주세요!",
         ],
 
         .agentHeader: [.english: "Agent", .korean: "에이전트"],

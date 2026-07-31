@@ -25,6 +25,6 @@ scenario at every milestone by Team 1 (강상우 · 박해영).
 - Up through M-A (moving across the screen/windows without a socket), verify
   the socket-independent scenarios first (overlapping-window landing, window
   fall, multi-display, full-screen Space, hotkey conflicts) using the dummy
-  development avatar (`PetAgent/Resources/Avatars/dummy/`).
+  development avatar (`Shaydi/Resources/Avatars/dummy/`).
 - Verify the socket reconnection scenario after P7 (socket server + F11
   executor), at the point of integration with the `workspace` repo.

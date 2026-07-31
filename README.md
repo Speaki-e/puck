@@ -2,7 +2,7 @@
 
 macOS desktop pet app (Swift). Owns pet rendering/movement, the system tool
 executor, and voice/text input. This is the main-app repo of the `Speaki-e`
-project (codename PetAgent); the overall picture lives in
+project (codename Shaydi); the overall picture lives in
 `plan/프로젝트_개요.md`, and this repo's detailed plan is `plan/02_pet-app.md`.
 
 - **Independence principle**: even without a local socket connection to
@@ -40,16 +40,16 @@ merge conflicts).
 
 1. `brew install xcodegen` (if you don't have it).
 2. From the repo root, run `xcodegen generate` — this creates
-   `PetAgent.xcodeproj` and `PetAgent/Resources/Info.plist`.
-3. Open `PetAgent.xcodeproj` in Xcode 15+.
+   `Shaydi.xcodeproj` and `Shaydi/Resources/Info.plist`.
+3. Open `Shaydi.xcodeproj` in Xcode 15+.
 4. Grant the TCC permissions requested on first launch: Accessibility
    (hotkeys/UI inspection/synthetic clicks), microphone, speech recognition,
    Screen Recording (optional, fallback only).
 5. Build and run — it should work immediately with the dummy avatar in
-   `PetAgent/Resources/Avatars/dummy/`, with no socket connection required
+   `Shaydi/Resources/Avatars/dummy/`, with no socket connection required
    (per the M-A milestone).
 6. Running the `workspace` repo alongside it connects them over a local Unix
-   socket (`~/Library/Application Support/PetAgent/bridge.sock`).
+   socket (`~/Library/Application Support/Shaydi/bridge.sock`).
 
 ### Day-to-day: `scripts/install.sh`
 
@@ -62,12 +62,12 @@ until you re-grant it by hand.
 certificate (any free personal team will do; the team ID is read from the
 keychain, or from `DEVELOPMENT_TEAM` if you set it), installs them into
 `/Applications`, and relaunches. The signature is then stable across
-rebuilds: **grant Accessibility once to `/Applications/PetAgent.app`** and
+rebuilds: **grant Accessibility once to `/Applications/Shaydi.app`** and
 every later `./scripts/install.sh` keeps it.
 
 To just build/test from the CLI:
-`xcodebuild -project PetAgent.xcodeproj -scheme PetAgent build` /
-`xcodebuild -project PetAgent.xcodeproj -scheme PetAgent test`.
+`xcodebuild -project Shaydi.xcodeproj -scheme Shaydi build` /
+`xcodebuild -project Shaydi.xcodeproj -scheme Shaydi test`.
 
 ## Stack summary
 

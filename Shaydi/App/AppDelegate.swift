@@ -148,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
 
         requestPermissions()
+        setUpAppearance()
 
         // byeolki: "둘이 같이 가야하는거임" -- ShaydiAgent (the F13 client
         // window, now a separate Dock-resident app) is useless without this
@@ -184,6 +185,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         if let spaceChangeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(spaceChangeObserver)
         }
+    }
+
+    // MARK: - Appearance (light/dark override)
+
+    /// byeolki, 2026-08-01: "테마가 내가 아마 다크모드일텐데, 시스템모드랑
+    /// 다크모드랑 생긴게 다른데?" -- .preferredColorScheme (SettingsView,
+    /// ClientWindowView) only recolors SwiftUI content; NSPopover's own
+    /// chrome and any NSVisualEffectView material follow NSApp.appearance
+    /// instead, which nothing was setting. Seeded here at launch, kept live
+    /// via onAppearanceChanged, and broadcast to ShaydiAgent (a separate
+    /// process with no access to this UserDefaults domain) over
+    /// DistributedNotificationCenter so its client window picks up the same
+    /// override immediately rather than only at its own next launch.
+    private func setUpAppearance() {
+        applyAppKitAppearance(settingsStore.appearance)
+        settingsStore.onAppearanceChanged = { [weak self] appearance in
+            self?.applyAppKitAppearance(appearance)
+            DistributedNotificationCenter.default().postNotificationName(
+                AppAppearance.crossProcessChangeNotification, object: nil, userInfo: nil, deliverImmediately: true
+            )
+        }
+    }
+
+    private func applyAppKitAppearance(_ appearance: AppAppearance) {
+        NSApp.appearance = appearance.nsApplicationAppearance
     }
 
     // MARK: - Permissions

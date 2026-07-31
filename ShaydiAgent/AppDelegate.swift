@@ -23,12 +23,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self?.bridgeClient.broadcast(message) ?? false
     })
     private var window: ClientWindow?
+    private var appearanceObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // byeolki: "둘이 같이 가야하는거임" -- launching either app brings up
         // the other, since this app is useless without Shaydi hosting
         // bridge.sock on the other end.
         CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.shaydiBundleID)
+
+        setUpAppearance()
 
         bridgeClient.onMessage = { [weak self] message in
             DispatchQueue.main.async { self?.handle(message) }
@@ -60,6 +63,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// runs at each app's own launch, not on the other's quit.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+
+    // MARK: - Appearance (light/dark override)
+
+    /// byeolki, 2026-08-01: "테마가 내가 아마 다크모드일텐데, 시스템모드랑
+    /// 다크모드랑 생긴게 다른데?" -- ClientWindowStore.appearance used to
+    /// have a doc comment claiming AppDelegate seeded/kept it live from
+    /// SettingsStore, but nothing here ever actually did that: this process
+    /// has no SettingsStore of its own (it would drag in HotkeyBindings and
+    /// everything else that class depends on for one setting), so it reads
+    /// Shaydi's UserDefaults domain directly and listens for the
+    /// DistributedNotificationCenter broadcast Shaydi's own AppDelegate
+    /// posts whenever the setting changes.
+    private func setUpAppearance() {
+        applyAppearance(currentAppearance())
+        appearanceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: AppAppearance.crossProcessChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyAppearance(self?.currentAppearance() ?? .system)
+        }
+    }
+
+    private func currentAppearance() -> AppAppearance {
+        let raw = UserDefaults(suiteName: AppIdentity.shaydiBundleID)?.string(forKey: AppAppearance.defaultsKey)
+        return AppAppearance.resolved(fromDefaultsValue: raw)
+    }
+
+    private func applyAppearance(_ appearance: AppAppearance) {
+        clientWindowStore.appearance = appearance
+        NSApp.appearance = appearance.nsApplicationAppearance
     }
 
     private func handle(_ message: BridgeMessage) {

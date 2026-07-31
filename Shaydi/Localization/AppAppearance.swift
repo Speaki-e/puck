@@ -9,6 +9,7 @@
 //  .system still exists as the option that does that.
 //
 
+import AppKit
 import SwiftUI
 
 enum AppAppearance: String, Equatable, CaseIterable {
@@ -24,5 +25,44 @@ enum AppAppearance: String, Equatable, CaseIterable {
         case .light: return .light
         case .dark: return .dark
         }
+    }
+
+    /// `.preferredColorScheme` only affects the SwiftUI view hierarchy it's
+    /// applied to -- NSVisualEffectView materials, NSPopover's own chrome,
+    /// and other AppKit-native rendering follow `NSApp.appearance` instead,
+    /// which SwiftUI's modifier never touches. Set this alongside
+    /// `.preferredColorScheme` (see AppDelegate in both targets) so glass/
+    /// blur backgrounds actually match an explicit Light/Dark override
+    /// instead of silently continuing to follow the real system appearance
+    /// -- byeolki, 2026-08-01: "시스템모드랑 다크모드랑 생긴게 다른데?".
+    var nsApplicationAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+
+    /// The UserDefaults key SettingsStore persists this under, in Shaydi's
+    /// own defaults domain -- exposed here (not just inside SettingsStore)
+    /// because ShaydiAgent is a separate process with no access to
+    /// SettingsStore itself (pulling that whole class in would also drag in
+    /// HotkeyBindings and everything else it depends on). ShaydiAgent reads
+    /// this key directly via `UserDefaults(suiteName: AppIdentity.shaydiBundleID)`.
+    static let defaultsKey = "Shaydi.appearance"
+
+    /// Posted (via DistributedNotificationCenter, not the ordinary
+    /// NotificationCenter, since the two processes don't share one) whenever
+    /// Shaydi's own appearance setting changes, so ShaydiAgent can react
+    /// immediately instead of only picking up the new value at its own next
+    /// launch.
+    static let crossProcessChangeNotification = Notification.Name("com.speaki-e.Shaydi.appearanceChanged")
+
+    /// Resolves a raw UserDefaults string (or nil/unrecognized) the same way
+    /// everywhere this is read from -- SettingsStore's own getter and
+    /// ShaydiAgent's cross-process reader both go through this, so they
+    /// can't disagree on what counts as "unset."
+    static func resolved(fromDefaultsValue raw: String?) -> AppAppearance {
+        raw.flatMap(AppAppearance.init(rawValue:)) ?? .system
     }
 }

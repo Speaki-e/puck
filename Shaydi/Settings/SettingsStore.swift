@@ -19,7 +19,7 @@ final class SettingsStore {
         static let toyScale = "Shaydi.toyScale"
         static let speechLocale = "Shaydi.speechLocale"
         static let language = "Shaydi.language"
-        static let appearance = "Shaydi.appearance"
+        static let appearance = AppAppearance.defaultsKey
         static let pushToTalk = "Shaydi.hotkey.pushToTalk"
         static let textInput = "Shaydi.hotkey.textInput"
         static let characterSummon = "Shaydi.hotkey.characterSummon"
@@ -157,7 +157,7 @@ final class SettingsStore {
 
     var appearance: AppAppearance {
         get {
-            defaults.string(forKey: Keys.appearance).flatMap(AppAppearance.init(rawValue:)) ?? .system
+            AppAppearance.resolved(fromDefaultsValue: defaults.string(forKey: Keys.appearance))
         }
         set {
             defaults.set(newValue.rawValue, forKey: Keys.appearance)

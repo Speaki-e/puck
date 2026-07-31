@@ -5,7 +5,12 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 932 passing (`xcodebuild test`) · **`main`:** `fc546bb`
+**Last updated:** 2026-08-01 · **Tests:** 934 passing (`xcodebuild test`) · **`main`:** `e315d42`
+
+**2026-08-01: the mute sulk stopped dragging the pet to center screen, and now has its own on/off switch.** byeolki: "mute 기능 처럼 어떤 설정 요소를 키거나 끄면 캐릭터가 가운데로 가서 제 목소리가 듣기 싫으신거에요? 약간 이런식으로 말하던거 있는데. 그거 그냥 캐릭터 이동 없이 현재 캐릭터에 뜨게 해주고, 이런거 설정 가능하도록 해줘."
+
+- `showMutedComplaint()` (`AppDelegate.swift`) no longer calls `moveCharacter(to: controller.roamableArea's midpoint)` -- the sulk (angry face + "제 목소리가 시끄러우신거에요?") now plays wherever the pet already is. This didn't need a bubble-positioning change: `showNoticeBubble` already anchors to `characterBody.position` via `anchorBubbleToPet` (from the earlier "말풍선이 펫한테서 나오게" work), so removing the move was the entire fix. `pinCharacter()` stays, so the pet still holds still for the two seconds rather than wandering off mid-sulk.
+- `SettingsStore.isMuteComplaintEnabled` (new, defaults to true) gates whether the sulk fires at all -- checked in the `onMuteChanged` closure, not inside `showMutedComplaint()` itself, so "whether to react" stays separate from "how to react." No live-callback needed (unlike `isNotchEnabled`): this is only consulted at the instant mute is toggled, never applied to something already on screen. New toggle in Settings' Sound section: "Complain when muted" / "음소거하면 투덜대기".
 
 **2026-08-01: an on/off switch for the notch, in Settings.** byeolki: "다이내믹 아일랜드 끄고 킬 수 있는 버튼 추가해줘."
 

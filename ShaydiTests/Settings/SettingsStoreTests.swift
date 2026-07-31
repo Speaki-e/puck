@@ -48,6 +48,18 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(SettingsStore(defaults: defaults).avoidClimbingFocusedWindow)
     }
 
+    func test_isMuteComplaintEnabled_defaultsToTrue() {
+        XCTAssertTrue(SettingsStore(defaults: defaults).isMuteComplaintEnabled)
+    }
+
+    func test_isMuteComplaintEnabled_roundTrips() {
+        let store = SettingsStore(defaults: defaults)
+
+        store.isMuteComplaintEnabled = false
+
+        XCTAssertFalse(SettingsStore(defaults: defaults).isMuteComplaintEnabled)
+    }
+
     func test_isNotchEnabled_defaultsToTrue() {
         XCTAssertTrue(SettingsStore(defaults: defaults).isNotchEnabled)
     }

@@ -27,7 +27,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case accessibilityLabel, accessibilityGranted, accessibilityNotGranted
     case openSystemSettingsButton, accessibilityExplanation
 
-    case volumeLabel, muteLabel, autoMuteLabel
+    case volumeLabel, muteLabel, autoMuteLabel, muteComplaintLabel
 
     case avoidClimbingLabel, speedLabel, toySizeLabel, toyPumpkin, toyWand
 
@@ -95,6 +95,10 @@ enum Strings {
         .autoMuteLabel: [
             .english: "Auto-mute during Focus (best-effort, may not detect reliably)",
             .korean: "포커스 모드에서 자동 음소거 (최선 노력 기반, 정확하지 않을 수 있음)",
+        ],
+        .muteComplaintLabel: [
+            .english: "Complain when muted",
+            .korean: "음소거하면 투덜대기",
         ],
 
         .avoidClimbingLabel: [

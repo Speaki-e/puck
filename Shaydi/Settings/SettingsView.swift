@@ -46,6 +46,7 @@ struct SettingsView: View {
     @State private var volume: Double
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
+    @State private var isMuteComplaintEnabled: Bool
     @State private var avoidClimbingFocusedWindow: Bool
     @State private var isNotchEnabled: Bool
     @State private var toyScale: Double
@@ -84,6 +85,7 @@ struct SettingsView: View {
         _volume = State(initialValue: Double(store.volume))
         _isMuted = State(initialValue: store.isMuted)
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
+        _isMuteComplaintEnabled = State(initialValue: store.isMuteComplaintEnabled)
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
         _isNotchEnabled = State(initialValue: store.isNotchEnabled)
         _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
@@ -245,6 +247,12 @@ struct SettingsView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .onChange(of: autoMuteOnFocus) { store.autoMuteOnFocus = $0 }
+            }
+            SettingsRow(label: text(.muteComplaintLabel)) {
+                Toggle("", isOn: $isMuteComplaintEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: isMuteComplaintEnabled) { store.isMuteComplaintEnabled = $0 }
             }
         }
     }

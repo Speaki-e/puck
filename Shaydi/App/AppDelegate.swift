@@ -377,7 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         settingsStore.onVolumeChanged = { [weak sfxPlayer] volume in sfxPlayer?.volume = volume }
         settingsStore.onMuteChanged = { [weak self, weak sfxPlayer] isMuted in
             sfxPlayer?.isMuted = isMuted
-            guard isMuted else { return }
+            guard isMuted, self?.settingsStore.isMuteComplaintEnabled == true else { return }
             self?.showMutedComplaint()
         }
         settingsStore.onToyScaleChanged = { [weak self] scale in
@@ -1216,18 +1216,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// It has to be a bubble rather than a line: the complaint is *about*
     /// being muted, so playing it as audio is the one thing that can't work.
     ///
-    /// Only on mute going ON, and only from the Settings toggle -- Focus's
-    /// auto-mute (which sets SFXPlayer directly, not the store) isn't the
-    /// user telling the pet to be quiet, so it doesn't get sulked at.
+    /// Only on mute going ON, only from the Settings toggle (Focus's
+    /// auto-mute, which sets SFXPlayer directly rather than through the
+    /// store, isn't the user telling the pet to be quiet), and only when
+    /// SettingsStore.isMuteComplaintEnabled is on -- byeolki, 2026-08-01:
+    /// "그거 그냥 캐릭터 이동 없이 현재 캐릭터에 뜨게 해주고, 이런거 설정
+    /// 가능하도록 해줘". This used to also drag the pet to center screen
+    /// (moveCharacter to controller.roamableArea's midpoint); that's gone --
+    /// the sulk now happens wherever the pet already is. pinCharacter is
+    /// still what holds it there for the duration, since a wandering pet
+    /// mid-sulk would read as broken either way.
     private func showMutedComplaint() {
-        guard let controller = characterController else { return }
+        guard characterController != nil else { return }
 
-        // Front and centre, hanging in mid-air: wherever the pet happened to
-        // be, it drops what it was doing and gets in the way (byeolki: "강제로
-        // 펫을 화면의 중앙으로 가져와서", 2026-07-31). Pinned is what holds it
-        // there -- it runs no locomotion and no gravity, so the pet stays put
-        // for exactly as long as the complaint lasts.
-        moveCharacter(to: CGPoint(x: controller.roamableArea.midX, y: controller.roamableArea.midY))
         // pinCharacter, not a raw .pinned transition -- it owns the
         // stateBeforePin bookkeeping, so a hotkey pin overlapping the sulk
         // can't corrupt that pairing. Transition first, then the emotion:

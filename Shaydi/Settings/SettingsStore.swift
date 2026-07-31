@@ -26,6 +26,7 @@ final class SettingsStore {
         static let toySummon1 = "Shaydi.hotkey.toySummon1"
         static let toySummon2 = "Shaydi.hotkey.toySummon2"
         static let isNotchEnabled = "Shaydi.isNotchEnabled"
+        static let isMuteComplaintEnabled = "Shaydi.isMuteComplaintEnabled"
         static let hasRequestedAccessibility = "Shaydi.hasRequestedAccessibility"
     }
 
@@ -102,6 +103,17 @@ final class SettingsStore {
             defaults.set(newValue, forKey: Keys.isNotchEnabled)
             onNotchEnabledChanged?(newValue)
         }
+    }
+
+    /// Whether muting gets a sulk (angry face + "제 목소리가 시끄러우신거에
+    /// 요?") -- byeolki, 2026-08-01, after asking for the sulk to stop
+    /// moving the pet to center screen: "이런거 설정 가능하도록 해줘". No
+    /// live-callback needed (unlike isNotchEnabled): this is only consulted
+    /// at the moment mute is toggled, not applied to something already on
+    /// screen.
+    var isMuteComplaintEnabled: Bool {
+        get { defaults.object(forKey: Keys.isMuteComplaintEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.isMuteComplaintEnabled) }
     }
 
     /// Multiplies MovementSolver.walkSpeed for Walk/Climb/WalkOnTop/MoveTo/

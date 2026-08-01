@@ -65,4 +65,27 @@ extension View {
             self
         }
     }
+
+    /// The handful of surfaces the 2026-08-01 redesign deliberately colors
+    /// (the send button, the "새 채팅" pill, the user's own bubble) --
+    /// `Glass.tint(_:)` on macOS 26+, a flat fill as the pre-26 fallback
+    /// (there's no tinted material to fall back to the way the untinted
+    /// variants fall back to `.regularMaterial`).
+    @ViewBuilder
+    func glassSurface(in shape: some Shape, tint: Color) -> some View {
+        if #available(macOS 26.0, *) {
+            glassEffect(.regular.tint(tint), in: shape)
+        } else {
+            background(tint, in: shape)
+        }
+    }
+
+    @ViewBuilder
+    func glassControl(in shape: some Shape, tint: Color) -> some View {
+        if #available(macOS 26.0, *) {
+            glassEffect(.regular.tint(tint).interactive(), in: shape)
+        } else {
+            background(tint, in: shape)
+        }
+    }
 }

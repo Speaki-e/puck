@@ -85,15 +85,19 @@ struct ClientSidebarView: View {
 
     private var sessionSection: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Filled with `accent`, not just glass -- Orbita's "New Chat"
+            // pill is the one bold, colored anchor in an otherwise neutral
+            // sidebar, and this is the equivalent primary action here.
             Button {
                 store.requestNewSession(title: "새 채팅", in: store.activeWorkspaceId)
             } label: {
                 Label("새 채팅", systemImage: "square.and.pencil")
                     .font(ClientTheme.Typography.workspaceName)
+                    .foregroundStyle(ClientTheme.Colors.onAccent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
                     .contentShape(Capsule())
-                    .glassControl(in: Capsule())
+                    .glassControl(in: Capsule(), tint: ClientTheme.Colors.accent)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
@@ -137,7 +141,7 @@ private struct WorkspaceRow: View {
         Button(action: onSelect) {
             HStack(spacing: ClientTheme.Metrics.spacingSmall) {
                 Image(systemName: workspace.projectPath == nil ? "bubble.left.and.bubble.right.fill" : "folder.fill")
-                    .foregroundStyle(isActive ? Color.primary : ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(isActive ? ClientTheme.Colors.accent : ClientTheme.Colors.secondaryText)
                     .frame(width: 18)
                 Text(workspace.name)
                     .font(ClientTheme.Typography.workspaceName)
@@ -146,7 +150,7 @@ private struct WorkspaceRow: View {
                 if isActive {
                     Image(systemName: "checkmark")
                         .font(.caption)
-                        .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        .foregroundStyle(ClientTheme.Colors.accent)
                 }
             }
             .contentShape(Rectangle())
@@ -154,7 +158,8 @@ private struct WorkspaceRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-        // Selection is a raised glass surface now, not an accent-tinted fill.
+        // Selection: a raised glass row (not accent-tinted -- that would be loud
+        // at this density) plus the icon/checkmark switching to accent.
         .glassSurface(in: ClientTheme.Shapes.row, isEnabled: isActive)
     }
 }
@@ -169,7 +174,7 @@ private struct SessionRow: View {
             HStack(spacing: ClientTheme.Metrics.spacingSmall) {
                 Image(systemName: "message.fill")
                     .font(.caption)
-                    .foregroundStyle(isActive ? Color.primary : ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(isActive ? ClientTheme.Colors.accent : ClientTheme.Colors.secondaryText)
                     .frame(width: 18)
                 Text(session.title)
                     .font(ClientTheme.Typography.sessionTitle)
@@ -184,7 +189,8 @@ private struct SessionRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-        // Selection is a raised glass surface now, not an accent-tinted fill.
+        // Selection: a raised glass row (not accent-tinted -- that would be loud
+        // at this density) plus the icon/checkmark switching to accent.
         .glassSurface(in: ClientTheme.Shapes.row, isEnabled: isActive)
     }
 }

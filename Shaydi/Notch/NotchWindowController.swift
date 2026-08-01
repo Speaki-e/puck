@@ -12,9 +12,12 @@ import AppKit
 
 final class NotchWindowController {
     /// The resting pill, no bigger than it needs to be to read as a notch.
-    static let collapsedSize = CGSize(width: 160, height: 24)
-    /// Sized to fit ToyCatalogue's toy-button row once expanded.
-    static let expandedSize = CGSize(width: 260, height: 140)
+    static let collapsedSize = CGSize(width: 170, height: 24)
+    /// Room for boring.notch's own headline widgets (Now Playing + battery)
+    /// stacked above the toy row -- byeolki, 2026-08-01: "다이내믹 아일랜드
+    /// 걍 Boring Notch 클론코딩을 기반으로 하고, 거기에 toy 꺼내는 것만
+    /// 얹으라는 소리였는데".
+    static let expandedSize = CGSize(width: 300, height: 220)
 
     private(set) var window: NotchWindow?
     private(set) var isExpanded = false

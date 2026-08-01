@@ -132,6 +132,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     private var menuBarController: MenuBarController?
     private var textInputBubbleWindow: TextInputBubbleWindow?
     private var notchWindowController: NotchWindowController?
+    private var notchStatusStore: NotchStatusStore?
+    private var nowPlayingMonitor: NowPlayingMonitor?
+    private var batteryMonitor: BatteryMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Only ever one pet: a second launch (double-click, or a Debug build
@@ -176,6 +179,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // .alreadyRunning and nothing tells the user which file to delete.
         frameClock.stop()
         notchWindowController?.stop()
+        nowPlayingMonitor?.stop()
+        batteryMonitor?.stop()
         hotkeyManager?.stop()
         voiceInputController?.pushToTalkUp()
         bridgeServer?.stop()
@@ -318,17 +323,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     private func startNotch() {
         guard let controller = notchWindowController else { return }
+        let statusStore = NotchStatusStore()
+        notchStatusStore = statusStore
+
+        // boring.notch's two headline widgets, ported verbatim (see
+        // NowPlayingMonitor/BatteryMonitor's own doc comments) -- fresh
+        // instances each time startNotch() runs, so toggling the notch back
+        // on after Settings turned it off doesn't need any of this managed
+        // across the gap.
+        let nowPlaying = NowPlayingMonitor()
+        nowPlaying.onChange = { [weak statusStore] info in statusStore?.nowPlaying = info }
+        nowPlaying.start()
+        nowPlayingMonitor = nowPlaying
+
+        let battery = BatteryMonitor()
+        battery.onChange = { [weak statusStore] status in statusStore?.battery = status }
+        battery.start()
+        batteryMonitor = battery
+
         let view = NotchView(
+            status: statusStore,
             initialToysOut: toyBox?.outToyNames ?? [],
             onToggleToy: { [weak self] toy in self?.toggleToy(toy) ?? [] },
-            onExpandedChanged: { [weak controller] isExpanded in controller?.setExpanded(isExpanded) }
+            onExpandedChanged: { [weak controller] isExpanded in controller?.setExpanded(isExpanded) },
+            onTogglePlayPause: { [weak nowPlaying] in nowPlaying?.togglePlayPause() },
+            onNextTrack: { [weak nowPlaying] in nowPlaying?.nextTrack() },
+            onPreviousTrack: { [weak nowPlaying] in nowPlaying?.previousTrack() }
         )
         controller.start(contentView: NSHostingView(rootView: view))
     }
 
     /// Settings' toggle (byeolki, 2026-08-01: "다이내믹 아일랜드 끄고 킬 수
     /// 있는 버튼 추가해줘") -- turning it off tears the window down
-    /// immediately rather than just skipping it on the next launch.
+    /// immediately rather than just skipping it on the next launch, and
+    /// stops the two monitors so a disabled notch isn't still polling
+    /// MediaRemote/IOKit in the background.
     private func setNotchEnabled(_ isEnabled: Bool) {
         guard let controller = notchWindowController else { return }
         if isEnabled {
@@ -336,6 +365,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             startNotch()
         } else {
             controller.stop()
+            nowPlayingMonitor?.stop()
+            batteryMonitor?.stop()
+            nowPlayingMonitor = nil
+            batteryMonitor = nil
+            notchStatusStore = nil
         }
     }
 

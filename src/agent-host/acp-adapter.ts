@@ -1,10 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
 import chokidar, { type FSWatcher } from "chokidar";
 import * as acp from "@agentclientprotocol/sdk";
+import { resolveClaudeAgentCommand } from "../shared/acp-command.js";
 
 export interface CodeEditorResult {
   ok: boolean;
@@ -39,9 +39,7 @@ export interface AcpAdapterOptions {
 
 function claudeAgentCommand(): { command: string; args: string[] } {
   const appPath = process.env.WORKSPACE_APP_PATH ?? process.cwd();
-  const requireFromApp = createRequire(path.join(appPath, "package.json"));
-  const agentPath = requireFromApp.resolve("@agentclientprotocol/claude-agent-acp/dist/index.js");
-  return { command: process.execPath, args: [agentPath] };
+  return resolveClaudeAgentCommand(appPath);
 }
 
 function permissionDenied(): acp.RequestPermissionResponse {
@@ -153,7 +151,9 @@ export class AcpAdapter {
               void context.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
               forceKillTimer = setTimeout(() => child?.kill(), 2_000);
             };
-            input.signal.addEventListener("abort", cancel, { once: true });
+            const listenForAbort = !input.signal.aborted;
+            if (listenForAbort) input.signal.addEventListener("abort", cancel, { once: true });
+            else cancel();
             try {
               void session.prompt(input.task).catch(() => undefined);
               for (;;) {
@@ -165,7 +165,7 @@ export class AcpAdapter {
                 this.options.onUpdate?.(message.update);
               }
             } finally {
-              input.signal.removeEventListener("abort", cancel);
+              if (listenForAbort) input.signal.removeEventListener("abort", cancel);
             }
           });
         });

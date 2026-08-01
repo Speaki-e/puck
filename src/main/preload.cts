@@ -21,4 +21,9 @@ contextBridge.exposeInMainWorld("workspace", {
     ipcRenderer.on("agent:status", wrapped);
     return () => ipcRenderer.removeListener("agent:status", wrapped);
   },
+  onWorkingPaths: (listener: (paths: string[]) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: string[]) => listener(payload);
+    ipcRenderer.on("agent:working-paths", wrapped);
+    return () => ipcRenderer.removeListener("agent:working-paths", wrapped);
+  },
 });

@@ -1,4 +1,3 @@
-import type { MessagePort } from "node:worker_threads";
 import type {
   AgentHostRequest,
   AgentHostResponse,
@@ -8,7 +7,12 @@ import type { JSONValue } from "@speaki-e/protocol";
 import { AcpAdapter } from "./acp-adapter.js";
 import { CodeEditorQueue, QueueCancelledError } from "./code-editor-queue.js";
 
-const parentPort = (process as NodeJS.Process & { parentPort?: MessagePort }).parentPort;
+interface UtilityParentPort {
+  postMessage(message: unknown): void;
+  on(event: "message", listener: (event: { data: AgentHostRequest }) => void): void;
+}
+
+const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
 if (!parentPort) throw new Error("Agent Host는 Electron Utility Process로 실행해야 합니다");
 
 const queue = new CodeEditorQueue();
@@ -24,7 +28,7 @@ function emit(event: AgentHostEvent["event"], payload: AgentHostEvent["payload"]
   parentPort!.postMessage({ kind: "event", event, payload } satisfies AgentHostEvent);
 }
 
-parentPort.on("message", async (message: AgentHostRequest) => {
+parentPort.on("message", async ({ data: message }) => {
   try {
     switch (message.method) {
       case "ping":
@@ -60,6 +64,15 @@ parentPort.on("message", async (message: AgentHostRequest) => {
         if (process.env.NODE_ENV !== "test") throw new Error("테스트 환경에서만 사용할 수 있습니다");
         setImmediate(() => process.exit(97));
         break;
+      case "busyForTest": {
+        if (process.env.NODE_ENV !== "test") throw new Error("테스트 환경에서만 사용할 수 있습니다");
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < Math.min(message.payload.durationMs, 2_000)) {
+          Math.sqrt(Math.random());
+        }
+        respond({ kind: "response", id: message.id, ok: true, payload: { elapsedMs: Date.now() - startedAt } });
+        break;
+      }
       case "shutdown":
         queue.cancelAll();
         respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });

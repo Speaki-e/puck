@@ -76,7 +76,7 @@ struct AvatarManagementView: View {
                     SettingsRow(label: name) {
                         if name == selectedAvatarName {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                                .foregroundStyle(.secondary)
                         } else {
                             Button(text(.avatarSelectButton)) { selectAvatar(name) }
                                 .controlSize(.small)
@@ -89,7 +89,7 @@ struct AvatarManagementView: View {
                 if !reportMessage.isEmpty {
                     Text(reportMessage)
                         .font(.footnote)
-                        .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 }
                 // "아바타 패키지 형태도 사용자에게 알려줘야함" -- condensed
@@ -97,7 +97,7 @@ struct AvatarManagementView: View {
                 // end user importing a package would never see otherwise.
                 Text(text(.avatarPackageFormatExplanation))
                     .font(.footnote)
-                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 SettingsStackedRow(label: text(.sizeHeader), value: String(format: "%.2fx", scale)) {
                     Slider(value: $scale, in: 0.25...3.0)
@@ -108,7 +108,7 @@ struct AvatarManagementView: View {
             SettingsSection(title: text(.emotionsHeader)) {
                 Text(text(.emotionsExplanation))
                     .font(.footnote)
-                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 // Collapsed by default: the shipped avatar maps sixteen
                 // emotions, and sixteen always-open rows pushed the toy grid
@@ -120,7 +120,7 @@ struct AvatarManagementView: View {
                             SettingsRow(label: emotion) {
                                 Text(mappedEmotions.contains(emotion) ? text(.mappedLabel) : text(.notMappedLabel))
                                     .font(.caption)
-                                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                                    .foregroundStyle(.secondary)
                                 Button(text(.chooseImageButton)) { chooseEmotionImage(for: emotion) }
                                     .controlSize(.small)
                             }
@@ -143,7 +143,7 @@ struct AvatarManagementView: View {
                 if !emotionMessage.isEmpty {
                     Text(emotionMessage)
                         .font(.footnote)
-                        .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 }
             }

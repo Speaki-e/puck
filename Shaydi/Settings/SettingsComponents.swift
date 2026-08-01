@@ -28,7 +28,7 @@ struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingSmall) {
             Text(title)
                 .font(ClientTheme.Typography.sectionHeader)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
 
             VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingMedium) {
@@ -76,7 +76,7 @@ struct SettingsStackedRow<Control: View>: View {
                 if let value {
                     Text(value)
                         .font(ClientTheme.Typography.mono)
-                        .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        .foregroundStyle(.secondary)
                 }
             }
             control
@@ -108,7 +108,7 @@ struct ToyTile: View {
                         // A toy whose PNG didn't ship still gets a tile, so
                         // the grid doesn't silently lose an entry.
                         Image(systemName: "questionmark")
-                            .foregroundStyle(ClientTheme.Colors.secondaryText)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .frame(height: 34)
@@ -146,14 +146,14 @@ struct SettingsActionRow: View {
                 if let systemImage {
                     Image(systemName: systemImage)
                         .frame(width: 16)
-                        .foregroundStyle(ClientTheme.Colors.secondaryText)
+                        .foregroundStyle(.secondary)
                 }
                 Text(label)
                     .font(ClientTheme.Typography.sessionTitle)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.caption2)
-                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
             .padding(.vertical, ClientTheme.Metrics.spacingSmall)

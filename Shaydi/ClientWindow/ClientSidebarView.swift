@@ -41,7 +41,7 @@ struct ClientSidebarView: View {
             // own background runs to the top of the window.
             Color.clear.frame(height: 28)
 
-            workspaceHeader
+            header
                 .padding(.horizontal, isExpanded ? ClientTheme.Metrics.spacingMedium : ClientTheme.Metrics.spacingSmall)
 
             newChatButton
@@ -53,12 +53,17 @@ struct ClientSidebarView: View {
             } else {
                 Spacer(minLength: 0)
             }
-
-            footer
         }
+        .padding(.bottom, ClientTheme.Metrics.spacingSmall)
         .frame(width: isExpanded ? ClientTheme.Metrics.sidebarWidthExpanded : ClientTheme.Metrics.sidebarWidthCollapsed)
         .frame(maxHeight: .infinity)
         .background(sidebarBackground)
+        // Figma's sidebar reads as "the same white" as the main column,
+        // told apart only by this hairline -- not a darker fill (byeolki,
+        // 2026-08-02, "그냥 똑같이 해달라고").
+        .overlay(alignment: .trailing) {
+            Rectangle().fill(palette.surfaceBorder).frame(width: 1)
+        }
         .animation(.easeInOut(duration: 0.18), value: isExpanded)
         .sheet(isPresented: $showingNewWorkspaceSheet) {
             NewWorkspaceSheet(
@@ -68,6 +73,29 @@ struct ClientSidebarView: View {
                 },
                 onCancel: { showingNewWorkspaceSheet = false }
             )
+        }
+    }
+
+    /// The workspace switcher plus the collapse toggle, together -- Figma's
+    /// reference puts its own collapse/grid icon at the sidebar's top-right
+    /// corner, not buried in a footer below the session list (byeolki,
+    /// 2026-08-02: "그냥 똑같이 해달라고", after an earlier pass left the
+    /// toggle where the pre-Figma layout had it). Side by side when
+    /// expanded (room for both); stacked when collapsed (68pt has no room
+    /// for the avatar and the toggle on one line).
+    @ViewBuilder
+    private var header: some View {
+        if isExpanded {
+            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                workspaceHeader
+                Spacer(minLength: 0)
+                collapseToggle
+            }
+        } else {
+            VStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                workspaceHeader
+                collapseToggle
+            }
         }
     }
 
@@ -115,7 +143,6 @@ struct ClientSidebarView: View {
                         .font(ClientTheme.Typography.workspaceName)
                         .foregroundStyle(palette.textPrimary)
                         .lineLimit(1)
-                    Spacer(minLength: 0)
                 }
             }
             .contentShape(Rectangle())
@@ -165,27 +192,22 @@ struct ClientSidebarView: View {
         .help("새 채팅")
     }
 
-    private var footer: some View {
-        VStack(spacing: ClientTheme.Metrics.spacingSmall) {
-            Divider().opacity(0.5)
-
-            Button {
-                isExpanded.toggle()
-            } label: {
-                Image(systemName: isExpanded ? "sidebar.left" : "sidebar.right")
-                    .foregroundStyle(palette.textSecondary)
-                    .frame(width: ClientTheme.Metrics.railButtonSize, height: ClientTheme.Metrics.railButtonSize)
-            }
-            .buttonStyle(.plain)
-            // Icon-only, always -- no visible text in either state to fall
-            // back on, so VoiceOver would otherwise announce nothing but
-            // "button" (byeolki, 2026-08-02, from the final review's own
-            // deferred finding: "사이드바 하단 아이콘 버튼들에 접근성 라벨
-            // 없음").
-            .accessibilityLabel(isExpanded ? "사이드바 접기" : "사이드바 펼치기")
-            .help(isExpanded ? "사이드바 접기" : "사이드바 펼치기")
+    private var collapseToggle: some View {
+        Button {
+            isExpanded.toggle()
+        } label: {
+            Image(systemName: isExpanded ? "sidebar.left" : "sidebar.right")
+                .foregroundStyle(palette.textSecondary)
+                .frame(width: ClientTheme.Metrics.railButtonSize, height: ClientTheme.Metrics.railButtonSize)
         }
-        .padding(.bottom, ClientTheme.Metrics.spacingSmall)
+        .buttonStyle(.plain)
+        // Icon-only, always -- no visible text in either state to fall
+        // back on, so VoiceOver would otherwise announce nothing but
+        // "button" (byeolki, 2026-08-02, from the final review's own
+        // deferred finding: "사이드바 하단 아이콘 버튼들에 접근성 라벨
+        // 없음").
+        .accessibilityLabel(isExpanded ? "사이드바 접기" : "사이드바 펼치기")
+        .help(isExpanded ? "사이드바 접기" : "사이드바 펼치기")
     }
 }
 

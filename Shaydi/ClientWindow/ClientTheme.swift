@@ -35,8 +35,10 @@ enum ClientTheme {
     enum Metrics {
         /// 2026-08-01 rebuild: a real, non-popover sidebar (ClientSidebarView)
         /// replaces the icon-only rail -- collapsible between these two widths.
-        static let sidebarWidthExpanded: CGFloat = 240
-        static let sidebarWidthCollapsed: CGFloat = 56
+        /// 2026-08-02: widths pulled to match byeolki's 5 Figma references
+        /// exactly (220/68), not just "close enough" approximations.
+        static let sidebarWidthExpanded: CGFloat = 220
+        static let sidebarWidthCollapsed: CGFloat = 68
         static let railButtonSize: CGFloat = 36
         /// The centered column width the transcript, empty state, and input
         /// bar all cap themselves to.
@@ -49,12 +51,14 @@ enum ClientTheme {
         static let spacingSmall: CGFloat = 6
         static let spacingMedium: CGFloat = 10
         static let spacingLarge: CGFloat = 16
-        static let bubbleCornerRadius: CGFloat = 18
-        static let cardCornerRadius: CGFloat = 14
+        /// 2026-08-02: 20 matches the Figma references' card/input/bubble
+        /// rounding exactly (their nav-row rounding is 12, unchanged below).
+        static let bubbleCornerRadius: CGFloat = 20
+        static let cardCornerRadius: CGFloat = 20
         static let rowCornerRadius: CGFloat = 12
         /// The small sender avatar drawn above each message bubble.
         static let avatarSize: CGFloat = 22
-        /// The client window's own floor -- sidebar expanded (240) + the main
+        /// The client window's own floor -- sidebar expanded (220) + the main
         /// column's own minimum (420), rounded up a little for breathing
         /// room. `ClientWindowView`'s SwiftUI `.frame(minWidth:minHeight:)`
         /// and `ShaydiAgent/AppDelegate`'s AppKit-level `NSWindow.minSize`

@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist-main/main/index.js",
+  "main": "dist-main/main/index.cjs",
   "packageManager": "pnpm@11.18.0",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.main.json",
+    "build": "vite build && npm run build:main",
     "build:renderer": "vite build",
-    "build:main": "tsc -p tsconfig.main.json",
+    "build:main": "tsc -p tsconfig.main.json && esbuild src/main/index.ts --bundle --platform=node --format=cjs --outfile=dist-main/main/index.cjs --external:electron",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -35,13 +35,14 @@
     "ws": "8.21.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.58.2",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.10.4",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "6.0.1",
     "electron-builder": "26.8.1",
+    "esbuild": "0.28.1",
     "typescript": "5.9.3",
     "vite": "8.0.0",
     "vitest": "4.1.0"

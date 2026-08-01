@@ -116,6 +116,17 @@ struct SettingsView: View {
         }
         .frame(width: MenuBarController.panelSize.width, height: MenuBarController.panelSize.height)
         .preferredColorScheme(appearance.colorScheme)
+        // `.id` forces SwiftUI to discard and rebuild this subtree instead of
+        // diffing it in place -- byeolki, 2026-08-01: "라이트 테마에서 다크
+        // 테마로 가면 멀쩡한데, 라이트 테마에서 시스템 테마로 가면 이상함."
+        // Explicit->explicit (Light->Dark) is a genuine value change SwiftUI
+        // diffs correctly; explicit->nil (System) is a documented SwiftUI
+        // quirk where `.preferredColorScheme(nil)` sometimes fails to
+        // invalidate a previously-applied explicit override in place, leaving
+        // stale light-derived rendering under what should now be system
+        // (dark) chrome. Keying identity on the enum itself sidesteps the
+        // diff path entirely for every transition, not just this one.
+        .id(appearance)
     }
 
     /// The reference opens with its mark and name; ours is the pumpkin that

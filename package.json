@@ -11,10 +11,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "vite build && npm run build:main",
-    "build:renderer": "vite build",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:renderer": "vite build && npm run verify:renderer",
     "build:main": "tsc -p tsconfig.main.json && esbuild src/main/index.ts --bundle --platform=node --format=cjs --outfile=dist-main/main/index.cjs --external:electron && esbuild src/agent-host/index.ts --bundle --platform=node --format=cjs --outfile=dist-main/agent-host/index.cjs --external:electron",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "verify:renderer": "node scripts/verify-renderer-build.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

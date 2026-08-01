@@ -5,6 +5,7 @@ import { JsonlLogger } from "./logger.js";
 import { WorkspaceRegistry } from "./workspace-registry.js";
 import { WorkspaceController } from "./workspace-controller.js";
 import { AgentHostController } from "./agent-host-controller.js";
+import { PetBridge } from "./pet-bridge.js";
 
 const isHeadless = process.argv.includes("--headless");
 
@@ -42,6 +43,9 @@ async function main(): Promise<void> {
     if (event.event === "status") controller.sendAgentStatus(JSON.stringify(event.payload));
   });
   await agentHost.start();
+  const petBridge = new PetBridge({ socketPath: argumentValue("--bridge-socket"), logger });
+  petBridge.on("state", (state: string) => controller.sendAgentStatus(`pet-app: ${state}`));
+  petBridge.connect();
   controller.setAgentCommands({
     run: async (command, workspace) => {
       const requestId = randomUUID();
@@ -67,6 +71,7 @@ async function main(): Promise<void> {
   });
 
   app.on("before-quit", () => {
+    void petBridge.close();
     void agentHost.stop();
     void controller.close();
   });

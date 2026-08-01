@@ -82,15 +82,21 @@ struct ChatView: View {
                     }
                     .buttonStyle(.plain)
                 } else {
+                    // Filled with `accent`, not just glass -- the one button
+                    // every reference shot (Sense, the dark chat, Orbita)
+                    // treats as the single colored anchor in an otherwise
+                    // neutral bar.
+                    let canSend = !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     Button(action: send) {
                         Image(systemName: "arrow.up")
                             .fontWeight(.semibold)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(ClientTheme.Colors.onAccent)
                             .padding(7)
-                            .glassControl(in: Circle())
+                            .glassControl(in: Circle(), tint: ClientTheme.Colors.accent)
                     }
                     .buttonStyle(.plain)
-                    .disabled(draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(canSend ? 1 : 0.4)
+                    .disabled(!canSend)
                 }
             }
             .padding(.leading, ClientTheme.Metrics.spacingLarge)
@@ -116,16 +122,26 @@ struct ChatView: View {
 private struct EmptyTranscript: View {
     var body: some View {
         VStack(spacing: ClientTheme.Metrics.spacingMedium) {
-            // The pumpkin is the app's mark (byeolki, 2026-07-30: "호박을
-            // 로고로 쓰고 싶어") -- it's also the app icon, and the toy the
-            // pet plays with.
-            Image("PumpkinLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
+            ZStack {
+                // A soft glow behind the mark -- Sense's gradient orb and
+                // Orbita's gradient circle both use exactly this to make an
+                // otherwise flat icon read as the app's "hero" rather than
+                // just another asset.
+                Circle()
+                    .fill(ClientTheme.Colors.accent.opacity(0.35))
+                    .frame(width: 96, height: 96)
+                    .blur(radius: 24)
+                // The pumpkin is the app's mark (byeolki, 2026-07-30: "호박을
+                // 로고로 쓰고 싶어") -- it's also the app icon, and the toy the
+                // pet plays with.
+                Image("PumpkinLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 72, height: 72)
+            }
             Text("무엇을 도와드릴까요?")
-                .font(ClientTheme.Typography.summary)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .font(ClientTheme.Typography.greeting)
+                .foregroundStyle(ClientTheme.Colors.bubbleText)
         }
         .padding(ClientTheme.Metrics.spacingLarge * 1.5)
         .glassSurface(in: ClientTheme.Shapes.panel)
@@ -177,28 +193,69 @@ private struct ApprovalBanner: View {
     }
 }
 
-/// Only the user's side gets a bubble, and it's glass rather than a colored
-/// fill (there is no accent color any more). The agent's text sits directly
-/// on the page like it does in Mail or Notes -- with both sides bubbled and
-/// no hue to tell them apart, the transcript read as two identical columns.
+/// 2026-08-01 redesign: every reference shot (Sense, the dark chat, Orbita)
+/// labels who's speaking above each message, so both sides now get a small
+/// sender row (avatar + name) -- and the user's own bubble is the one place
+/// besides the send button and "새 채팅" pill that `accent` shows up, which
+/// is what actually tells the two sides apart now (previously that job fell
+/// to "only the user gets a background at all", the flattest possible
+/// version of the same idea).
 private struct MessageBubble: View {
     let text: String
     let isUser: Bool
 
+    private var content: some View {
+        Text(text)
+            .font(ClientTheme.Typography.messageBody)
+            .foregroundStyle(isUser ? ClientTheme.Colors.onAccent : ClientTheme.Colors.bubbleText)
+            .textSelection(.enabled)
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+            .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
+    }
+
     var body: some View {
-        HStack {
-            if isUser { Spacer(minLength: 0) }
-            Text(text)
-                .font(ClientTheme.Typography.messageBody)
-                .foregroundStyle(ClientTheme.Colors.bubbleText)
-                .textSelection(.enabled)
-                .padding(.horizontal, isUser ? ClientTheme.Metrics.spacingMedium : 0)
-                .padding(.vertical, isUser ? ClientTheme.Metrics.spacingSmall + 2 : 0)
-                .glassSurface(in: ClientTheme.Shapes.bubble, isEnabled: isUser)
+        VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+            senderRow
+            HStack {
+                if isUser { Spacer(minLength: 0) }
+                Group {
+                    if isUser {
+                        content.glassSurface(in: ClientTheme.Shapes.bubble, tint: ClientTheme.Colors.accent)
+                    } else {
+                        content.glassSurface(in: ClientTheme.Shapes.bubble)
+                    }
+                }
                 .frame(maxWidth: 420, alignment: isUser ? .trailing : .leading)
-            if !isUser { Spacer(minLength: 0) }
+                if !isUser { Spacer(minLength: 0) }
+            }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+    }
+
+    private var senderRow: some View {
+        HStack(spacing: 5) {
+            if !isUser { avatar }
+            Text(isUser ? "나" : AppIdentity.displayName)
+                .font(ClientTheme.Typography.senderLabel)
+                .foregroundStyle(ClientTheme.Colors.secondaryText)
+            if isUser { avatar }
+        }
+    }
+
+    private var avatar: some View {
+        Group {
+            if isUser {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(ClientTheme.Colors.accent)
+            } else {
+                Image("PumpkinLogo")
+                    .resizable()
+                    .scaledToFit()
+            }
+        }
+        .frame(width: ClientTheme.Metrics.avatarSize, height: ClientTheme.Metrics.avatarSize)
+        .background(isUser ? ClientTheme.Colors.accentSoft : Color.clear, in: Circle())
     }
 }
 

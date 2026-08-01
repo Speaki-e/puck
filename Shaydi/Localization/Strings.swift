@@ -83,7 +83,7 @@ enum Strings {
         .tabMovement: [.english: "Movement", .korean: "이동"],
 
         .languageLabel: [.english: "Language", .korean: "언어"],
-        .appearanceLabel: [.english: "Appearance", .korean: "모양"],
+        .appearanceLabel: [.english: "Appearance", .korean: "테마"],
         .appearanceSystem: [.english: "System", .korean: "시스템"],
         .appearanceLight: [.english: "Light", .korean: "라이트"],
         .appearanceDark: [.english: "Dark", .korean: "다크"],
@@ -122,14 +122,17 @@ enum Strings {
         .importAvatarButton: [.english: "Import Avatar Package…", .korean: "아바타 패키지 가져오기…"],
         .avatarSelectButton: [.english: "Select", .korean: "선택"],
         .avatarPackageFormatExplanation: [
-            .english: "An avatar package is a folder: manifest.json plus one transparent PNG per pose (idle is required; walk, climb, fall, etc. are recommended), and an optional sounds/ folder of .wav clips. Keep artwork around 1024px on its longest side and under ~500KB per image.",
-            .korean: "아바타 패키지는 폴더 하나입니다: manifest.json과 동작별 투명 배경 PNG(idle은 필수, walk·climb·fall 등은 권장), 그리고 선택적으로 .wav 파일이 담긴 sounds/ 폴더로 구성됩니다. 이미지는 긴 변 기준 1024px 내외, 파일당 약 500KB 이하를 권장합니다.",
+            .english:
+                "An avatar package is a folder: manifest.json plus one transparent PNG per pose (idle is required; walk, climb, fall, etc. are recommended), and an optional sounds/ folder of .wav clips. Keep artwork around 1024px on its longest side and under ~500KB per image.",
+            .korean:
+                "아바타 패키지는 폴더 하나입니다: manifest.json과 동작별 투명 배경 PNG(idle은 필수, walk·climb·fall 등은 권장), 그리고 선택적으로 .wav 파일이 담긴 sounds/ 폴더로 구성됩니다. 이미지는 긴 변 기준 1024px 내외, 파일당 약 500KB 이하를 권장합니다.",
         ],
         .importPanelPrompt: [.english: "Import", .korean: "가져오기"],
         .sizeHeader: [.english: "Size", .korean: "크기"],
         .emotionsHeader: [.english: "Emotions", .korean: "감정 표현"],
         .emotionsExplanation: [
-            .english: "Maps a socket event (agent thinking, task failed, task done) to an image. Falls back to idle if unmapped.",
+            .english:
+                "Maps a socket event (agent thinking, task failed, task done) to an image. Falls back to idle if unmapped.",
             .korean: "소켓 이벤트(생각 중, 작업 실패, 작업 완료)를 이미지에 매핑합니다. 매핑되지 않으면 대기 이미지로 대체됩니다.",
         ],
         .mappedLabel: [.english: "Mapped", .korean: "매핑됨"],
@@ -145,7 +148,8 @@ enum Strings {
         ],
 
         .permissionNeededBubble: [
-            .english: "I need permission for that — could you allow it in the window I'm pointing at?",
+            .english:
+                "I need permission for that — could you allow it in the window I'm pointing at?",
             .korean: "그거 하려면 권한이 필요해요. 제가 가리키는 창에서 허용해 주세요!",
         ],
 
@@ -155,11 +159,16 @@ enum Strings {
         .apiKeyClear: [.english: "Remove", .korean: "삭제"],
         .apiKeySavedFormat: [.english: "Saved to %1$@", .korean: "%1$@에 저장했어요"],
         .apiKeySourceFormat: [.english: "In use, from %1$@", .korean: "사용 중 — 출처: %1$@"],
-        .apiKeyMissing: [.english: "No key set — the pet can't run commands yet.", .korean: "키가 없어요 — 아직 명령을 수행할 수 없습니다."],
+        .apiKeyMissing: [
+            .english: "No key set — the pet can't run commands yet.",
+            .korean: "키가 없어요 — 아직 명령을 수행할 수 없습니다.",
+        ],
         .apiKeySaveFailed: [.english: "Couldn't write the key file.", .korean: "키 파일을 저장하지 못했어요."],
         .apiKeyExplanation: [
-            .english: "Stored in a .env file readable only by you. An OPENAI_API_KEY environment variable, or a .env next to the project, takes precedence over this field.",
-            .korean: "본인만 읽을 수 있는 .env 파일에 저장됩니다. 환경변수 OPENAI_API_KEY나 프로젝트 폴더의 .env가 있으면 그쪽이 우선합니다.",
+            .english:
+                "Stored in a .env file readable only by you. An OPENAI_API_KEY environment variable, or a .env next to the project, takes precedence over this field.",
+            .korean:
+                "본인만 읽을 수 있는 .env 파일에 저장됩니다. 환경변수 OPENAI_API_KEY나 프로젝트 폴더의 .env가 있으면 그쪽이 우선합니다.",
         ],
         .installedFormat: [.english: "Installed '%1$@'.", .korean: "'%1$@' 설치 완료."],
         .installedMissingRecommendedFormat: [
@@ -174,7 +183,9 @@ enum Strings {
             .english: "Rejected — missing required clip file(s): %1$@",
             .korean: "거부됨 — 필수 클립 파일 누락: %1$@",
         ],
-        .failedToValidateFormat: [.english: "Failed to validate: %1$@", .korean: "유효성 검사 실패: %1$@"],
+        .failedToValidateFormat: [
+            .english: "Failed to validate: %1$@", .korean: "유효성 검사 실패: %1$@",
+        ],
         .updatedEmotionFormat: [.english: "Updated '%1$@'.", .korean: "'%1$@' 업데이트 완료."],
         .failedToSetEmotionFormat: [
             .english: "Failed to set '%1$@': %2$@",

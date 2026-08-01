@@ -5,7 +5,18 @@ check here instead of asking for a status recap. Full design rationale is in
 [`docs/directory-structure.md`](docs/directory-structure.md); implementation
 order (P0-P9) is defined in `plan/02_pet-app.md` section 2.
 
-**Last updated:** 2026-08-01 · **Tests:** 951 passing (`xcodebuild test`) · **`main`:** `aae88c0`
+**Last updated:** 2026-08-01 · **Tests:** 951 passing (`xcodebuild test`) · **`main`:** `1336668`
+
+**2026-08-01: client window design renewal, referencing three Dribbble shots (Sense, an AI chat dark theme, Orbita GPT).** byeolki: "이 3개 참고해서 알잘딱깔센으로 디자인 리뉴얼 해줘," then, once the images actually loaded, "이거 3개 참고해."
+
+- `ClientTheme.Colors.accent` (new): a burnt pumpkin-ember, brought back after two prior removals (lime `#A2E048`, then a flat pumpkin tint -- both explicitly rejected as "그냥 포인터 컬러 제거해줘"). What's different this time: all three references use color the same sparing way -- one gradient mark, one filled send button, one CTA pill, everything else neutral -- so `accent` only shows up in five places (the send button, the "새 채팅" pill, the active nav indicator, the user's own bubble, the empty-state glow), not painted across the whole UI the way the first two attempts were.
+- `GlassSurface.swift` gained tinted overloads (`glassSurface(in:tint:)`, `glassControl(in:tint:)`, `Glass.regular.tint(_:)` on macOS 26+) alongside the existing neutral ones -- the untinted `glassSurface`/`glassControl` calls everywhere else are untouched.
+- `MessageBubble` (ChatView.swift): every message now has a small sender row (avatar + "나"/"Shaydi") above it, matching all three references' clear attribution -- previously the only signal was "user gets a background, assistant doesn't." The user's own bubble is now accent-tinted; the assistant's gets the same neutral glass card back (safe to give it one now that hue, not just presence-of-background, tells the two sides apart).
+- `EmptyTranscript`: a soft blurred accent glow behind the pumpkin mark (Sense's gradient orb, Orbita's gradient circle) and a bigger, bolder greeting (`ClientTheme.Typography.greeting`, new) -- the empty state previously read as a caption, not a hero.
+- `ClientSidebarView`: "새 채팅" is now a solid accent-filled pill (Orbita's one bold CTA in an otherwise neutral sidebar); the active workspace/session row's icon and checkmark switch to accent instead of a flat gray.
+- Metrics bumped for a softer, more rounded feel across the board: `cardCornerRadius` 10→14, `rowCornerRadius` 8→12, `bubbleCornerRadius` 16→18.
+- No new data model fields -- `ChatTimelineEntry` still has no avatar/timestamp/model-name fields, so sender labels are the two static strings ("나"/`AppIdentity.displayName`) rather than anything per-message.
+- Verified: full suite (951 tests, unaffected -- this is pure SwiftUI styling) green, both apps rebuilt and relaunched, screenshotted the empty-state/sidebar/input-bar combination showing the accent-filled New Chat pill, tinted active session dot, glowing pumpkin mark, and bold greeting together. **Not verified by hand**: an actual populated chat transcript (the new sender-row/bubble-tint styling) -- sending a message requires typing into the window, which needs a real click this sandbox can't synthesize.
 
 **2026-08-01: fixed a real race in the cross-process theme sync landed earlier today.** byeolki: "셰이디에이전트에는 테마 변경에 대한 적용이 안됨."
 

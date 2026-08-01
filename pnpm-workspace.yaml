@@ -1,0 +1,5 @@
+allowBuilds:
+  '@speaki-e/protocol@git+https://github.com/Speaki-e/protocol.git#4244922fa4605645e577905ed37b33b94a5b16e5': true
+  electron: true
+  electron-winstaller: true
+  esbuild: true

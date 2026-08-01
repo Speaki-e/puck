@@ -10,28 +10,25 @@ interface Props {
 
 export function EditorTabs({ tabs, activePath, onActivate, onClose }: Props) {
   return (
-    <div className="tab-strip" role="tablist">
-      {tabs.map((tab) => (
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab.path === activePath}
-          className={`editor-tab ${tab.path === activePath ? "active" : ""}`}
-          key={tab.path}
-          onClick={() => onActivate(tab.path)}
-          title={tab.path}
-        >
-          <span>{tab.path.split("/").at(-1)}</span>
-          {isDirty(tab) && <span className="dirty-dot">●</span>}
-          <span
-            className="tab-close"
-            role="button"
-            tabIndex={0}
-            onClick={(event) => { event.stopPropagation(); onClose(tab.path); }}
-            onKeyDown={(event) => { if (event.key === "Enter") onClose(tab.path); }}
-          >×</span>
-        </button>
-      ))}
+    <div className="tab-strip" role="tablist" aria-label="열린 파일">
+      <div className="window-controls" aria-hidden><i /><i /><i /></div>
+      <div className="tabs-scroll">
+        {tabs.map((tab) => {
+          const active = tab.path === activePath;
+          const extension = tab.path.split(".").at(-1)?.toUpperCase().slice(0, 2) ?? "·";
+          return (
+            <div className={`editor-tab ${active ? "active" : ""}`} key={tab.path} role="presentation">
+              <button type="button" role="tab" aria-selected={active} className="tab-main" onClick={() => onActivate(tab.path)} title={tab.path}>
+                <span className="tab-file-icon">{extension}</span>
+                <span className="tab-name">{tab.path.split("/").at(-1)}</span>
+                {isDirty(tab) && <span className="dirty-dot" title="저장하지 않은 변경" />}
+              </button>
+              <button type="button" className="tab-close" onClick={() => onClose(tab.path)} aria-label={`${tab.path} 닫기`}>×</button>
+            </div>
+          );
+        })}
+      </div>
+      <span className="tab-strip-fill" />
     </div>
   );
 }

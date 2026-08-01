@@ -1,6 +1,5 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { FileService } from "./file-service.js";
 import { WorkspaceRegistry, type WorkspaceRecord } from "./workspace-registry.js";
 import type { SaveFileRequest } from "../shared/file-contract.js";
@@ -8,6 +7,8 @@ import { JsonlLogger } from "./logger.js";
 
 export class WorkspaceController {
   private readonly services = new Map<string, FileService>();
+  private runAgent: (command: string, workspace: WorkspaceRecord) => Promise<{ requestId: string }> = async (command) => ({ requestId: `mock-${command}` });
+  private cancelAgent: () => Promise<boolean> = async () => false;
 
   constructor(
     readonly registry: WorkspaceRegistry,
@@ -19,6 +20,14 @@ export class WorkspaceController {
     if (projectPath) await this.bindDefault(projectPath);
     const current = this.registry.get("default");
     if (current?.realProjectPath) await this.ensureService(current);
+  }
+
+  setAgentCommands(commands: {
+    run(command: string, workspace: WorkspaceRecord): Promise<{ requestId: string }>;
+    cancel(): Promise<boolean>;
+  }): void {
+    this.runAgent = commands.run;
+    this.cancelAgent = commands.cancel;
   }
 
   installIpc(): void {
@@ -37,14 +46,15 @@ export class WorkspaceController {
       return result;
     });
     ipcMain.handle("agent:run", async (_event, command: string, workspaceId: string) => {
-      const requestId = randomUUID();
-      this.broadcast("agent:status", `Mock Agent Host 대기: ${command}`);
-      await this.logger.write("info", "agent_run_requested", { requestId, workspaceId });
-      return { requestId };
+      const workspace = this.registry.get(workspaceId);
+      if (!workspace?.realProjectPath) throw new Error("프로젝트가 연결되지 않았습니다");
+      const result = await this.runAgent(command, workspace);
+      await this.logger.write("info", "agent_run_requested", { requestId: result.requestId, workspaceId });
+      return result;
     });
     ipcMain.handle("agent:cancel", async () => {
       this.broadcast("agent:status", "취소 요청됨");
-      return false;
+      return this.cancelAgent();
     });
   }
 
@@ -92,5 +102,9 @@ export class WorkspaceController {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(channel, payload);
     }
+  }
+
+  sendAgentStatus(status: string): void {
+    this.broadcast("agent:status", status);
   }
 }

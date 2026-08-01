@@ -20,12 +20,10 @@ export interface AgentHostResponseMap {
   shutdown: { accepted: true };
 }
 
-export type AgentHostRequest<K extends keyof AgentHostRequestMap = keyof AgentHostRequestMap> = {
-  kind: "request";
-  id: string;
-  method: K;
-  payload: AgentHostRequestMap[K];
-};
+export type AgentHostRequest<K extends keyof AgentHostRequestMap = keyof AgentHostRequestMap> =
+  K extends keyof AgentHostRequestMap
+    ? { kind: "request"; id: string; method: K; payload: AgentHostRequestMap[K] }
+    : never;
 
 export type AgentHostResponse = {
   kind: "response";

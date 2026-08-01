@@ -11,7 +11,7 @@
   "scripts": {
     "build": "vite build && npm run build:main",
     "build:renderer": "vite build",
-    "build:main": "tsc -p tsconfig.main.json && esbuild src/main/index.ts --bundle --platform=node --format=cjs --outfile=dist-main/main/index.cjs --external:electron",
+    "build:main": "tsc -p tsconfig.main.json && esbuild src/main/index.ts --bundle --platform=node --format=cjs --outfile=dist-main/main/index.cjs --external:electron && esbuild src/agent-host/index.ts --bundle --platform=node --format=cjs --outfile=dist-main/agent-host/index.cjs --external:electron",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

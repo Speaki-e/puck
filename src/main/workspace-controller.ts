@@ -40,6 +40,8 @@ export class WorkspaceController {
     ipcMain.handle("files:list-tree", async (_event, workspaceId: string) => (await this.service(workspaceId)).listTree());
     ipcMain.handle("files:read", async (_event, workspaceId: string, filePath: string) =>
       (await this.service(workspaceId)).readFile(filePath));
+    ipcMain.handle("files:preview-image", async (_event, workspaceId: string, filePath: string) =>
+      (await this.service(workspaceId)).readImagePreview(filePath));
     ipcMain.handle("files:save", async (_event, workspaceId: string, request: SaveFileRequest) => {
       const result = await (await this.service(workspaceId)).saveFile(request);
       await this.logger.write("info", "file_saved", { workspaceId, path: result.path, size: result.size });
@@ -74,6 +76,7 @@ export class WorkspaceController {
       "workspace:current",
       "files:list-tree",
       "files:read",
+      "files:preview-image",
       "files:save",
       "agent:run",
       "agent:cancel",

@@ -18,7 +18,8 @@ export type EditorAction =
   | { type: "diskChanged"; path: string }
   | { type: "reload"; file: FileContent }
   | { type: "keepMine"; path: string }
-  | { type: "close"; path: string };
+  | { type: "close"; path: string }
+  | { type: "restore"; tabs: EditorTab[]; activePath?: string };
 
 export function isDirty(tab: EditorTab): boolean {
   return tab.content !== tab.savedContent;
@@ -77,5 +78,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         : state.activePath;
       return { tabs, activePath };
     }
+    case "restore":
+      return { tabs: action.tabs, activePath: action.activePath ?? action.tabs.at(-1)?.path };
   }
 }

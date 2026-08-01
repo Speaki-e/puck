@@ -12,6 +12,7 @@ import {
 } from "../shared/file-contract.js";
 
 export const DEFAULT_EDITABLE_SIZE_LIMIT = 2 * 1024 * 1024;
+export const DEFAULT_IMAGE_PREVIEW_SIZE_LIMIT = 10 * 1024 * 1024;
 const DEFAULT_IGNORES = new Set([".git", "node_modules", "dist", "dist-main", "release"]);
 
 function revision(buffer: Buffer): string {
@@ -22,6 +23,23 @@ function isBinary(buffer: Buffer): boolean {
   const sample = buffer.subarray(0, Math.min(buffer.length, 8192));
   return sample.includes(0);
 }
+
+function imageMime(buffer: Buffer): string | undefined {
+  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+  const header = buffer.subarray(0, 6).toString("ascii");
+  if (header === "GIF87a" || header === "GIF89a") return "image/gif";
+  if (buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  return undefined;
+}
+
+const IMAGE_EXTENSION_MIME = new Map([
+  [".png", "image/png"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".gif", "image/gif"],
+  [".webp", "image/webp"],
+]);
 
 function languageFor(filePath: string): string | undefined {
   const extension = path.extname(filePath).toLowerCase();
@@ -84,6 +102,31 @@ export class FileService extends EventEmitter {
       readOnly: metadata.size > this.editableSizeLimit,
       size: metadata.size,
       language: languageFor(target),
+    };
+  }
+
+  async readImagePreview(requestPath: string): Promise<FileContent> {
+    const target = await this.resolveExisting(requestPath);
+    const metadata = await stat(target);
+    if (!metadata.isFile()) throw new FileServiceError("invalid_path", "파일 경로가 아닙니다");
+    if (metadata.size > DEFAULT_IMAGE_PREVIEW_SIZE_LIMIT) {
+      throw new FileServiceError("file_too_large", "10MB를 초과하는 이미지는 미리 볼 수 없습니다");
+    }
+    const buffer = await readFile(target);
+    const detectedMime = imageMime(buffer);
+    const expectedMime = IMAGE_EXTENSION_MIME.get(path.extname(target).toLowerCase());
+    if (!detectedMime || detectedMime !== expectedMime) {
+      throw new FileServiceError("binary_file", "지원하는 이미지 형식과 실제 파일 내용이 일치하지 않습니다");
+    }
+    return {
+      path: relativeForWire(this.root, target),
+      content: "",
+      revision: revision(buffer),
+      readOnly: true,
+      size: metadata.size,
+      language: "image",
+      mimeType: detectedMime,
+      previewUrl: `data:${detectedMime};base64,${buffer.toString("base64")}`,
     };
   }
 

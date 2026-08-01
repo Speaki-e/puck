@@ -51,4 +51,16 @@ describe("FileService", () => {
     await expect(limited.saveFile({ path: opened.path, content: opened.content, expectedRevision: opened.revision }))
       .rejects.toMatchObject({ code: "file_too_large" });
   });
+
+  it("확장자와 실제 MIME가 일치하는 이미지만 미리보기로 반환한다", async () => {
+    const { root, service } = await fixture();
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+    await writeFile(path.join(root, "pixel.png"), png);
+    const preview = await service.readImagePreview("pixel.png");
+    expect(preview).toMatchObject({ mimeType: "image/png", readOnly: true, language: "image" });
+    expect(preview.previewUrl).toMatch(/^data:image\/png;base64,/);
+
+    await writeFile(path.join(root, "fake.jpg"), png);
+    await expect(service.readImagePreview("fake.jpg")).rejects.toMatchObject({ code: "binary_file" });
+  });
 });

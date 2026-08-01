@@ -92,7 +92,7 @@
 - [x] Electron 폴백 창과 격리된 preload
 - [x] Windows 기본 메뉴·프레임 제거 및 내부 창 제어 버튼
 - [x] 폴백 셸에서 프로젝트 선택·편집·명령 입력·중지·상태 표시
-- [ ] Editor View 정적 빌드를 패키징 결과에서 독립적으로 제공하는지 검증
+- [x] Editor View 정적 빌드의 Monaco worker·로컬 폰트·상대 asset 오프라인 검증
 - [ ] macOS 폴백 창과 타이틀바 동작 검증
 
 ### 김민영

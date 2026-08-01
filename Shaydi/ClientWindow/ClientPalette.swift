@@ -30,12 +30,20 @@ struct ClientPalette {
     /// real `glassEffect` here and a flat bordered fill everywhere else.
     var usesGlassSurfaces: Bool
 
+    // 2026-08-02: neutral tokens (background/border/text) pulled to match
+    // the "Gray" scale of byeolki's 5 Figma references pixel-for-pixel
+    // ("ㅇㄴㅇㄴ 그냥 똑같이 해달라고" -- after an earlier pass that only
+    // touched two components, byeolki wants the visual style matched, not
+    // just cherry-picked). `accent` stays the established pumpkin orange,
+    // not Figma's neutral/black send button -- that's this app's own brand
+    // color (byeolki, 2026-07-30: "호박을 로고로 쓰고 싶어"), deliberately
+    // out of scope for a "match Figma's colors" pass.
     static let light = ClientPalette(
-        background: Color(red: 0.980, green: 0.976, blue: 0.969), // #FAF9F7
+        background: .white, // Gray/White Alpha 0 #FFFFFF
         surface: .white,
-        surfaceBorder: Color(red: 0.925, green: 0.918, blue: 0.902), // #ECEAE6
-        textPrimary: Color(red: 0.102, green: 0.102, blue: 0.102), // #1A1A1A
-        textSecondary: Color(red: 0.42, green: 0.42, blue: 0.42),
+        surfaceBorder: Color(red: 0.933, green: 0.914, blue: 0.941), // Gray/+5 #EEE9F0
+        textPrimary: Color(red: 0.200, green: 0.169, blue: 0.212), // Gray/-3 #332B36
+        textSecondary: Color(red: 0.412, green: 0.369, blue: 0.431), // Gray/0 #695E6E
         accent: Color(red: 0.80, green: 0.42, blue: 0.12),
         onAccent: .white,
         success: .green,

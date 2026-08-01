@@ -76,26 +76,15 @@ struct ChatView: View {
         .background(palette.background)
     }
 
-    /// A solid, always-anchored card with a workspace/session context pill
-    /// (screenshot #2's model-picker pill, repurposed -- this client has no
-    /// model picker, so it names the active session instead) and a
-    /// disclaimer caption underneath -- a real, honest addition regardless
-    /// of the reference: this client runs an actual agent that can be wrong.
+    /// A solid, always-anchored card, plus a disclaimer caption underneath --
+    /// a real, honest addition regardless of the reference: this client runs
+    /// an actual agent that can be wrong. 2026-08-02: the session-context
+    /// pill that used to sit above the text field is gone -- the topBar's
+    /// new session-selector pill (added the same day) already names the
+    /// active session, so this was a second, redundant place saying the same
+    /// thing; Figma's own input container has no such pill either.
     private var inputBar: some View {
         VStack(spacing: ClientTheme.Metrics.spacingSmall) {
-            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.caption2)
-                Text(session.title)
-                    .font(ClientTheme.Typography.caption)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(palette.textSecondary)
-            .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-            .padding(.vertical, 3)
-            .background(palette.surfaceBorder.opacity(0.5), in: Capsule())
-            .frame(maxWidth: .infinity, alignment: .leading)
-
             HStack(spacing: ClientTheme.Metrics.spacingMedium) {
                 TextField("메시지를 입력하세요", text: $draftText, onCommit: send)
                     .textFieldStyle(.plain)
@@ -112,15 +101,19 @@ struct ChatView: View {
                     .buttonStyle(.plain)
                 } else {
                     let canSend = !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    // Figma's send button is a flat gray disc until there's
+                    // something to send, then a solid dark fill -- matched
+                    // here as gray-vs-brand-accent rather than an opacity
+                    // fade, which is what byeolki asked to be fixed
+                    // ("그냥 똑같이 해달라고").
                     Button(action: send) {
                         Image(systemName: "arrow.up")
                             .fontWeight(.semibold)
-                            .foregroundStyle(palette.onAccent)
+                            .foregroundStyle(canSend ? palette.onAccent : palette.textSecondary)
                             .padding(7)
-                            .background(palette.accent, in: Circle())
+                            .background(canSend ? palette.accent : palette.surfaceBorder, in: Circle())
                     }
                     .buttonStyle(.plain)
-                    .opacity(canSend ? 1 : 0.4)
                     .disabled(!canSend)
                 }
             }
@@ -272,11 +265,19 @@ private struct ApprovalBanner: View {
     }
 }
 
-/// 2026-08-01 rebuild: only the **user's** message gets a filled,
-/// accent-tinted bubble now -- the assistant's text flows directly on the
-/// column background, sender row (avatar + name) still above it. Both
-/// sides sharing an identical bubble previously read as two of the same
-/// control rather than two different speakers.
+/// 2026-08-01 rebuild: only the **user's** message gets a tinted bubble
+/// now -- the assistant's text flows directly on the column background,
+/// sender row (avatar + name) still above it. Both sides sharing an
+/// identical bubble previously read as two of the same control rather than
+/// two different speakers.
+///
+/// 2026-08-02: the user bubble's fill went from a solid `accent` block to
+/// `accent.opacity(0.14)` -- the same soft tint already used for the active
+/// sidebar/session row -- to match the neutral, low-contrast bubble in
+/// byeolki's Figma references ("그냥 똑같이 해달라고") without abandoning
+/// the app's own orange accent for a color that isn't ours. Text goes back
+/// to `textPrimary` either way now, since a light tint can't carry white
+/// text.
 private struct MessageBubble: View {
     let text: String
     let isUser: Bool
@@ -286,7 +287,7 @@ private struct MessageBubble: View {
     private var content: some View {
         Text(text)
             .font(ClientTheme.Typography.messageBody)
-            .foregroundStyle(isUser ? palette.onAccent : palette.textPrimary)
+            .foregroundStyle(palette.textPrimary)
             .textSelection(.enabled)
     }
 
@@ -300,7 +301,7 @@ private struct MessageBubble: View {
                         content
                             .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
                             .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
-                            .background(palette.accent, in: ClientTheme.Shapes.bubble)
+                            .background(palette.accent.opacity(0.14), in: ClientTheme.Shapes.bubble)
                     } else {
                         VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingSmall) {
                             content

@@ -61,13 +61,29 @@ enum ClientTheme {
         /// The empty-state greeting -- Sense's "Good Morning" and Orbita's
         /// "Hi, there" are both bold and noticeably larger than any other
         /// text on screen; `summary` alone read as just another label.
-        static let greeting = Font.system(.title2, design: .rounded).weight(.bold)
+        static let greeting = Font.system(.largeTitle, design: .rounded).weight(.bold)
+        /// The line under the greeting (Orbita: "Tell us what you need, and
+        /// we'll handle the rest.") -- the greeting alone read as a title
+        /// with nothing to follow it.
+        static let greetingSubtitle = Font.system(.body, design: .rounded)
+        /// The example-prompt chips under the greeting, and the disclaimer
+        /// caption under the input bar.
+        static let caption = Font.system(.caption, design: .rounded)
         /// Sender labels above a message bubble ("나" / the app's name).
         static let senderLabel = Font.system(.caption2, design: .rounded).weight(.semibold)
     }
 
     enum Metrics {
-        static let sidebarWidth: CGFloat = 232
+        /// 2026-08-01 Orbita-structured redesign: the resizable workspace/
+        /// session sidebar is gone, replaced by a slim icon rail (workspace
+        /// switcher + session history, both behind popovers) -- Orbita's own
+        /// nav rail is this narrow because it holds icons only, never text.
+        static let railWidth: CGFloat = 60
+        static let railButtonSize: CGFloat = 36
+        /// The centered column width the transcript, empty state, and input
+        /// bar all cap themselves to -- Orbita's content never runs edge to
+        /// edge even in a wide window.
+        static let contentMaxWidth: CGFloat = 720
         static let spacingSmall: CGFloat = 6
         static let spacingMedium: CGFloat = 10
         static let spacingLarge: CGFloat = 16

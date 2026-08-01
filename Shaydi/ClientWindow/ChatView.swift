@@ -13,9 +13,6 @@ import SwiftUI
 struct ChatView: View {
     @ObservedObject var session: ChatSession
     let store: ClientWindowStore
-    /// Room left at the top for the window's floating header, which is drawn
-    /// over this view rather than above it.
-    var topInset: CGFloat = 0
 
     @State private var draftText = ""
     @State private var showDisconnectedBanner = false
@@ -34,12 +31,16 @@ struct ChatView: View {
                                 .id(entry.id)
                         }
                     }
+                    .frame(maxWidth: ClientTheme.Metrics.contentMaxWidth)
+                    .frame(maxWidth: .infinity)
                     .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
                     .padding(.bottom, ClientTheme.Metrics.spacingLarge)
-                    .padding(.top, topInset + ClientTheme.Metrics.spacingMedium)
+                    .padding(.top, ClientTheme.Metrics.spacingMedium)
                 }
                 .overlay {
-                    if session.timeline.isEmpty { EmptyTranscript() }
+                    if session.timeline.isEmpty {
+                        EmptyTranscript(onPromptSelected: { draftText = $0 })
+                    }
                 }
                 .onChange(of: session.timeline.count) {
                     guard let lastId = session.timeline.last?.id else { return }
@@ -63,11 +64,13 @@ struct ChatView: View {
         }
     }
 
-    /// A glass capsule floating over the transcript rather than a bar
-    /// welded to the bottom edge -- the Apple-style treatment, and the one
-    /// place the window most needs to read as its own app.
+    /// 2026-08-01 (byeolki: "Orbita로 해봐봐"): Orbita's own input bar is a
+    /// solid, always-anchored card, not a floating glass capsule -- and it
+    /// carries a disclaimer caption underneath, which this adopts too (a
+    /// real, honest addition regardless of the reference: this client runs
+    /// an actual agent that can be wrong).
     private var inputBar: some View {
-        GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
+        VStack(spacing: ClientTheme.Metrics.spacingSmall) {
             HStack(spacing: ClientTheme.Metrics.spacingMedium) {
                 TextField("메시지를 입력하세요", text: $draftText, onCommit: send)
                     .textFieldStyle(.plain)
@@ -101,10 +104,19 @@ struct ChatView: View {
             }
             .padding(.leading, ClientTheme.Metrics.spacingLarge)
             .padding(.trailing, ClientTheme.Metrics.spacingSmall)
-            .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-            .glassSurface(in: Capsule())
+            .padding(.vertical, ClientTheme.Metrics.spacingMedium)
+            .glassSurface(in: ClientTheme.Shapes.card)
+
+            Text("\(AppIdentity.displayName)는 실수를 할 수 있어요.")
+                .font(ClientTheme.Typography.caption)
+                .foregroundStyle(ClientTheme.Colors.secondaryText)
         }
-        .padding(ClientTheme.Metrics.spacingMedium)
+        .frame(maxWidth: ClientTheme.Metrics.contentMaxWidth)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
+        .padding(.top, ClientTheme.Metrics.spacingSmall)
+        .padding(.bottom, ClientTheme.Metrics.spacingLarge)
+        .background(VisualEffectBackground(material: .contentBackground))
     }
 
     private func send() {
@@ -119,9 +131,26 @@ struct ChatView: View {
 
 /// A new session opens onto a large empty pane; without this it reads as a
 /// rendering failure rather than "say something".
+///
+/// 2026-08-01 (byeolki: "Orbita로 해봐봐"): Orbita's own empty state isn't
+/// just an icon and one line -- a subtitle under the greeting, then a row of
+/// suggestion chips the user can tap instead of typing from nothing. Orbita's
+/// own chips are app-specific actions (Connect Calendar, Browse
+/// Integrations) this client has no equivalent for; what carries over
+/// honestly is example *prompts*, since prefilling the input is a real thing
+/// this client can do.
 private struct EmptyTranscript: View {
+    let onPromptSelected: (String) -> Void
+
+    private static let examplePrompts: [(icon: String, text: String)] = [
+        ("doc.text.magnifyingglass", "이 코드 설명해줘"),
+        ("ladybug.fill", "여기 버그 있는지 찾아줘"),
+        ("checkmark.seal", "테스트 작성해줘"),
+        ("wand.and.stars", "리팩토링 해줘"),
+    ]
+
     var body: some View {
-        VStack(spacing: ClientTheme.Metrics.spacingMedium) {
+        VStack(spacing: ClientTheme.Metrics.spacingLarge) {
             ZStack {
                 // A soft glow behind the mark -- Sense's gradient orb and
                 // Orbita's gradient circle both use exactly this to make an
@@ -139,13 +168,88 @@ private struct EmptyTranscript: View {
                     .scaledToFit()
                     .frame(width: 72, height: 72)
             }
-            Text("무엇을 도와드릴까요?")
-                .font(ClientTheme.Typography.greeting)
-                .foregroundStyle(ClientTheme.Colors.bubbleText)
+
+            VStack(spacing: 4) {
+                Text("무엇을 도와드릴까요?")
+                    .font(ClientTheme.Typography.greeting)
+                    .foregroundStyle(ClientTheme.Colors.bubbleText)
+                Text("코드든 잡담이든, 편하게 말 걸어보세요.")
+                    .font(ClientTheme.Typography.greetingSubtitle)
+                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+            }
+
+            FlowChips(items: Self.examplePrompts, onSelect: onPromptSelected)
         }
         .padding(ClientTheme.Metrics.spacingLarge * 1.5)
-        .glassSurface(in: ClientTheme.Shapes.panel)
-        .allowsHitTesting(false)
+        .frame(maxWidth: ClientTheme.Metrics.contentMaxWidth)
+    }
+}
+
+/// The example-prompt row under the empty-state greeting -- wraps onto a
+/// second line rather than overflowing or scrolling horizontally, since the
+/// window's min width (640) is narrower than four chips laid out in one row.
+private struct FlowChips: View {
+    let items: [(icon: String, text: String)]
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        FlowLayout(spacing: ClientTheme.Metrics.spacingSmall) {
+            ForEach(items, id: \.text) { item in
+                Button {
+                    onSelect(item.text)
+                } label: {
+                    Label(item.text, systemImage: item.icon)
+                        .font(ClientTheme.Typography.caption)
+                        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                        .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+                        .glassControl(in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+/// A minimal wrapping row layout -- SwiftUI has no built-in equivalent, and
+/// pulling in a dependency for four chips isn't worth it.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        var rowWidth: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if rowWidth > 0, rowWidth + spacing + size.width > width {
+                totalHeight += rowHeight + spacing
+                rowWidth = 0
+                rowHeight = 0
+            }
+            rowWidth += (rowWidth > 0 ? spacing : 0) + size.width
+            rowHeight = max(rowHeight, size.height)
+        }
+        totalHeight += rowHeight
+        return CGSize(width: width.isFinite ? width : rowWidth, height: totalHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var origin = bounds.origin
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if origin.x > bounds.minX, origin.x + size.width > bounds.maxX {
+                origin.x = bounds.minX
+                origin.y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: origin, proposal: .unspecified)
+            origin.x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 

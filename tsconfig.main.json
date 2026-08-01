@@ -13,5 +13,5 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/main/**/*.ts", "src/agent-host/**/*.ts", "src/shared/**/*.ts", "src/mocks/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/main/**/*.cts", "src/agent-host/**/*.ts", "src/shared/**/*.ts", "src/mocks/**/*.ts"]
 }

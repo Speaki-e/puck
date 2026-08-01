@@ -8,6 +8,7 @@ export class AgentHostController extends EventEmitter {
   private child?: UtilityProcess;
   private rpc?: AgentHostRpc;
   private stopping = false;
+  private ready = false;
   private restartTimer?: NodeJS.Timeout;
 
   constructor(
@@ -22,6 +23,7 @@ export class AgentHostController extends EventEmitter {
   async start(): Promise<void> {
     if (this.child) return;
     this.stopping = false;
+    this.ready = false;
     const child = utilityProcess.fork(this.modulePath, [], {
       serviceName: "Workspace Agent Host",
       env: {
@@ -33,7 +35,13 @@ export class AgentHostController extends EventEmitter {
     this.child = child;
     const rpc = new AgentHostRpc((message) => child.postMessage(message));
     this.rpc = rpc;
-    rpc.on("event", (event: AgentHostEvent) => this.emit("event", event));
+    rpc.on("event", (event: AgentHostEvent) => {
+      if (event.event === "ready") {
+        this.ready = true;
+        this.emit("ready");
+      }
+      this.emit("event", event);
+    });
     child.on("message", (message) => rpc.receive(message as never));
     child.on("spawn", () => {
       void this.logger.write("info", "agent_host_spawned", { pid: child.pid });
@@ -48,7 +56,13 @@ export class AgentHostController extends EventEmitter {
     timeoutMs?: number,
   ): Promise<AgentHostResponseMap[K]> {
     if (!this.rpc) return Promise.reject(new Error("Agent Host가 실행 중이 아닙니다"));
-    return this.rpc.request(method, payload, timeoutMs);
+    const execute = () => {
+      if (!this.rpc) throw new Error("Agent Host가 실행 중이 아닙니다");
+      return this.rpc.request(method, payload, timeoutMs);
+    };
+    return this.ready
+      ? execute()
+      : this.waitUntilReady(Math.min(timeoutMs ?? 30_000, 10_000)).then(execute);
   }
 
   async stop(): Promise<void> {
@@ -65,6 +79,7 @@ export class AgentHostController extends EventEmitter {
     this.rpc?.failAll("Agent Host가 종료되었습니다");
     this.rpc = undefined;
     this.child = undefined;
+    this.ready = false;
   }
 
   get pid(): number | undefined {
@@ -76,6 +91,7 @@ export class AgentHostController extends EventEmitter {
     rpc.failAll(`Agent Host가 비정상 종료되었습니다 (${code})`);
     this.rpc = undefined;
     this.child = undefined;
+    this.ready = false;
     void this.logger.write(code === 0 ? "info" : "error", "agent_host_exited", { code });
     if (this.stopping) return;
     this.emit("status", "AI 기능을 다시 시작하는 중");
@@ -84,5 +100,20 @@ export class AgentHostController extends EventEmitter {
       this.restartTimer = undefined;
       void this.start();
     }, 1_000);
+  }
+
+  private waitUntilReady(timeoutMs: number): Promise<void> {
+    if (this.ready) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const onReady = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        this.off("ready", onReady);
+        reject(new Error("Agent Host 준비 시간 초과"));
+      }, timeoutMs);
+      this.once("ready", onReady);
+    });
   }
 }

@@ -255,8 +255,8 @@
 ### 이주한
 
 - [ ] 실제 통합 후 Agent Host 리소스·프로세스 경계 조정
-- [ ] code_editor 실행 중 파일 변경을 Editor View에 실시간 표시
-- [ ] 전체 흐름에서 Main 이벤트 루프 응답성 확인
+- [x] ACP tool location의 작업 중 파일을 Editor View 파일 트리에 실시간 표시
+- [x] Agent Host CPU 작업 중 Main 이벤트 루프 응답성 E2E 확인
 
 ### 공통
 
@@ -295,11 +295,11 @@
 - [x] Electron 종료 시 Bridge·Agent Host·FileService 정리
 - [x] electron-builder Windows 디렉터리 패키징
 - [x] 실행·구조 README
-- [ ] 저장된 폴백 창 크기 적용
-- [ ] 로그 회전·보존 기간·최대 크기
-- [ ] Windows 앱 아이콘과 설치 프로그램
+- [x] 저장된 폴백 창 크기·위치·최대화 상태 적용 및 화면 이탈 복구
+- [x] 로그 일별·5MB 회전, 14일 보존, 최대 30개 파일 정책
+- [x] 자체 노드 아이콘과 Windows NSIS 설치 프로그램 구성
 - [ ] macOS 앱 아이콘·서명·notarization·패키징
-- [ ] 배포 환경에서 Claude Agent ACP 실행 파일 탐색 검증
+- [x] Windows 패키지에서 Agent Host·Claude ACP·native `claude.exe` 탐색 검증
 
 ### 공통
 

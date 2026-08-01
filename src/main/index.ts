@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, safeStorage } from "electron";
+import { app, BrowserWindow, Menu, safeStorage, screen } from "electron";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { JsonlLogger } from "./logger.js";
@@ -7,6 +7,9 @@ import { WorkspaceController } from "./workspace-controller.js";
 import { AgentHostController } from "./agent-host-controller.js";
 import { PetBridge } from "./pet-bridge.js";
 import { SecretStore } from "./secret-store.js";
+import { normalizeWindowState, WindowStateStore } from "./window-state-store.js";
+import { resolveClaudeAgentCommand } from "../shared/acp-command.js";
+import { workingPathsFromUpdate, type AcpUpdatePayload } from "../shared/acp-update.js";
 
 const isHeadless = process.argv.includes("--headless");
 
@@ -15,10 +18,16 @@ function argumentValue(name: string): string | undefined {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
-async function createFallbackWindow(): Promise<void> {
+async function createFallbackWindow(stateStore: WindowStateStore): Promise<() => Promise<void>> {
+  const state = normalizeWindowState(
+    await stateStore.load(),
+    screen.getAllDisplays().map((display) => display.workArea),
+  );
   const window = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    x: state.x,
+    y: state.y,
+    width: state.width,
+    height: state.height,
     minWidth: 880,
     minHeight: 560,
     title: "Workspace",
@@ -32,8 +41,31 @@ async function createFallbackWindow(): Promise<void> {
       preload: path.join(app.getAppPath(), "dist-main", "main", "preload.cjs"),
     },
   });
+  let saveTimer: NodeJS.Timeout | undefined;
+  const persistBounds = () => {
+    const bounds = window.getNormalBounds();
+    return stateStore.save({ ...bounds, maximized: window.isMaximized() });
+  };
+  const saveBounds = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      saveTimer = undefined;
+      void persistBounds();
+    }, 250);
+  };
+  window.on("move", saveBounds);
+  window.on("resize", saveBounds);
+  window.on("maximize", saveBounds);
+  window.on("unmaximize", saveBounds);
+  window.on("close", () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = undefined;
+    void persistBounds();
+  });
   window.setMenuBarVisibility(false);
   await window.loadFile(path.join(app.getAppPath(), "dist", "index.html"));
+  if (state.maximized) window.maximize();
+  return () => window.isDestroyed() ? stateStore.flush() : persistBounds();
 }
 
 async function main(): Promise<void> {
@@ -42,6 +74,7 @@ async function main(): Promise<void> {
   const logger = new JsonlLogger(path.join(app.getPath("userData"), "logs"));
   const registry = new WorkspaceRegistry(path.join(app.getPath("userData"), "workspaces.json"));
   const secrets = new SecretStore(path.join(app.getPath("userData"), "secrets.json"), safeStorage);
+  const windowStateStore = new WindowStateStore(path.join(app.getPath("userData"), "window-state.json"));
   const environmentApiKey = process.env.ANTHROPIC_API_KEY;
   if (environmentApiKey && secrets.available && !(await secrets.get("claudeApiKey"))) {
     await secrets.set("claudeApiKey", environmentApiKey);
@@ -49,8 +82,11 @@ async function main(): Promise<void> {
   const claudeApiKey = await secrets.get("claudeApiKey") ?? environmentApiKey;
   const controller = new WorkspaceController(registry, logger);
   await controller.initialize(argumentValue("--project"));
+  const agentHostModulePath = app.isPackaged
+    ? path.join(path.dirname(app.getAppPath()), "app.asar.unpacked", "dist-main", "agent-host", "index.cjs")
+    : path.join(app.getAppPath(), "dist-main", "agent-host", "index.cjs");
   const agentHost = new AgentHostController(
-    path.join(app.getAppPath(), "dist-main", "agent-host", "index.cjs"),
+    agentHostModulePath,
     logger,
     app.getAppPath(),
     claudeApiKey,
@@ -62,16 +98,21 @@ async function main(): Promise<void> {
       agentHostPid: () => agentHost.pid,
       pingAgentHost: () => agentHost.request("ping", { now: Date.now() }, 2_000),
       crashAgentHost: () => agentHost.request("crashForTest", {}, 2_000).then(() => false, () => true),
+      busyAgentHost: (durationMs: number) => agentHost.request("busyForTest", { durationMs }, 5_000),
+      resolveAcpCommand: () => resolveClaudeAgentCommand(app.getAppPath()),
     };
   }
   const petBridge = new PetBridge({ socketPath: argumentValue("--bridge-socket"), logger });
   petBridge.on("state", (state: string) => controller.sendAgentStatus(`pet-app: ${state}`));
   petBridge.connect();
-  let activeRun: { requestId: string; workspaceId: string; sessionId: string } | undefined;
+  let activeRun: { requestId: string; workspaceId: string; sessionId: string; projectPath: string } | undefined;
   agentHost.on("event", (event: { event: string; payload: unknown }) => {
     if (event.event === "status") controller.sendAgentStatus(JSON.stringify(event.payload));
     if (event.event !== "code_editor_update" || !activeRun) return;
-    const payload = event.payload as { sessionUpdate?: string; content?: { type?: string; text?: string } };
+    const payload = event.payload as AcpUpdatePayload;
+    if (payload.locations) {
+      controller.sendWorkingPaths(workingPathsFromUpdate(activeRun.projectPath, payload));
+    }
     if (payload.sessionUpdate === "agent_message_chunk" && payload.content?.type === "text" && payload.content.text) {
       petBridge.sendEvent({
         type: "event",
@@ -85,7 +126,7 @@ async function main(): Promise<void> {
   const runAgent = async (command: string, workspace: { id: string; realProjectPath?: string }, sessionId: string) => {
     if (!workspace.realProjectPath) throw new Error("프로젝트가 연결되지 않았습니다");
     const requestId = randomUUID();
-    activeRun = { requestId, workspaceId: workspace.id, sessionId };
+    activeRun = { requestId, workspaceId: workspace.id, sessionId, projectPath: workspace.realProjectPath };
     petBridge.sendEvent({ type: "event", workspace_id: workspace.id, session_id: sessionId, event: "agent_thinking" });
     void agentHost.request("runCodeEditor", {
       requestId,
@@ -109,7 +150,10 @@ async function main(): Promise<void> {
       controller.sendAgentStatus(summary);
       petBridge.sendEvent({ type: "event", workspace_id: workspace.id, session_id: sessionId, event: "agent_done", ok: false, summary });
     }).finally(() => {
-      if (activeRun?.requestId === requestId) activeRun = undefined;
+      if (activeRun?.requestId === requestId) {
+        activeRun = undefined;
+        controller.sendWorkingPaths([]);
+      }
     });
     return { requestId };
   };
@@ -141,7 +185,9 @@ async function main(): Promise<void> {
   controller.installIpc();
   await logger.write("info", "workspace_started", { headless: isHeadless });
 
-  if (!isHeadless) await createFallbackWindow();
+  const saveWindowState = isHeadless
+    ? () => windowStateStore.flush()
+    : await createFallbackWindow(windowStateStore);
 
   app.on("window-all-closed", () => {
     if (!isHeadless) app.quit();
@@ -152,7 +198,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     event.preventDefault();
     shuttingDown = true;
-    void Promise.all([petBridge.close(), agentHost.stop(), controller.close()])
+    void Promise.all([petBridge.close(), agentHost.stop(), controller.close(), saveWindowState()])
       .finally(() => app.exit(0));
   });
 }

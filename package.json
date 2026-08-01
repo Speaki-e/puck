@@ -20,9 +20,12 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "dev:renderer": "vite --host 127.0.0.1",
+    "generate:icon": "electron scripts/generate-icon.cjs",
     "start": "npm run build && electron .",
     "start:headless": "npm run build && electron . --headless",
     "package": "npm run build && electron-builder --dir",
+    "package:win": "npm run build && set PATH=%CD%\\scripts;%PATH% && electron-builder --win nsis dir && npm run verify:package:win",
+    "verify:package:win": "node scripts/verify-windows-package.mjs",
     "dist": "npm run build && electron-builder"
   },
   "dependencies": {
@@ -64,6 +67,7 @@
       "package.json"
     ],
     "asarUnpack": [
+      "dist-main/agent-host/**/*",
       "node_modules/@agentclientprotocol/claude-agent-acp/**/*"
     ],
     "mac": {
@@ -71,8 +75,19 @@
       "identity": null
     },
     "win": {
-      "target": "dir",
+      "target": [
+        "nsis",
+        "dir"
+      ],
+      "icon": "assets/icon.png",
       "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Workspace"
     }
   }
 }

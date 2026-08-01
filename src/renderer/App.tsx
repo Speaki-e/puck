@@ -88,7 +88,7 @@ export function App() {
   const [state, dispatch] = useReducer(editorReducer, initialState);
   const [command, setCommand] = useState("");
   const [status, setStatus] = useState("준비됨");
-  const [workingPaths] = useState(() => new Set<string>());
+  const [workingPaths, setWorkingPaths] = useState(() => new Set<string>());
   const restoredProjects = useRef(new Set<string>());
   const active = state.tabs.find((tab) => tab.path === state.activePath);
 
@@ -111,6 +111,7 @@ export function App() {
   }), [api, refreshTree, state.tabs, workspace]);
 
   useEffect(() => api?.onAgentStatus(setStatus), [api]);
+  useEffect(() => api?.onWorkingPaths((paths) => setWorkingPaths(new Set(paths))), [api]);
 
   useEffect(() => {
     if (!api || !workspace?.projectPath || restoredProjects.current.has(workspace.projectPath)) return;

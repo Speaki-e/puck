@@ -11,6 +11,7 @@ export interface AgentHostRequestMap {
   };
   cancelCodeEditor: { requestId: string };
   crashForTest: Record<string, never>;
+  busyForTest: { durationMs: number };
   shutdown: Record<string, never>;
 }
 
@@ -19,6 +20,7 @@ export interface AgentHostResponseMap {
   runCodeEditor: JSONValue;
   cancelCodeEditor: { cancelled: boolean };
   crashForTest: { accepted: true };
+  busyForTest: { elapsedMs: number };
   shutdown: { accepted: true };
 }
 

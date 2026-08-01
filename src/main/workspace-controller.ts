@@ -132,4 +132,8 @@ export class WorkspaceController {
   sendAgentStatus(status: string): void {
     this.broadcast("agent:status", status);
   }
+
+  sendWorkingPaths(paths: string[]): void {
+    this.broadcast("agent:working-paths", paths);
+  }
 }

@@ -50,9 +50,16 @@ test("Agent Host가 반복 충돌해도 하나의 프로세스로 복구한다",
   });
   try {
     await expect.poll(
-      () => application.evaluate(() => (globalThis as any).__workspaceTest?.agentHostPid()),
+      () => application.evaluate(async () => {
+        try {
+          await (globalThis as any).__workspaceTest?.pingAgentHost();
+          return true;
+        } catch {
+          return false;
+        }
+      }),
       { timeout: 10_000 },
-    ).not.toBeUndefined();
+    ).toBe(true);
     let previousPid = await application.evaluate(() => (globalThis as any).__workspaceTest.agentHostPid()) as number;
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -66,13 +73,42 @@ test("Agent Host가 반복 충돌해도 하나의 프로세스로 복구한다",
           } catch {
             return undefined;
           }
-        }),
+        }).then((pid) => typeof pid === "number" && pid !== previousPid),
         { timeout: 10_000 },
-      ).not.toBe(previousPid);
+      ).toBe(true);
       const nextPid = await application.evaluate(() => (globalThis as any).__workspaceTest.agentHostPid()) as number;
       expect(typeof nextPid).toBe("number");
       previousPid = nextPid;
     }
+  } finally {
+    await application.close();
+  }
+});
+
+test("Agent Host가 CPU 작업 중이어도 Main 이벤트 루프는 응답한다", async () => {
+  const application = await electron.launch({
+    executablePath: electronPath,
+    args: [path.resolve("."), "--headless"],
+    env: { ...process.env, NODE_ENV: "test" },
+  });
+  try {
+    await expect.poll(
+      () => application.evaluate(async () => {
+        try {
+          await (globalThis as any).__workspaceTest?.pingAgentHost();
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+      { timeout: 10_000 },
+    ).toBe(true);
+    const busy = application.evaluate(() => (globalThis as any).__workspaceTest.busyAgentHost(750));
+    const startedAt = Date.now();
+    const mainResponse = await application.evaluate(() => "responsive");
+    expect(mainResponse).toBe("responsive");
+    expect(Date.now() - startedAt).toBeLessThan(300);
+    await expect(busy).resolves.toMatchObject({ elapsedMs: expect.any(Number) });
   } finally {
     await application.close();
   }

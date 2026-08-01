@@ -24,6 +24,7 @@ export interface WorkspaceApi {
   windowControl(action: "minimize" | "maximize" | "close"): Promise<boolean>;
   onFileChange(listener: (event: FileChangeEvent) => void): () => void;
   onAgentStatus(listener: (status: string) => void): () => void;
+  onWorkingPaths(listener: (paths: string[]) => void): () => void;
 }
 
 declare global {

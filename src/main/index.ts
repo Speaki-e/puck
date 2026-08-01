@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, safeStorage } from "electron";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { JsonlLogger } from "./logger.js";
@@ -6,6 +6,7 @@ import { WorkspaceRegistry } from "./workspace-registry.js";
 import { WorkspaceController } from "./workspace-controller.js";
 import { AgentHostController } from "./agent-host-controller.js";
 import { PetBridge } from "./pet-bridge.js";
+import { SecretStore } from "./secret-store.js";
 
 const isHeadless = process.argv.includes("--headless");
 
@@ -35,12 +36,19 @@ async function main(): Promise<void> {
   await app.whenReady();
   const logger = new JsonlLogger(path.join(app.getPath("userData"), "logs"));
   const registry = new WorkspaceRegistry(path.join(app.getPath("userData"), "workspaces.json"));
+  const secrets = new SecretStore(path.join(app.getPath("userData"), "secrets.json"), safeStorage);
+  const environmentApiKey = process.env.ANTHROPIC_API_KEY;
+  if (environmentApiKey && secrets.available && !(await secrets.get("claudeApiKey"))) {
+    await secrets.set("claudeApiKey", environmentApiKey);
+  }
+  const claudeApiKey = await secrets.get("claudeApiKey") ?? environmentApiKey;
   const controller = new WorkspaceController(registry, logger);
   await controller.initialize(argumentValue("--project"));
   const agentHost = new AgentHostController(
     path.join(app.getAppPath(), "dist-main", "agent-host", "index.cjs"),
     logger,
     app.getAppPath(),
+    claudeApiKey,
   );
   agentHost.on("status", (status: string) => controller.sendAgentStatus(status));
   agentHost.on("event", (event: { event: string; payload: unknown }) => {
@@ -83,10 +91,13 @@ async function main(): Promise<void> {
     if (!isHeadless) app.quit();
   });
 
-  app.on("before-quit", () => {
-    void petBridge.close();
-    void agentHost.stop();
-    void controller.close();
+  let shuttingDown = false;
+  app.on("before-quit", (event) => {
+    if (shuttingDown) return;
+    event.preventDefault();
+    shuttingDown = true;
+    void Promise.all([petBridge.close(), agentHost.stop(), controller.close()])
+      .finally(() => app.exit(0));
   });
 }
 

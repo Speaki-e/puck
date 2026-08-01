@@ -209,12 +209,12 @@ struct SettingsView: View {
 
             Text(apiKeyStatus)
                 .font(.footnote)
-                .foregroundStyle(agentConfiguration.isConfigured ? ClientTheme.Colors.secondaryText : ClientTheme.Colors.warning)
+                .foregroundStyle(agentConfiguration.isConfigured ? .secondary : Color.orange)
                 .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
 
             Text(text(.apiKeyExplanation))
                 .font(.footnote)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
         }
     }
@@ -323,7 +323,7 @@ struct SettingsView: View {
             SettingsRow(label: text(.accessibilityLabel)) {
                 Text(AccessibilityPermission.isTrusted(prompt: false) ? text(.accessibilityGranted) : text(.accessibilityNotGranted))
                     .font(.caption)
-                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(.secondary)
             }
             // The launch prompt only appears once, so this is the way back
             // for anyone who dismissed it or revoked the grant later.
@@ -332,7 +332,7 @@ struct SettingsView: View {
             }
             Text(text(.accessibilityExplanation))
                 .font(.footnote)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
         }
     }

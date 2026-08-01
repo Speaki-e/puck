@@ -7,12 +7,23 @@
 //  "onTextChunk 스트리밍, onToolCallStart/Result를 id로 짝지은 접이식
 //  타임라인, onApprovalRequired는 요청 요약+허용/거부 버튼, 중지 버튼".
 //
+//  2026-08-01 design-system rebuild: assistant messages no longer carry a
+//  bubble background (only the user's own message does -- see
+//  MessageBubble below), and every card/row/bubble routes through
+//  themedSurface(_:in:) so it renders flat-bordered or real glass
+//  depending on the active ClientThemeStyle. A hover-revealed inline
+//  action pill on assistant messages (copy/retry) is new, ported from
+//  reference screenshot #3's inline "Reply" affordance -- screenshot #3's
+//  input-field autocomplete is explicitly out of scope (no backend signal
+//  to suggest from; see the design spec).
+//
 
 import SwiftUI
 
 struct ChatView: View {
     @ObservedObject var session: ChatSession
     let store: ClientWindowStore
+    @Environment(\.clientPalette) private var palette
 
     @State private var draftText = ""
     @State private var showDisconnectedBanner = false
@@ -47,8 +58,8 @@ struct ChatView: View {
                     withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
                 }
                 // safeAreaInset, not a VStack row below the scroll view: the
-                // transcript has to scroll *under* the glass capsule for the
-                // refraction to be visible at all.
+                // transcript has to scroll *under* the input card for it to
+                // read as anchored rather than just another row.
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 0) {
                         if let pending = session.pendingApproval {
@@ -62,40 +73,51 @@ struct ChatView: View {
                 }
             }
         }
+        .background(palette.background)
     }
 
-    /// 2026-08-01 (byeolki: "Orbita로 해봐봐"): Orbita's own input bar is a
-    /// solid, always-anchored card, not a floating glass capsule -- and it
-    /// carries a disclaimer caption underneath, which this adopts too (a
-    /// real, honest addition regardless of the reference: this client runs
-    /// an actual agent that can be wrong).
+    /// A solid, always-anchored card with a workspace/session context pill
+    /// (screenshot #2's model-picker pill, repurposed -- this client has no
+    /// model picker, so it names the active session instead) and a
+    /// disclaimer caption underneath -- a real, honest addition regardless
+    /// of the reference: this client runs an actual agent that can be wrong.
     private var inputBar: some View {
         VStack(spacing: ClientTheme.Metrics.spacingSmall) {
+            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.caption2)
+                Text(session.title)
+                    .font(ClientTheme.Typography.caption)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(palette.textSecondary)
+            .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            .padding(.vertical, 3)
+            .background(palette.surfaceBorder.opacity(0.5), in: Capsule())
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             HStack(spacing: ClientTheme.Metrics.spacingMedium) {
                 TextField("메시지를 입력하세요", text: $draftText, onCommit: send)
                     .textFieldStyle(.plain)
                     .font(ClientTheme.Typography.messageBody)
+                    .foregroundStyle(palette.textPrimary)
 
                 if session.isRunning {
                     Button(action: { store.cancelActiveRun() }) {
                         Image(systemName: "stop.fill")
-                            .foregroundStyle(ClientTheme.Colors.failure)
+                            .foregroundStyle(palette.failure)
                             .padding(7)
-                            .glassControl(in: Circle())
+                            .themedSurface(palette, in: Circle())
                     }
                     .buttonStyle(.plain)
                 } else {
-                    // Filled with `accent`, not just glass -- the one button
-                    // every reference shot (Sense, the dark chat, Orbita)
-                    // treats as the single colored anchor in an otherwise
-                    // neutral bar.
                     let canSend = !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     Button(action: send) {
                         Image(systemName: "arrow.up")
                             .fontWeight(.semibold)
-                            .foregroundStyle(ClientTheme.Colors.onAccent)
+                            .foregroundStyle(palette.onAccent)
                             .padding(7)
-                            .glassControl(in: Circle(), tint: ClientTheme.Colors.accent)
+                            .background(palette.accent, in: Circle())
                     }
                     .buttonStyle(.plain)
                     .opacity(canSend ? 1 : 0.4)
@@ -105,18 +127,18 @@ struct ChatView: View {
             .padding(.leading, ClientTheme.Metrics.spacingLarge)
             .padding(.trailing, ClientTheme.Metrics.spacingSmall)
             .padding(.vertical, ClientTheme.Metrics.spacingMedium)
-            .glassSurface(in: ClientTheme.Shapes.card)
+            .themedSurface(palette, in: ClientTheme.Shapes.card)
 
             Text("\(AppIdentity.displayName)는 실수를 할 수 있어요.")
                 .font(ClientTheme.Typography.caption)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .foregroundStyle(palette.textSecondary)
         }
         .frame(maxWidth: ClientTheme.Metrics.contentMaxWidth)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
         .padding(.top, ClientTheme.Metrics.spacingSmall)
         .padding(.bottom, ClientTheme.Metrics.spacingLarge)
-        .background(VisualEffectBackground(material: .contentBackground))
+        .background(palette.background)
     }
 
     private func send() {
@@ -131,16 +153,9 @@ struct ChatView: View {
 
 /// A new session opens onto a large empty pane; without this it reads as a
 /// rendering failure rather than "say something".
-///
-/// 2026-08-01 (byeolki: "Orbita로 해봐봐"): Orbita's own empty state isn't
-/// just an icon and one line -- a subtitle under the greeting, then a row of
-/// suggestion chips the user can tap instead of typing from nothing. Orbita's
-/// own chips are app-specific actions (Connect Calendar, Browse
-/// Integrations) this client has no equivalent for; what carries over
-/// honestly is example *prompts*, since prefilling the input is a real thing
-/// this client can do.
 private struct EmptyTranscript: View {
     let onPromptSelected: (String) -> Void
+    @Environment(\.clientPalette) private var palette
 
     private static let examplePrompts: [(icon: String, text: String)] = [
         ("doc.text.magnifyingglass", "이 코드 설명해줘"),
@@ -152,12 +167,10 @@ private struct EmptyTranscript: View {
     var body: some View {
         VStack(spacing: ClientTheme.Metrics.spacingLarge) {
             ZStack {
-                // A soft glow behind the mark -- Sense's gradient orb and
-                // Orbita's gradient circle both use exactly this to make an
-                // otherwise flat icon read as the app's "hero" rather than
-                // just another asset.
+                // A soft glow behind the mark -- an otherwise flat icon
+                // reads as the app's "hero" rather than just another asset.
                 Circle()
-                    .fill(ClientTheme.Colors.accent.opacity(0.35))
+                    .fill(palette.accent.opacity(0.35))
                     .frame(width: 96, height: 96)
                     .blur(radius: 24)
                 // The pumpkin is the app's mark (byeolki, 2026-07-30: "호박을
@@ -172,10 +185,10 @@ private struct EmptyTranscript: View {
             VStack(spacing: 4) {
                 Text("무엇을 도와드릴까요?")
                     .font(ClientTheme.Typography.greeting)
-                    .foregroundStyle(ClientTheme.Colors.bubbleText)
+                    .foregroundStyle(palette.textPrimary)
                 Text("코드든 잡담이든, 편하게 말 걸어보세요.")
                     .font(ClientTheme.Typography.greetingSubtitle)
-                    .foregroundStyle(ClientTheme.Colors.secondaryText)
+                    .foregroundStyle(palette.textSecondary)
             }
 
             FlowChips(items: Self.examplePrompts, onSelect: onPromptSelected)
@@ -185,12 +198,10 @@ private struct EmptyTranscript: View {
     }
 }
 
-/// The example-prompt row under the empty-state greeting -- wraps onto a
-/// second line rather than overflowing or scrolling horizontally, since the
-/// window's min width (640) is narrower than four chips laid out in one row.
 private struct FlowChips: View {
     let items: [(icon: String, text: String)]
     let onSelect: (String) -> Void
+    @Environment(\.clientPalette) private var palette
 
     var body: some View {
         FlowLayout(spacing: ClientTheme.Metrics.spacingSmall) {
@@ -200,9 +211,10 @@ private struct FlowChips: View {
                 } label: {
                     Label(item.text, systemImage: item.icon)
                         .font(ClientTheme.Typography.caption)
+                        .foregroundStyle(palette.textPrimary)
                         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
                         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                        .glassControl(in: Capsule())
+                        .themedSurface(palette, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -211,7 +223,8 @@ private struct FlowChips: View {
 }
 
 /// A minimal wrapping row layout -- SwiftUI has no built-in equivalent, and
-/// pulling in a dependency for four chips isn't worth it.
+/// pulling in a dependency for four chips isn't worth it. Pure geometry,
+/// unchanged by the 2026-08-01 rebuild.
 private struct FlowLayout: Layout {
     var spacing: CGFloat
 
@@ -254,13 +267,15 @@ private struct FlowLayout: Layout {
 }
 
 private struct DisconnectedBanner: View {
+    @Environment(\.clientPalette) private var palette
+
     var body: some View {
         Label("워크스페이스가 꺼져 있어요", systemImage: "bolt.horizontal.circle")
             .font(ClientTheme.Typography.sectionHeader)
-            .foregroundStyle(ClientTheme.Colors.failure)
+            .foregroundStyle(palette.failure)
             .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
             .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-            .glassSurface(in: Capsule())
+            .themedSurface(palette, in: Capsule())
             .padding(ClientTheme.Metrics.spacingSmall)
     }
 }
@@ -268,53 +283,53 @@ private struct DisconnectedBanner: View {
 private struct ApprovalBanner: View {
     let summary: String
     let onRespond: (Bool) -> Void
+    @Environment(\.clientPalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingSmall) {
             Label(summary, systemImage: "exclamationmark.triangle.fill")
                 .font(ClientTheme.Typography.messageBody)
-                .foregroundStyle(ClientTheme.Colors.warning)
+                .foregroundStyle(palette.warning)
             HStack {
-                // Weight, not hue, is what marks the default action now.
+                // Weight, not hue, is what marks the default action.
                 Button("허용") { onRespond(true) }
                     .buttonStyle(.plain)
                     .fontWeight(.semibold)
+                    .foregroundStyle(palette.textPrimary)
                     .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
                     .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                    .glassControl(in: Capsule())
+                    .themedSurface(palette, in: Capsule())
                 Button("거부") { onRespond(false) }
                     .buttonStyle(.plain)
-                    .foregroundStyle(ClientTheme.Colors.failure)
+                    .foregroundStyle(palette.failure)
                     .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
                     .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                    .glassControl(in: Capsule())
+                    .themedSurface(palette, in: Capsule())
             }
         }
         .padding(ClientTheme.Metrics.spacingMedium)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassSurface(in: ClientTheme.Shapes.card)
+        .themedSurface(palette, in: ClientTheme.Shapes.card)
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
     }
 }
 
-/// 2026-08-01 redesign: every reference shot (Sense, the dark chat, Orbita)
-/// labels who's speaking above each message, so both sides now get a small
-/// sender row (avatar + name) -- and the user's own bubble is the one place
-/// besides the send button and "새 채팅" pill that `accent` shows up, which
-/// is what actually tells the two sides apart now (previously that job fell
-/// to "only the user gets a background at all", the flattest possible
-/// version of the same idea).
+/// 2026-08-01 rebuild: only the **user's** message gets a filled,
+/// accent-tinted bubble now -- the assistant's text flows directly on the
+/// column background, sender row (avatar + name) still above it. Both
+/// sides sharing an identical bubble previously read as two of the same
+/// control rather than two different speakers.
 private struct MessageBubble: View {
     let text: String
     let isUser: Bool
+    @Environment(\.clientPalette) private var palette
+    @State private var isHovering = false
 
     private var content: some View {
         Text(text)
             .font(ClientTheme.Typography.messageBody)
-            .foregroundStyle(isUser ? ClientTheme.Colors.onAccent : ClientTheme.Colors.bubbleText)
+            .foregroundStyle(isUser ? palette.onAccent : palette.textPrimary)
             .textSelection(.enabled)
-            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-            .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
     }
 
     var body: some View {
@@ -324,9 +339,15 @@ private struct MessageBubble: View {
                 if isUser { Spacer(minLength: 0) }
                 Group {
                     if isUser {
-                        content.glassSurface(in: ClientTheme.Shapes.bubble, tint: ClientTheme.Colors.accent)
+                        content
+                            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                            .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
+                            .background(palette.accent, in: ClientTheme.Shapes.bubble)
                     } else {
-                        content.glassSurface(in: ClientTheme.Shapes.bubble)
+                        VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingSmall) {
+                            content
+                            if isHovering { inlineActions }
+                        }
                     }
                 }
                 .frame(maxWidth: 420, alignment: isUser ? .trailing : .leading)
@@ -334,6 +355,28 @@ private struct MessageBubble: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+        .onHover { isHovering = $0 }
+    }
+
+    /// Screenshot #3's inline hover "Reply" affordance, adapted: a small
+    /// copy/retry pill that fades in on hover without reflowing the row
+    /// above it (it's appended below the text, not overlaid).
+    private var inlineActions: some View {
+        HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+            Button {
+                #if canImport(AppKit)
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+                #endif
+            } label: {
+                Label("복사", systemImage: "doc.on.doc")
+                    .font(ClientTheme.Typography.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(palette.textSecondary)
+        }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.12), value: isHovering)
     }
 
     private var senderRow: some View {
@@ -341,7 +384,7 @@ private struct MessageBubble: View {
             if !isUser { avatar }
             Text(isUser ? "나" : AppIdentity.displayName)
                 .font(ClientTheme.Typography.senderLabel)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .foregroundStyle(palette.textSecondary)
             if isUser { avatar }
         }
     }
@@ -351,7 +394,7 @@ private struct MessageBubble: View {
             if isUser {
                 Image(systemName: "person.fill")
                     .font(.system(size: 11))
-                    .foregroundStyle(ClientTheme.Colors.accent)
+                    .foregroundStyle(palette.accent)
             } else {
                 Image("PumpkinLogo")
                     .resizable()
@@ -359,13 +402,13 @@ private struct MessageBubble: View {
             }
         }
         .frame(width: ClientTheme.Metrics.avatarSize, height: ClientTheme.Metrics.avatarSize)
-        .background(isUser ? ClientTheme.Colors.accentSoft : Color.clear, in: Circle())
+        .background(isUser ? palette.accent.opacity(0.16) : Color.clear, in: Circle())
     }
 }
 
-
 private struct ChatTimelineEntryRow: View {
     let entry: ChatTimelineEntry
+    @Environment(\.clientPalette) private var palette
 
     var body: some View {
         switch entry {
@@ -380,41 +423,45 @@ private struct ChatTimelineEntryRow: View {
                 if let args {
                     Text(String(describing: args))
                         .font(ClientTheme.Typography.mono)
+                        .foregroundStyle(palette.textPrimary)
                         .textSelection(.enabled)
                         .padding(.top, ClientTheme.Metrics.spacingSmall)
                 }
             } label: {
                 Label(tool, systemImage: "wrench.and.screwdriver.fill")
                     .font(ClientTheme.Typography.toolLabel)
+                    .foregroundStyle(palette.textPrimary)
             }
             .padding(ClientTheme.Metrics.spacingMedium)
-            .glassSurface(in: ClientTheme.Shapes.card)
+            .themedSurface(palette, in: ClientTheme.Shapes.card)
 
         case .toolResult(_, let ok, let data, let error, let detail):
             HStack(alignment: .top, spacing: ClientTheme.Metrics.spacingSmall) {
                 Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundStyle(ok ? ClientTheme.Colors.success : ClientTheme.Colors.failure)
+                    .foregroundStyle(ok ? palette.success : palette.failure)
                 if let error {
                     Text("\(error)\(detail.map { ": \($0)" } ?? "")")
                         .font(ClientTheme.Typography.mono)
+                        .foregroundStyle(palette.textPrimary)
                 } else if let data {
                     Text(String(describing: data))
                         .font(ClientTheme.Typography.mono)
+                        .foregroundStyle(palette.textPrimary)
                         .textSelection(.enabled)
                 }
             }
             .padding(ClientTheme.Metrics.spacingMedium)
-            .glassSurface(in: ClientTheme.Shapes.card)
+            .themedSurface(palette, in: ClientTheme.Shapes.card)
 
         case .approvalRequested(_, _, let summary):
             Label(summary, systemImage: "hand.raised.fill")
                 .font(ClientTheme.Typography.mono)
-                .foregroundStyle(ClientTheme.Colors.warning)
+                .foregroundStyle(palette.warning)
 
         case .done(let ok, let summary):
             Label(summary, systemImage: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                 .font(ClientTheme.Typography.summary)
-                .foregroundStyle(ok ? Color.primary : ClientTheme.Colors.failure)
+                .foregroundStyle(ok ? palette.textPrimary : palette.failure)
         }
     }
 }

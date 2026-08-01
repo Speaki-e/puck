@@ -1,8 +1,10 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { JsonlLogger } from "./logger.js";
 import { WorkspaceRegistry } from "./workspace-registry.js";
 import { WorkspaceController } from "./workspace-controller.js";
+import { AgentHostController } from "./agent-host-controller.js";
 
 const isHeadless = process.argv.includes("--headless");
 
@@ -34,6 +36,27 @@ async function main(): Promise<void> {
   const registry = new WorkspaceRegistry(path.join(app.getPath("userData"), "workspaces.json"));
   const controller = new WorkspaceController(registry, logger);
   await controller.initialize(argumentValue("--project"));
+  const agentHost = new AgentHostController(path.join(app.getAppPath(), "dist-main", "agent-host", "index.cjs"), logger);
+  agentHost.on("status", (status: string) => controller.sendAgentStatus(status));
+  agentHost.on("event", (event: { event: string; payload: unknown }) => {
+    if (event.event === "status") controller.sendAgentStatus(JSON.stringify(event.payload));
+  });
+  await agentHost.start();
+  controller.setAgentCommands({
+    run: async (command, workspace) => {
+      const requestId = randomUUID();
+      void agentHost.request("runCodeEditor", {
+        requestId,
+        workspaceId: workspace.id,
+        sessionId: "default",
+        task: command,
+        projectPath: workspace.realProjectPath!,
+      }, 600_000).then((result) => controller.sendAgentStatus(JSON.stringify(result)))
+        .catch((error) => controller.sendAgentStatus(error instanceof Error ? error.message : String(error)));
+      return { requestId };
+    },
+    cancel: async () => false,
+  });
   controller.installIpc();
   await logger.write("info", "workspace_started", { headless: isHeadless });
 
@@ -44,6 +67,7 @@ async function main(): Promise<void> {
   });
 
   app.on("before-quit", () => {
+    void agentHost.stop();
     void controller.close();
   });
 }

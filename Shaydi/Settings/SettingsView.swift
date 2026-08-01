@@ -20,6 +20,13 @@
 //  Tabs went with it: the reference has none, and four tabs over twelve
 //  controls was chrome the content never needed.
 //
+//  2026-08-02 (byeolki: "기존 셰이디앱에 있던 에이전트 관련 설정은 전부
+//  셰이디에이전트 설정으로 옮기고"): the F15 API-key section moved to
+//  ShaydiAgent's own Settings window (`AgentSettingsView`, Cmd+,) -- the
+//  agent that actually reads the key runs there, not here (see
+//  AgentConfiguration's own doc comment for why a shared .env rather than
+//  the Keychain in the first place).
+//
 
 import SwiftUI
 
@@ -52,11 +59,6 @@ struct SettingsView: View {
     @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
     @State private var toysOut: Set<String>
-    /// F15: what is typed into the key field before it is saved, and the
-    /// resolved configuration the status line reports on.
-    @State private var apiKeyDraft = ""
-    @State private var apiKeyMessage: String?
-    @State private var agentConfiguration = AgentConfiguration.load()
     /// Tracked locally so the hide/show row relabels itself immediately --
     /// the panel stays open after the toggle, and rebuilding it just to
     /// change one word would dismiss whatever else the user was doing.
@@ -104,7 +106,6 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
                     avatarSection
                     toySection
-                    agentSection
                     soundSection
                     movementSection
                     generalSection
@@ -179,70 +180,6 @@ struct SettingsView: View {
                     .onChange(of: toyScale) { store.toyScale = $0 }
             }
         }
-    }
-
-    /// F15 (2026-07-31, byeolki: "설정 같은데에서 api 키 넣을 수 있게").
-    /// The key goes to a .env both apps read -- this panel is Shaydi's, and
-    /// the agent that needs the key runs in ShaydiAgent (see
-    /// AgentConfiguration.writableEnvFile for why not the Keychain).
-    private var agentSection: some View {
-        SettingsSection(title: text(.agentHeader)) {
-            SettingsStackedRow(label: text(.apiKeyLabel)) {
-                HStack {
-                    // SecureField, so a key isn't left legible on a screen
-                    // that gets shared or recorded.
-                    // Not in Strings: an OpenAI key prefix is the same string
-                    // in every language, and the table's test rejects entries
-                    // whose translations are identical.
-                    SecureField("sk-…", text: $apiKeyDraft)
-                        .textFieldStyle(.roundedBorder)
-                    Button(text(.apiKeySave)) { saveAPIKey(apiKeyDraft) }
-                        .controlSize(.small)
-                        .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    if agentConfiguration.isConfigured {
-                        Button(text(.apiKeyClear)) { saveAPIKey(nil) }
-                            .controlSize(.small)
-                    }
-                }
-            }
-
-            Text(apiKeyStatus)
-                .font(.footnote)
-                .foregroundStyle(agentConfiguration.isConfigured ? .secondary : Color.orange)
-                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-
-            Text(text(.apiKeyExplanation))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-        }
-    }
-
-    private var apiKeyStatus: String {
-        if let message = apiKeyMessage { return message }
-        guard let source = agentConfiguration.keySource else { return text(.apiKeyMissing) }
-        return String(format: text(.apiKeySourceFormat), source.displayName)
-    }
-
-    /// Passing nil removes the assignment, which is how the Remove button
-    /// falls back to whatever other source (an env var, the project's .env)
-    /// was being shadowed.
-    private func saveAPIKey(_ key: String?) {
-        let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let target = AgentConfiguration.writableEnvFile
-        guard DotEnv.write(key: "OPENAI_API_KEY", value: trimmed?.isEmpty == false ? trimmed : nil, to: target) else {
-            apiKeyMessage = text(.apiKeySaveFailed)
-            return
-        }
-        apiKeyDraft = ""
-        // Re-read rather than assumed: the field only wins if nothing with
-        // higher precedence is already supplying a key, and saying "saved"
-        // while a stale env var keeps winning is the confusion keySource
-        // exists to prevent.
-        agentConfiguration = .load()
-        apiKeyMessage = trimmed?.isEmpty == false
-            ? String(format: text(.apiKeySavedFormat), target.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-            : nil
     }
 
     private var soundSection: some View {

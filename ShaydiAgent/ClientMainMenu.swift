@@ -34,6 +34,16 @@ enum ClientMainMenu {
         let menu = NSMenu(title: appName)
         menu.addItem(title: "\(appName) 정보", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)))
         menu.addItem(.separator())
+        // Raw string selector, not #selector(AppDelegate.showSettings(_:)) --
+        // ShaydiTests compiles this file directly without AppDelegate (see
+        // this file's header), so a typed reference to it wouldn't build
+        // there. Same reasoning as the undo/redo items below. Resolved via
+        // the responder chain (nil target): AppKit checks NSApp.delegate as
+        // a target-for-action fallback, which is where AppDelegate implements
+        // this -- byeolki, 2026-08-02: "기존 셰이디앱에 있던 에이전트 관련
+        // 설정은 전부 셰이디에이전트 설정으로 옮기고".
+        menu.addItem(title: "설정…", action: Selector(("showSettings:")), keyEquivalent: ",")
+        menu.addItem(.separator())
         menu.addItem(title: "\(appName) 가리기", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         menu.addItem(
             title: "다른 항목 가리기",

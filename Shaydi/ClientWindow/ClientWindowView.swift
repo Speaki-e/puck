@@ -4,14 +4,14 @@
 //
 //  F13 · owner: 박해영 (Haeyoung Park)
 //  The "Claude Desktop"-style client window (plan/02_pet-app.md F13).
-//  Docked beside the pinned character when summoned via Option+Shift+Space.
 //
-//  2026-08-01 restructure (byeolki: "Orbita로 해봐봐", after "아예 갈아엎을
-//  순 없는거냐" -- the prior pass only changed colors on the same skeleton,
-//  which read as no change at all): the resizable workspace/session sidebar
-//  is gone. Orbita GPT's own shape is a slim icon rail plus a real top bar
-//  with the primary action as a filled pill -- ClientRailView and `topBar`
-//  below are that structure, not just its palette.
+//  2026-08-01 design-system rebuild (byeolki: "기존 프론트엔드에서 고치기
+//  보다는 프론트엔드를 처음부터 만드는 마음으로", after asking to tear down
+//  the same-day Orbita-structured redesign entirely). ClientRailView's
+//  popover-only rail becomes ClientSidebarView's real sidebar; theming
+//  moves from Shaydi's system-wide AppAppearance to this window's own
+//  ClientThemeStyle (light/dark/glass), injected as a SwiftUI environment
+//  value so every nested view reads it without a threaded parameter.
 //
 
 import SwiftUI
@@ -19,9 +19,7 @@ import SwiftUI
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
 
-    private var activeWorkspace: ClientWorkspace? {
-        store.workspaces.first { $0.id == store.activeWorkspaceId }
-    }
+    private var palette: ClientPalette { store.themeStyle.palette }
 
     private var activeSession: ChatSession? {
         store.session(workspaceId: store.activeWorkspaceId, sessionId: store.activeSessionId)
@@ -29,7 +27,7 @@ struct ClientWindowView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ClientRailView(store: store)
+            ClientSidebarView(store: store)
 
             VStack(spacing: 0) {
                 topBar
@@ -37,15 +35,17 @@ struct ClientWindowView: View {
                 mainArea
             }
             .frame(minWidth: 420)
-            // A material, not a flat color -- every glass surface in this
-            // pane is reading from what's behind it.
-            .background(VisualEffectBackground(material: .contentBackground))
+            .background(palette.background)
         }
         .frame(minWidth: 640, minHeight: 420)
-        .preferredColorScheme(store.appearance.colorScheme)
-        // See SettingsView's identical `.id` -- same SwiftUI
-        // `.preferredColorScheme(nil)` diffing quirk applies here too.
-        .id(store.appearance)
+        .environment(\.clientPalette, palette)
+        .preferredColorScheme(store.themeStyle.colorScheme)
+        // preferredColorScheme(_:) alone doesn't force a redraw when the
+        // *value* changes but the enum case looks unrelated to SwiftUI's own
+        // diffing (same quirk SettingsView/notch code already documents for
+        // AppAppearance) -- .id keys the whole subtree to the theme so a
+        // switch always re-renders.
+        .id(store.themeStyle)
     }
 
     /// Chat only. The embedded editor view (EditorWebView) is its own track
@@ -60,37 +60,15 @@ struct ClientWindowView: View {
         }
     }
 
-    /// A real row now, not a floating glass capsule over the transcript --
-    /// Orbita's top bar is opaque and always occupies its own space, with the
-    /// one filled pill (there: "New Chat") as its single loud element.
+    /// Minimal -- the primary "새 채팅" action lives in the sidebar now
+    /// (2026-08-01 rebuild), so this is just the current session's title.
     private var topBar: some View {
-        HStack(spacing: ClientTheme.Metrics.spacingMedium) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(activeSession?.title ?? "")
-                    .font(ClientTheme.Typography.workspaceName)
-                if let workspaceName = activeWorkspace?.name, workspaceName != activeSession?.title {
-                    Text(workspaceName)
-                        .font(.caption)
-                        .foregroundStyle(ClientTheme.Colors.secondaryText)
-                }
-            }
-
-            Spacer(minLength: 0)
-
-            Button {
-                store.requestNewSession(title: "새 채팅", in: store.activeWorkspaceId)
-            } label: {
-                Label("새 채팅", systemImage: "square.and.pencil")
-                    .font(ClientTheme.Typography.workspaceName)
-                    .foregroundStyle(ClientTheme.Colors.onAccent)
-                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                    .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                    .glassControl(in: Capsule(), tint: ClientTheme.Colors.accent)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
-        .padding(.top, 28) // clears the transparent titlebar / traffic lights
-        .padding(.bottom, ClientTheme.Metrics.spacingMedium)
+        Text(activeSession?.title ?? "")
+            .font(ClientTheme.Typography.workspaceName)
+            .foregroundStyle(palette.textPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
+            .padding(.top, 28) // clears the transparent titlebar / traffic lights
+            .padding(.bottom, ClientTheme.Metrics.spacingMedium)
     }
 }

@@ -44,6 +44,9 @@ struct ClientWindowView: View {
         }
         .frame(minWidth: 640, minHeight: 420)
         .preferredColorScheme(store.appearance.colorScheme)
+        // See SettingsView's identical `.id` -- same SwiftUI
+        // `.preferredColorScheme(nil)` diffing quirk applies here too.
+        .id(store.appearance)
     }
 
     /// Chat only. The embedded editor view (EditorWebView) is its own track

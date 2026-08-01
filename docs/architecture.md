@@ -33,6 +33,8 @@ FileService는 요청 경로의 기존 부모까지 `realpath`로 확인합니�
 
 `AcpAdapter`는 공식 `@agentclientprotocol/sdk`의 NDJSON stream을 사용합니다. 세션 업데이트를 Agent Host 이벤트로 정규화하고, 파일 워처와 실행 전후 스냅샷을 결합해 변경 파일을 수집하며, 실패 시 ACP stderr의 마지막 8KB만 결과 detail에 포함합니다.
 
+1차 ACP 수명 주기 정책은 작업별 격리입니다. 각 `code_editor` 실행마다 프로세스와 세션을 새로 만들고 완료·취소·실패 시 즉시 종료합니다. 장기 세션 재사용보다 장애 격리와 프로젝트 간 상태 누출 방지를 우선하며, 같은 워크스페이스의 순서는 `CodeEditorQueue`가 보장합니다.
+
 승인 결정은 `PermissionResolver` 주입 지점입니다. 승인 브리지가 연결되기 전 기본 정책은 거부입니다.
 
 ## PetBridge

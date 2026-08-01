@@ -31,14 +31,15 @@ export class AgentHostController extends EventEmitter {
       },
     });
     this.child = child;
-    this.rpc = new AgentHostRpc((message) => child.postMessage(message));
-    this.rpc.on("event", (event: AgentHostEvent) => this.emit("event", event));
-    child.on("message", (message) => this.rpc?.receive(message as never));
+    const rpc = new AgentHostRpc((message) => child.postMessage(message));
+    this.rpc = rpc;
+    rpc.on("event", (event: AgentHostEvent) => this.emit("event", event));
+    child.on("message", (message) => rpc.receive(message as never));
     child.on("spawn", () => {
       void this.logger.write("info", "agent_host_spawned", { pid: child.pid });
       this.emit("status", "AI 기능 준비 중");
     });
-    child.on("exit", (code) => this.handleExit(code));
+    child.on("exit", (code) => this.handleExit(child, rpc, code));
   }
 
   request<K extends keyof AgentHostRequestMap>(
@@ -66,13 +67,22 @@ export class AgentHostController extends EventEmitter {
     this.child = undefined;
   }
 
-  private handleExit(code: number): void {
-    this.rpc?.failAll(`Agent Host가 비정상 종료되었습니다 (${code})`);
+  get pid(): number | undefined {
+    return this.child?.pid;
+  }
+
+  private handleExit(child: UtilityProcess, rpc: AgentHostRpc, code: number): void {
+    if (this.child !== child || this.rpc !== rpc) return;
+    rpc.failAll(`Agent Host가 비정상 종료되었습니다 (${code})`);
     this.rpc = undefined;
     this.child = undefined;
     void this.logger.write(code === 0 ? "info" : "error", "agent_host_exited", { code });
     if (this.stopping) return;
     this.emit("status", "AI 기능을 다시 시작하는 중");
-    this.restartTimer = setTimeout(() => void this.start(), 1_000);
+    if (this.restartTimer) clearTimeout(this.restartTimer);
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = undefined;
+      void this.start();
+    }, 1_000);
   }
 }

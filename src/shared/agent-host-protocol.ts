@@ -10,6 +10,7 @@ export interface AgentHostRequestMap {
     projectPath: string;
   };
   cancelCodeEditor: { requestId: string };
+  crashForTest: Record<string, never>;
   shutdown: Record<string, never>;
 }
 
@@ -17,6 +18,7 @@ export interface AgentHostResponseMap {
   ping: { now: number; hostNow: number };
   runCodeEditor: JSONValue;
   cancelCodeEditor: { cancelled: boolean };
+  crashForTest: { accepted: true };
   shutdown: { accepted: true };
 }
 

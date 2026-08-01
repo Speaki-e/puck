@@ -4,9 +4,17 @@ import type {
   AgentHostResponse,
   AgentHostEvent,
 } from "../shared/agent-host-protocol.js";
+import type { JSONValue } from "@speaki-e/protocol";
+import { AcpAdapter } from "./acp-adapter.js";
+import { CodeEditorQueue, QueueCancelledError } from "./code-editor-queue.js";
 
 const parentPort = (process as NodeJS.Process & { parentPort?: MessagePort }).parentPort;
 if (!parentPort) throw new Error("Agent Host는 Electron Utility Process로 실행해야 합니다");
+
+const queue = new CodeEditorQueue();
+const adapter = new AcpAdapter({
+  onUpdate: (update) => emit("code_editor_update", JSON.parse(JSON.stringify(update)) as JSONValue),
+});
 
 function respond(message: AgentHostResponse): void {
   parentPort!.postMessage(message);
@@ -22,19 +30,34 @@ parentPort.on("message", async (message: AgentHostRequest) => {
       case "ping":
         respond({ kind: "response", id: message.id, ok: true, payload: { now: message.payload.now, hostNow: Date.now() } });
         break;
-      case "runCodeEditor":
-        emit("status", { state: "running", requestId: message.payload.requestId });
-        respond({
-          kind: "response",
-          id: message.id,
-          ok: true,
-          payload: { ok: true, summary: `Mock Agent Host: ${message.payload.task}`, changedFiles: [] },
+      case "runCodeEditor": {
+        const run = queue.enqueue({
+          requestId: message.payload.requestId,
+          workspaceId: message.payload.workspaceId,
+          execute: (signal) => {
+            emit("status", { state: "running", requestId: message.payload.requestId });
+            return adapter.run({ ...message.payload, signal });
+          },
         });
+        const position = queue.position(message.payload.requestId);
+        if (position && position > 0) emit("status", { state: "queued", requestId: message.payload.requestId, position });
+        try {
+          const result = await run;
+          respond({ kind: "response", id: message.id, ok: true, payload: result as unknown as JSONValue });
+        } catch (error) {
+          if (error instanceof QueueCancelledError) {
+            respond({ kind: "response", id: message.id, ok: true, payload: { ok: false, summary: "중단됨", changedFiles: [], error: "cancelled" } });
+          } else {
+            throw error;
+          }
+        }
         break;
+      }
       case "cancelCodeEditor":
-        respond({ kind: "response", id: message.id, ok: true, payload: { cancelled: false } });
+        respond({ kind: "response", id: message.id, ok: true, payload: { cancelled: queue.cancel(message.payload.requestId) } });
         break;
       case "shutdown":
+        queue.cancelAll();
         respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
         setImmediate(() => process.exit(0));
         break;

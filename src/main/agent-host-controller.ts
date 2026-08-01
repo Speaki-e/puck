@@ -13,6 +13,7 @@ export class AgentHostController extends EventEmitter {
   constructor(
     private readonly modulePath: string,
     private readonly logger: JsonlLogger,
+    private readonly appPath = process.cwd(),
   ) {
     super();
   }
@@ -22,7 +23,11 @@ export class AgentHostController extends EventEmitter {
     this.stopping = false;
     const child = utilityProcess.fork(this.modulePath, [], {
       serviceName: "Workspace Agent Host",
-      env: { NODE_ENV: process.env.NODE_ENV ?? "production" },
+      env: {
+        NODE_ENV: process.env.NODE_ENV ?? "production",
+        WORKSPACE_APP_PATH: this.appPath,
+        ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}),
+      },
     });
     this.child = child;
     this.rpc = new AgentHostRpc((message) => child.postMessage(message));

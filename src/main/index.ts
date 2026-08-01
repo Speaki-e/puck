@@ -37,7 +37,11 @@ async function main(): Promise<void> {
   const registry = new WorkspaceRegistry(path.join(app.getPath("userData"), "workspaces.json"));
   const controller = new WorkspaceController(registry, logger);
   await controller.initialize(argumentValue("--project"));
-  const agentHost = new AgentHostController(path.join(app.getAppPath(), "dist-main", "agent-host", "index.cjs"), logger);
+  const agentHost = new AgentHostController(
+    path.join(app.getAppPath(), "dist-main", "agent-host", "index.cjs"),
+    logger,
+    app.getAppPath(),
+  );
   agentHost.on("status", (status: string) => controller.sendAgentStatus(status));
   agentHost.on("event", (event: { event: string; payload: unknown }) => {
     if (event.event === "status") controller.sendAgentStatus(JSON.stringify(event.payload));
@@ -46,9 +50,11 @@ async function main(): Promise<void> {
   const petBridge = new PetBridge({ socketPath: argumentValue("--bridge-socket"), logger });
   petBridge.on("state", (state: string) => controller.sendAgentStatus(`pet-app: ${state}`));
   petBridge.connect();
+  let activeRequestId: string | undefined;
   controller.setAgentCommands({
     run: async (command, workspace) => {
       const requestId = randomUUID();
+      activeRequestId = requestId;
       void agentHost.request("runCodeEditor", {
         requestId,
         workspaceId: workspace.id,
@@ -56,10 +62,17 @@ async function main(): Promise<void> {
         task: command,
         projectPath: workspace.realProjectPath!,
       }, 600_000).then((result) => controller.sendAgentStatus(JSON.stringify(result)))
-        .catch((error) => controller.sendAgentStatus(error instanceof Error ? error.message : String(error)));
+        .catch((error) => controller.sendAgentStatus(error instanceof Error ? error.message : String(error)))
+        .finally(() => {
+          if (activeRequestId === requestId) activeRequestId = undefined;
+        });
       return { requestId };
     },
-    cancel: async () => false,
+    cancel: async () => {
+      if (!activeRequestId) return false;
+      const result = await agentHost.request("cancelCodeEditor", { requestId: activeRequestId }, 5_000);
+      return result.cancelled;
+    },
   });
   controller.installIpc();
   await logger.write("info", "workspace_started", { headless: isHeadless });

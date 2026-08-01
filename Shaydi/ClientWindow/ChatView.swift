@@ -157,11 +157,11 @@ private struct EmptyTranscript: View {
     let onPromptSelected: (String) -> Void
     @Environment(\.clientPalette) private var palette
 
-    private static let examplePrompts: [(icon: String, text: String)] = [
-        ("doc.text.magnifyingglass", "이 코드 설명해줘"),
-        ("ladybug.fill", "여기 버그 있는지 찾아줘"),
-        ("checkmark.seal", "테스트 작성해줘"),
-        ("wand.and.stars", "리팩토링 해줘"),
+    private static let examplePrompts = [
+        "이 코드 설명해줘",
+        "여기 버그 있는지 찾아줘",
+        "테스트 작성해줘",
+        "리팩토링 해줘",
     ]
 
     var body: some View {
@@ -185,77 +185,41 @@ private struct EmptyTranscript: View {
                     .foregroundStyle(palette.textSecondary)
             }
 
-            FlowChips(items: Self.examplePrompts, onSelect: onPromptSelected)
+            PromptCards(items: Self.examplePrompts, onSelect: onPromptSelected)
         }
         .padding(ClientTheme.Metrics.spacingLarge * 1.5)
         .frame(maxWidth: ClientTheme.Metrics.contentMaxWidth)
     }
 }
 
-private struct FlowChips: View {
-    let items: [(icon: String, text: String)]
+/// An equal-width row of bordered prompt cards, replacing the 2026-08-01
+/// rebuild's wrapped icon chips -- byeolki shared 5 Figma references
+/// (2026-08-02, "얘네 참고해서 레이아웃 배치나 UI 손봐줄래") whose empty
+/// state uses this exact pattern (a fixed-height row of plain-text bordered
+/// cards) across all three of its "Ask Me Anything" screens.
+private struct PromptCards: View {
+    let items: [String]
     let onSelect: (String) -> Void
     @Environment(\.clientPalette) private var palette
 
     var body: some View {
-        FlowLayout(spacing: ClientTheme.Metrics.spacingSmall) {
-            ForEach(items, id: \.text) { item in
+        HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+            ForEach(items, id: \.self) { text in
                 Button {
-                    onSelect(item.text)
+                    onSelect(text)
                 } label: {
-                    Label(item.text, systemImage: item.icon)
-                        .font(ClientTheme.Typography.caption)
+                    Text(text)
+                        .font(ClientTheme.Typography.sessionTitle)
                         .foregroundStyle(palette.textPrimary)
-                        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                        .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-                        .themedSurface(palette, in: Capsule())
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .padding(ClientTheme.Metrics.spacingMedium)
+                        .frame(height: 92)
+                        .themedSurface(palette, in: ClientTheme.Shapes.card)
                 }
                 .buttonStyle(.plain)
             }
-        }
-    }
-}
-
-/// A minimal wrapping row layout -- SwiftUI has no built-in equivalent, and
-/// pulling in a dependency for four chips isn't worth it. Pure geometry,
-/// unchanged by the 2026-08-01 rebuild.
-private struct FlowLayout: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        var rowWidth: CGFloat = 0
-        var totalHeight: CGFloat = 0
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if rowWidth > 0, rowWidth + spacing + size.width > width {
-                totalHeight += rowHeight + spacing
-                rowWidth = 0
-                rowHeight = 0
-            }
-            rowWidth += (rowWidth > 0 ? spacing : 0) + size.width
-            rowHeight = max(rowHeight, size.height)
-        }
-        totalHeight += rowHeight
-        return CGSize(width: width.isFinite ? width : rowWidth, height: totalHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var origin = bounds.origin
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if origin.x > bounds.minX, origin.x + size.width > bounds.maxX {
-                origin.x = bounds.minX
-                origin.y += rowHeight + spacing
-                rowHeight = 0
-            }
-            subview.place(at: origin, proposal: .unspecified)
-            origin.x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
         }
     }
 }

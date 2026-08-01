@@ -166,21 +166,15 @@ private struct EmptyTranscript: View {
 
     var body: some View {
         VStack(spacing: ClientTheme.Metrics.spacingLarge) {
-            ZStack {
-                // A soft glow behind the mark -- an otherwise flat icon
-                // reads as the app's "hero" rather than just another asset.
-                Circle()
-                    .fill(palette.accent.opacity(0.35))
-                    .frame(width: 96, height: 96)
-                    .blur(radius: 24)
-                // The pumpkin is the app's mark (byeolki, 2026-07-30: "호박을
-                // 로고로 쓰고 싶어") -- it's also the app icon, and the toy the
-                // pet plays with.
-                Image("PumpkinLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 72, height: 72)
-            }
+            // The pumpkin is the app's mark (byeolki, 2026-07-30: "호박을
+            // 로고로 쓰고 싶어") -- it's also the app icon, and the toy the
+            // pet plays with. byeolki, 2026-08-02: "호박 주변에 빛 효과
+            // 그런거 있는거 없애조" -- the glow behind it is gone, just the
+            // plain mark now.
+            Image("PumpkinLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
 
             VStack(spacing: 4) {
                 Text("무엇을 도와드릴까요?")

@@ -1,5 +1,13 @@
 import { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
+import {
+  javascriptDefaults,
+  JsxEmit,
+  ModuleKind,
+  ModuleResolutionKind,
+  ScriptTarget,
+  typescriptDefaults,
+} from "monaco-editor/languages/features/typescript/register.js";
 
 self.MonacoEnvironment = {
   getWorker(_moduleId: string, label: string) {
@@ -20,3 +28,29 @@ self.MonacoEnvironment = {
 };
 
 loader.config({ monaco });
+
+const diagnostics = {
+  noSemanticValidation: true,
+  noSuggestionDiagnostics: true,
+  noSyntaxValidation: false,
+};
+
+typescriptDefaults.setDiagnosticsOptions(diagnostics);
+javascriptDefaults.setDiagnosticsOptions(diagnostics);
+typescriptDefaults.setCompilerOptions({
+  allowNonTsExtensions: true,
+  allowJs: true,
+  jsx: JsxEmit.ReactJSX,
+  module: ModuleKind.ESNext,
+  moduleResolution: ModuleResolutionKind.NodeJs,
+  target: ScriptTarget.ES2020,
+});
+javascriptDefaults.setCompilerOptions({
+  allowNonTsExtensions: true,
+  allowJs: true,
+  checkJs: false,
+  jsx: JsxEmit.ReactJSX,
+  module: ModuleKind.ESNext,
+  moduleResolution: ModuleResolutionKind.NodeJs,
+  target: ScriptTarget.ES2020,
+});

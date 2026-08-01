@@ -4,8 +4,7 @@
 //
 //  Shared · owner: 박해영 (Haeyoung Park)
 //  In-app light/dark override -- byeolki: "화이트모드 다크모드 추가하고".
-//  An explicit user setting (Settings' General tab, an explicit user
-//  preference, not just following the system) rather than only ever
+//  An explicit user setting (Settings' General tab) rather than only ever
 //  following the system appearance -- .system still exists as the option
 //  that does that.
 //
@@ -45,19 +44,8 @@ enum AppAppearance: String, Equatable, CaseIterable {
     }
 
     /// The UserDefaults key SettingsStore persists this under, in Shaydi's
-    /// own defaults domain -- exposed here (not just inside SettingsStore)
-    /// because ShaydiAgent is a separate process with no access to
-    /// SettingsStore itself (pulling that whole class in would also drag in
-    /// HotkeyBindings and everything else it depends on). ShaydiAgent reads
-    /// this key directly via `UserDefaults(suiteName: AppIdentity.shaydiBundleID)`.
+    /// own defaults domain.
     static let defaultsKey = "Shaydi.appearance"
-
-    /// Posted (via DistributedNotificationCenter, not the ordinary
-    /// NotificationCenter, since the two processes don't share one) whenever
-    /// Shaydi's own appearance setting changes, so ShaydiAgent can react
-    /// immediately instead of only picking up the new value at its own next
-    /// launch.
-    static let crossProcessChangeNotification = Notification.Name("com.speaki-e.Shaydi.appearanceChanged")
 
     /// Resolves a raw UserDefaults string (or nil/unrecognized) the same way
     /// everywhere this is read from -- SettingsStore's own getter and
@@ -65,33 +53,5 @@ enum AppAppearance: String, Equatable, CaseIterable {
     /// can't disagree on what counts as "unset."
     static func resolved(fromDefaultsValue raw: String?) -> AppAppearance {
         raw.flatMap(AppAppearance.init(rawValue:)) ?? .system
-    }
-
-    /// The key `crossProcessUserInfo` carries this value under, and
-    /// `resolved(fromCrossProcessUserInfo:)` reads it back from.
-    private static let crossProcessUserInfoKey = "appearance"
-
-    /// Carries the actual new value alongside `crossProcessChangeNotification`
-    /// -- byeolki, 2026-08-01: "셰이디에이전트에는 테마 변경에 대한 적용이
-    /// 안됨." The live-update path used to have ShaydiAgent re-read Shaydi's
-    /// UserDefaults domain in response to the notification, but
-    /// `UserDefaults.set()` isn't guaranteed to be visible to a second
-    /// process by the time a Darwin/distributed notification posted right
-    /// afterward is delivered and handled -- a real race, not just a
-    /// theoretical one. Sending the value directly removes ShaydiAgent's
-    /// dependency on that timing entirely for the live path (only its own
-    /// launch-time seed, before any notification has arrived, still reads
-    /// UserDefaults).
-    var crossProcessUserInfo: [AnyHashable: Any] {
-        [Self.crossProcessUserInfoKey: rawValue]
-    }
-
-    /// nil if `userInfo` carries no recognizable value at all (missing key,
-    /// or the notification came with none) -- distinguishing "nothing here"
-    /// from "system" lets the caller fall back to its own UserDefaults read
-    /// instead of silently treating a malformed notification as "system."
-    static func resolved(fromCrossProcessUserInfo userInfo: [AnyHashable: Any]?) -> AppAppearance? {
-        guard let raw = userInfo?[crossProcessUserInfoKey] as? String else { return nil }
-        return resolved(fromDefaultsValue: raw)
     }
 }

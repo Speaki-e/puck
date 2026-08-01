@@ -198,26 +198,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// 다크모드랑 생긴게 다른데?" -- .preferredColorScheme (SettingsView,
     /// ClientWindowView) only recolors SwiftUI content; NSPopover's own
     /// chrome and any NSVisualEffectView material follow NSApp.appearance
-    /// instead, which nothing was setting. Seeded here at launch, kept live
-    /// via onAppearanceChanged, and broadcast to ShaydiAgent (a separate
-    /// process with no access to this UserDefaults domain) over
-    /// DistributedNotificationCenter so its client window picks up the same
-    /// override immediately rather than only at its own next launch.
+    /// instead, which nothing was setting. Seeded here at launch and kept
+    /// live via onAppearanceChanged.
     private func setUpAppearance() {
         applyAppKitAppearance(settingsStore.appearance)
         settingsStore.onAppearanceChanged = { [weak self] appearance in
             self?.applyAppKitAppearance(appearance)
-            // userInfo carries the value itself (byeolki, 2026-08-01: "셰이디
-            // 에이전트에는 테마 변경에 대한 적용이 안됨") -- ShaydiAgent used
-            // to re-read this from UserDefaults on receipt, racing against
-            // whether the write above had actually propagated to cfprefsd
-            // yet. Sending it directly removes that race.
-            DistributedNotificationCenter.default().postNotificationName(
-                AppAppearance.crossProcessChangeNotification,
-                object: nil,
-                userInfo: appearance.crossProcessUserInfo,
-                deliverImmediately: true
-            )
         }
     }
 

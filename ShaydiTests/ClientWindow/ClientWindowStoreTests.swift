@@ -23,7 +23,19 @@ private final class StubTransport: UserInputTransport {
 }
 
 final class ClientWindowStoreTests: XCTestCase {
-    private func makeStore(defaults: UserDefaults = .standard) -> (ClientWindowStore, StubTransport) {
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        suiteName = "ShaydiTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    private func makeStore() -> (ClientWindowStore, StubTransport) {
         let transport = StubTransport()
         let store = ClientWindowStore(sender: UserInputSender { transport }, defaults: defaults)
         return (store, transport)
@@ -168,17 +180,13 @@ final class ClientWindowStoreTests: XCTestCase {
     }
 
     func test_themeStyle_defaultsToDark() {
-        let defaults = UserDefaults(suiteName: #file)!
-        defaults.removePersistentDomain(forName: #file)
-        let (store, _) = makeStore(defaults: defaults)
+        let (store, _) = makeStore()
 
         XCTAssertEqual(store.themeStyle, .dark)
     }
 
     func test_themeStyle_roundTrips() {
-        let defaults = UserDefaults(suiteName: #file)!
-        defaults.removePersistentDomain(forName: #file)
-        let (store, _) = makeStore(defaults: defaults)
+        let (store, _) = makeStore()
 
         store.themeStyle = .glass
 
@@ -190,9 +198,7 @@ final class ClientWindowStoreTests: XCTestCase {
     }
 
     func test_settingThemeStyle_firesOnThemeStyleChanged() {
-        let defaults = UserDefaults(suiteName: #file)!
-        defaults.removePersistentDomain(forName: #file)
-        let (store, _) = makeStore(defaults: defaults)
+        let (store, _) = makeStore()
         var received: ClientThemeStyle?
         store.onThemeStyleChanged = { received = $0 }
 

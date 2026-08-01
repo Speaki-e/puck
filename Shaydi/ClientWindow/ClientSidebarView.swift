@@ -9,9 +9,9 @@
 //  behind a popover -- reference screenshot #2 (a dark, Claude-Desktop-
 //  shaped app) shows its sidebar this way, and it's a genuine usability
 //  improvement over "click an icon, open a popover" for something used on
-//  every message. The workspace switcher and the collapsed state keep
-//  ClientRailView's popover pattern, since a 56pt icon rail has no room for
-//  a real list.
+//  every message. Only the workspace switcher keeps ClientRailView's popover
+//  pattern into the collapsed state, since a 56pt icon rail has no room for
+//  a real list -- session switching still needs the sidebar expanded.
 //
 
 import SwiftUI

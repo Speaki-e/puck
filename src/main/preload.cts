@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("workspace", {
   currentWorkspace: () => ipcRenderer.invoke("workspace:current"),
   listTree: (workspaceId: string) => ipcRenderer.invoke("files:list-tree", workspaceId),
   readFile: (workspaceId: string, filePath: string) => ipcRenderer.invoke("files:read", workspaceId, filePath),
+  previewImage: (workspaceId: string, filePath: string) => ipcRenderer.invoke("files:preview-image", workspaceId, filePath),
   saveFile: (workspaceId: string, request: unknown) => ipcRenderer.invoke("files:save", workspaceId, request),
   runCommand: (command: string, workspaceId: string) => ipcRenderer.invoke("agent:run", command, workspaceId),
   cancelCommand: () => ipcRenderer.invoke("agent:cancel"),

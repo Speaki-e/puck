@@ -1,5 +1,5 @@
 import Editor, { type BeforeMount } from "@monaco-editor/react";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { FileTreeEntry } from "../shared/file-contract";
 import { FileTree } from "./components/FileTree";
 import { EditorTabs } from "./components/EditorTabs";
@@ -7,6 +7,39 @@ import { editorReducer, isDirty } from "./editor-state";
 import type { RendererWorkspaceRecord } from "./workspace-api";
 
 const initialState = { tabs: [] };
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+
+interface StoredDrafts {
+  projectPath: string;
+  expiresAt: number;
+  activePath?: string;
+  tabs: Array<{ path: string; content: string; revision: string }>;
+}
+
+function isImagePath(filePath: string): boolean {
+  return IMAGE_EXTENSIONS.has(filePath.split(".").at(-1)?.toLowerCase() ?? "");
+}
+
+function draftKey(projectPath: string): string {
+  return `workspace:drafts:${projectPath}`;
+}
+
+function readDraft(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function removeDraft(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Draft recovery is best-effort and must never break the editor.
+  }
+}
 
 function Icon({ name }: { name: "folder" | "save" | "play" | "stop" | "sparkle" | "branch" }) {
   const paths = {
@@ -56,6 +89,7 @@ export function App() {
   const [command, setCommand] = useState("");
   const [status, setStatus] = useState("준비됨");
   const [workingPaths] = useState(() => new Set<string>());
+  const restoredProjects = useRef(new Set<string>());
   const active = state.tabs.find((tab) => tab.path === state.activePath);
 
   const refreshTree = useCallback(async (record: RendererWorkspaceRecord) => {
@@ -78,6 +112,79 @@ export function App() {
 
   useEffect(() => api?.onAgentStatus(setStatus), [api]);
 
+  useEffect(() => {
+    if (!api || !workspace?.projectPath || restoredProjects.current.has(workspace.projectPath)) return;
+    restoredProjects.current.add(workspace.projectPath);
+    const key = draftKey(workspace.projectPath);
+    const raw = readDraft(key);
+    if (!raw) return;
+    let stored: StoredDrafts;
+    try {
+      stored = JSON.parse(raw) as StoredDrafts;
+    } catch {
+      removeDraft(key);
+      return;
+    }
+    if (stored.projectPath !== workspace.projectPath || stored.expiresAt < Date.now() || !Array.isArray(stored.tabs)) {
+      removeDraft(key);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(stored.tabs.map(async (draft) => {
+      try {
+        const disk = await api.readFile(workspace.id, draft.path);
+        return {
+          ...disk,
+          content: draft.content,
+          savedContent: disk.content,
+          diskChanged: disk.revision !== draft.revision,
+        };
+      } catch {
+        return undefined;
+      }
+    })).then((tabs) => {
+      const restored = tabs.filter((tab): tab is NonNullable<typeof tab> => Boolean(tab));
+      if (!cancelled && restored.length) {
+        dispatch({ type: "restore", tabs: restored, activePath: stored.activePath });
+        setStatus(`${restored.length}개의 미저장 파일을 복구했습니다`);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [api, workspace]);
+
+  useEffect(() => {
+    if (!workspace?.projectPath || !restoredProjects.current.has(workspace.projectPath)) return;
+    const timer = window.setTimeout(() => {
+      const dirtyTabs = state.tabs.filter((tab) => isDirty(tab) && !tab.previewUrl);
+      const key = draftKey(workspace.projectPath!);
+      if (!dirtyTabs.length) {
+        removeDraft(key);
+        return;
+      }
+      const payload: StoredDrafts = {
+        projectPath: workspace.projectPath!,
+        expiresAt: Date.now() + DRAFT_TTL_MS,
+        activePath: dirtyTabs.some((tab) => tab.path === state.activePath) ? state.activePath : dirtyTabs.at(-1)?.path,
+        tabs: dirtyTabs.map((tab) => ({ path: tab.path, content: tab.content, revision: tab.revision })),
+      };
+      try {
+        localStorage.setItem(key, JSON.stringify(payload));
+      } catch {
+        setStatus("미저장 복구 데이터를 저장할 공간이 부족합니다");
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [state, workspace]);
+
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!state.tabs.some(isDirty)) return;
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [state.tabs]);
+
   const openProject = async () => {
     const record = await api?.selectProject();
     if (!record) return;
@@ -89,7 +196,10 @@ export function App() {
   const openFile = async (filePath: string) => {
     if (!api || !workspace) return;
     try {
-      dispatch({ type: "open", file: await api.readFile(workspace.id, filePath) });
+      const file = isImagePath(filePath)
+        ? await api.previewImage(workspace.id, filePath)
+        : await api.readFile(workspace.id, filePath);
+      dispatch({ type: "open", file });
       setStatus(filePath);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "파일을 열 수 없습니다");
@@ -124,7 +234,11 @@ export function App() {
   }, [saveActive]);
 
   const reloadActive = async () => {
-    if (api && workspace && active) dispatch({ type: "reload", file: await api.readFile(workspace.id, active.path) });
+    if (!api || !workspace || !active) return;
+    const file = active.previewUrl
+      ? await api.previewImage(workspace.id, active.path)
+      : await api.readFile(workspace.id, active.path);
+    dispatch({ type: "reload", file });
   };
 
   const runCommand = async () => {
@@ -236,7 +350,18 @@ export function App() {
                     <button type="button" className="button-primary-small" onClick={() => dispatch({ type: "keepMine", path: active.path })}>내 내용 유지</button>
                   </div>
                 )}
-                <Editor
+                {active.previewUrl ? (
+                  <div className="image-preview">
+                    <div className="image-preview-canvas">
+                      <img src={active.previewUrl} alt={active.path.split("/").at(-1)} />
+                    </div>
+                    <div className="image-metadata">
+                      <strong>{active.path.split("/").at(-1)}</strong>
+                      <span>{active.mimeType}</span>
+                      <span>{Math.max(1, Math.round(active.size / 1024))} KB</span>
+                    </div>
+                  </div>
+                ) : <Editor
                   path={active.path}
                   value={active.content}
                   language={active.language}
@@ -260,7 +385,7 @@ export function App() {
                     renderLineHighlight: "all",
                     overviewRulerBorder: false,
                   }}
-                />
+                />}
               </>
             ) : (
               <div className="empty-editor">

@@ -21,4 +21,11 @@ describe("editorReducer", () => {
     state = editorReducer(state, { type: "keepMine", path: file.path });
     expect(state.tabs[0]?.diskChanged).toBe(false);
   });
+
+  it("미저장 복구 탭과 활성 파일을 복원한다", () => {
+    const restored = { ...file, content: "draft", savedContent: "one", diskChanged: false };
+    const state = editorReducer({ tabs: [] }, { type: "restore", tabs: [restored], activePath: restored.path });
+    expect(state.activePath).toBe(restored.path);
+    expect(isDirty(state.tabs[0]!)).toBe(true);
+  });
 });

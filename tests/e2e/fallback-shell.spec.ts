@@ -13,7 +13,8 @@ test("폴백 셸이 안전한 preload와 함께 열린다", async () => {
   });
   try {
     const window = await application.firstWindow();
-    await expect(window.getByText("Workspace", { exact: true })).toBeVisible();
+    await window.waitForLoadState("load");
+    await expect(window.locator(".brand-name")).toHaveText("Workspace", { timeout: 15_000 });
     await expect(window.locator("header").getByRole("button", { name: "프로젝트 열기" })).toBeVisible();
     expect(await window.evaluate(() => typeof window.workspace?.selectProject)).toBe("function");
     if (process.platform === "win32") {

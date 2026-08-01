@@ -14,6 +14,8 @@ export interface FileContent {
   readOnly: boolean;
   size: number;
   language?: string;
+  previewUrl?: string;
+  mimeType?: string;
 }
 
 export interface SaveFileRequest {

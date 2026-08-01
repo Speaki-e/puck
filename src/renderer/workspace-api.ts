@@ -17,6 +17,7 @@ export interface WorkspaceApi {
   currentWorkspace(): Promise<RendererWorkspaceRecord | undefined>;
   listTree(workspaceId: string): Promise<FileTreeEntry[]>;
   readFile(workspaceId: string, path: string): Promise<FileContent>;
+  previewImage(workspaceId: string, path: string): Promise<FileContent>;
   saveFile(workspaceId: string, request: SaveFileRequest): Promise<SaveFileResult>;
   runCommand(command: string, workspaceId: string): Promise<{ requestId: string }>;
   cancelCommand(): Promise<boolean>;

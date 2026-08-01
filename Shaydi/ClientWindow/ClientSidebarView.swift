@@ -13,6 +13,12 @@
 //  pattern into the collapsed state, since a 56pt icon rail has no room for
 //  a real list -- session switching still needs the sidebar expanded.
 //
+//  2026-08-02: the footer's theme popover is gone -- byeolki: "테마는 셰이디
+//  앱과 동기화 되어서 메뉴막대를 통한 셰이디 설정으로 변경할 수 있어야하거든".
+//  ClientThemeStyle is now a Shaydi Settings item (SettingsView's "채팅
+//  테마" row), synced here cross-process by ShaydiAgent's AppDelegate --
+//  this view only reads store.themeStyle via clientPalette, never sets it.
+//
 
 import SwiftUI
 
@@ -22,7 +28,6 @@ struct ClientSidebarView: View {
 
     @State private var isExpanded = true
     @State private var showingWorkspacePopover = false
-    @State private var showingThemePopover = false
     @State private var showingNewWorkspaceSheet = false
 
     private var activeWorkspace: ClientWorkspace? {
@@ -153,21 +158,6 @@ struct ClientSidebarView: View {
             Divider().opacity(0.5)
 
             Button {
-                showingThemePopover = true
-            } label: {
-                Image(systemName: "paintpalette.fill")
-                    .foregroundStyle(palette.textSecondary)
-                    .frame(width: ClientTheme.Metrics.railButtonSize, height: ClientTheme.Metrics.railButtonSize)
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showingThemePopover, arrowEdge: .trailing) {
-                ThemePopoverContent(selection: Binding(
-                    get: { store.themeStyle },
-                    set: { store.themeStyle = $0 }
-                ))
-            }
-
-            Button {
                 isExpanded.toggle()
             } label: {
                 Image(systemName: isExpanded ? "sidebar.left" : "sidebar.right")
@@ -270,40 +260,6 @@ private struct WorkspaceRow: View {
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
         .background(isActive ? palette.accent.opacity(0.14) : Color.clear, in: ClientTheme.Shapes.row)
-    }
-}
-
-/// The 3-way theme picker opened from the sidebar footer's palette icon.
-private struct ThemePopoverContent: View {
-    @Binding var selection: ClientThemeStyle
-    @Environment(\.clientPalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(ClientThemeStyle.allCases) { style in
-                Button {
-                    selection = style
-                } label: {
-                    HStack {
-                        Text(style.displayName)
-                            .font(ClientTheme.Typography.sessionTitle)
-                            .foregroundStyle(palette.textPrimary)
-                        Spacer()
-                        if style == selection {
-                            Image(systemName: "checkmark")
-                                .font(.caption)
-                                .foregroundStyle(palette.accent)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-            }
-        }
-        .padding(ClientTheme.Metrics.spacingSmall)
-        .frame(width: 160)
     }
 }
 

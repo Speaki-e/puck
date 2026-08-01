@@ -44,4 +44,19 @@ final class ClientThemeStyleTests: XCTestCase {
         XCTAssertEqual(ClientThemeStyle.resolved(fromDefaultsValue: nil), .dark)
         XCTAssertEqual(ClientThemeStyle.resolved(fromDefaultsValue: "sepia"), .dark)
     }
+
+    // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    // 셰이디 설정으로 변경할 수 있어야하거든" -- the setting now lives in
+    // Shaydi's own Settings and is broadcast to ShaydiAgent cross-process,
+    // the same DistributedNotificationCenter shape AppAppearance used to use.
+    func test_crossProcessUserInfo_roundTripsThroughResolved() {
+        for style in ClientThemeStyle.allCases {
+            XCTAssertEqual(ClientThemeStyle.resolved(fromCrossProcessUserInfo: style.crossProcessUserInfo), style)
+        }
+    }
+
+    func test_resolved_fromMissingCrossProcessUserInfoKey_isNil() {
+        XCTAssertNil(ClientThemeStyle.resolved(fromCrossProcessUserInfo: [:]))
+        XCTAssertNil(ClientThemeStyle.resolved(fromCrossProcessUserInfo: nil))
+    }
 }

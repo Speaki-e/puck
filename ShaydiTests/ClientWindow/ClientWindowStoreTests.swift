@@ -23,21 +23,9 @@ private final class StubTransport: UserInputTransport {
 }
 
 final class ClientWindowStoreTests: XCTestCase {
-    private var defaults: UserDefaults!
-    private var suiteName: String!
-
-    override func setUp() {
-        suiteName = "ShaydiTests.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
-    }
-
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
-    }
-
     private func makeStore() -> (ClientWindowStore, StubTransport) {
         let transport = StubTransport()
-        let store = ClientWindowStore(sender: UserInputSender { transport }, defaults: defaults)
+        let store = ClientWindowStore(sender: UserInputSender { transport })
         return (store, transport)
     }
 
@@ -179,31 +167,15 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertFalse(store.showUserMessage("hi", workspaceId: "nope", sessionId: "nope"))
     }
 
-    func test_themeStyle_defaultsToDark() {
+    // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    // 셰이디 설정으로 변경할 수 있어야하거든" -- themeStyle moved to being a
+    // Shaydi Settings item (see SettingsStoreTests' clientThemeStyle cases),
+    // externally set here by ShaydiAgent's AppDelegate rather than persisted
+    // by this store, so there's nothing left to round-trip or fire a
+    // callback on at this layer.
+    func test_themeStyle_defaultsToDark_untilExternallySet() {
         let (store, _) = makeStore()
 
         XCTAssertEqual(store.themeStyle, .dark)
-    }
-
-    func test_themeStyle_roundTrips() {
-        let (store, _) = makeStore()
-
-        store.themeStyle = .glass
-
-        XCTAssertEqual(store.themeStyle, .glass)
-        XCTAssertEqual(
-            ClientThemeStyle.resolved(fromDefaultsValue: defaults.string(forKey: ClientThemeStyle.defaultsKey)),
-            .glass
-        )
-    }
-
-    func test_settingThemeStyle_firesOnThemeStyleChanged() {
-        let (store, _) = makeStore()
-        var received: ClientThemeStyle?
-        store.onThemeStyleChanged = { received = $0 }
-
-        store.themeStyle = .light
-
-        XCTAssertEqual(received, .light)
     }
 }

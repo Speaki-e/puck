@@ -23,6 +23,12 @@ enum L10nKey: String, CaseIterable, Hashable {
     case tabGeneral, tabSound, tabMovement
 
     case appearanceLabel, appearanceSystem, appearanceLight, appearanceDark
+    /// The client (chat) window's own theme -- byeolki, 2026-08-02: "테마는
+    /// 셰이디앱과 동기화 되어서 메뉴막대를 통한 셰이디 설정으로 변경할 수
+    /// 있어야하거든". A separate setting from `appearanceLabel` above (that
+    /// one is system-wide light/dark/system; this one is the 3-way
+    /// light/dark/glass ClientThemeStyle).
+    case clientThemeLabel
     case accessibilityLabel, accessibilityGranted, accessibilityNotGranted
     case openSystemSettingsButton, accessibilityExplanation
 
@@ -85,6 +91,7 @@ enum Strings {
         .appearanceSystem: "시스템",
         .appearanceLight: "라이트",
         .appearanceDark: "다크",
+        .clientThemeLabel: "채팅 테마",
         .accessibilityLabel: "손쉬운 사용",
         .accessibilityGranted: "허용됨",
         .accessibilityNotGranted: "허용 안 됨",

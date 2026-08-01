@@ -168,6 +168,29 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(received, .light)
     }
 
+    // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    // 셰이디 설정으로 변경할 수 있어야하거든" -- the client window's theme
+    // moved here from being a ClientWindow-local setting.
+    func test_clientThemeStyle_defaultsToDark() {
+        XCTAssertEqual(SettingsStore(defaults: defaults).clientThemeStyle, .dark)
+    }
+
+    func test_clientThemeStyle_roundTrips() {
+        let store = SettingsStore(defaults: defaults)
+        store.clientThemeStyle = .glass
+        XCTAssertEqual(store.clientThemeStyle, .glass)
+    }
+
+    func test_settingClientThemeStyle_firesOnClientThemeStyleChanged() {
+        let store = SettingsStore(defaults: defaults)
+        var received: ClientThemeStyle?
+        store.onClientThemeStyleChanged = { received = $0 }
+
+        store.clientThemeStyle = .light
+
+        XCTAssertEqual(received, .light)
+    }
+
     func test_hotkeyBindings_roundTrip() {
         let store = SettingsStore(defaults: defaults)
         var bindings = HotkeyBindings.defaults

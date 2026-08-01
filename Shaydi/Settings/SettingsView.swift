@@ -42,6 +42,7 @@ struct SettingsView: View {
     var onQuit: (() -> Void)?
 
     @State private var appearance: AppAppearance
+    @State private var clientThemeStyle: ClientThemeStyle
     @State private var volume: Double
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
@@ -80,6 +81,7 @@ struct SettingsView: View {
         self.onToggleVisibility = onToggleVisibility
         self.onQuit = onQuit
         _appearance = State(initialValue: store.appearance)
+        _clientThemeStyle = State(initialValue: store.clientThemeStyle)
         _volume = State(initialValue: Double(store.volume))
         _isMuted = State(initialValue: store.isMuted)
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
@@ -298,6 +300,21 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .onChange(of: appearance) { store.appearance = $0 }
+            }
+            // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를
+            // 통한 셰이디 설정으로 변경할 수 있어야하거든" -- the client
+            // (chat) window's own theme, moved here from a ClientWindow-
+            // local popover so it's controlled from the same place as every
+            // other appearance setting.
+            SettingsStackedRow(label: text(.clientThemeLabel)) {
+                Picker("", selection: $clientThemeStyle) {
+                    ForEach(ClientThemeStyle.allCases) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .onChange(of: clientThemeStyle) { store.clientThemeStyle = $0 }
             }
             // byeolki, 2026-08-01: "다이내믹 아일랜드 끄고 킬 수 있는 버튼
             // 추가해줘" -- the toy-summon pill at the top of the screen.

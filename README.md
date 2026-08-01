@@ -50,9 +50,11 @@ corepack pnpm test
 corepack pnpm build
 corepack pnpm test:e2e
 corepack pnpm package
+# Windows NSIS 설치 파일 + unpacked 앱 + 패키지 내부 ACP 검증
+corepack pnpm package:win
 ```
 
-단위 테스트는 경로 이탈, 바이너리·대용량 파일, revision 충돌, JSON Lines 분할 수신, PetBridge 연결 종료, ACP Mock 왕복, 같은 워크스페이스의 직렬 큐와 대기 취소를 포함합니다. Playwright 테스트는 폴백 창과 격리된 preload를 실제 Electron에서 확인합니다.
+단위 테스트는 경로 이탈, 바이너리·대용량 파일, revision 충돌, JSON Lines 분할 수신, PetBridge 연결 종료, ACP Mock 왕복·취소·크래시 복구, 같은 워크스페이스의 직렬 큐를 포함합니다. Playwright 테스트는 폴백 창, 격리된 preload, Agent Host 재시작, Main 이벤트 루프 응답성과 PetBridge 왕복을 실제 Electron에서 확인합니다. Windows 산출물은 `release/Workspace Setup <version>.exe`에 생성됩니다.
 
 ## 보안 및 파일 규칙
 

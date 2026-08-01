@@ -81,4 +81,38 @@ describe("PetBridge", () => {
     const bridge = new PetBridge({ socketPath: socketPath(), logger: new JsonlLogger(logs) });
     await expect(bridge.dispatch("launch_app", {})).resolves.toMatchObject({ error: "pet_app_disconnected" });
   });
+
+  it("GUI 입력을 수신 이벤트로 전달하고 Workspace 이벤트를 소켓으로 보낸다", async () => {
+    const receivedLines: string[] = [];
+    let peer: net.Socket | undefined;
+    const { bridge } = await setup((socket) => {
+      peer = socket;
+      socket.on("data", (chunk) => receivedLines.push(...chunk.toString("utf8").trim().split("\n")));
+    });
+    const incoming = new Promise<unknown>((resolve) => bridge.once("message", resolve));
+    peer!.write(`${JSON.stringify({
+      type: "user_input",
+      text: "파일을 정리해줘",
+      source: "text",
+      workspace_id: "w1",
+      session_id: "s1",
+    })}\n`);
+
+    await expect(incoming).resolves.toMatchObject({ type: "user_input", workspace_id: "w1", session_id: "s1" });
+    expect(bridge.sendEvent({
+      type: "event",
+      workspace_id: "w1",
+      session_id: "s1",
+      event: "agent_done",
+      ok: true,
+      summary: "완료",
+    })).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(receivedLines.map((line) => JSON.parse(line))).toContainEqual(expect.objectContaining({
+      type: "event",
+      event: "agent_done",
+      workspace_id: "w1",
+      session_id: "s1",
+    }));
+  });
 });

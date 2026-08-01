@@ -30,6 +30,19 @@ export class WorkspaceController {
     this.cancelAgent = commands.cancel;
   }
 
+  async runCommand(command: string, workspaceId: string): Promise<{ requestId: string }> {
+    const workspace = this.registry.get(workspaceId);
+    if (!workspace?.realProjectPath) throw new Error("프로젝트가 연결되지 않았습니다");
+    const result = await this.runAgent(command, workspace);
+    await this.logger.write("info", "agent_run_requested", { requestId: result.requestId, workspaceId });
+    return result;
+  }
+
+  async cancelCommand(): Promise<boolean> {
+    this.broadcast("agent:status", "취소 요청 중");
+    return this.cancelAgent();
+  }
+
   installIpc(): void {
     ipcMain.handle("workspace:select-project", async () => {
       const result = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });

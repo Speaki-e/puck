@@ -3,10 +3,15 @@
 //  Shaydi
 //
 //  F13 · owner: 박해영 (Haeyoung Park)
-//  The "Claude Desktop"-style client window: sidebar (workspace switcher +
-//  session list) on the left, the chat transcript on the right
-//  (plan/02_pet-app.md F13). Docked beside the pinned character when summoned
-//  via Option+Shift+Space.
+//  The "Claude Desktop"-style client window (plan/02_pet-app.md F13).
+//  Docked beside the pinned character when summoned via Option+Shift+Space.
+//
+//  2026-08-01 restructure (byeolki: "Orbita로 해봐봐", after "아예 갈아엎을
+//  순 없는거냐" -- the prior pass only changed colors on the same skeleton,
+//  which read as no change at all): the resizable workspace/session sidebar
+//  is gone. Orbita GPT's own shape is a slim icon rail plus a real top bar
+//  with the primary action as a filled pill -- ClientRailView and `topBar`
+//  below are that structure, not just its palette.
 //
 
 import SwiftUI
@@ -23,19 +28,13 @@ struct ClientWindowView: View {
     }
 
     var body: some View {
-        // HSplitView, not HStack + Divider: the divider is then a real
-        // draggable splitter (byeolki: "그 사이드 바나 그런 거 전부 조절
-        // 가능하게 늘리고 줄이고"). It's AppKit's NSSplitView underneath, so
-        // the drag behaviour is the system's, not something hand-rolled.
-        HSplitView {
-            ClientSidebarView(store: store)
+        HStack(spacing: 0) {
+            ClientRailView(store: store)
 
-            ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                topBar
+                Divider().opacity(0.5)
                 mainArea
-                // The header floats *over* the content rather than sitting in
-                // a bar above it: glass has to have something behind it to
-                // refract, and a divider-separated strip gives it nothing.
-                header
             }
             .frame(minWidth: 420)
             // A material, not a flat color -- every glass surface in this
@@ -55,35 +54,43 @@ struct ClientWindowView: View {
     @ViewBuilder
     private var mainArea: some View {
         if let activeSession {
-            ChatView(session: activeSession, store: store, topInset: Self.headerHeight)
+            ChatView(session: activeSession, store: store)
         } else {
             Spacer()
         }
     }
 
-    /// How far the content has to be pushed down to clear the floating
-    /// header (its own height plus the window's transparent titlebar strip).
-    private static let headerHeight: CGFloat = 64
-
-    private var header: some View {
-        GlassGroup(spacing: ClientTheme.Metrics.spacingSmall) {
-            HStack(spacing: ClientTheme.Metrics.spacingMedium) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(activeSession?.title ?? "")
-                        .font(ClientTheme.Typography.workspaceName)
-                    Text(activeWorkspace?.name ?? "")
+    /// A real row now, not a floating glass capsule over the transcript --
+    /// Orbita's top bar is opaque and always occupies its own space, with the
+    /// one filled pill (there: "New Chat") as its single loud element.
+    private var topBar: some View {
+        HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(activeSession?.title ?? "")
+                    .font(ClientTheme.Typography.workspaceName)
+                if let workspaceName = activeWorkspace?.name, workspaceName != activeSession?.title {
+                    Text(workspaceName)
                         .font(.caption)
                         .foregroundStyle(ClientTheme.Colors.secondaryText)
                 }
-                // No glass behind the title (byeolki, 2026-07-30): a label
-                // that never moves or reacts doesn't need a surface, and it
-                // read as a floating chip for no reason.
-                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+
+            Spacer(minLength: 0)
+
+            Button {
+                store.requestNewSession(title: "새 채팅", in: store.activeWorkspaceId)
+            } label: {
+                Label("새 채팅", systemImage: "square.and.pencil")
+                    .font(ClientTheme.Typography.workspaceName)
+                    .foregroundStyle(ClientTheme.Colors.onAccent)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                    .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+                    .glassControl(in: Capsule(), tint: ClientTheme.Colors.accent)
+            }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
         .padding(.top, 28) // clears the transparent titlebar / traffic lights
+        .padding(.bottom, ClientTheme.Metrics.spacingMedium)
     }
 }

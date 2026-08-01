@@ -67,25 +67,26 @@ extension View {
     }
 
     /// The handful of surfaces the 2026-08-01 redesign deliberately colors
-    /// (the send button, the "새 채팅" pill, the user's own bubble) --
-    /// `Glass.tint(_:)` on macOS 26+, a flat fill as the pre-26 fallback
-    /// (there's no tinted material to fall back to the way the untinted
-    /// variants fall back to `.regularMaterial`).
-    @ViewBuilder
+    /// (the send button, the "새 채팅" pill, the user's own bubble): a flat
+    /// solid fill on every OS version, not `Glass.tint(_:)` on macOS 26+.
+    ///
+    /// 2026-08-01 (the Orbita-structured redesign): measured on the actual
+    /// machine running macOS 26.5.1 -- `glassEffect(.regular.tint(accent),
+    /// in:)` renders as visually indistinguishable from untinted glass (pixel
+    /// -sampled a "tinted" button and a plain one: both landed on the same
+    /// neutral gray, zero saturation). Real Liquid Glass tinting is
+    /// apparently too subtle to read as color at all against this app's
+    /// materials. `accent` only exists to be the one loud, unmistakable
+    /// anchor every reference (Sense, the dark chat, Orbita) uses it for --
+    /// an invisible "accent" defeats the entire point, so these two
+    /// deliberately opt out of Liquid Glass and just paint the color, on
+    /// every OS version alike (which also means the pre-26 fallback here no
+    /// longer needs to be a special case).
     func glassSurface(in shape: some Shape, tint: Color) -> some View {
-        if #available(macOS 26.0, *) {
-            glassEffect(.regular.tint(tint), in: shape)
-        } else {
-            background(tint, in: shape)
-        }
+        background(tint, in: shape)
     }
 
-    @ViewBuilder
     func glassControl(in shape: some Shape, tint: Color) -> some View {
-        if #available(macOS 26.0, *) {
-            glassEffect(.regular.tint(tint).interactive(), in: shape)
-        } else {
-            background(tint, in: shape)
-        }
+        background(tint, in: shape)
     }
 }

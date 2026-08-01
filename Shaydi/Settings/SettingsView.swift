@@ -41,7 +41,6 @@ struct SettingsView: View {
     var onToggleVisibility: (() -> Void)?
     var onQuit: (() -> Void)?
 
-    @State private var language: AppLanguage
     @State private var appearance: AppAppearance
     @State private var volume: Double
     @State private var isMuted: Bool
@@ -80,7 +79,6 @@ struct SettingsView: View {
         self.onOpenClient = onOpenClient
         self.onToggleVisibility = onToggleVisibility
         self.onQuit = onQuit
-        _language = State(initialValue: store.language)
         _appearance = State(initialValue: store.appearance)
         _volume = State(initialValue: Double(store.volume))
         _isMuted = State(initialValue: store.isMuted)
@@ -94,7 +92,7 @@ struct SettingsView: View {
         _isCharacterHidden = State(initialValue: initialIsCharacterHidden)
     }
 
-    private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
+    private func text(_ key: L10nKey) -> String { Strings.text(key) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -147,7 +145,6 @@ struct SettingsView: View {
 
     private var avatarSection: some View {
         AvatarManagementView(
-            language: language,
             onScaleChanged: onAvatarScaleChanged,
             initialSelectedAvatarName: store.selectedAvatarName,
             onSelectAvatar: { store.selectedAvatarName = $0 }
@@ -290,16 +287,6 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         SettingsSection(title: text(.tabGeneral)) {
-            SettingsStackedRow(label: text(.languageLabel)) {
-                Picker("", selection: $language) {
-                    ForEach(AppLanguage.allCases, id: \.self) { option in
-                        Text(option.displayName).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .onChange(of: language) { store.language = $0 }
-            }
             // byeolki: "화이트모드 다크모드 추가하고" -- an explicit override,
             // not just passively following the system (.system does that).
             SettingsStackedRow(label: text(.appearanceLabel)) {

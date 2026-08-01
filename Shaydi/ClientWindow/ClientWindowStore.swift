@@ -14,8 +14,7 @@ import Foundation
 final class ClientWindowStore: ObservableObject {
     static let defaultWorkspaceId = "default"
     static let defaultSessionId = "default"
-    /// Not localized yet -- ClientWindowStore has no AppLanguage dependency.
-    /// Revisit when the sidebar (F13 UI) is built and can supply one.
+    /// Korean-only, matching the rest of the app's UI text.
     private static let casualSessionTitle = "Casual"
 
     /// Sessions are keyed on (workspaceId, sessionId), not sessionId alone:

@@ -21,29 +21,29 @@ function Icon({ name }: { name: "folder" | "save" | "play" | "stop" | "sparkle" 
 }
 
 const configureMonaco: BeforeMount = (monaco) => {
-  monaco.editor.defineTheme("workspace-light", {
-    base: "vs",
+  monaco.editor.defineTheme("workspace-dark", {
+    base: "vs-dark",
     inherit: true,
     rules: [
-      { token: "comment", foreground: "8f8f8f", fontStyle: "italic" },
-      { token: "keyword", foreground: "7928ca" },
-      { token: "string", foreground: "0761d1" },
-      { token: "number", foreground: "ab570a" },
-      { token: "type", foreground: "0070f3" },
+      { token: "comment", foreground: "737373", fontStyle: "italic" },
+      { token: "keyword", foreground: "C084FC" },
+      { token: "string", foreground: "7DD3FC" },
+      { token: "number", foreground: "FBBF24" },
+      { token: "type", foreground: "60A5FA" },
     ],
     colors: {
-      "editor.background": "#ffffff",
-      "editor.foreground": "#171717",
-      "editorLineNumber.foreground": "#b7b7b7",
-      "editorLineNumber.activeForeground": "#4d4d4d",
-      "editor.lineHighlightBackground": "#fafafa",
-      "editor.selectionBackground": "#d3e5ff",
-      "editor.inactiveSelectionBackground": "#edf4ff",
-      "editorIndentGuide.background1": "#f0f0f0",
-      "editorIndentGuide.activeBackground1": "#d5d5d5",
-      "editorCursor.foreground": "#171717",
-      "editorWhitespace.foreground": "#e8e8e8",
-      "editorGutter.background": "#ffffff",
+      "editor.background": "#101010",
+      "editor.foreground": "#e7e7e7",
+      "editorLineNumber.foreground": "#4f4f4f",
+      "editorLineNumber.activeForeground": "#a3a3a3",
+      "editor.lineHighlightBackground": "#151515",
+      "editor.selectionBackground": "#173f70",
+      "editor.inactiveSelectionBackground": "#182c43",
+      "editorIndentGuide.background1": "#252525",
+      "editorIndentGuide.activeBackground1": "#404040",
+      "editorCursor.foreground": "#f5f5f5",
+      "editorWhitespace.foreground": "#292929",
+      "editorGutter.background": "#101010",
     },
   });
 };
@@ -142,7 +142,14 @@ export function App() {
     <main className="workspace-shell">
       <header className="titlebar">
         <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden><span /></span>
+          <span className="brand-mark" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="6" cy="7" r="2.25" />
+              <circle cx="18" cy="7" r="2.25" />
+              <circle cx="12" cy="17" r="2.25" />
+              <path d="M8 8.2 10.8 15M16 8.2 13.2 15M8.2 7h7.6" />
+            </svg>
+          </span>
           <span className="brand-name">Workspace</span>
           <span className="alpha-badge">ALPHA</span>
         </div>
@@ -224,7 +231,7 @@ export function App() {
                   path={active.path}
                   value={active.content}
                   language={active.language}
-                  theme="workspace-light"
+                  theme="workspace-dark"
                   beforeMount={configureMonaco}
                   onChange={(value) => dispatch({ type: "edit", path: active.path, content: value ?? "" })}
                   options={{

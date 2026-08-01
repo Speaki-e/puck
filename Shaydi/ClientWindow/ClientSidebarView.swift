@@ -121,6 +121,13 @@ struct ClientSidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // byeolki, 2026-08-02: "사이드바 하단 아이콘 버튼들에 접근성 라벨
+        // 없음" -- collapsed, this is just a single letter with no other
+        // text anywhere in the button; expanded, the workspace name is
+        // visible but nothing states this is a *switcher*, not just a label.
+        .accessibilityLabel("워크스페이스 전환")
+        .accessibilityValue(activeWorkspace?.name ?? "")
+        .help("워크스페이스 전환")
         .popover(isPresented: $showingWorkspacePopover, arrowEdge: .trailing) {
             WorkspacePopoverContent(
                 store: store,
@@ -151,6 +158,11 @@ struct ClientSidebarView: View {
             .themedSurface(palette, in: ClientTheme.Shapes.row)
         }
         .buttonStyle(.plain)
+        // Collapsed, this is icon-only -- VoiceOver has nothing to read
+        // without an explicit label, even though the icon itself is
+        // decorative-looking (a pencil-on-paper glyph, not a real word).
+        .accessibilityLabel("새 채팅")
+        .help("새 채팅")
     }
 
     private var footer: some View {
@@ -165,6 +177,13 @@ struct ClientSidebarView: View {
                     .frame(width: ClientTheme.Metrics.railButtonSize, height: ClientTheme.Metrics.railButtonSize)
             }
             .buttonStyle(.plain)
+            // Icon-only, always -- no visible text in either state to fall
+            // back on, so VoiceOver would otherwise announce nothing but
+            // "button" (byeolki, 2026-08-02, from the final review's own
+            // deferred finding: "사이드바 하단 아이콘 버튼들에 접근성 라벨
+            // 없음").
+            .accessibilityLabel(isExpanded ? "사이드바 접기" : "사이드바 펼치기")
+            .help(isExpanded ? "사이드바 접기" : "사이드바 펼치기")
         }
         .padding(.bottom, ClientTheme.Metrics.spacingSmall)
     }

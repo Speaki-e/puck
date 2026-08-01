@@ -32,10 +32,10 @@ struct EditorUnavailableView: View {
         VStack(spacing: ClientTheme.Metrics.spacingMedium) {
             Image(systemName: "folder.badge.questionmark")
                 .font(.system(size: 40))
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .foregroundStyle(.secondary)
             Text("이 워크스페이스에는 연결된 프로젝트가 없어요")
                 .font(ClientTheme.Typography.sessionTitle)
-                .foregroundStyle(ClientTheme.Colors.secondaryText)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -189,7 +189,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hosting.sizingOptions = []
             newWindow.contentViewController = hosting
             newWindow.setContentSize(CGSize(width: 1100, height: 740))
-            newWindow.minSize = CGSize(width: 760, height: 520)
+            // Same numbers ClientWindowView declares as its own SwiftUI
+            // minWidth/minHeight (ClientTheme.Metrics.windowMinWidth/
+            // windowMinHeight) -- this is the constraint that's actually
+            // enforced (sizingOptions = [] above means SwiftUI's own
+            // .frame(minWidth:) never drives a real resize limit), so the two
+            // had drifted apart before without anything catching it.
+            newWindow.minSize = CGSize(width: ClientTheme.Metrics.windowMinWidth, height: ClientTheme.Metrics.windowMinHeight)
             newWindow.center()
             self.window = newWindow
             return newWindow

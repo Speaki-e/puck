@@ -79,6 +79,12 @@ targets:
           - Resources/ShaydiAgent.entitlements
       - path: Shaydi/ClientWindow
       - path: Shaydi/Localization
+      # AgentSettingsView reuses SettingsSection/SettingsStackedRow rather
+      # than hand-duplicating their padding/typography (2026-08-02, byeolki:
+      # "패딩이나 폰트사이즈, 높이 같은게 아직 안 맞는 부분이 있는거 같은데").
+      # Only this one file, not all of Shaydi/Settings -- the rest depends on
+      # SettingsStore/AppAppearance/AvatarManagementView, which are Shaydi's.
+      - path: Shaydi/Settings/SettingsComponents.swift
       # F15 (2026-07-31): the agent loop. Compiled into this app, not
       # Shaydi -- the pet executes tools, the client decides which ones.
       - path: Shaydi/Agent

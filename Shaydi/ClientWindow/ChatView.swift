@@ -352,7 +352,7 @@ private struct MessageBubble: View {
                         .animation(.easeInOut(duration: 0.12), value: isHovering)
                     }
                 }
-                .frame(maxWidth: 420, alignment: isUser ? .trailing : .leading)
+                .frame(maxWidth: ClientTheme.Metrics.bubbleMaxWidth, alignment: isUser ? .trailing : .leading)
                 if !isUser { Spacer(minLength: 0) }
             }
         }

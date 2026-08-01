@@ -41,6 +41,11 @@ enum ClientTheme {
         /// The centered column width the transcript, empty state, and input
         /// bar all cap themselves to.
         static let contentMaxWidth: CGFloat = 720
+        /// A single message bubble's own cap, well short of `contentMaxWidth`
+        /// -- long line lengths hurt readability regardless of how wide the
+        /// window is, the same reason chat UIs generally cap a bubble's width
+        /// even in a wide column.
+        static let bubbleMaxWidth: CGFloat = 420
         static let spacingSmall: CGFloat = 6
         static let spacingMedium: CGFloat = 10
         static let spacingLarge: CGFloat = 16
@@ -49,6 +54,16 @@ enum ClientTheme {
         static let rowCornerRadius: CGFloat = 12
         /// The small sender avatar drawn above each message bubble.
         static let avatarSize: CGFloat = 22
+        /// The client window's own floor -- sidebar expanded (240) + the main
+        /// column's own minimum (420), rounded up a little for breathing
+        /// room. `ClientWindowView`'s SwiftUI `.frame(minWidth:minHeight:)`
+        /// and `ShaydiAgent/AppDelegate`'s AppKit-level `NSWindow.minSize`
+        /// both read this single constant -- they used to disagree (640/420
+        /// vs. the enforced 760/520), which meant the SwiftUI-declared
+        /// minimum was never actually reachable and the two numbers could
+        /// silently drift apart again the next time either one changed.
+        static let windowMinWidth: CGFloat = 760
+        static let windowMinHeight: CGFloat = 520
     }
 
     /// The shapes surfaces are cut to. Spelled once here rather than

@@ -171,8 +171,8 @@
 - [x] 연결 종료 시 대기 도구 즉시 실패
 - [x] 지수 backoff 자동 재연결
 - [x] 잘못된 protocol 메시지와 알 수 없는 result 로깅
-- [ ] 수신 GUI 메시지를 Agent Host/WorkspaceController로 실제 라우팅
-- [ ] Workspace 이벤트를 PetAgentClient로 실제 브로드캐스트
+- [x] 수신 `user_input`·`run_cancel`을 Agent Host/WorkspaceController로 실제 라우팅
+- [x] `agent_thinking`·`text_chunk`·`agent_done` 이벤트를 PetAgentClient로 실제 브로드캐스트
 - [ ] pet-app 실제 `bridge.sock`과 장시간 재연결 시험
 
 ### 김민영

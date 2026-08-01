@@ -23,7 +23,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self?.bridgeClient.broadcast(message) ?? false
     })
     private var window: ClientWindow?
-    private var appearanceObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // byeolki: "둘이 같이 가야하는거임" -- launching either app brings up
@@ -31,7 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // bridge.sock on the other end.
         CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.shaydiBundleID)
 
-        setUpAppearance()
+        applyNSAppearance(for: clientWindowStore.themeStyle)
+        clientWindowStore.onThemeStyleChanged = { [weak self] style in self?.applyNSAppearance(for: style) }
 
         bridgeClient.onMessage = { [weak self] message in
             DispatchQueue.main.async { self?.handle(message) }
@@ -65,45 +65,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
-    // MARK: - Appearance (light/dark override)
+    // MARK: - Theme (ClientThemeStyle -> NSApp.appearance)
 
-    /// byeolki, 2026-08-01: "테마가 내가 아마 다크모드일텐데, 시스템모드랑
-    /// 다크모드랑 생긴게 다른데?" -- ClientWindowStore.appearance used to
-    /// have a doc comment claiming AppDelegate seeded/kept it live from
-    /// SettingsStore, but nothing here ever actually did that: this process
-    /// has no SettingsStore of its own (it would drag in HotkeyBindings and
-    /// everything else that class depends on for one setting), so it reads
-    /// Shaydi's UserDefaults domain directly and listens for the
-    /// DistributedNotificationCenter broadcast Shaydi's own AppDelegate
-    /// posts whenever the setting changes.
-    private func setUpAppearance() {
-        applyAppearance(currentAppearance())
-        appearanceObserver = DistributedNotificationCenter.default().addObserver(
-            forName: AppAppearance.crossProcessChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            // byeolki, 2026-08-01: "셰이디에이전트에는 테마 변경에 대한 적용이
-            // 안됨" -- re-reading Shaydi's UserDefaults domain here raced
-            // against whether that write had actually propagated by the time
-            // this notification arrived. The value now travels with the
-            // notification itself; re-reading UserDefaults is only the
-            // fallback for a notification that somehow arrived without one.
-            let appearance = AppAppearance.resolved(fromCrossProcessUserInfo: notification.userInfo)
-                ?? self?.currentAppearance()
-                ?? .system
-            self?.applyAppearance(appearance)
-        }
-    }
-
-    private func currentAppearance() -> AppAppearance {
-        let raw = UserDefaults(suiteName: AppIdentity.shaydiBundleID)?.string(forKey: AppAppearance.defaultsKey)
-        return AppAppearance.resolved(fromDefaultsValue: raw)
-    }
-
-    private func applyAppearance(_ appearance: AppAppearance) {
-        clientWindowStore.appearance = appearance
-        NSApp.appearance = appearance.nsApplicationAppearance
+    /// NSVisualEffectView materials (the `.glass` theme's sidebar) and
+    /// native chrome (NSOpenPanel, popovers) follow NSApp.appearance, not
+    /// SwiftUI's .preferredColorScheme, which never touches them -- same
+    /// reason Shaydi's own AppDelegate sets NSApp.appearance alongside its
+    /// SwiftUI modifier. This process now has exactly one window driven by
+    /// exactly one theme setting (ClientWindowStore.themeStyle), so there's
+    /// no cross-process broadcast to listen for -- unlike the AppAppearance
+    /// wiring this replaces, changing it is entirely local.
+    private func applyNSAppearance(for style: ClientThemeStyle) {
+        NSApp.appearance = NSAppearance(named: style.colorScheme == .dark ? .darkAqua : .aqua)
     }
 
     private func handle(_ message: BridgeMessage) {

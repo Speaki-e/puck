@@ -23,32 +23,43 @@ struct AgentSettingsView: View {
 
     private func text(_ key: L10nKey) -> String { Strings.text(key) }
 
+    /// Reuses Shaydi's own SettingsSection/SettingsStackedRow rather than
+    /// hand-approximating their padding/typography -- byeolki, 2026-08-02:
+    /// "패딩이나 폰트사이즈, 높이 같은게 아직 안 맞는 부분이 있는거 같은데".
+    /// The first version of this file rebuilt the layout by eye instead of
+    /// reusing the real components, and it drifted: the section title was
+    /// missing SettingsSection's `.secondary` tint (read as a heading, not a
+    /// muted label), the "OpenAI API 키" row label was dropped entirely, and
+    /// the outer spacing didn't match SettingsStackedRow's tighter
+    /// label-to-control rhythm. Sharing the component instead of the
+    /// constants means this can't drift again.
     var body: some View {
-        VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingMedium) {
-            Text(text(.agentHeader))
-                .font(ClientTheme.Typography.sectionHeader)
-
-            HStack {
-                // SecureField, so a key isn't left legible on a screen that
-                // gets shared or recorded.
-                SecureField("sk-…", text: $apiKeyDraft)
-                    .textFieldStyle(.roundedBorder)
-                Button(text(.apiKeySave)) { saveAPIKey(apiKeyDraft) }
-                    .controlSize(.small)
-                    .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if agentConfiguration.isConfigured {
-                    Button(text(.apiKeyClear)) { saveAPIKey(nil) }
+        SettingsSection(title: text(.agentHeader)) {
+            SettingsStackedRow(label: text(.apiKeyLabel)) {
+                HStack {
+                    // SecureField, so a key isn't left legible on a screen
+                    // that gets shared or recorded.
+                    SecureField("sk-…", text: $apiKeyDraft)
+                        .textFieldStyle(.roundedBorder)
+                    Button(text(.apiKeySave)) { saveAPIKey(apiKeyDraft) }
                         .controlSize(.small)
+                        .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if agentConfiguration.isConfigured {
+                        Button(text(.apiKeyClear)) { saveAPIKey(nil) }
+                            .controlSize(.small)
+                    }
                 }
             }
 
             Text(apiKeyStatus)
                 .font(.footnote)
                 .foregroundStyle(agentConfiguration.isConfigured ? .secondary : Color.orange)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
 
             Text(text(.apiKeyExplanation))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
         }
         .padding(ClientTheme.Metrics.spacingLarge)
         .frame(width: 420)

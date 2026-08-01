@@ -37,7 +37,7 @@ struct ClientWindowView: View {
             .frame(minWidth: 420)
             .background(palette.background)
         }
-        .frame(minWidth: 640, minHeight: 420)
+        .frame(minWidth: ClientTheme.Metrics.windowMinWidth, minHeight: ClientTheme.Metrics.windowMinHeight)
         .environment(\.clientPalette, palette)
         .preferredColorScheme(store.themeStyle.colorScheme)
     }

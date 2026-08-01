@@ -12,7 +12,7 @@
 //  MessageBubble below), and every card/row/bubble routes through
 //  themedSurface(_:in:) so it renders flat-bordered or real glass
 //  depending on the active ClientThemeStyle. A hover-revealed inline
-//  action pill on assistant messages (copy/retry) is new, ported from
+//  action pill on assistant messages (copy) is new, ported from
 //  reference screenshot #3's inline "Reply" affordance -- screenshot #3's
 //  input-field autocomplete is explicitly out of scope (no backend signal
 //  to suggest from; see the design spec).
@@ -348,6 +348,8 @@ private struct MessageBubble: View {
                             content
                             if isHovering { inlineActions }
                         }
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.12), value: isHovering)
                     }
                 }
                 .frame(maxWidth: 420, alignment: isUser ? .trailing : .leading)
@@ -359,8 +361,8 @@ private struct MessageBubble: View {
     }
 
     /// Screenshot #3's inline hover "Reply" affordance, adapted: a small
-    /// copy/retry pill that fades in on hover without reflowing the row
-    /// above it (it's appended below the text, not overlaid).
+    /// copy pill that fades in on hover without reflowing the row above it
+    /// (it's appended below the text, not overlaid).
     private var inlineActions: some View {
         HStack(spacing: ClientTheme.Metrics.spacingSmall) {
             Button {
@@ -375,8 +377,6 @@ private struct MessageBubble: View {
             .buttonStyle(.plain)
             .foregroundStyle(palette.textSecondary)
         }
-        .transition(.opacity)
-        .animation(.easeInOut(duration: 0.12), value: isHovering)
     }
 
     private var senderRow: some View {

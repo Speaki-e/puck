@@ -40,12 +40,6 @@ struct ClientWindowView: View {
         .frame(minWidth: 640, minHeight: 420)
         .environment(\.clientPalette, palette)
         .preferredColorScheme(store.themeStyle.colorScheme)
-        // preferredColorScheme(_:) alone doesn't force a redraw when the
-        // *value* changes but the enum case looks unrelated to SwiftUI's own
-        // diffing (same quirk SettingsView/notch code already documents for
-        // AppAppearance) -- .id keys the whole subtree to the theme so a
-        // switch always re-renders.
-        .id(store.themeStyle)
     }
 
     /// Chat only. The embedded editor view (EditorWebView) is its own track

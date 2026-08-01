@@ -39,9 +39,11 @@ final class SettingsStore {
     var onVolumeChanged: ((Float) -> Void)?
     var onMuteChanged: ((Bool) -> Void)?
     var onWalkSpeedMultiplierChanged: ((Double) -> Void)?
-    /// byeolki: "화이트모드 다크모드 추가하고" -- the client window (F13) is a
-    /// separate SwiftUI hierarchy from Settings, so it needs its own signal to
-    /// pick up a live appearance change instead of only reading it at open time.
+    /// byeolki: "화이트모드 다크모드 추가하고" -- AppDelegate uses this to keep
+    /// NSApp.appearance (NSPopover chrome, NSVisualEffectView materials --
+    /// AppKit-native rendering that .preferredColorScheme never touches) in
+    /// sync with a live appearance change instead of only applying it at
+    /// launch.
     var onAppearanceChanged: ((AppAppearance) -> Void)?
     /// The notch (2026-08-01) is a persistent NSWindow AppDelegate owns, not
     /// something SettingsView can start/stop directly -- this is how turning

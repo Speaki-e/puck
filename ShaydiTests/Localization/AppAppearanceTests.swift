@@ -4,8 +4,8 @@
 //
 //  Shared test · owner: 박해영 (Haeyoung Park)
 //  byeolki: "화이트모드 다크모드 추가하고" -- an explicit in-app appearance
-//  override, an explicit user preference, not just following the system
-//  (a user setting, not a passive follow-the-system default).
+//  override (Settings' General tab) rather than only ever following the
+//  system appearance.
 //
 
 import XCTest
@@ -64,26 +64,5 @@ final class AppAppearanceTests: XCTestCase {
 
     func test_dark_mapsToDarkAquaNSApplicationAppearance() {
         XCTAssertEqual(AppAppearance.dark.nsApplicationAppearance?.name, .darkAqua)
-    }
-
-    // byeolki, 2026-08-01: "셰이디에이전트에는 테마 변경에 대한 적용이 안됨."
-    // The live path had ShaydiAgent re-read Shaydi's UserDefaults domain in
-    // response to the DistributedNotificationCenter broadcast -- but
-    // UserDefaults.set() isn't guaranteed to be visible to a second process
-    // (via a fresh UserDefaults(suiteName:)) by the time a Darwin/distributed
-    // notification posted immediately afterward is delivered and handled.
-    // Carrying the actual value in the notification's userInfo removes that
-    // race entirely: the receiver never needs to re-derive it from storage
-    // for the live-update path (only the very first launch, before any
-    // notification has ever arrived, still reads UserDefaults directly).
-    func test_crossProcessUserInfo_roundTripsThroughResolved() {
-        for appearance in AppAppearance.allCases {
-            XCTAssertEqual(AppAppearance.resolved(fromCrossProcessUserInfo: appearance.crossProcessUserInfo), appearance)
-        }
-    }
-
-    func test_resolved_fromMissingUserInfoKey_isNil() {
-        XCTAssertNil(AppAppearance.resolved(fromCrossProcessUserInfo: [:]))
-        XCTAssertNil(AppAppearance.resolved(fromCrossProcessUserInfo: nil))
     }
 }

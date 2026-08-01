@@ -7,6 +7,14 @@
 //  toy-summon row added on top -- byeolki, 2026-08-01, after the first pass
 //  shipped only a generic pill: "다이내믹 아일랜드 걍 Boring Notch
 //  클론코딩을 기반으로 하고, 거기에 toy 꺼내는 것만 얹으라는 소리였는데".
+//  2026-08-01 (later same day): actually cloned boring.notch's source
+//  (github.com/TheBoredTeam/boring.notch) after byeolki flagged the result
+//  as still "이상한데" -- the plain RoundedRectangle read as a floating
+//  pill rather than an extension of the screen's own top edge. Now uses
+//  NotchShape (the real concave/convex notch flare, ported from
+//  boringNotch/components/Notch/NotchShape.swift) and a short hover
+//  debounce (ported from ContentView.handleHover) instead of toggling
+//  instantly.
 //
 //  Owns its own hover-driven `isExpanded` state (for the pill's own shape
 //  animation) and separately reports it via onExpandedChanged, so
@@ -37,6 +45,7 @@ struct NotchView: View {
 
     @State private var isExpanded = false
     @State private var toysOut: Set<String>
+    @State private var pendingHoverWorkItem: DispatchWorkItem?
 
     init(
         status: NotchStatusStore,
@@ -68,14 +77,37 @@ struct NotchView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: isExpanded ? 26 : 12, style: .continuous)
-                .fill(.black)
+            NotchShape(
+                topCornerRadius: isExpanded ? NotchCornerRadii.expanded.top : NotchCornerRadii.collapsed.top,
+                bottomCornerRadius: isExpanded ? NotchCornerRadii.expanded.bottom : NotchCornerRadii.collapsed.bottom
+            )
+            .fill(.black)
+            // NotchWindow itself draws no shadow (see its own doc comment)
+            // -- flush with the menu bar while collapsed, lifted only once
+            // actually opened, matching boring.notch's own conditional
+            // shadow in ContentView.
+            .shadow(color: isExpanded ? .black.opacity(0.6) : .clear, radius: 8)
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isExpanded)
-        .onHover { hovering in
+        .onHover(perform: handleHover)
+    }
+
+    /// A short delay before actually opening/closing, ported from
+    /// boring.notch's ContentView.handleHover -- toggling `isExpanded`
+    /// (and telling NotchWindowController to resize the real NSWindow)
+    /// the instant the cursor merely crosses the pill made a cursor
+    /// passing through on its way to a menu-bar item pop it open, and
+    /// moving from the pill onto a widget inside it read as a flicker
+    /// (momentary close immediately followed by reopen).
+    private func handleHover(_ hovering: Bool) {
+        pendingHoverWorkItem?.cancel()
+        let delay = hovering ? 0.15 : 0.2
+        let workItem = DispatchWorkItem {
             isExpanded = hovering
             onExpandedChanged?(hovering)
         }
+        pendingHoverWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     /// A grip capsule at rest -- unless something's playing, in which case a

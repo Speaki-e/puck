@@ -18,3 +18,7 @@ ShaydiAgent/Resources/Info.plist
 # Local secrets / logs
 *.log
 .env
+
+# AI-generated planning/analysis/design docs -- not committed automatically
+# (see /Users/byeolki/Documents/Project/.claude/CLAUDE.md)
+docs/superpowers/

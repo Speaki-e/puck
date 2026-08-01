@@ -3,9 +3,10 @@
 //  Shaydi
 //
 //  Notch test · owner: 박해영 (Haeyoung Park)
-//  screenFrameProvider is injectable for the same reason
-//  TextInputBubbleWindow injects frontmostAppProvider -- a real NSScreen
-//  can't be relied on to have a known frame inside a test runner.
+//  screenFrameProvider/screenMetricsProvider are injectable for the same
+//  reason TextInputBubbleWindow injects frontmostAppProvider -- a real
+//  NSScreen can't be relied on to have a known frame/notch inside a test
+//  runner.
 //
 
 import XCTest
@@ -14,10 +15,16 @@ import AppKit
 
 final class NotchWindowControllerTests: XCTestCase {
     private let screenFrame = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+    // A real MacBook Pro 14"-shaped notch, in points.
+    private let notchMetrics = NotchScreenMetrics(
+        screenWidth: 1728, notchHeight: 32,
+        auxiliaryLeftWidth: 190, auxiliaryRightWidth: 190, menuBarHeight: 24
+    )
 
-    private func makeController() -> NotchWindowController {
+    private func makeController(metrics: NotchScreenMetrics? = nil) -> NotchWindowController {
         let controller = NotchWindowController()
         controller.screenFrameProvider = { [screenFrame] in screenFrame }
+        controller.screenMetricsProvider = { metrics }
         return controller
     }
 
@@ -34,20 +41,48 @@ final class NotchWindowControllerTests: XCTestCase {
         XCTAssertEqual(controller.screenFrameProvider(), screen.frame)
     }
 
+    // 2026-08-01: after cloning boring.notch's source to fix the notch
+    // sizing, the default provider must read the same NSScreen values
+    // boring.notch's getClosedNotchSize does -- not a hardcoded guess.
+    func test_defaultScreenMetricsProvider_matchesLiveScreenValues() {
+        guard let screen = NSScreen.main else { return }
+        let controller = NotchWindowController()
+
+        let metrics = controller.screenMetricsProvider()
+
+        XCTAssertEqual(metrics?.screenWidth, screen.frame.width)
+        XCTAssertEqual(metrics?.notchHeight, screen.safeAreaInsets.top)
+        XCTAssertEqual(metrics?.auxiliaryLeftWidth, screen.auxiliaryTopLeftArea?.width)
+        XCTAssertEqual(metrics?.auxiliaryRightWidth, screen.auxiliaryTopRightArea?.width)
+    }
+
     func test_start_positionsWindow_topCenterOfScreen_atCollapsedSize() {
-        let controller = makeController()
+        let controller = makeController(metrics: notchMetrics)
 
         controller.start(contentView: NSView())
         defer { controller.stop() }
 
         let expected = NotchLayout.frame(
-            screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: NotchWindowController.collapsedSize
+            screenMidX: screenFrame.midX, topY: screenFrame.maxY,
+            size: NotchGeometry.closedSize(for: notchMetrics)
+        )
+        XCTAssertEqual(controller.window?.frame, expected)
+    }
+
+    func test_start_withNoNotchMetricsAvailable_fallsBackToFallbackSize() {
+        let controller = makeController(metrics: nil)
+
+        controller.start(contentView: NSView())
+        defer { controller.stop() }
+
+        let expected = NotchLayout.frame(
+            screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: NotchGeometry.fallbackSize
         )
         XCTAssertEqual(controller.window?.frame, expected)
     }
 
     func test_setExpanded_true_resizesToExpandedSize_keepingTopEdgeFixed() {
-        let controller = makeController()
+        let controller = makeController(metrics: notchMetrics)
         controller.start(contentView: NSView())
         defer { controller.stop() }
 
@@ -60,7 +95,7 @@ final class NotchWindowControllerTests: XCTestCase {
     }
 
     func test_setExpanded_falseAfterTrue_returnsToCollapsedSize() {
-        let controller = makeController()
+        let controller = makeController(metrics: notchMetrics)
         controller.start(contentView: NSView())
         defer { controller.stop() }
 
@@ -68,13 +103,14 @@ final class NotchWindowControllerTests: XCTestCase {
         controller.setExpanded(false)
 
         let expected = NotchLayout.frame(
-            screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: NotchWindowController.collapsedSize
+            screenMidX: screenFrame.midX, topY: screenFrame.maxY,
+            size: NotchGeometry.closedSize(for: notchMetrics)
         )
         XCTAssertEqual(controller.window?.frame, expected)
     }
 
     func test_stop_ordersOutAndClearsWindow() {
-        let controller = makeController()
+        let controller = makeController(metrics: notchMetrics)
         controller.start(contentView: NSView())
 
         controller.stop()

@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self?.bridgeClient.broadcast(message) ?? false
     })
     private var window: ClientWindow?
+    private var settingsWindow: NSWindow?
     private var clientThemeStyleObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -142,6 +143,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default:
             break // relayed to this connection only ever as one of the above (protocol 3.7)
         }
+    }
+
+    // MARK: - Settings (F15 agent config, moved here 2026-08-02)
+
+    /// Wired from ClientMainMenu's "설정…" (Cmd+,) item via the responder
+    /// chain -- byeolki: "기존 셰이디앱에 있던 에이전트 관련 설정은 전부
+    /// 셰이디에이전트 설정으로 옮기고". `@objc` and this exact selector name
+    /// are load-bearing: ClientMainMenu references `Selector(("showSettings:"))`
+    /// as a raw string rather than `#selector(AppDelegate.showSettings(_:))`
+    /// so that file keeps compiling in ShaydiTests, which never links this
+    /// class (see ClientMainMenu's own header comment).
+    @objc private func showSettings(_ sender: Any?) {
+        let window = settingsWindow ?? {
+            let newWindow = NSWindow(
+                contentRect: .zero,
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            newWindow.title = "설정"
+            newWindow.isReleasedWhenClosed = false
+            newWindow.applyGlassChrome()
+            newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView())
+            newWindow.center()
+            settingsWindow = newWindow
+            return newWindow
+        }()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func showWindow() {

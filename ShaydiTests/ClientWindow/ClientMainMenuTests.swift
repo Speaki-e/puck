@@ -28,11 +28,25 @@ final class ClientMainMenuTests: XCTestCase {
     func test_make_bindsTheStandardShortcuts() {
         let found = shortcuts(in: ClientMainMenu.make())
 
-        // Quit/close/minimize plus the clipboard set the chat input needs.
-        for key in ["q", "w", "m", "x", "c", "v", "a", "z", "h"] {
+        // Quit/close/minimize plus the clipboard set the chat input needs,
+        // plus Settings (","), the standard Mac shortcut for it.
+        for key in ["q", "w", "m", "x", "c", "v", "a", "z", "h", ","] {
             XCTAssertNotNil(found[key], "Cmd+\(key.uppercased()) has no menu item, so it can't fire")
             XCTAssertTrue(found[key]?.contains(.command) ?? false, "Cmd+\(key.uppercased()) must be a Command shortcut")
         }
+    }
+
+    // byeolki, 2026-08-02: "기존 셰이디앱에 있던 에이전트 관련 설정은 전부
+    // 셰이디에이전트 설정으로 옮기고" -- the item this shortcut fires.
+    func test_make_settingsItem_targetsTheResponderChain() {
+        let settings = ClientMainMenu.make().items
+            .compactMap(\.submenu)
+            .flatMap(\.items)
+            .first { $0.keyEquivalent == "," }
+
+        XCTAssertEqual(settings?.action, Selector(("showSettings:")))
+        // nil target = go up the responder chain to AppDelegate, same as Quit.
+        XCTAssertNil(settings?.target)
     }
 
     func test_make_wiresQuitToTheApplicationItself() {

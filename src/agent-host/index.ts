@@ -56,6 +56,10 @@ parentPort.on("message", async (message: AgentHostRequest) => {
       case "cancelCodeEditor":
         respond({ kind: "response", id: message.id, ok: true, payload: { cancelled: queue.cancel(message.payload.requestId) } });
         break;
+      case "crashForTest":
+        if (process.env.NODE_ENV !== "test") throw new Error("테스트 환경에서만 사용할 수 있습니다");
+        setImmediate(() => process.exit(97));
+        break;
       case "shutdown":
         queue.cancelAll();
         respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });

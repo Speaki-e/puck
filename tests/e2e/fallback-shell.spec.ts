@@ -37,3 +37,39 @@ test("폴백 셸이 안전한 preload와 함께 열린다", async () => {
     await application.close();
   }
 });
+
+test("Agent Host가 반복 충돌해도 하나의 프로세스로 복구한다", async () => {
+  const application = await electron.launch({
+    executablePath: electronPath,
+    args: [path.resolve("."), "--headless"],
+    env: { ...process.env, NODE_ENV: "test" },
+  });
+  try {
+    await expect.poll(
+      () => application.evaluate(() => (globalThis as any).__workspaceTest?.agentHostPid()),
+      { timeout: 10_000 },
+    ).not.toBeUndefined();
+    let previousPid = await application.evaluate(() => (globalThis as any).__workspaceTest.agentHostPid()) as number;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await expect(application.evaluate(() => (globalThis as any).__workspaceTest.crashAgentHost())).resolves.toBe(true);
+      await expect.poll(
+        () => application.evaluate(async () => {
+          try {
+            const hook = (globalThis as any).__workspaceTest;
+            await hook.pingAgentHost();
+            return hook.agentHostPid();
+          } catch {
+            return undefined;
+          }
+        }),
+        { timeout: 10_000 },
+      ).not.toBe(previousPid);
+      const nextPid = await application.evaluate(() => (globalThis as any).__workspaceTest.agentHostPid()) as number;
+      expect(typeof nextPid).toBe("number");
+      previousPid = nextPid;
+    }
+  } finally {
+    await application.close();
+  }
+});

@@ -60,6 +60,13 @@ async function main(): Promise<void> {
     if (event.event === "status") controller.sendAgentStatus(JSON.stringify(event.payload));
   });
   await agentHost.start();
+  if (process.env.NODE_ENV === "test") {
+    (globalThis as typeof globalThis & { __workspaceTest?: Record<string, unknown> }).__workspaceTest = {
+      agentHostPid: () => agentHost.pid,
+      pingAgentHost: () => agentHost.request("ping", { now: Date.now() }, 2_000),
+      crashAgentHost: () => agentHost.request("crashForTest", {}, 2_000).then(() => false, () => true),
+    };
+  }
   const petBridge = new PetBridge({ socketPath: argumentValue("--bridge-socket"), logger });
   petBridge.on("state", (state: string) => controller.sendAgentStatus(`pet-app: ${state}`));
   petBridge.connect();

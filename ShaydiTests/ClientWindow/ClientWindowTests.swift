@@ -16,18 +16,6 @@ final class ClientWindowTests: XCTestCase {
         ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 1100, height: 740))
     }
 
-    // byeolki, 2026-08-02: "신호등만 색이 다르게 보임 ... 신호등 부분만
-    // 다른 부분 같음" -- titlebarAppearsTransparent alone hides the gray
-    // titlebar bar, but the window's own opaque default background still
-    // shows through right around the traffic lights unless the window
-    // itself is non-opaque with a clear background too.
-    func test_isNonOpaqueWithClearBackground() {
-        let window = makeWindow()
-
-        XCTAssertFalse(window.isOpaque)
-        XCTAssertEqual(window.backgroundColor, .clear)
-    }
-
     func test_appliesGlassChrome() {
         let window = makeWindow()
 

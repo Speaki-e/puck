@@ -47,22 +47,25 @@ extension NSWindow {
     /// -- the plain-titlebar look was part of what read as "default macOS
     /// settings pane" (byeolki: "맥 기본 설정창처럼 생겼네").
     ///
-    /// `isOpaque`/`backgroundColor` are load-bearing here, not decoration --
-    /// byeolki, 2026-08-02: "신호등만 색이 다르게 보임 ... 신호등 부분만
-    /// 다른 부분 같음". `titlebarAppearsTransparent` alone hides the gray
-    /// titlebar *bar*, but the window's own default opaque background
-    /// (`NSColor.windowBackgroundColor`, a light system gray) still shows
-    /// through in the sliver right around the traffic lights unless the
-    /// window itself is non-opaque with a clear background -- every other
-    /// custom window in this app (OverlayWindow, NotchWindow,
-    /// TextInputBubbleWindow) already sets these two for the same reason,
-    /// this one just hadn't needed to draw all the way to its own corners
-    /// until now.
+    /// 2026-08-02: tried adding `isOpaque = false`/`backgroundColor = .clear`
+    /// here too, on the theory that the window's own opaque default
+    /// background was leaking through around the traffic lights (byeolki:
+    /// "신호등만 색이 다르게 보임"). Made it worse, not better -- a real
+    /// screenshot showed a visibly translucent patch appear right where the
+    /// traffic lights sit. Reverted. The likely reason: unlike
+    /// `OverlayWindow`/`NotchWindow`/`TextInputBubbleWindow` (all
+    /// `.borderless`, no titlebar at all), this window is `.titled` with
+    /// `fullSizeContentView` -- it still has a real native titlebar
+    /// container view hosting the traffic lights, layered above the content.
+    /// Making the *window* non-opaque exposes that native layer's own
+    /// vibrancy/translucency against the desktop behind it instead of
+    /// against our dark content, which reads as a mismatched patch rather
+    /// than fixing one. The `isOpaque`/`backgroundColor` trick only applies
+    /// to genuinely borderless windows; a titled window's titlebar area
+    /// needs a different fix, not discovered yet -- see PROGRESS.md.
     func applyGlassChrome() {
         styleMask.insert(.fullSizeContentView)
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
-        isOpaque = false
-        backgroundColor = .clear
     }
 }

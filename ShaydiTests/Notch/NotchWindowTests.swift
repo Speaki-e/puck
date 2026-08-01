@@ -37,6 +37,15 @@ final class NotchWindowTests: XCTestCase {
         XCTAssertTrue(window.collectionBehavior.contains(.fullScreenAuxiliary))
     }
 
+    // 2026-08-01: an NSWindow-level shadow draws a rectangular penumbra
+    // behind NotchShape's flare, reading as a floating pill instead of an
+    // extension of the menu bar -- NotchView draws its own conditional
+    // shadow only while expanded instead (see NotchViewTests-adjacent
+    // reasoning in NotchView's doc comment).
+    func test_hasNoWindowLevelShadow() {
+        XCTAssertFalse(makeWindow().hasShadow)
+    }
+
     func test_acceptsMouseEvents_unlikeOverlayWindow() {
         // OverlayWindow.ignoresMouseEvents defaults true (click-through) --
         // this window hosts real buttons, so it must not.

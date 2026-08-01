@@ -27,7 +27,14 @@ final class NotchWindow: NSWindow {
         )
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        // false, not true -- byeolki, 2026-08-01, after cloning boring.notch
+        // to fix the notch's look: an NSWindow-level shadow draws a
+        // rectangular penumbra behind NotchShape's flare, which reads as a
+        // pill floating in front of the menu bar instead of an extension of
+        // it. boring.notch's own BoringNotchWindow sets this false too and
+        // draws its own conditional SwiftUI-level shadow only while
+        // expanded (see NotchView) -- flush when collapsed, lifted when open.
+        hasShadow = false
         // .statusBar, not .floating -- byeolki, 2026-08-01: "맥북 노치가
         // 메뉴막대 쪽에 있는데, 너가 만든거 위치는 걍 메뉴막대를 제외한 화면
         // 맨 위임 조정하고". This is the same level NSStatusItem/menu extras

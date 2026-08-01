@@ -11,12 +11,11 @@
 import AppKit
 
 final class NotchWindowController {
-    /// The resting pill, no bigger than it needs to be to read as a notch.
-    static let collapsedSize = CGSize(width: 170, height: 24)
     /// Room for boring.notch's own headline widgets (Now Playing + battery)
     /// stacked above the toy row -- byeolki, 2026-08-01: "다이내믹 아일랜드
     /// 걍 Boring Notch 클론코딩을 기반으로 하고, 거기에 toy 꺼내는 것만
-    /// 얹으라는 소리였는데".
+    /// 얹으라는 소리였는데". This is our own content's size, not tied to
+    /// the physical notch, so unlike collapsedSize it stays a constant.
     static let expandedSize = CGSize(width: 300, height: 220)
 
     private(set) var window: NotchWindow?
@@ -34,13 +33,36 @@ final class NotchWindowController {
     /// notch/menu bar occupies.
     var screenFrameProvider: () -> CGRect? = { NSScreen.main?.frame }
 
+    /// The real notch's own dimensions, if this screen has one -- read the
+    /// same NSScreen values boring.notch's getClosedNotchSize does. nil
+    /// (not a zeroed struct) when there's no main screen at all, so
+    /// `collapsedSize()` can tell "no data" apart from "screen has no
+    /// notch" and fall back correctly in both cases.
+    var screenMetricsProvider: () -> NotchScreenMetrics? = {
+        guard let screen = NSScreen.main else { return nil }
+        return NotchScreenMetrics(
+            screenWidth: screen.frame.width,
+            notchHeight: screen.safeAreaInsets.top,
+            auxiliaryLeftWidth: screen.auxiliaryTopLeftArea?.width,
+            auxiliaryRightWidth: screen.auxiliaryTopRightArea?.width,
+            menuBarHeight: screen.frame.maxY - screen.visibleFrame.maxY
+        )
+    }
+
     private var screenChangeObserver: NSObjectProtocol?
+
+    /// The resting pill's size -- the real physical notch's own
+    /// width/height when this screen has one, so the pill reads as an
+    /// extension of the hardware cutout instead of a floating guess.
+    private func collapsedSize() -> CGSize {
+        screenMetricsProvider().map(NotchGeometry.closedSize) ?? NotchGeometry.fallbackSize
+    }
 
     func start(contentView: NSView) {
         guard let screenFrame = screenFrameProvider() else { return }
 
         let window = NotchWindow(contentRect: NotchLayout.frame(
-            screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: Self.collapsedSize
+            screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: collapsedSize()
         ))
         window.contentView = contentView
         window.orderFrontRegardless()
@@ -69,7 +91,7 @@ final class NotchWindowController {
 
     private func reposition() {
         guard let window, let screenFrame = screenFrameProvider() else { return }
-        let size = isExpanded ? Self.expandedSize : Self.collapsedSize
+        let size = isExpanded ? Self.expandedSize : collapsedSize()
         let frame = NotchLayout.frame(screenMidX: screenFrame.midX, topY: screenFrame.maxY, size: size)
         // Not animated: the SwiftUI content already animates its own
         // corner-radius/opacity change, and animating the NSWindow frame

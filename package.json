@@ -1,0 +1,71 @@
+{
+  "name": "@speaki-e/workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-main/main/index.js",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "dev:renderer": "vite --host 127.0.0.1",
+    "start": "npm run build && electron .",
+    "start:headless": "npm run build && electron . --headless",
+    "package": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "0.64.0",
+    "@agentclientprotocol/sdk": "1.3.0",
+    "@monaco-editor/react": "4.7.0",
+    "@speaki-e/protocol": "github:Speaki-e/protocol#4244922fa4605645e577905ed37b33b94a5b16e5",
+    "chokidar": "5.0.0",
+    "electron": "43.2.0",
+    "monaco-editor": "0.56.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "ws": "8.21.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/node": "24.10.4",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/ws": "8.18.1",
+    "@vitejs/plugin-react": "6.0.1",
+    "electron-builder": "26.8.1",
+    "typescript": "5.9.3",
+    "vite": "8.0.0",
+    "vitest": "4.1.0"
+  },
+  "build": {
+    "appId": "io.speaki.workspace",
+    "productName": "Workspace",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-main/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/@agentclientprotocol/claude-agent-acp/**/*"
+    ],
+    "mac": {
+      "target": "dir",
+      "identity": null
+    },
+    "win": {
+      "target": "dir"
+    }
+  }
+}

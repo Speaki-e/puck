@@ -14,6 +14,7 @@ export class AgentHostController extends EventEmitter {
     private readonly modulePath: string,
     private readonly logger: JsonlLogger,
     private readonly appPath = process.cwd(),
+    private readonly claudeApiKey?: string,
   ) {
     super();
   }
@@ -26,7 +27,7 @@ export class AgentHostController extends EventEmitter {
       env: {
         NODE_ENV: process.env.NODE_ENV ?? "production",
         WORKSPACE_APP_PATH: this.appPath,
-        ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}),
+        ...(this.claudeApiKey ? { ANTHROPIC_API_KEY: this.claudeApiKey } : {}),
       },
     });
     this.child = child;

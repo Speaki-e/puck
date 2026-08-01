@@ -152,6 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         requestPermissions()
         setUpAppearance()
+        setUpClientThemeStyle()
 
         // byeolki: "둘이 같이 가야하는거임" -- ShaydiAgent (the F13 client
         // window, now a separate Dock-resident app) is useless without this
@@ -195,11 +196,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     // MARK: - Appearance (light/dark override)
 
     /// byeolki, 2026-08-01: "테마가 내가 아마 다크모드일텐데, 시스템모드랑
-    /// 다크모드랑 생긴게 다른데?" -- .preferredColorScheme (SettingsView,
-    /// ClientWindowView) only recolors SwiftUI content; NSPopover's own
-    /// chrome and any NSVisualEffectView material follow NSApp.appearance
-    /// instead, which nothing was setting. Seeded here at launch and kept
-    /// live via onAppearanceChanged.
+    /// 다크모드랑 생긴게 다른데?" -- .preferredColorScheme (SettingsView)
+    /// only recolors SwiftUI content; NSPopover's own chrome and any
+    /// NSVisualEffectView material follow NSApp.appearance instead, which
+    /// nothing was setting. Seeded here at launch and kept live via
+    /// onAppearanceChanged.
     private func setUpAppearance() {
         applyAppKitAppearance(settingsStore.appearance)
         settingsStore.onAppearanceChanged = { [weak self] appearance in
@@ -209,6 +210,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     private func applyAppKitAppearance(_ appearance: AppAppearance) {
         NSApp.appearance = appearance.nsApplicationAppearance
+    }
+
+    // MARK: - Client (chat) window theme, broadcast to ShaydiAgent
+
+    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    /// 셰이디 설정으로 변경할 수 있어야하거든" -- ClientThemeStyle (the
+    /// client window's own light/dark/glass theme, separate from the
+    /// system-wide appearance above) is a Settings item here, but only
+    /// ShaydiAgent's client window actually renders with it -- this process
+    /// never applies it locally, just persists it (via SettingsStore) and
+    /// broadcasts it, same DistributedNotificationCenter shape as
+    /// onAppearanceChanged above.
+    private func setUpClientThemeStyle() {
+        broadcastClientThemeStyle(settingsStore.clientThemeStyle)
+        settingsStore.onClientThemeStyleChanged = { [weak self] style in
+            self?.broadcastClientThemeStyle(style)
+        }
+    }
+
+    private func broadcastClientThemeStyle(_ style: ClientThemeStyle) {
+        // userInfo carries the value itself, not just a "something changed"
+        // ping -- re-reading UserDefaults on receipt would race against
+        // whether this process's write above had actually propagated to
+        // cfprefsd by the time ShaydiAgent's observer fires (the same race
+        // AppAppearance's broadcast hit first).
+        DistributedNotificationCenter.default().postNotificationName(
+            ClientThemeStyle.crossProcessChangeNotification,
+            object: nil,
+            userInfo: style.crossProcessUserInfo,
+            deliverImmediately: true
+        )
     }
 
     // MARK: - Permissions

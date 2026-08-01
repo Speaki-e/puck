@@ -19,6 +19,7 @@ final class SettingsStore {
         static let toyScale = "Shaydi.toyScale"
         static let speechLocale = "Shaydi.speechLocale"
         static let appearance = AppAppearance.defaultsKey
+        static let clientThemeStyle = ClientThemeStyle.defaultsKey
         static let pushToTalk = "Shaydi.hotkey.pushToTalk"
         static let textInput = "Shaydi.hotkey.textInput"
         static let characterSummon = "Shaydi.hotkey.characterSummon"
@@ -45,6 +46,12 @@ final class SettingsStore {
     /// sync with a live appearance change instead of only applying it at
     /// launch.
     var onAppearanceChanged: ((AppAppearance) -> Void)?
+    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    /// 셰이디 설정으로 변경할 수 있어야하거든" -- AppDelegate uses this to
+    /// broadcast the new value to ShaydiAgent (DistributedNotificationCenter,
+    /// same shape as onAppearanceChanged's own broadcast) so the client
+    /// window picks it up immediately.
+    var onClientThemeStyleChanged: ((ClientThemeStyle) -> Void)?
     /// The notch (2026-08-01) is a persistent NSWindow AppDelegate owns, not
     /// something SettingsView can start/stop directly -- this is how turning
     /// it off in Settings actually tears the window down immediately.
@@ -165,6 +172,16 @@ final class SettingsStore {
         set {
             defaults.set(newValue.rawValue, forKey: Keys.appearance)
             onAppearanceChanged?(newValue)
+        }
+    }
+
+    var clientThemeStyle: ClientThemeStyle {
+        get {
+            ClientThemeStyle.resolved(fromDefaultsValue: defaults.string(forKey: Keys.clientThemeStyle))
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.clientThemeStyle)
+            onClientThemeStyleChanged?(newValue)
         }
     }
 

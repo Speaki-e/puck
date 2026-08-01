@@ -26,7 +26,6 @@ final class ClientWindowStore: ObservableObject {
     }
 
     private let sender: UserInputSender
-    private let defaults: UserDefaults
     private var sessionsByKey: [SessionKey: ChatSession] = [:]
     private var sessionOrder: [SessionKey] = []
 
@@ -46,35 +45,21 @@ final class ClientWindowStore: ObservableObject {
     @Published var activeWorkspaceId: String
     @Published var activeSessionId: String
 
-    private static let themeStyleDefaultsKey = ClientThemeStyle.defaultsKey
+    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    /// 셰이디 설정으로 변경할 수 있어야하거든" -- a Shaydi Settings item now
+    /// (SettingsStore.clientThemeStyle), not a ClientWindow-local one. This
+    /// store doesn't persist or own the value at all; ShaydiAgent's
+    /// AppDelegate seeds it at launch (reading Shaydi's UserDefaults domain)
+    /// and keeps it live via a DistributedNotificationCenter broadcast --
+    /// same shape the old `appearance` property (removed 2026-08-01, since
+    /// undone here) used for Shaydi's own system-wide AppAppearance.
+    @Published var themeStyle: ClientThemeStyle = .dark
 
-    /// byeolki, 2026-08-01: "테마 종류를 다크, 화이트, 글래스로" -- an in-app
-    /// theme setting independent of Shaydi's own system-wide AppAppearance
-    /// (the pet overlay/Notch/Settings' light/dark/system toggle). Persisted
-    /// in whichever UserDefaults domain this store was given (ShaydiAgent's
-    /// own by default) -- unlike the appearance property this replaces,
-    /// nothing about this needs to be read cross-process from Shaydi, so no
-    /// DistributedNotificationCenter broadcast is involved.
-    @Published var themeStyle: ClientThemeStyle {
-        didSet {
-            defaults.set(themeStyle.rawValue, forKey: Self.themeStyleDefaultsKey)
-            onThemeStyleChanged?(themeStyle)
-        }
-    }
-    /// AppDelegate uses this to keep NSApp.appearance (and therefore
-    /// NSVisualEffectView materials / native popover chrome, none of which
-    /// SwiftUI's .preferredColorScheme touches) in sync with the resolved
-    /// theme -- same reasoning AppAppearance's own doc comment already
-    /// documents for the pattern this mirrors.
-    var onThemeStyleChanged: ((ClientThemeStyle) -> Void)?
-
-    init(sender: UserInputSender, defaults: UserDefaults = .standard) {
+    init(sender: UserInputSender) {
         self.sender = sender
-        self.defaults = defaults
         workspaces = [ClientWorkspace(id: Self.defaultWorkspaceId, name: Self.casualSessionTitle, projectPath: nil)]
         activeWorkspaceId = Self.defaultWorkspaceId
         activeSessionId = Self.defaultSessionId
-        themeStyle = ClientThemeStyle.resolved(fromDefaultsValue: defaults.string(forKey: Self.themeStyleDefaultsKey))
         seedDefaultSession(forWorkspace: Self.defaultWorkspaceId)
     }
 

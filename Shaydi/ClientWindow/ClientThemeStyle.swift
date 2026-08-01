@@ -4,10 +4,15 @@
 //
 //  F13 · owner: 박해영 (Haeyoung Park)
 //  Which of the three ClientWindow themes is active -- byeolki: "테마 종류를
-//  다크, 화이트, 글래스로". Independent of Shaydi's own system-wide
+//  다크, 화이트, 글래스로". A distinct setting from Shaydi's system-wide
 //  AppAppearance (Settings' light/dark/system toggle, used by the pet
-//  overlay/Notch/Settings) -- persisted separately, in ShaydiAgent's own
-//  UserDefaults domain, and read by ClientWindowStore.
+//  overlay/Notch/Settings), but not a separate ClientWindow-local one either
+//  -- byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+//  셰이디 설정으로 변경할 수 있어야하거든". Persisted in Shaydi's own
+//  UserDefaults domain (SettingsStore) and broadcast to ShaydiAgent over
+//  DistributedNotificationCenter, the same shape AppAppearance's old
+//  cross-process wiring used -- ShaydiAgent's AppDelegate is the only
+//  consumer, seeding ClientWindowStore.themeStyle from it.
 //
 
 import SwiftUI
@@ -43,12 +48,43 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
         }
     }
 
-    static let defaultsKey = "ShaydiAgent.clientThemeStyle"
+    /// Shaydi's own UserDefaults domain now (SettingsStore), not
+    /// ShaydiAgent's -- see this type's header comment.
+    static let defaultsKey = "Shaydi.clientThemeStyle"
 
     /// Same resolve-with-fallback shape as AppAppearance.resolved(fromDefaultsValue:)
     /// -- `.dark` (not `.light`) is the fallback since that's this app's
     /// original, already-shipped look.
     static func resolved(fromDefaultsValue raw: String?) -> ClientThemeStyle {
         raw.flatMap(ClientThemeStyle.init(rawValue:)) ?? .dark
+    }
+
+    /// Posted by Shaydi's AppDelegate whenever `SettingsStore.clientThemeStyle`
+    /// changes, so ShaydiAgent (a separate process with no access to
+    /// Shaydi's UserDefaults domain) picks up the same value immediately
+    /// instead of only at its own next launch.
+    static let crossProcessChangeNotification = Notification.Name("com.speaki-e.Shaydi.clientThemeStyleChanged")
+
+    /// The key `crossProcessUserInfo` carries this value under, and
+    /// `resolved(fromCrossProcessUserInfo:)` reads it back from.
+    private static let crossProcessUserInfoKey = "clientThemeStyle"
+
+    /// Carries the actual new value alongside `crossProcessChangeNotification`
+    /// -- `UserDefaults.set()` isn't guaranteed to be visible to a second
+    /// process by the time a Darwin/distributed notification posted right
+    /// afterward is delivered and handled (a real race AppAppearance's own
+    /// wiring hit first), so the value travels with the notification itself
+    /// rather than ShaydiAgent re-reading UserDefaults on receipt.
+    var crossProcessUserInfo: [AnyHashable: Any] {
+        [Self.crossProcessUserInfoKey: rawValue]
+    }
+
+    /// nil if `userInfo` carries no recognizable value at all (missing key,
+    /// or the notification came with none) -- distinguishing "nothing here"
+    /// from a real value lets the caller fall back to its own UserDefaults
+    /// read instead of silently treating a malformed notification as unset.
+    static func resolved(fromCrossProcessUserInfo userInfo: [AnyHashable: Any]?) -> ClientThemeStyle? {
+        guard let raw = userInfo?[crossProcessUserInfoKey] as? String else { return nil }
+        return resolved(fromDefaultsValue: raw)
     }
 }

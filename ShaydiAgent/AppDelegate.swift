@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self?.bridgeClient.broadcast(message) ?? false
     })
     private var window: ClientWindow?
+    private var clientThemeStyleObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // byeolki: "둘이 같이 가야하는거임" -- launching either app brings up
@@ -30,8 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // bridge.sock on the other end.
         CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.shaydiBundleID)
 
-        applyNSAppearance(for: clientWindowStore.themeStyle)
-        clientWindowStore.onThemeStyleChanged = { [weak self] style in self?.applyNSAppearance(for: style) }
+        setUpClientThemeStyle()
 
         bridgeClient.onMessage = { [weak self] message in
             DispatchQueue.main.async { self?.handle(message) }
@@ -65,17 +65,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
-    // MARK: - Theme (ClientThemeStyle -> NSApp.appearance)
+    // MARK: - Theme (ClientThemeStyle, synced from Shaydi's Settings)
 
-    /// NSVisualEffectView materials (the `.glass` theme's sidebar) and
-    /// native chrome (NSOpenPanel, popovers) follow NSApp.appearance, not
-    /// SwiftUI's .preferredColorScheme, which never touches them -- same
-    /// reason Shaydi's own AppDelegate sets NSApp.appearance alongside its
-    /// SwiftUI modifier. This process now has exactly one window driven by
-    /// exactly one theme setting (ClientWindowStore.themeStyle), so there's
-    /// no cross-process broadcast to listen for -- unlike the AppAppearance
-    /// wiring this replaces, changing it is entirely local.
-    private func applyNSAppearance(for style: ClientThemeStyle) {
+    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    /// 셰이디 설정으로 변경할 수 있어야하거든" -- this process has no
+    /// SettingsStore of its own (same reasoning as everywhere else this
+    /// process reads Shaydi's UserDefaults domain directly instead), so it
+    /// reads Shaydi's `clientThemeStyle` at launch and listens for the
+    /// DistributedNotificationCenter broadcast Shaydi's AppDelegate posts
+    /// whenever the setting changes -- the exact shape the old (2026-08-01,
+    /// removed 2026-08-01, now reinstated here for a different value)
+    /// AppAppearance cross-process wiring used.
+    private func setUpClientThemeStyle() {
+        applyClientThemeStyle(currentClientThemeStyle())
+        clientThemeStyleObserver = DistributedNotificationCenter.default().addObserver(
+            forName: ClientThemeStyle.crossProcessChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            // The value travels with the notification itself -- re-reading
+            // Shaydi's UserDefaults domain here would race against whether
+            // that write had actually propagated by the time this
+            // notification arrived (the same race AppAppearance's old
+            // broadcast hit first); re-reading is only the fallback for a
+            // notification that somehow arrived without one.
+            let style = ClientThemeStyle.resolved(fromCrossProcessUserInfo: notification.userInfo)
+                ?? self?.currentClientThemeStyle()
+                ?? .dark
+            self?.applyClientThemeStyle(style)
+        }
+    }
+
+    private func currentClientThemeStyle() -> ClientThemeStyle {
+        let raw = UserDefaults(suiteName: AppIdentity.shaydiBundleID)?.string(forKey: ClientThemeStyle.defaultsKey)
+        return ClientThemeStyle.resolved(fromDefaultsValue: raw)
+    }
+
+    private func applyClientThemeStyle(_ style: ClientThemeStyle) {
+        clientWindowStore.themeStyle = style
+        // NSVisualEffectView materials (the `.glass` theme's sidebar) and
+        // native chrome (NSOpenPanel, popovers) follow NSApp.appearance, not
+        // SwiftUI's .preferredColorScheme, which never touches them -- same
+        // reason Shaydi's own AppDelegate sets NSApp.appearance alongside
+        // its SwiftUI modifier.
         NSApp.appearance = NSAppearance(named: style.colorScheme == .dark ? .darkAqua : .aqua)
     }
 

@@ -90,3 +90,26 @@ extension View {
         background(tint, in: shape)
     }
 }
+
+extension View {
+    /// Flat, bordered surface for `.light`/`.dark` -- the non-glass
+    /// counterpart to `glassSurface`.
+    func borderedSurface(_ palette: ClientPalette, in shape: some Shape) -> some View {
+        background(palette.surface, in: shape)
+            .overlay(shape.stroke(palette.surfaceBorder, lineWidth: 1))
+    }
+
+    /// Picks glass vs. flat per the active theme -- every themed card/row/
+    /// bubble in ChatView and the sidebar goes through this one call
+    /// instead of choosing `glassSurface`/`borderedSurface` directly, same
+    /// "one place to gate it" principle this file's header already states
+    /// for the macOS-26-vs-fallback split.
+    @ViewBuilder
+    func themedSurface(_ palette: ClientPalette, in shape: some Shape) -> some View {
+        if palette.usesGlassSurfaces {
+            glassSurface(in: shape)
+        } else {
+            borderedSurface(palette, in: shape)
+        }
+    }
+}

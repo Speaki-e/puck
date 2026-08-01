@@ -18,6 +18,7 @@ import SwiftUI
 
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
+    @State private var showingSessionPopover = false
 
     private var palette: ClientPalette { store.themeStyle.palette }
 
@@ -54,15 +55,96 @@ struct ClientWindowView: View {
         }
     }
 
-    /// Minimal -- the primary "새 채팅" action lives in the sidebar now
-    /// (2026-08-01 rebuild), so this is just the current session's title.
+    /// The current session's title, now a clickable pill instead of plain
+    /// text -- byeolki shared 5 Figma references (2026-08-02, "얘네 참고해서
+    /// 레이아웃 배치나 UI 손봐줄래") whose TopBar is a "New Chat ⌄" selector,
+    /// not a label. The primary "새 채팅" action still lives in the sidebar
+    /// (2026-08-01 rebuild); this adds a second, real way to switch sessions
+    /// from wherever the transcript already has your attention, backed by
+    /// the same session list the sidebar shows.
     private var topBar: some View {
-        Text(activeSession?.title ?? "")
-            .font(ClientTheme.Typography.workspaceName)
-            .foregroundStyle(palette.textPrimary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
-            .padding(.top, 28) // clears the transparent titlebar / traffic lights
-            .padding(.bottom, ClientTheme.Metrics.spacingMedium)
+        HStack {
+            sessionSelector
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
+        .padding(.top, 28) // clears the transparent titlebar / traffic lights
+        .padding(.bottom, ClientTheme.Metrics.spacingMedium)
+    }
+
+    private var sessionSelector: some View {
+        Button {
+            showingSessionPopover = true
+        } label: {
+            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                Text(activeSession?.title ?? "")
+                    .font(ClientTheme.Typography.workspaceName)
+                    .foregroundStyle(palette.textPrimary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(palette.textSecondary)
+            }
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+            .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+            .themedSurface(palette, in: ClientTheme.Shapes.row)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("세션 전환")
+        .accessibilityValue(activeSession?.title ?? "")
+        .help("세션 전환")
+        .popover(isPresented: $showingSessionPopover, arrowEdge: .bottom) {
+            TopBarSessionPopoverContent(store: store, onSelect: { showingSessionPopover = false })
+        }
+    }
+}
+
+private struct TopBarSessionPopoverContent: View {
+    @ObservedObject var store: ClientWindowStore
+    let onSelect: () -> Void
+    @Environment(\.clientPalette) private var palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(store.sessions(in: store.activeWorkspaceId)) { session in
+                let isActive = session.id == store.activeSessionId
+                Button {
+                    store.activeSessionId = session.id
+                    onSelect()
+                } label: {
+                    HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                        Image(systemName: "message.fill")
+                            .font(.caption)
+                            .foregroundStyle(isActive ? palette.accent : palette.textSecondary)
+                            .frame(width: 18)
+                        Text(session.title)
+                            .font(ClientTheme.Typography.sessionTitle)
+                            .foregroundStyle(palette.textPrimary)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+                .background(isActive ? palette.accent.opacity(0.14) : Color.clear, in: ClientTheme.Shapes.row)
+            }
+
+            Button {
+                store.requestNewSession(title: "새 채팅", in: store.activeWorkspaceId)
+                onSelect()
+            } label: {
+                Label("새 채팅", systemImage: "plus")
+                    .font(ClientTheme.Typography.sessionTitle)
+                    .foregroundStyle(palette.textSecondary)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+            .padding(.vertical, ClientTheme.Metrics.spacingSmall)
+        }
+        .padding(ClientTheme.Metrics.spacingSmall)
+        .frame(width: 240)
     }
 }

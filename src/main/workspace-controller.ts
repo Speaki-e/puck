@@ -56,6 +56,14 @@ export class WorkspaceController {
       this.broadcast("agent:status", "취소 요청됨");
       return this.cancelAgent();
     });
+    ipcMain.handle("window:control", (event, action: "minimize" | "maximize" | "close") => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) return false;
+      if (action === "minimize") window.minimize();
+      else if (action === "maximize") window.isMaximized() ? window.unmaximize() : window.maximize();
+      else if (action === "close") window.close();
+      return true;
+    });
   }
 
   async close(): Promise<void> {
@@ -69,6 +77,7 @@ export class WorkspaceController {
       "files:save",
       "agent:run",
       "agent:cancel",
+      "window:control",
     ]) ipcMain.removeHandler(channel);
   }
 

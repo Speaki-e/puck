@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("workspace", {
   saveFile: (workspaceId: string, request: unknown) => ipcRenderer.invoke("files:save", workspaceId, request),
   runCommand: (command: string, workspaceId: string) => ipcRenderer.invoke("agent:run", command, workspaceId),
   cancelCommand: () => ipcRenderer.invoke("agent:cancel"),
+  windowControl: (action: "minimize" | "maximize" | "close") => ipcRenderer.invoke("window:control", action),
   onFileChange: (listener: (event: unknown) => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, payload: unknown) => listener(payload);
     ipcRenderer.on("files:changed", wrapped);

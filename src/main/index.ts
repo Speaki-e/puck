@@ -1,4 +1,4 @@
-import { app, BrowserWindow, safeStorage } from "electron";
+import { app, BrowserWindow, Menu, safeStorage } from "electron";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { JsonlLogger } from "./logger.js";
@@ -22,6 +22,9 @@ async function createFallbackWindow(): Promise<void> {
     minWidth: 880,
     minHeight: 560,
     title: "Workspace",
+    frame: process.platform !== "win32",
+    autoHideMenuBar: true,
+    backgroundColor: "#090909",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -29,11 +32,13 @@ async function createFallbackWindow(): Promise<void> {
       preload: path.join(app.getAppPath(), "dist-main", "main", "preload.cjs"),
     },
   });
+  window.setMenuBarVisibility(false);
   await window.loadFile(path.join(app.getAppPath(), "dist", "index.html"));
 }
 
 async function main(): Promise<void> {
   await app.whenReady();
+  Menu.setApplicationMenu(null);
   const logger = new JsonlLogger(path.join(app.getPath("userData"), "logs"));
   const registry = new WorkspaceRegistry(path.join(app.getPath("userData"), "workspaces.json"));
   const secrets = new SecretStore(path.join(app.getPath("userData"), "secrets.json"), safeStorage);

@@ -49,7 +49,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .button-primary-small, .button-primary { border-color: #ededed; background: #ededed; color: #111; }
 .button-primary-small:hover, .button-primary:hover { background: #fff; transform: translateY(-1px); }
 .button-primary { height: 40px; padding: 0 16px; border-radius: 100px; font-size: 13px; }
-.project-button { justify-self: end; }
+.titlebar-actions { display: flex; height: 100%; align-items: center; justify-content: flex-end; gap: 10px; -webkit-app-region: no-drag; }
+.project-button { flex: 0 0 auto; }
+.window-actions { display: flex; height: 100%; align-items: stretch; margin: 0 -14px 0 0; }
+.window-actions button { position: relative; display: grid; width: 44px; height: 100%; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--mute); cursor: pointer; }
+.window-actions button:hover { background: #1c1c1c; color: var(--ink); }
+.window-actions .window-close:hover { background: #c42b1c; color: white; }
+.minimize-symbol { width: 10px; height: 1px; background: currentColor; }
+.maximize-symbol { width: 10px; height: 10px; border: 1px solid currentColor; }
+.close-symbol { position: relative; width: 11px; height: 11px; }
+.close-symbol::before, .close-symbol::after { position: absolute; top: 5px; left: 0; width: 11px; height: 1px; background: currentColor; content: ""; transform: rotate(45deg); }
+.close-symbol::after { transform: rotate(-45deg); }
 
 .editor-layout { display: grid; grid-template-columns: 274px minmax(0, 1fr); min-width: 0; min-height: 0; padding: 10px 10px 0; gap: 10px; }
 .sidebar, .editor-pane { min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--hairline); background: var(--surface); box-shadow: 0 1px 1px rgba(0, 0, 0, .35); }

@@ -3,7 +3,7 @@
 //  Shaydi
 //
 //  Shared · owner: Sangwoo Kang / Haeyoung Park
-//  UserDefaults wrapper: volume, hotkeys, language, misc options
+//  UserDefaults wrapper: volume, hotkeys, misc options
 //
 
 import CoreGraphics
@@ -18,7 +18,6 @@ final class SettingsStore {
         static let walkSpeedMultiplier = "Shaydi.walkSpeedMultiplier"
         static let toyScale = "Shaydi.toyScale"
         static let speechLocale = "Shaydi.speechLocale"
-        static let language = "Shaydi.language"
         static let appearance = AppAppearance.defaultsKey
         static let pushToTalk = "Shaydi.hotkey.pushToTalk"
         static let textInput = "Shaydi.hotkey.textInput"
@@ -40,10 +39,6 @@ final class SettingsStore {
     var onVolumeChanged: ((Float) -> Void)?
     var onMuteChanged: ((Bool) -> Void)?
     var onWalkSpeedMultiplierChanged: ((Double) -> Void)?
-    /// byeolki: "한국어 언어모드도 만들어주고" -- the menu bar's own text
-    /// (built once at construction, unlike SwiftUI's live-recomputed body)
-    /// needs this to update its titles when Settings' language picker changes.
-    var onLanguageChanged: ((AppLanguage) -> Void)?
     /// byeolki: "화이트모드 다크모드 추가하고" -- the client window (F13) is a
     /// separate SwiftUI hierarchy from Settings, so it needs its own signal to
     /// pick up a live appearance change instead of only reading it at open time.
@@ -160,16 +155,6 @@ final class SettingsStore {
     // can be out at once now, and the menu bar's per-toy on/off list is the
     // one place that decides. A stored "current toy" alongside it would just
     // be a second answer to the same question.
-
-    var language: AppLanguage {
-        get {
-            defaults.string(forKey: Keys.language).flatMap(AppLanguage.init(rawValue:)) ?? AppLanguage.systemDefault()
-        }
-        set {
-            defaults.set(newValue.rawValue, forKey: Keys.language)
-            onLanguageChanged?(newValue)
-        }
-    }
 
     var appearance: AppAppearance {
         get {

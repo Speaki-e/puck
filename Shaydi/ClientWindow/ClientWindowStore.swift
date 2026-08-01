@@ -27,6 +27,7 @@ final class ClientWindowStore: ObservableObject {
     }
 
     private let sender: UserInputSender
+    private let defaults: UserDefaults
     private var sessionsByKey: [SessionKey: ChatSession] = [:]
     private var sessionOrder: [SessionKey] = []
 
@@ -45,21 +46,36 @@ final class ClientWindowStore: ObservableObject {
     @Published private(set) var workspaces: [ClientWorkspace]
     @Published var activeWorkspaceId: String
     @Published var activeSessionId: String
-    /// byeolki: "화이트모드 다크모드 추가하고" -- fed into
-    /// ClientWindowView's .preferredColorScheme. This process (ShaydiAgent)
-    /// has no SettingsStore of its own, so its AppDelegate seeds this by
-    /// reading Shaydi's UserDefaults domain directly
-    /// (`UserDefaults(suiteName: AppIdentity.shaydiBundleID)`) and keeps it
-    /// live via a DistributedNotificationCenter broadcast Shaydi posts on
-    /// every change (see AppAppearance.crossProcessChangeNotification) --
-    /// ordinary NotificationCenter/onAppearanceChanged don't cross processes.
-    @Published var appearance: AppAppearance = .system
 
-    init(sender: UserInputSender) {
+    private static let themeStyleDefaultsKey = ClientThemeStyle.defaultsKey
+
+    /// byeolki, 2026-08-01: "테마 종류를 다크, 화이트, 글래스로" -- an in-app
+    /// theme setting independent of Shaydi's own system-wide AppAppearance
+    /// (the pet overlay/Notch/Settings' light/dark/system toggle). Persisted
+    /// in whichever UserDefaults domain this store was given (ShaydiAgent's
+    /// own by default) -- unlike the appearance property this replaces,
+    /// nothing about this needs to be read cross-process from Shaydi, so no
+    /// DistributedNotificationCenter broadcast is involved.
+    @Published var themeStyle: ClientThemeStyle {
+        didSet {
+            defaults.set(themeStyle.rawValue, forKey: Self.themeStyleDefaultsKey)
+            onThemeStyleChanged?(themeStyle)
+        }
+    }
+    /// AppDelegate uses this to keep NSApp.appearance (and therefore
+    /// NSVisualEffectView materials / native popover chrome, none of which
+    /// SwiftUI's .preferredColorScheme touches) in sync with the resolved
+    /// theme -- same reasoning AppAppearance's own doc comment already
+    /// documents for the pattern this mirrors.
+    var onThemeStyleChanged: ((ClientThemeStyle) -> Void)?
+
+    init(sender: UserInputSender, defaults: UserDefaults = .standard) {
         self.sender = sender
+        self.defaults = defaults
         workspaces = [ClientWorkspace(id: Self.defaultWorkspaceId, name: Self.casualSessionTitle, projectPath: nil)]
         activeWorkspaceId = Self.defaultWorkspaceId
         activeSessionId = Self.defaultSessionId
+        themeStyle = ClientThemeStyle.resolved(fromDefaultsValue: defaults.string(forKey: Self.themeStyleDefaultsKey))
         seedDefaultSession(forWorkspace: Self.defaultWorkspaceId)
     }
 

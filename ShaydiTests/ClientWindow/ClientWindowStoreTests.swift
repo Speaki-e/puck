@@ -23,9 +23,9 @@ private final class StubTransport: UserInputTransport {
 }
 
 final class ClientWindowStoreTests: XCTestCase {
-    private func makeStore() -> (ClientWindowStore, StubTransport) {
+    private func makeStore(defaults: UserDefaults = .standard) -> (ClientWindowStore, StubTransport) {
         let transport = StubTransport()
-        let store = ClientWindowStore(sender: UserInputSender { transport })
+        let store = ClientWindowStore(sender: UserInputSender { transport }, defaults: defaults)
         return (store, transport)
     }
 
@@ -165,5 +165,39 @@ final class ClientWindowStoreTests: XCTestCase {
         let (store, _) = makeStore()
 
         XCTAssertFalse(store.showUserMessage("hi", workspaceId: "nope", sessionId: "nope"))
+    }
+
+    func test_themeStyle_defaultsToDark() {
+        let defaults = UserDefaults(suiteName: #file)!
+        defaults.removePersistentDomain(forName: #file)
+        let (store, _) = makeStore(defaults: defaults)
+
+        XCTAssertEqual(store.themeStyle, .dark)
+    }
+
+    func test_themeStyle_roundTrips() {
+        let defaults = UserDefaults(suiteName: #file)!
+        defaults.removePersistentDomain(forName: #file)
+        let (store, _) = makeStore(defaults: defaults)
+
+        store.themeStyle = .glass
+
+        XCTAssertEqual(store.themeStyle, .glass)
+        XCTAssertEqual(
+            ClientThemeStyle.resolved(fromDefaultsValue: defaults.string(forKey: ClientThemeStyle.defaultsKey)),
+            .glass
+        )
+    }
+
+    func test_settingThemeStyle_firesOnThemeStyleChanged() {
+        let defaults = UserDefaults(suiteName: #file)!
+        defaults.removePersistentDomain(forName: #file)
+        let (store, _) = makeStore(defaults: defaults)
+        var received: ClientThemeStyle?
+        store.onThemeStyleChanged = { received = $0 }
+
+        store.themeStyle = .light
+
+        XCTAssertEqual(received, .light)
     }
 }

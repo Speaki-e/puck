@@ -926,7 +926,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             // can actually open the Accessibility pane with us pre-selected.
             _ = AccessibilityPermission.isTrusted(prompt: true)
             self.showNoticeBubble(
-                Strings.text(.permissionNeededBubble, self.settingsStore.language),
+                Strings.text(.permissionNeededBubble),
                 for: Self.permissionGuidanceDuration
             ) { [weak self] in
                 self?.isGuidingPermission = false

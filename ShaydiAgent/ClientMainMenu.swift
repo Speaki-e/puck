@@ -14,8 +14,7 @@
 //  one file directly (see project.yml) rather than reaching it through the
 //  Shaydi target, which never uses it.
 //
-//  Titles are Korean like the rest of the client window; it has no
-//  AppLanguage plumbing yet (see ClientWindowStore's note).
+//  Titles are Korean, matching the rest of the app's UI text.
 //
 
 import AppKit

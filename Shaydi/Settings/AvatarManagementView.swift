@@ -20,8 +20,6 @@ struct AvatarManagementView: View {
     /// manifest already has (loaded in onAppear) or the user adds below.
     private static let defaultEmotionKeys = ["happy", "thinking", "sad"]
 
-    let language: AppLanguage
-
     /// Called when the size slider changes, so AppDelegate can apply it to
     /// the *running* avatar immediately -- editing manifest.json alone only
     /// takes effect on next launch.
@@ -48,19 +46,17 @@ struct AvatarManagementView: View {
     @State private var installedAvatarNames: [String] = []
 
     init(
-        language: AppLanguage,
         onScaleChanged: ((Double) -> Void)? = nil,
         initialSelectedAvatarName: String = "dummy",
         onSelectAvatar: ((String) -> Void)? = nil
     ) {
-        self.language = language
         self.onScaleChanged = onScaleChanged
         self.initialSelectedAvatarName = initialSelectedAvatarName
         self.onSelectAvatar = onSelectAvatar
         _selectedAvatarName = State(initialValue: initialSelectedAvatarName)
     }
 
-    private func text(_ key: L10nKey) -> String { Strings.text(key, language) }
+    private func text(_ key: L10nKey) -> String { Strings.text(key) }
 
     // Plain SettingsSections, not cards (2026-07-31, byeolki: "pokopet
     // 설정창과 비슷하게") -- the window's panel is the only surface. No

@@ -4,8 +4,8 @@
 //
 //  Shared test · owner: 박해영 (Haeyoung Park)
 //  byeolki: "화이트모드 다크모드 추가하고" -- an explicit in-app appearance
-//  override, same shape as AppLanguage (a user setting, not a passive
-//  follow-the-system default).
+//  override, an explicit user preference, not just following the system
+//  (a user setting, not a passive follow-the-system default).
 //
 
 import XCTest

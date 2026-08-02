@@ -2,8 +2,8 @@
  * Avatar manifest.json schema (protocol docs/avatar-manifest.md, plan/01_protocol.md
  * section 6). Mirrors pet-app/PetAgent/Avatar/AvatarManifest.swift.
  *
- * 2026-07-29: primary avatar type switched from 3D usdz to 2D sprites (PNG).
- * `bounce_intensity` and `emotions` are new, additive, optional fields --
+ * Primary avatar type is 2D sprites (PNG) rather than 3D usdz.
+ * `bounce_intensity` and `emotions` are additive, optional fields --
  * non-breaking, MINOR version.
  */
 

@@ -23,7 +23,7 @@ enum ChatTimelineEntry: Equatable {
     case userMessage(id: UUID, text: String)
     case assistantText(id: UUID, text: String)
     case toolCall(id: String, tool: String, args: JSONValue?)
-    case toolResult(id: String, ok: Bool, data: JSONValue?, error: String?, detail: String?)
+    case toolResult(id: String, ok: Bool, data: JSONValue?, error: ToolErrorCode?, detail: String?)
     case approvalRequested(id: UUID, approvalId: String, summary: String)
     case done(id: UUID, ok: Bool, summary: String)
 }

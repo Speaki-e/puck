@@ -56,7 +56,7 @@ final class PetToolDispatcher {
         continuation?.resume(returning: DispatchedToolResult(
             ok: result.ok,
             data: result.data,
-            error: result.error,
+            error: result.error?.rawValue,
             detail: result.detail
         ))
     }

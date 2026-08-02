@@ -62,7 +62,7 @@ final class BridgeMessageCodableTests: XCTestCase {
             return XCTFail("expected .toolResult, got \(message)")
         }
         XCTAssertFalse(result.ok)
-        XCTAssertEqual(result.error, "timeout")
+        XCTAssertEqual(result.error, .timeout)
         XCTAssertNil(result.data)
         XCTAssertNil(result.detail)
     }
@@ -90,7 +90,7 @@ final class BridgeMessageCodableTests: XCTestCase {
     /// the human-readable specifics for logs/debugging.
     func test_toolResultDetail_roundTrips() throws {
         let original = BridgeMessage.toolResult(
-            ToolResult(id: "t1", ok: false, data: nil, error: "execution_failed", detail: "zsh exited 127")
+            ToolResult(id: "t1", ok: false, data: nil, error: .executionFailed, detail: "zsh exited 127")
         )
 
         let encoded = try JSONEncoder().encode(original)

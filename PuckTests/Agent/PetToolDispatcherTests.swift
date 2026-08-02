@@ -51,7 +51,7 @@ final class PetToolDispatcherTests: XCTestCase {
         async let result = sut.execute(tool: "launch_app", arguments: .object([:]), id: "mine")
         await waitForDispatch(on: wire)
         sut.handle(ToolResult(id: "someone-else", ok: true, data: nil, error: nil))
-        sut.handle(ToolResult(id: "mine", ok: false, data: nil, error: "execution_failed"))
+        sut.handle(ToolResult(id: "mine", ok: false, data: nil, error: .executionFailed))
 
         let awaited = await result
         XCTAssertEqual(awaited.error, "execution_failed")

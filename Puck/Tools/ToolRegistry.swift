@@ -96,7 +96,7 @@ enum ToolRegistry {
         // editor executor injected must not offer these to the model.
         Tool(name: "code_editor", executor: .workspace, requiresApproval: false, parameters: [
             Parameter(name: "task", type: .string, isRequired: true),
-            Parameter(name: "project_path", type: .string, isRequired: false),
+            Parameter(name: "project_path", type: .string, isRequired: true),
         ]),
         Tool(name: "open_in_editor", executor: .workspace, requiresApproval: false, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),

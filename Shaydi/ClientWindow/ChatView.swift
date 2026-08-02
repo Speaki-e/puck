@@ -50,7 +50,7 @@ struct ChatView: View {
                 }
                 .overlay {
                     if session.timeline.isEmpty {
-                        EmptyTranscript(onPromptSelected: { draftText = $0 })
+                        EmptyTranscript()
                     }
                 }
                 .onChange(of: session.timeline.count) {
@@ -150,16 +150,11 @@ struct ChatView: View {
 
 /// A new session opens onto a large empty pane; without this it reads as a
 /// rendering failure rather than "say something".
+///
+/// 2026-08-02: dropped the example-prompt cards entirely (byeolki: "프롬프트
+/// 추천 기능은 없애고") -- just the mark and the greeting now.
 private struct EmptyTranscript: View {
-    let onPromptSelected: (String) -> Void
     @Environment(\.clientPalette) private var palette
-
-    private static let examplePrompts = [
-        "이 코드 설명해줘",
-        "여기 버그 있는지 찾아줘",
-        "테스트 작성해줘",
-        "리팩토링 해줘",
-    ]
 
     var body: some View {
         VStack(spacing: ClientTheme.Metrics.spacingLarge) {
@@ -181,43 +176,9 @@ private struct EmptyTranscript: View {
                     .font(ClientTheme.Typography.greetingSubtitle)
                     .foregroundStyle(palette.textSecondary)
             }
-
-            PromptCards(items: Self.examplePrompts, onSelect: onPromptSelected)
         }
         .padding(ClientTheme.Metrics.spacingLarge * 1.5)
         .frame(maxWidth: ClientTheme.Metrics.contentMaxWidth)
-    }
-}
-
-/// An equal-width row of bordered prompt cards, replacing the 2026-08-01
-/// rebuild's wrapped icon chips -- byeolki shared 5 Figma references
-/// (2026-08-02, "얘네 참고해서 레이아웃 배치나 UI 손봐줄래") whose empty
-/// state uses this exact pattern (a fixed-height row of plain-text bordered
-/// cards) across all three of its "Ask Me Anything" screens.
-private struct PromptCards: View {
-    let items: [String]
-    let onSelect: (String) -> Void
-    @Environment(\.clientPalette) private var palette
-
-    var body: some View {
-        HStack(spacing: ClientTheme.Metrics.spacingMedium) {
-            ForEach(items, id: \.self) { text in
-                Button {
-                    onSelect(text)
-                } label: {
-                    Text(text)
-                        .font(ClientTheme.Typography.sessionTitle)
-                        .foregroundStyle(palette.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(3)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .padding(ClientTheme.Metrics.spacingMedium)
-                        .frame(height: 92)
-                        .themedSurface(palette, in: ClientTheme.Shapes.card)
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 }
 

@@ -45,14 +45,18 @@ test("ToolTimeouts.swift's fallback matches the registry's documented default", 
 });
 
 /** Parses each `Tool(name: "...", executor: ..., approval: ..., parameters: [...])` entry. */
-function parseSwiftToolRegistry(source: string): Map<string, { approval: string; params: Map<string, boolean> }> {
+function parseSwiftToolRegistry(
+  source: string,
+): Map<string, { approval: string; params: Map<string, { type: string; isRequired: boolean }> }> {
   const toolRegex = /Tool\(name: "([a-z_]+)", executor: \.\w+, approval: \.(\w+), parameters: \[([^\]]*)\]\),/g;
-  const result = new Map<string, { approval: string; params: Map<string, boolean> }>();
+  const result = new Map<string, { approval: string; params: Map<string, { type: string; isRequired: boolean }> }>();
   for (const match of source.matchAll(toolRegex)) {
     const [, name, approval, paramsBlock] = match;
-    const params = new Map<string, boolean>();
-    for (const paramMatch of paramsBlock!.matchAll(/Parameter\(name: "([a-z_]+)", type: \.\w+, isRequired: (true|false)\)/g)) {
-      params.set(paramMatch[1]!, paramMatch[2] === "true");
+    const params = new Map<string, { type: string; isRequired: boolean }>();
+    for (const paramMatch of paramsBlock!.matchAll(
+      /Parameter\(name: "([a-z_]+)", type: \.(\w+), isRequired: (true|false)\)/g,
+    )) {
+      params.set(paramMatch[1]!, { type: paramMatch[2]!, isRequired: paramMatch[3] === "true" });
     }
     result.set(name!, { approval: approval!, params });
   }
@@ -68,6 +72,13 @@ const SWIFT_APPROVAL_CASE_BY_TS_KIND: Record<string, string> = {
 
 test("ToolRegistry.swift mirrors every tool's approval kind and parameter required-ness from tools.ts", () => {
   const swift = parseSwiftToolRegistry(toolRegistrySource);
+  // Bidirectional: catches phantom/renamed tools on the Swift side too, not
+  // just tools missing from it.
+  assert.deepEqual(
+    [...swift.keys()].sort(),
+    TOOL_REGISTRY.map((t) => t.name).sort(),
+    "ToolRegistry.swift's tool set does not match tools.ts's TOOL_REGISTRY",
+  );
   for (const tool of TOOL_REGISTRY) {
     const mirrored = swift.get(tool.name);
     assert.ok(mirrored, `ToolRegistry.swift is missing tool "${tool.name}"`);
@@ -76,11 +87,24 @@ test("ToolRegistry.swift mirrors every tool's approval kind and parameter requir
       SWIFT_APPROVAL_CASE_BY_TS_KIND[tool.approval.kind],
       `${tool.name} approval kind mismatch (tools.ts says ${tool.approval.kind})`,
     );
+    // Bidirectional: catches extra/stale parameters on the Swift side, not
+    // just parameters that tools.ts has and Swift is missing.
+    assert.deepEqual(
+      [...mirrored.params.keys()].sort(),
+      tool.params.map((p) => p.name).sort(),
+      `${tool.name} parameter set mismatch between tools.ts and ToolRegistry.swift`,
+    );
     for (const param of tool.params) {
+      const mirroredParam = mirrored.params.get(param.name);
       assert.equal(
-        mirrored.params.get(param.name),
+        mirroredParam?.isRequired,
         param.required,
         `${tool.name}.${param.name} required-ness mismatch (tools.ts says ${param.required})`,
+      );
+      assert.equal(
+        mirroredParam?.type,
+        param.type,
+        `${tool.name}.${param.name} type mismatch (tools.ts says ${param.type})`,
       );
     }
   }

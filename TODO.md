@@ -13,10 +13,10 @@
 ## 지금 먼저 해야 할 P0
 
 - [ ] **공통** protocol PR: `state_snapshot`, `request_id`, 확장 `run_cancel(run_id)` 계약 확정
-- [ ] **김민영** 단일 HTTP/WebSocket `EditorGateway` 구현
-- [ ] **김민영** `SessionRouter`와 `RunRegistry` 구현
-- [ ] **김민영** 실제 태그 버전 `ai-module`을 Agent Host에 연결
-- [ ] **김민영** 승인·취소 브리지를 ai-module/ACP/PetBridge와 연결
+- [x] **김민영** 단일 HTTP/WebSocket `EditorGateway` 구현
+- [x] **김민영** `SessionRouter`와 `RunRegistry` 구현
+- [ ] **김민영** 실제 태그 버전 `ai-module`을 Agent Host에 연결 -- `부분 완료`: ai-module 저장소가 아직 `.gitignore` 커밋 하나뿐이라(태그 없음) 설치 불가. `AgentRuntime`/`ApprovalPort` 포트와 `petAppProxy`/`editorLocal` 실행기는 실제 계약대로 배선 완료, `MockAgentRuntime`으로 임시 대체(`main/index.ts`의 TODO 주석 참고). ai-module은 실행 위치를 Main 프로세스로 정함(TODO.md 기존 문구와 plan 문서가 갈렸던 부분 -- Main으로 확정)
+- [x] **김민영** 승인·취소 브리지를 ai-module/ACP/PetBridge와 연결
 - [ ] **공통** PetAgentClient → Workspace → ai-module → ACP → Editor View 전체 왕복 테스트
 - [ ] **이주한** 실제 Claude 인증 환경에서 자연어 파일 수정·취소·ACP 크래시 검증
 
@@ -35,9 +35,9 @@
 
 ### 김민영
 
-- [ ] Mock ai-module이 `user_input`부터 callback까지 실제 인터페이스대로 동작하도록 보강
-- [ ] Mock EditorGateway HTTP/WebSocket 클라이언트 작성
-- [ ] Mock 승인 요청/응답 시나리오 작성
+- [x] Mock ai-module이 `user_input`부터 callback까지 실제 인터페이스대로 동작하도록 보강 (`mocks/mock-agent-runtime.ts` -- tool/approval/session 스크립트 지원)
+- [ ] Mock EditorGateway HTTP/WebSocket 클라이언트 작성 -- `부분 완료`: `editor-gateway.test.ts`에 raw ws 테스트 헬퍼는 있지만, 다른 저장소(pet-app)가 재사용할 독립 모듈로는 아직 안 뺐다
+- [x] Mock 승인 요청/응답 시나리오 작성 (`pending-approval-store.test.ts`, `run-cancellation.test.ts`, `mock-agent-runtime.test.ts`의 `approve:` 스크립트)
 
 ### 공통
 
@@ -97,22 +97,22 @@
 
 ### 김민영
 
-- [ ] Workspace 프로세스당 단일 HTTP 서버
-- [ ] `/editor/:workspaceId` 라우팅
-- [ ] 프로세스 시작 시 임의 접근 토큰 생성
-- [ ] HTTP 요청 token 검증
-- [ ] WebSocket 연결 token 검증
-- [ ] 허용 Origin 검증
-- [ ] workspace ID 유효성 검증
-- [ ] 요청 본문 크기 제한
-- [ ] Editor View 정적 파일 제공
-- [ ] WebSocket 요청/응답의 `requestId` 매칭
-- [ ] 파일 트리·읽기·저장 API 연결
-- [ ] 파일 변경 이벤트 브로드캐스트
-- [ ] ACP 진행 상태 브로드캐스트
-- [ ] WKWebView에서 Editor View 로드
-- [ ] Electron 폴백 창도 동일 EditorGateway URL 사용
-- [ ] Editor View 재연결 시 열린 탭·활성 탭·작업 상태 복원
+- [x] Workspace 프로세스당 단일 HTTP 서버
+- [x] `/editor/:workspaceId` 라우팅
+- [x] 프로세스 시작 시 임의 접근 토큰 생성
+- [x] HTTP 요청 token 검증
+- [x] WebSocket 연결 token 검증
+- [x] 허용 Origin 검증
+- [x] workspace ID 유효성 검증
+- [x] 요청 본문 크기 제한
+- [x] Editor View 정적 파일 제공
+- [x] WebSocket 요청/응답의 `requestId` 매칭
+- [x] 파일 트리·읽기·저장 API 연결
+- [x] 파일 변경 이벤트 브로드캐스트
+- [x] ACP 진행 상태 브로드캐스트
+- [ ] WKWebView에서 Editor View 로드 -- 클라이언트 트랜스포트(`renderer/gateway-transport.ts`, `gateway-workspace-api.ts`)는 준비됐지만 실제 pet-app WKWebView와의 통합 검증은 pet-app 쪽 작업 필요
+- [x] Electron 폴백 창도 동일 EditorGateway URL 사용
+- [ ] Editor View 재연결 시 열린 탭·활성 탭·작업 상태 복원 -- `부분 완료`: 서버(`state:restore`/`state:update`)와 클라이언트 API(`WorkspaceApi.restoreState/saveState`)는 구현·테스트 완료, App.tsx가 재연결 시 이걸 호출해 탭을 다시 여는 UI 연동은 아직 안 함
 
 ### 공통
 
@@ -138,16 +138,16 @@
 
 ### 김민영
 
-- [ ] `SessionRouter` 구현
-- [ ] 동일 `session_id` 사용자 입력 순차 라우팅
-- [ ] 서로 다른 세션 병렬 실행
-- [ ] ai-module 자체 큐와 Workspace 라우팅 큐의 중복 방지
-- [ ] `RunRegistry` 구현
-- [ ] `ActiveRun` 시작·완료·상태 전이 관리
-- [ ] 동일 세션 중복 실행 정책 구현
-- [ ] 실행과 승인 요청 연결
-- [ ] Agent Host 종료 시 모든 ActiveRun 실패 처리
-- [ ] AI 이벤트를 protocol 이벤트로 정규화
+- [x] `SessionRouter` 구현
+- [x] 동일 `session_id` 사용자 입력 순차 라우팅
+- [x] 서로 다른 세션 병렬 실행
+- [x] ai-module 자체 큐와 Workspace 라우팅 큐의 중복 방지 (SessionRouter가 세션당 직렬 체인을 단일하게 소유)
+- [x] `RunRegistry` 구현
+- [x] `ActiveRun` 시작·완료·상태 전이 관리
+- [x] 동일 세션 중복 실행 정책 구현 (`DuplicateActiveRunError`)
+- [x] 실행과 승인 요청 연결 (`attachApproval`/`approvalsFor`)
+- [x] Agent Host 종료 시 모든 ActiveRun 실패 처리 (`AgentHostController`에 `exited` 이벤트 추가 + `failAllActiveRuns`)
+- [x] AI 이벤트를 protocol 이벤트로 정규화 (`main/index.ts`의 `agentHost.on("event", ...)` -- `code_editor_update`를 requestId/workspaceId로 감싸도록 Agent Host도 함께 고쳤다)
 
 ### 공통
 
@@ -179,10 +179,10 @@
 
 - [ ] `workspace_create_request`와 응답 처리
 - [ ] `session_create_request`와 응답 처리
-- [ ] 요청·응답 `request_id` 매칭
-- [ ] `user_input`을 SessionRouter로 연결
-- [ ] 승인·취소 GUI 메시지 연결
-- [ ] Editor View URL 준비 이벤트 전송
+- [ ] 요청·응답 `request_id` 매칭 (공통 protocol PR로 `request_id` 계약이 확정된 뒤 진행)
+- [x] `user_input`을 SessionRouter로 연결
+- [x] 승인·취소 GUI 메시지 연결 (`approval_response`/`run_cancel`)
+- [x] Editor View URL 준비 이벤트 전송 (`editor_view_ready`/`editor_view_unavailable`, 프로젝트 바인딩 시점 + pet-app 재연결 시점마다 재통지)
 
 ### 공통
 
@@ -218,9 +218,9 @@
 
 ### 김민영
 
-- [ ] ACP `requestPermission`을 ApprovalPort에 연결
-- [ ] ACP session/update를 표준 agent 이벤트로 변환
-- [ ] ACP 결과를 ai-module `code_editor` 결과로 반환
+- [x] ACP `requestPermission`을 ApprovalPort에 연결 (`acp-permission-bridge.ts` -- Agent Host가 크로스 프로세스로 Main에 되묻는 `permission_request`/`permissionResponse` 왕복 추가)
+- [x] ACP session/update를 표준 agent 이벤트로 변환 (text_chunk/working-paths/EditorGateway 브로드캐스트)
+- [x] ACP 결과를 ai-module `code_editor` 결과로 반환 (`tool-executors.ts`의 `mapCodeEditorResult`)
 
 ### 공통
 
@@ -235,22 +235,22 @@
 
 ### 김민영
 
-- [ ] 합의된 실제 태그 버전 `ai-module` 설치
-- [ ] Agent Host 안에서 ai-module 초기화
-- [ ] Claude API 키와 모델을 필요한 시점에만 전달
-- [ ] `petAppProxy` 구현 및 PetBridge 연결
-- [ ] `editorLocal` 구현 및 EditorGateway 연결
-- [ ] `code_editor(task, project_path)` 등록
-- [ ] 세션 workspace를 기준으로 실제 project path 강제
-- [ ] `CodeEditorResult`를 ai-module 결과로 반환
-- [ ] `open_in_editor` 구현
-- [ ] 경로 검증 및 `file_not_found` 처리
-- [ ] Editor View 미연결 시 마지막 탭 요청 저장
-- [ ] 다음 Editor View 연결 시 저장된 파일 열기
-- [ ] `read_file` 구현
-- [ ] 프로젝트 내부 읽기 전용 접근
-- [ ] 대용량·바이너리·인코딩 오류 표준화
-- [ ] ai-module callback을 PetAgentClient 이벤트로 전달
+- [ ] 합의된 실제 태그 버전 `ai-module` 설치 -- 저장소에 태그도 코드도 없어(2026-08-02 기준 `.gitignore` 커밋 1개) 설치할 대상이 없다. 아래 항목들은 실제 포트 계약(`shared/ports.ts`)대로 배선해뒀고, `MockAgentRuntime`을 임시 구현체로 연결했다(`main/index.ts`의 TODO 주석 참고)
+- [ ] Agent Host 안에서 ai-module 초기화 -- Main 프로세스에서 구동하는 쪽으로 확정(plan/03_workspace.md 4.1 원문 채택). ai-module 자체가 없어 초기화 대상도 없음
+- [ ] Claude API 키와 모델을 필요한 시점에만 전달 -- ai-module이 없어 아직 전달할 대상이 없다(ACP/Agent Host 쪽 키 전달은 이주한이 이미 구현)
+- [x] `petAppProxy` 구현 및 PetBridge 연결 (`tool-executors.ts`의 `createPetAppProxyExecutor`)
+- [x] `editorLocal` 구현 및 EditorGateway 연결 (`createEditorLocalExecutor`)
+- [x] `code_editor(task, project_path)` 등록 (editorLocal이 처리, ai-module의 실제 tool-use 루프가 없어 `MockAgentRuntime`의 `tool:` 스크립트로 왕복 검증)
+- [x] 세션 workspace를 기준으로 실제 project path 강제 (모델이 보낸 project_path 무시 -- 단위 테스트로 확인)
+- [x] `CodeEditorResult`를 ai-module 결과로 반환
+- [x] `open_in_editor` 구현
+- [x] 경로 검증 및 `file_not_found` 처리 (protocol에 전용 에러 코드가 없어 `execution_failed`+detail로 표준화, TODO 주석으로 protocol PR 필요성 명시)
+- [x] Editor View 미연결 시 마지막 탭 요청 저장
+- [x] 다음 Editor View 연결 시 저장된 파일 열기
+- [x] `read_file` 구현
+- [x] 프로젝트 내부 읽기 전용 접근
+- [x] 대용량·바이너리·인코딩 오류 표준화
+- [x] ai-module callback을 PetAgentClient 이벤트로 전달 (`AgentCallbacks` -> `petBridge.sendEvent`, `main/index.ts`)
 
 ### 이주한
 
@@ -271,18 +271,18 @@
 
 ### 김민영
 
-- [ ] `PendingApproval` 저장소 구현
-- [ ] `approval_id` 생성과 `await_approval` 전송
-- [ ] `approval_response` 한 번만 resolve
-- [ ] 중복·알 수 없는 승인 ID 무시
-- [ ] 실행 취소 시 관련 승인 자동 거부
-- [ ] Agent Host 종료 시 승인 자동 거부
-- [ ] pet-app 연결 종료 시 승인 자동 거부
-- [ ] 폴백 셸 승인 팝업
-- [ ] 현재 protocol `run_cancel(session_id)` 호환 처리
-- [ ] 확장 `run_cancel(workspace_id, session_id, run_id)` 처리
-- [ ] 취소 시 ActiveRun → pet 도구 → ACP → 승인 순서 정리
-- [ ] `agent_done(ok=false, summary="중단됨")` 전송
+- [x] `PendingApproval` 저장소 구현 (`pending-approval-store.ts`)
+- [x] `approval_id` 생성과 `await_approval` 전송
+- [x] `approval_response` 한 번만 resolve
+- [x] 중복·알 수 없는 승인 ID 무시
+- [x] 실행 취소 시 관련 승인 자동 거부 (`run-cancellation.ts`의 `cancelActiveRun`)
+- [x] Agent Host 종료 시 승인 자동 거부 (`failAllActiveRuns`)
+- [x] pet-app 연결 종료 시 승인 자동 거부 (`petBridge.on("state", ...)`에서 `rejectAll()`)
+- [ ] 폴백 셸 승인 팝업 -- 렌더러 UI(App.tsx)에 아직 붙이지 않음. 채팅 패널이 pet-app으로 이관되면서 폴백 셸의 승인 UI 형태가 재정의 필요(이번 라운드 범위 밖으로 판단)
+- [x] 현재 protocol `run_cancel(session_id)` 호환 처리
+- [ ] 확장 `run_cancel(workspace_id, session_id, run_id)` 처리 -- `PROTOCOL_EXTENSIONS_ENABLED=false`인 동안은 wire로 보내지 않는다는 기존 원칙을 따름, 공통 protocol PR 이후 진행
+- [x] 취소 시 ActiveRun → pet 도구 → ACP → 승인 순서 정리
+- [x] `agent_done(ok=false, summary="중단됨")` 전송 (정상 완료 경로와 경합해도 `RunRegistry.markDoneSent`로 정확히 한 번만 전송)
 - [ ] 설정 화면: API 키, 모델, 최근 프로젝트, 창 크기, 파일 제한, 로그 수준
 - [ ] Editor diff 화면
 
@@ -333,12 +333,12 @@
 
 ### 김민영
 
-- [ ] 승인 대기 중 pet-app 연결 종료 시험
-- [ ] 같은 세션 중복 사용자 입력 순서 시험
-- [ ] `run_id`가 다른 취소 요청 오작동 방지 시험
-- [ ] EditorGateway WebSocket 재연결 시험
-- [ ] Editor View 재연결 후 탭·작업 상태 복원 시험
-- [ ] 잘못된 token·Origin·workspace ID·본문 크기 시험
+- [ ] 승인 대기 중 pet-app 연결 종료 시험 -- `rejectAll()` 단위 시험은 있지만(`pending-approval-store.test.ts`), 실제 PetBridge 연결 종료 이벤트와 묶은 통합 시험은 아직
+- [x] 같은 세션 중복 사용자 입력 순서 시험 (`session-router.test.ts`)
+- [ ] `run_id`가 다른 취소 요청 오작동 방지 시험 -- 현재 protocol의 `run_cancel`은 `run_id`가 없어(session_id만) 해당되지 않음, 확장 계약이 정식화된 뒤 진행
+- [x] EditorGateway WebSocket 재연결 시험 (연결 종료 후 재연결해 `state:restore`로 상태 복원 확인)
+- [x] Editor View 재연결 후 탭·작업 상태 복원 시험 (서버 측, 위와 동일 테스트)
+- [x] 잘못된 token·Origin·workspace ID·본문 크기 시험
 
 ### 공통
 
@@ -390,13 +390,8 @@
 
 ### 김민영
 
-- EditorGateway와 WKWebView 통신
-- SessionRouter와 RunRegistry
-- 실제 ai-module 통합
-- `code_editor`, `open_in_editor`, `read_file`
-- 승인·취소 브리지
-- diff와 설정 화면
-- state snapshot 생성·전달
+- (2026-08-02 갱신) EditorGateway, SessionRouter/RunRegistry, 도구 3종(petAppProxy/editorLocal), 승인·취소 브리지는 포트 계약대로 구현·테스트 완료. 실제 ai-module 태그가 나오면 `main/index.ts`의 `MockAgentRuntime` 한 줄만 교체하면 되도록 배선해둠
+- 남은 것: 실제 ai-module 태그 연결(저장소가 아직 비어 있어 대기), `workspace_create_request`/`session_create_request` 처리, 폴백 셸 승인 팝업 UI, Editor View 재연결 시 App.tsx의 탭 자동 복원(서버 API는 준비됨), diff와 설정 화면, state snapshot 생성·전달(공통 protocol PR 대기)
 
 ### 공통
 

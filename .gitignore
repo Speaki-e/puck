@@ -23,3 +23,6 @@ PuckClient/Resources/Info.plist
 # (see /Users/byeolki/Documents/Project/.claude/CLAUDE.md)
 docs/superpowers/
 .superpowers/
+
+# Local isolated workspaces for subagent-driven-development
+.worktrees/

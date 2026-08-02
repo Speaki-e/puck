@@ -44,6 +44,20 @@ enum ToolRegistry {
         case object
     }
 
+    /// How a tool's approval requirement works. Mirrors TypeScript's ToolApproval
+    /// union (src/types/tools.ts) -- `.requiredWithWhitelist`/`.acpInternal` are
+    /// their own cases (not folded into a Bool) because they change *who*
+    /// decides, not just *whether* a prompt appears: requiredWithWhitelist
+    /// (run_shell) skips the prompt only for allowlisted commands; acpInternal
+    /// (code_editor) routes through Claude Code's own ACP approval flow, so
+    /// pet-app never shows a prompt for it at all.
+    enum Approval: String {
+        case notRequired = "not_required"
+        case required = "required"
+        case requiredWithWhitelist = "required_with_whitelist"
+        case acpInternal = "acp_internal"
+    }
+
     struct Parameter {
         let name: String
         let type: ParameterType
@@ -58,56 +72,65 @@ enum ToolRegistry {
     struct Tool {
         let name: String
         let executor: Executor
-        /// Approval is the *agent's* gate, not the executor's: it happens
-        /// before dispatch, and `denied_by_user` never crosses the socket
-        /// (docs/socket.md).
-        let requiresApproval: Bool
+        /// The full approval semantics -- see `Approval`.
+        let approval: Approval
         let parameters: [Parameter]
+
+        /// Whether a consumer should prompt before running, collapsing
+        /// `.acpInternal`/`.notRequired` to false and `.required`/
+        /// `.requiredWithWhitelist` to true -- the coarse view most call
+        /// sites (e.g. PetToolDispatcher's gating) actually need.
+        var requiresApproval: Bool {
+            switch approval {
+            case .notRequired, .acpInternal: return false
+            case .required, .requiredWithWhitelist: return true
+            }
+        }
 
         var timeoutSeconds: TimeInterval { ToolTimeouts.seconds(for: name) }
     }
 
     static let all: [Tool] = [
-        Tool(name: "launch_app", executor: .petApp, requiresApproval: false, parameters: [
+        Tool(name: "launch_app", executor: .petApp, approval: .notRequired, parameters: [
             Parameter(name: "app_name", type: .string, isRequired: false),
             Parameter(name: "bundle_id", type: .string, isRequired: false),
         ]),
-        Tool(name: "list_running_apps", executor: .petApp, requiresApproval: false, parameters: []),
-        Tool(name: "get_frontmost_window", executor: .petApp, requiresApproval: false, parameters: []),
-        Tool(name: "find_ui_element", executor: .petApp, requiresApproval: false, parameters: [
+        Tool(name: "list_running_apps", executor: .petApp, approval: .notRequired, parameters: []),
+        Tool(name: "get_frontmost_window", executor: .petApp, approval: .notRequired, parameters: []),
+        Tool(name: "find_ui_element", executor: .petApp, approval: .notRequired, parameters: [
             Parameter(name: "pid", type: .number, isRequired: true),
             Parameter(name: "role", type: .string, isRequired: false),
             Parameter(name: "title_contains", type: .string, isRequired: false),
         ]),
-        Tool(name: "point_at", executor: .petApp, requiresApproval: false, parameters: [
+        Tool(name: "point_at", executor: .petApp, approval: .notRequired, parameters: [
             Parameter(name: "frame", type: .object, isRequired: true),
         ]),
-        Tool(name: "click_element", executor: .petApp, requiresApproval: true, parameters: [
+        Tool(name: "click_element", executor: .petApp, approval: .required, parameters: [
             Parameter(name: "frame", type: .object, isRequired: true),
         ]),
-        Tool(name: "run_shell", executor: .petApp, requiresApproval: true, parameters: [
+        Tool(name: "run_shell", executor: .petApp, approval: .requiredWithWhitelist, parameters: [
             Parameter(name: "command", type: .string, isRequired: true),
         ]),
-        Tool(name: "run_applescript", executor: .petApp, requiresApproval: true, parameters: [
+        Tool(name: "run_applescript", executor: .petApp, approval: .required, parameters: [
             Parameter(name: "script", type: .string, isRequired: true),
         ]),
         // workspace executor -- listed because the registry is the registry,
         // but the workspace repo has shipped none of them, so an agent with no
         // editor executor injected must not offer these to the model.
-        Tool(name: "code_editor", executor: .workspace, requiresApproval: false, parameters: [
+        Tool(name: "code_editor", executor: .workspace, approval: .acpInternal, parameters: [
             Parameter(name: "task", type: .string, isRequired: true),
             Parameter(name: "project_path", type: .string, isRequired: true),
         ]),
-        Tool(name: "open_in_editor", executor: .workspace, requiresApproval: false, parameters: [
+        Tool(name: "open_in_editor", executor: .workspace, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
         ]),
-        Tool(name: "read_file", executor: .workspace, requiresApproval: false, parameters: [
+        Tool(name: "read_file", executor: .workspace, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
         ]),
         // ai-module executor -- branches the casual conversation into a task
         // session. Never crosses the socket, which is why its registry
         // timeout is a placeholder 0 rather than a duration.
-        Tool(name: "open_task_session", executor: .aiModule, requiresApproval: false, parameters: [
+        Tool(name: "open_task_session", executor: .aiModule, approval: .notRequired, parameters: [
             Parameter(name: "title", type: .string, isRequired: true),
             Parameter(name: "brief", type: .string, isRequired: true),
         ]),

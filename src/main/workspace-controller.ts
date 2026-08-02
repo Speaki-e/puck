@@ -1,11 +1,12 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
+import { EventEmitter } from "node:events";
 import { FileService } from "./file-service.js";
 import { WorkspaceRegistry, type WorkspaceRecord } from "./workspace-registry.js";
 import type { SaveFileRequest } from "../shared/file-contract.js";
 import { JsonlLogger } from "./logger.js";
 
-export class WorkspaceController {
+export class WorkspaceController extends EventEmitter {
   private readonly services = new Map<string, FileService>();
   private runAgent: (command: string, workspace: WorkspaceRecord) => Promise<{ requestId: string }> = async (command) => ({ requestId: `mock-${command}` });
   private cancelAgent: () => Promise<boolean> = async () => false;
@@ -13,7 +14,9 @@ export class WorkspaceController {
   constructor(
     readonly registry: WorkspaceRegistry,
     private readonly logger: JsonlLogger,
-  ) {}
+  ) {
+    super();
+  }
 
   async initialize(projectPath?: string): Promise<void> {
     await this.registry.load();
@@ -41,6 +44,11 @@ export class WorkspaceController {
   async cancelCommand(): Promise<boolean> {
     this.broadcast("agent:status", "취소 요청 중");
     return this.cancelAgent();
+  }
+
+  /** EditorGateway(김민영 W2)가 같은 워크스페이스의 FileService 인스턴스를 재사용하기 위한 접점. */
+  getFileService(workspaceId: string): Promise<FileService> {
+    return this.service(workspaceId);
   }
 
   installIpc(): void {
@@ -103,6 +111,8 @@ export class WorkspaceController {
     this.services.delete("default");
     await this.ensureService(record);
     await this.logger.write("info", "workspace_project_bound", { workspaceId: "default", projectPath: record.realProjectPath });
+    // EditorGateway(김민영 W4)가 editor_view_ready/unavailable을 pet-app에 보낼 수 있도록 알린다.
+    this.emit("project-bound", record);
     return record;
   }
 

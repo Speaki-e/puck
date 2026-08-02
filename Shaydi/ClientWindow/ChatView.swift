@@ -120,7 +120,11 @@ struct ChatView: View {
             .padding(.leading, ClientTheme.Metrics.spacingLarge)
             .padding(.trailing, ClientTheme.Metrics.spacingSmall)
             .padding(.vertical, ClientTheme.Metrics.spacingMedium)
-            .themedSurface(palette, in: ClientTheme.Shapes.card)
+            // A full pill, not a rounded card -- byeolki's slothGPT
+            // reference (2026-08-02, "이거에 좀 더 맞춰봐") uses
+            // `rounded-[9999px]` for its message input specifically, distinct
+            // from its own cards/bubbles.
+            .themedSurface(palette, in: Capsule())
 
             Text("\(AppIdentity.displayName)는 실수를 할 수 있어요.")
                 .font(ClientTheme.Typography.caption)
@@ -265,19 +269,22 @@ private struct ApprovalBanner: View {
     }
 }
 
-/// 2026-08-01 rebuild: only the **user's** message gets a tinted bubble
-/// now -- the assistant's text flows directly on the column background,
-/// sender row (avatar + name) still above it. Both sides sharing an
-/// identical bubble previously read as two of the same control rather than
-/// two different speakers.
+/// 2026-08-01 rebuild: only the **user's** message got a tinted bubble at
+/// first -- the assistant's text flowed directly on the column background,
+/// sender row (avatar + name) above it either way.
 ///
-/// 2026-08-02: the user bubble's fill went from a solid `accent` block to
-/// `accent.opacity(0.14)` -- the same soft tint already used for the active
-/// sidebar/session row -- to match the neutral, low-contrast bubble in
-/// byeolki's Figma references ("그냥 똑같이 해달라고") without abandoning
-/// the app's own orange accent for a color that isn't ours. Text goes back
-/// to `textPrimary` either way now, since a light tint can't carry white
-/// text.
+/// 2026-08-02 (first pass): the user bubble's fill went from a solid
+/// `accent` block to `accent.opacity(0.14)`, matching the neutral,
+/// low-contrast bubble in byeolki's first Figma reference.
+///
+/// 2026-08-02 (second pass, "이거에 좀 더 맞춰봐"): byeolki's slothGPT
+/// reference gives **both** sides the exact same subtle bubble fill,
+/// differentiated only by the avatar/name row -- not by bubble color at
+/// all. Matched here by giving the assistant the same faint tint as the
+/// user (dropped further, to 0.06, since it now has to read as a neutral
+/// "message surface" rather than a "this is you" accent, and both bubbles
+/// carry it). `textPrimary` throughout either way, since a fill this light
+/// can't carry white text.
 private struct MessageBubble: View {
     let text: String
     let isUser: Bool
@@ -296,21 +303,15 @@ private struct MessageBubble: View {
             senderRow
             HStack {
                 if isUser { Spacer(minLength: 0) }
-                Group {
-                    if isUser {
-                        content
-                            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                            .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
-                            .background(palette.accent.opacity(0.14), in: ClientTheme.Shapes.bubble)
-                    } else {
-                        VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingSmall) {
-                            content
-                            if isHovering { inlineActions }
-                        }
-                        .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.12), value: isHovering)
-                    }
+                VStack(alignment: isUser ? .trailing : .leading, spacing: ClientTheme.Metrics.spacingSmall) {
+                    content
+                        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                        .padding(.vertical, ClientTheme.Metrics.spacingSmall + 2)
+                        .background(palette.accent.opacity(0.06), in: ClientTheme.Shapes.bubble)
+                    if !isUser, isHovering { inlineActions }
                 }
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.12), value: isHovering)
                 .frame(maxWidth: ClientTheme.Metrics.bubbleMaxWidth, alignment: isUser ? .trailing : .leading)
                 if !isUser { Spacer(minLength: 0) }
             }

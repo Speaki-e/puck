@@ -51,10 +51,12 @@ enum ClientTheme {
         static let spacingSmall: CGFloat = 6
         static let spacingMedium: CGFloat = 10
         static let spacingLarge: CGFloat = 16
-        /// 2026-08-02: 20 matches the Figma references' card/input/bubble
-        /// rounding exactly (their nav-row rounding is 12, unchanged below).
-        static let bubbleCornerRadius: CGFloat = 20
-        static let cardCornerRadius: CGFloat = 20
+        /// 2026-08-02: 24 matches the slothGPT chatbot-kit reference's own
+        /// card/bubble rounding exactly (byeolki: "이거에 좀 더 맞춰봐", a
+        /// closer analogue than the legal-case-app reference used earlier
+        /// the same day -- their nav-row rounding is 12, unchanged below).
+        static let bubbleCornerRadius: CGFloat = 24
+        static let cardCornerRadius: CGFloat = 24
         static let rowCornerRadius: CGFloat = 12
         /// The small sender avatar drawn above each message bubble.
         static let avatarSize: CGFloat = 22

@@ -14,8 +14,11 @@ import Foundation
 final class ClientWindowStore: ObservableObject {
     static let defaultWorkspaceId = "default"
     static let defaultSessionId = "default"
-    /// Korean-only, matching the rest of the app's UI text.
-    private static let casualSessionTitle = "Casual"
+    /// 02_pet-app.md F13 calls the always-present default session/workspace
+    /// the "일상 대화" (casual conversation) one -- this was the English word
+    /// "Casual" until 2026-08-02, which leaked into the sidebar/topBar UI
+    /// despite the rest of the app being Korean-only.
+    private static let casualSessionTitle = "일상 대화"
 
     /// Sessions are keyed on (workspaceId, sessionId), not sessionId alone:
     /// every workspace gets its own "default" casual session (see

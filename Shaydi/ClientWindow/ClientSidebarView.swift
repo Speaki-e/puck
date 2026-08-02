@@ -29,6 +29,7 @@ struct ClientSidebarView: View {
     @State private var isExpanded = true
     @State private var showingWorkspacePopover = false
     @State private var showingNewWorkspaceSheet = false
+    @State private var isHoveringNewChat = false
 
     private var activeWorkspace: ClientWorkspace? {
         store.workspaces.first { $0.id == store.activeWorkspaceId }
@@ -108,15 +109,29 @@ struct ClientSidebarView: View {
         }
     }
 
+    /// byeolki, 2026-08-02: "사이드바 위주로 좀 개선해봐" -- a real, always-
+    /// accurate count (`store.sessions(in:).count`) instead of a decorative
+    /// label, giving the list a scannable header the way Figma's own
+    /// "Today · N Total" section headers do, without inventing a date
+    /// grouping this store has no timestamps to back.
     private var sessionList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(store.sessions(in: store.activeWorkspaceId)) { session in
-                    SidebarSessionRow(
-                        session: session,
-                        isActive: session.id == store.activeSessionId,
-                        onSelect: { store.activeSessionId = session.id }
-                    )
+        let sessions = store.sessions(in: store.activeWorkspaceId)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("채팅 \(sessions.count)개")
+                    .font(ClientTheme.Typography.sectionHeader)
+                    .foregroundStyle(palette.textSecondary)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+                    .padding(.bottom, ClientTheme.Metrics.spacingSmall)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(sessions) { session in
+                        SidebarSessionRow(
+                            session: session,
+                            isActive: session.id == store.activeSessionId,
+                            onSelect: { store.activeSessionId = session.id }
+                        )
+                    }
                 }
             }
             .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
@@ -183,8 +198,10 @@ struct ClientSidebarView: View {
             .padding(.vertical, ClientTheme.Metrics.spacingSmall)
             .frame(maxWidth: isExpanded ? .infinity : ClientTheme.Metrics.railButtonSize)
             .themedSurface(palette, in: ClientTheme.Shapes.row)
+            .opacity(isHoveringNewChat ? 0.8 : 1)
         }
         .buttonStyle(.plain)
+        .onHover { isHoveringNewChat = $0 }
         // Collapsed, this is icon-only -- VoiceOver has nothing to read
         // without an explicit label, even though the icon itself is
         // decorative-looking (a pencil-on-paper glyph, not a real word).
@@ -216,6 +233,7 @@ private struct SidebarSessionRow: View {
     let isActive: Bool
     let onSelect: () -> Void
     @Environment(\.clientPalette) private var palette
+    @State private var isHovering = false
 
     var body: some View {
         Button(action: onSelect) {
@@ -238,7 +256,18 @@ private struct SidebarSessionRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
-        .background(isActive ? palette.accent.opacity(0.14) : Color.clear, in: ClientTheme.Shapes.row)
+        // A hover fill on top of not-active rows -- previously only the
+        // active row gave any feedback at all, so every other row in the
+        // list looked inert until clicked (byeolki, 2026-08-02: "사이드바
+        // 위주로 좀 개선해봐").
+        .background(rowBackground, in: ClientTheme.Shapes.row)
+        .onHover { isHovering = $0 }
+    }
+
+    private var rowBackground: Color {
+        if isActive { return palette.accent.opacity(0.14) }
+        if isHovering { return palette.surfaceBorder.opacity(0.6) }
+        return .clear
     }
 }
 

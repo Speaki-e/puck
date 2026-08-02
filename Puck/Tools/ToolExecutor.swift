@@ -22,14 +22,14 @@ enum ToolExecutionError: Error, Equatable {
     case permissionDenied
     case executionFailed(String)
 
-    var protocolErrorCode: String {
+    var protocolErrorCode: ToolErrorCode {
         switch self {
-        case .timeout: return "timeout"
-        case .unknownTool: return "unknown_tool"
-        case .cancelled: return "cancelled"
-        case .notSupportedTarget: return "not_supported_target"
-        case .permissionDenied: return "permission_denied"
-        case .executionFailed: return "execution_failed"
+        case .timeout: return .timeout
+        case .unknownTool: return .unknownTool
+        case .cancelled: return .cancelled
+        case .notSupportedTarget: return .notSupportedTarget
+        case .permissionDenied: return .permissionDenied
+        case .executionFailed: return .executionFailed
         }
     }
 

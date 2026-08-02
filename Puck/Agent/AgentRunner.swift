@@ -201,7 +201,11 @@ final class AgentRunner {
     /// One place for "tell the model, tell the UI, tell the pet" so a tool
     /// result can never reach one of the three and not the others.
     private func report(callId: String, ok: Bool, error: String?, detail: String?, data: JSONValue?) {
-        emit(.toolResult(id: callId, ok: ok, data: data, error: error, detail: detail))
+        // error is the model-facing vocabulary (may be "denied_by_user", which
+        // never crosses the socket -- see ToolErrorCode's doc comment), so the
+        // wire event only carries it when it's actually one of the closed
+        // protocol codes.
+        emit(.toolResult(id: callId, ok: ok, data: data, error: error.flatMap(ToolErrorCode.init(rawValue:)), detail: detail))
         // detail rides along in the error field when there is one: the code
         // alone ("execution_failed") is never enough to act on, and this line
         // is the only place the reason survives after the chat scrolls away.

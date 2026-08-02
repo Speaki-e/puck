@@ -52,7 +52,7 @@ final class ToolCancellationTests: XCTestCase {
         let replied = expectation(description: "timeout reply")
         executor.dispatch(request, timeout: 0.1) { result in
             XCTAssertFalse(result.ok)
-            XCTAssertEqual(result.error, "timeout")
+            XCTAssertEqual(result.error, .timeout)
             replied.fulfill()
         }
 

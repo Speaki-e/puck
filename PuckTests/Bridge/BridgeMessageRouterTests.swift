@@ -126,7 +126,7 @@ final class BridgeMessageRouterTests: XCTestCase {
                 }
                 XCTAssertEqual(result.id, "t7")
                 XCTAssertFalse(result.ok)
-                XCTAssertEqual(result.error, "cancelled")
+                XCTAssertEqual(result.error, .cancelled)
                 replied.fulfill()
             }
         )

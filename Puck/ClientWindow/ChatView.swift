@@ -411,7 +411,7 @@ private struct ChatTimelineEntryRow: View {
                 Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .foregroundStyle(ok ? palette.success : palette.failure)
                 if let error {
-                    Text("\(error)\(detail.map { ": \($0)" } ?? "")")
+                    Text("\(error.rawValue)\(detail.map { ": \($0)" } ?? "")")
                         .font(ClientTheme.Typography.mono)
                         .foregroundStyle(palette.textPrimary)
                 } else if let data {

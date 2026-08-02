@@ -55,7 +55,7 @@ final class ToolExecutorTests: XCTestCase {
         let expectation = expectation(description: "completion called")
         executor.dispatch(ToolDispatch(id: "t2", tool: "run_shell", args: .object([:]))) { result in
             XCTAssertFalse(result.ok)
-            XCTAssertEqual(result.error, "execution_failed")
+            XCTAssertEqual(result.error, .executionFailed)
             // protocol 3.1: error carries only the standard code; detail is
             // the human-readable specifics, without which the actual failure
             // reason reaches neither the wire nor the logs.
@@ -75,7 +75,7 @@ final class ToolExecutorTests: XCTestCase {
             // A tool that doesn't exist is a registry/agent mismatch, not an
             // execution failure -- the codes must be distinguishable so
             // ai-module can react differently (protocol 3.1).
-            XCTAssertEqual(result.error, "unknown_tool")
+            XCTAssertEqual(result.error, .unknownTool)
             XCTAssertEqual(result.detail, "unknown tool: does_not_exist")
             expectation.fulfill()
         }
@@ -95,7 +95,7 @@ final class ToolExecutorTests: XCTestCase {
         let expectation = expectation(description: "completion called")
         executor.dispatch(ToolDispatch(id: "t9", tool: "slow", args: .object([:]))) { result in
             XCTAssertFalse(result.ok)
-            XCTAssertEqual(result.error, "cancelled")
+            XCTAssertEqual(result.error, .cancelled)
             expectation.fulfill()
         }
 
@@ -137,7 +137,7 @@ final class ToolExecutorTests: XCTestCase {
         let expectation = expectation(description: "completion called")
         executor.dispatch(ToolDispatch(id: "t4", tool: "slow", args: .object([:])), timeout: 0.05) { result in
             XCTAssertFalse(result.ok)
-            XCTAssertEqual(result.error, "timeout")
+            XCTAssertEqual(result.error, .timeout)
             expectation.fulfill()
         }
 
@@ -160,7 +160,7 @@ final class ToolExecutorTests: XCTestCase {
         executor.dispatch(ToolDispatch(id: "t5", tool: "slow", args: .object([:])), timeout: 0.05) { result in
             callCount += 1
             if callCount == 1 {
-                XCTAssertEqual(result.error, "timeout")
+                XCTAssertEqual(result.error, .timeout)
                 firstCompletion.fulfill()
             } else {
                 unexpectedSecondCompletion.fulfill()

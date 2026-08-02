@@ -7,7 +7,7 @@
 
 import type { BridgeMessage, ToolErrorCode } from "./types/events.js";
 
-const TOOL_ERROR_CODES: ReadonlySet<ToolErrorCode> = new Set([
+export const TOOL_ERROR_CODES: ReadonlySet<ToolErrorCode> = new Set([
   "timeout",
   "pet_app_disconnected",
   "permission_denied",

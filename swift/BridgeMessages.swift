@@ -9,6 +9,19 @@
 //  change management rules).
 //
 
+/// Standard tool_result error codes that cross the socket (protocol 3.1).
+/// `denied_by_user` is deliberately excluded -- approval happens inside the
+/// agent before dispatch, so it never reaches pet-app/workspace on the wire.
+enum ToolErrorCode: String, Codable, Equatable {
+    case timeout = "timeout"
+    case petAppDisconnected = "pet_app_disconnected"
+    case permissionDenied = "permission_denied"
+    case notSupportedTarget = "not_supported_target"
+    case executionFailed = "execution_failed"
+    case unknownTool = "unknown_tool"
+    case cancelled = "cancelled"
+}
+
 /// workspace -> pet-app: tool execution request (protocol 3.1)
 struct ToolDispatch: Equatable {
     let id: String
@@ -22,13 +35,13 @@ struct ToolResult: Equatable {
     let ok: Bool
     let data: JSONValue?
     /// Standard error code (timeout, unknown_tool, execution_failed, ...).
-    let error: String?
+    let error: ToolErrorCode?
     /// Human-readable failure specifics (optional) -- the code alone says
     /// *what kind* of failure; this says *what actually happened*, so the
     /// real reason reaches the wire and the logs (protocol 3.1).
     let detail: String?
 
-    init(id: String, ok: Bool, data: JSONValue?, error: String?, detail: String? = nil) {
+    init(id: String, ok: Bool, data: JSONValue?, error: ToolErrorCode?, detail: String? = nil) {
         self.id = id
         self.ok = ok
         self.data = data
@@ -56,7 +69,7 @@ enum BridgeEvent: Equatable {
     case agentThinking
     case textChunk(text: String)
     case toolCall(id: String, tool: String, args: JSONValue?, detail: JSONValue?)
-    case toolResult(id: String, ok: Bool, data: JSONValue?, error: String?, detail: String?)
+    case toolResult(id: String, ok: Bool, data: JSONValue?, error: ToolErrorCode?, detail: String?)
     case awaitApproval(summary: String, approvalId: String)
     case agentDone(ok: Bool, summary: String)
 }
@@ -254,7 +267,7 @@ extension BridgeMessage: Codable {
                     id: try container.decode(String.self, forKey: .id),
                     ok: try container.decode(Bool.self, forKey: .ok),
                     data: try container.decodeIfPresent(JSONValue.self, forKey: .data),
-                    error: try container.decodeIfPresent(String.self, forKey: .error),
+                    error: try container.decodeIfPresent(ToolErrorCode.self, forKey: .error),
                     detail: try container.decodeIfPresent(String.self, forKey: .detail)
                 )
             )
@@ -280,7 +293,7 @@ extension BridgeMessage: Codable {
                     id: try container.decode(String.self, forKey: .id),
                     ok: try container.decode(Bool.self, forKey: .ok),
                     data: try container.decodeIfPresent(JSONValue.self, forKey: .data),
-                    error: try container.decodeIfPresent(String.self, forKey: .error),
+                    error: try container.decodeIfPresent(ToolErrorCode.self, forKey: .error),
                     detail: try container.decodeIfPresent(String.self, forKey: .detail)
                 )
             case .awaitApproval:

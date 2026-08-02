@@ -15,6 +15,9 @@
 //
 
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
@@ -66,10 +69,37 @@ struct ClientWindowView: View {
         HStack {
             sessionSelector
             Spacer(minLength: 0)
+            settingsButton
         }
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
         .padding(.top, 28) // clears the transparent titlebar / traffic lights
         .padding(.bottom, ClientTheme.Metrics.spacingMedium)
+    }
+
+    /// byeolki's slothGPT reference (2026-08-02, "이거에 좀 더 맞춰봐") puts a
+    /// settings gear in the TopBar's own icon group, not just behind Cmd+,.
+    /// This calls the *same* real action ShaydiAgent's menu already does --
+    /// ClientMainMenu's "설정…" item resolves `Selector(("showSettings:"))`
+    /// through the responder chain to AppDelegate rather than a typed
+    /// `#selector` reference (ShaydiTests compiles ClientMainMenu.swift
+    /// without AppDelegate, so a typed reference wouldn't build there); this
+    /// button does the same nil-target send for the same reason, and reaches
+    /// the same place since ClientWindowView is only ever actually shown by
+    /// ShaydiAgent's own AppDelegate.
+    private var settingsButton: some View {
+        Button {
+            #if canImport(AppKit)
+            NSApp.sendAction(Selector(("showSettings:")), to: nil, from: nil)
+            #endif
+        } label: {
+            Image(systemName: "gearshape")
+                .foregroundStyle(palette.textSecondary)
+                .padding(ClientTheme.Metrics.spacingSmall)
+                .themedSurface(palette, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("설정")
+        .help("설정")
     }
 
     private var sessionSelector: some View {

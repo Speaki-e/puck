@@ -7,3 +7,6 @@ dist-test/
 
 # Local AI agent working brief (generated from ../plans/, not shared)
 CLAUDE.md
+
+# Local isolated workspaces for subagent-driven-development
+.worktrees/

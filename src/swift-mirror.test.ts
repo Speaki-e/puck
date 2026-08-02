@@ -7,12 +7,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { TOOL_REGISTRY } from "./types/tools.js";
+import { TOOL_ERROR_CODES } from "./validate.js";
 
 // dist-test/swift-mirror.test.js -> <repo root>/swift/ToolTimeouts.swift
 const swiftSource = readFileSync(new URL("../swift/ToolTimeouts.swift", import.meta.url), "utf8");
 
 // dist-test/swift-mirror.test.js -> <repo root>/swift/ToolRegistry.swift
 const toolRegistrySource = readFileSync(new URL("../swift/ToolRegistry.swift", import.meta.url), "utf8");
+
+// dist-test/swift-mirror.test.js -> <repo root>/swift/BridgeMessages.swift
+const bridgeMessagesSource = readFileSync(new URL("../swift/BridgeMessages.swift", import.meta.url), "utf8");
 
 /** Parses the `"tool": 30,` entries out of ToolTimeouts.bySeconds. */
 function parseSwiftTimeouts(source: string): Map<string, number> {
@@ -80,4 +84,20 @@ test("ToolRegistry.swift mirrors every tool's approval kind and parameter requir
       );
     }
   }
+});
+
+/** Parses every `case <name> = "<raw_value>"` inside `enum ToolErrorCode`. */
+function parseSwiftToolErrorCodes(source: string): Set<string> {
+  const body = source.match(/enum ToolErrorCode: String, Codable, Equatable \{([\s\S]*?)\n\}/);
+  assert.ok(body, "could not locate ToolErrorCode enum in the Swift mirror");
+  const codes = new Set<string>();
+  for (const [, rawValue] of body[1]!.matchAll(/case \w+ = "([a-z_]+)"/g)) {
+    codes.add(rawValue!);
+  }
+  return codes;
+}
+
+test("BridgeMessages.swift's ToolErrorCode mirrors validate.ts's TOOL_ERROR_CODES", () => {
+  const swiftCodes = parseSwiftToolErrorCodes(bridgeMessagesSource);
+  assert.deepEqual([...swiftCodes].sort(), [...TOOL_ERROR_CODES].sort());
 });

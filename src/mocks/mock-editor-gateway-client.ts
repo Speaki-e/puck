@@ -41,11 +41,19 @@ export function connectMockEditorGateway(wsUrl: string): Promise<MockEditorGatew
     const queued = queue.shift();
     if (queued) return Promise.resolve(queued);
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("timeout waiting for EditorGateway message")), timeoutMs);
-      waiters.push((message) => {
+      const waiter = (message: EditorMessage) => {
         clearTimeout(timer);
         resolve(message);
-      });
+      };
+      // 타임아웃이 먼저 발생하면 이 waiter를 반드시 큐에서 제거해야 한다 -- 안 그러면 나중에 도착하는
+      // (관련 없는) 메시지가 이미 reject된 이 Promise로 조용히 삼켜지고, 그다음 next() 호출은 그
+      // 메시지를 못 받아 자기 타임아웃까지 기다리게 된다.
+      const timer = setTimeout(() => {
+        const index = waiters.indexOf(waiter);
+        if (index >= 0) waiters.splice(index, 1);
+        reject(new Error("timeout waiting for EditorGateway message"));
+      }, timeoutMs);
+      waiters.push(waiter);
     });
   };
 

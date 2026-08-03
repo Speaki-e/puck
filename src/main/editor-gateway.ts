@@ -96,6 +96,13 @@ export class EditorGateway {
     });
     const wss = new WebSocketServer({ noServer: true, maxPayload: this.options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES });
     server.on("upgrade", (req, socket, head) => this.handleUpgrade(req, socket, head, wss));
+    // 포트 0(OS 임의 할당)은 매 프로세스 시작마다 바뀐다 -- Editor View(App.tsx)의 draft
+    // 복구는 이 origin(http://127.0.0.1:port) 기준 localStorage에 저장되므로, 앱을 재시작하면
+    // 포트가 달라져 이전 세션의 draft에 다시 접근할 방법이 없다(같은 세션 내 새로고침/재연결에는
+    // 영향 없음 -- editor-gateway-reconnect.spec.ts로 검증됨). "7일 만료 복구 데이터"가 노리는
+    // 주된 시나리오(크래시/재시작 복구)에는 이 한계가 남아 있다 -- 포트를 고정하려면 여러
+    // Workspace 프로세스가 동시에 뜨는 경우(e2e 병렬 실행 등)의 포트 경합을 함께 풀어야 해서
+    // 이번 라운드 범위 밖으로 남겨둔다(TODO.md W7 공통 참고).
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
       server.listen(0, this.options.host ?? "127.0.0.1", () => resolve());

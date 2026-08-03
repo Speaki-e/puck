@@ -6,40 +6,13 @@ import { EditorTabs } from "./components/EditorTabs";
 import { editorReducer, isDirty } from "./editor-state";
 import type { RendererWorkspaceRecord } from "./workspace-api";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { DRAFT_TTL_MS, draftKey, readDraft, removeDraft, type StoredDrafts, sweepExpiredDrafts } from "./draft-store";
 
 const initialState = { tabs: [] };
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
-const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
-
-interface StoredDrafts {
-  projectPath: string;
-  expiresAt: number;
-  activePath?: string;
-  tabs: Array<{ path: string; content: string; revision: string }>;
-}
 
 function isImagePath(filePath: string): boolean {
   return IMAGE_EXTENSIONS.has(filePath.split(".").at(-1)?.toLowerCase() ?? "");
-}
-
-function draftKey(projectPath: string): string {
-  return `workspace:drafts:${projectPath}`;
-}
-
-function readDraft(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function removeDraft(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    // Draft recovery is best-effort and must never break the editor.
-  }
 }
 
 function Icon({ name }: { name: "folder" | "save" | "play" | "stop" | "sparkle" | "branch" | "gear" }) {
@@ -100,6 +73,9 @@ export function App() {
   const active = state.tabs.find((tab) => tab.path === state.activePath);
 
   useEffect(() => setDiffAgainstDisk(undefined), [active?.path]);
+
+  // 앱 시작 시 한 번 만료된 임시 복구 데이터를 정리한다(현재 열려는 프로젝트와 무관하게 전부 훑는다).
+  useEffect(() => sweepExpiredDrafts(), []);
 
   const refreshTree = useCallback(async (record: RendererWorkspaceRecord) => {
     if (api) setTree(await api.listTree(record.id));

@@ -7,6 +7,7 @@ import { EditorGateway } from "./editor-gateway.js";
 import { FileService } from "./file-service.js";
 import { JsonlLogger } from "./logger.js";
 import type { EditorMessage } from "../shared/editor-contract.js";
+import { connectMockEditorGateway, type MockEditorGatewayClient } from "../mocks/mock-editor-gateway-client.js";
 
 const gateways: EditorGateway[] = [];
 
@@ -39,42 +40,18 @@ async function setup(): Promise<{ gateway: EditorGateway; service: FileService; 
   return { gateway, service, projectRoot };
 }
 
-interface ConnectedSocket {
-  socket: WebSocket;
-  /** open 이벤트와 서버가 곧바로 push하는 메시지 사이의 경합을 피하려고 생성 즉시 큐잉을 시작한다. */
-  next(): Promise<EditorMessage>;
-}
+// 실제 클라이언트 로직은 mocks/mock-editor-gateway-client.ts로 뺐다(W0: 다른 저장소도 재사용
+// 가능한 Mock EditorGateway WebSocket 클라이언트). 여기서는 이 테스트 파일의 기존 호출부
+// 시그니처(connect(gateway, workspaceId, token) / requestOnce(connection, message))만 유지하는
+// 얇은 래퍼다.
+type ConnectedSocket = MockEditorGatewayClient;
 
 function connect(gateway: EditorGateway, workspaceId: string, token: string): Promise<ConnectedSocket> {
-  const socket = new WebSocket(`ws://127.0.0.1:${gateway.port}/editor/${workspaceId}/ws?token=${token}`);
-  const queue: EditorMessage[] = [];
-  const waiters: Array<(message: EditorMessage) => void> = [];
-  socket.on("message", (data) => {
-    const message = JSON.parse(data.toString()) as EditorMessage;
-    const waiter = waiters.shift();
-    if (waiter) waiter(message);
-    else queue.push(message);
-  });
-  const next = (): Promise<EditorMessage> => {
-    const queued = queue.shift();
-    if (queued) return Promise.resolve(queued);
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("timeout")), 2_000);
-      waiters.push((message) => {
-        clearTimeout(timer);
-        resolve(message);
-      });
-    });
-  };
-  return new Promise((resolve, reject) => {
-    socket.once("open", () => resolve({ socket, next }));
-    socket.once("error", reject);
-  });
+  return connectMockEditorGateway(`ws://127.0.0.1:${gateway.port}/editor/${workspaceId}/ws?token=${token}`);
 }
 
 async function requestOnce(connection: ConnectedSocket, message: EditorMessage): Promise<EditorMessage> {
-  connection.socket.send(JSON.stringify(message));
-  return connection.next();
+  return connection.request(message);
 }
 
 function tokenFromUrl(url: string): string {
@@ -96,6 +73,19 @@ describe("EditorGateway", () => {
     const asset = await fetch(`http://127.0.0.1:${gateway.port}/editor/default/assets/app.js?token=${token}`);
     expect(asset.status).toBe(200);
     expect(await asset.text()).toContain("editor view");
+  });
+
+  it("asset 요청은 token 없이도 서빙한다 (index.html의 상대 경로는 쿼리스트링을 안 옮긴다)", async () => {
+    const { gateway } = await setup();
+    const asset = await fetch(`http://127.0.0.1:${gateway.port}/editor/default/assets/app.js`);
+    expect(asset.status).toBe(200);
+    expect(await asset.text()).toContain("editor view");
+  });
+
+  it("진입 문서는 token 없이 거부한다", async () => {
+    const { gateway } = await setup();
+    const page = await fetch(`http://127.0.0.1:${gateway.port}/editor/default/`);
+    expect(page.status).toBe(401);
   });
 
   it("트레일링 슬래시가 없으면 붙여서 리다이렉트한다", async () => {

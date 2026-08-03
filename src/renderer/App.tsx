@@ -1,10 +1,11 @@
-import Editor, { type BeforeMount } from "@monaco-editor/react";
+import Editor, { DiffEditor, type BeforeMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { FileTreeEntry } from "../shared/file-contract";
 import { FileTree } from "./components/FileTree";
 import { EditorTabs } from "./components/EditorTabs";
 import { editorReducer, isDirty } from "./editor-state";
 import type { RendererWorkspaceRecord } from "./workspace-api";
+import { SettingsPanel } from "./components/SettingsPanel";
 
 const initialState = { tabs: [] };
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
@@ -41,7 +42,7 @@ function removeDraft(key: string): void {
   }
 }
 
-function Icon({ name }: { name: "folder" | "save" | "play" | "stop" | "sparkle" | "branch" }) {
+function Icon({ name }: { name: "folder" | "save" | "play" | "stop" | "sparkle" | "branch" | "gear" }) {
   const paths = {
     folder: <><path d="M3 5.5h5l1.5 2H21v10.5a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z" /><path d="M1.5 9h20" /></>,
     save: <><path d="M4 3h13l3 3v15H4z" /><path d="M8 3v6h8V3M8 21v-7h8v7" /></>,
@@ -49,6 +50,7 @@ function Icon({ name }: { name: "folder" | "save" | "play" | "stop" | "sparkle" 
     stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
     sparkle: <><path d="m12 2 1.3 4.2A6 6 0 0 0 17.8 11L22 12l-4.2 1.3a6 6 0 0 0-4.5 4.5L12 22l-1.3-4.2a6 6 0 0 0-4.5-4.5L2 12l4.2-1.3a6 6 0 0 0 4.5-4.5Z" /></>,
     branch: <><circle cx="6" cy="5" r="2" /><circle cx="18" cy="6" r="2" /><circle cx="6" cy="19" r="2" /><path d="M6 7v10M8 8c2 5 8 1 8-1" /></>,
+    gear: <><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" /></>,
   };
   return <svg className="icon" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
@@ -83,14 +85,21 @@ const configureMonaco: BeforeMount = (monaco) => {
 
 export function App() {
   const api = window.workspace;
+  // restoreState/saveState는 EditorGateway 경유 호스트(WKWebView 등)에서만 정의된다 -- 폴백
+  // 셸(IPC)은 아래의 localStorage 초안 복구를 그대로 쓴다(W2 완료 기준: 재연결 시 탭 복원).
+  const isGatewayHost = Boolean(api?.restoreState);
   const [workspace, setWorkspace] = useState<RendererWorkspaceRecord>();
   const [tree, setTree] = useState<FileTreeEntry[]>([]);
   const [state, dispatch] = useReducer(editorReducer, initialState);
   const [command, setCommand] = useState("");
   const [status, setStatus] = useState("준비됨");
   const [workingPaths, setWorkingPaths] = useState(() => new Set<string>());
+  const [diffAgainstDisk, setDiffAgainstDisk] = useState<string>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const restoredProjects = useRef(new Set<string>());
   const active = state.tabs.find((tab) => tab.path === state.activePath);
+
+  useEffect(() => setDiffAgainstDisk(undefined), [active?.path]);
 
   const refreshTree = useCallback(async (record: RendererWorkspaceRecord) => {
     if (api) setTree(await api.listTree(record.id));
@@ -114,7 +123,9 @@ export function App() {
   useEffect(() => api?.onWorkingPaths((paths) => setWorkingPaths(new Set(paths))), [api]);
 
   useEffect(() => {
-    if (!api || !workspace?.projectPath || restoredProjects.current.has(workspace.projectPath)) return;
+    // 게이트웨이 호스트는 아래 별도 effect가 state:restore로 탭을 복원한다 -- 여기서 또
+    // dispatch("restore")를 하면 서로 덮어써서 충돌한다.
+    if (isGatewayHost || !api || !workspace?.projectPath || restoredProjects.current.has(workspace.projectPath)) return;
     restoredProjects.current.add(workspace.projectPath);
     const key = draftKey(workspace.projectPath);
     const raw = readDraft(key);
@@ -151,7 +162,42 @@ export function App() {
       }
     });
     return () => { cancelled = true; };
-  }, [api, workspace]);
+  }, [api, workspace, isGatewayHost]);
+
+  useEffect(() => {
+    if (!isGatewayHost || !api?.restoreState || !workspace) return;
+    let cancelled = false;
+    void api.restoreState().then(async (restored) => {
+      if (cancelled) return;
+      if (restored.workingPaths.length) setWorkingPaths(new Set(restored.workingPaths));
+      if (!restored.openTabs.length) return;
+      const tabs = (await Promise.all(restored.openTabs.map(async (filePath) => {
+        try {
+          const file = isImagePath(filePath) ? await api.previewImage(workspace.id, filePath) : await api.readFile(workspace.id, filePath);
+          return { ...file, savedContent: file.content, diskChanged: false };
+        } catch {
+          return undefined;
+        }
+      }))).filter((tab): tab is NonNullable<typeof tab> => Boolean(tab));
+      if (!cancelled && tabs.length) {
+        dispatch({ type: "restore", tabs, activePath: restored.activePath });
+        setStatus(`재연결됨 -- ${tabs.length}개의 탭을 복원했습니다`);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [api, workspace, isGatewayHost]);
+
+  useEffect(() => {
+    if (!isGatewayHost || !api?.saveState || !workspace) return;
+    const timer = window.setTimeout(() => {
+      api.saveState!({
+        openTabs: state.tabs.map((tab) => tab.path),
+        activePath: state.activePath,
+        workingPaths: [...workingPaths],
+      });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [api, workspace, isGatewayHost, state.tabs, state.activePath, workingPaths]);
 
   useEffect(() => {
     if (!workspace?.projectPath || !restoredProjects.current.has(workspace.projectPath)) return;
@@ -192,6 +238,15 @@ export function App() {
     setWorkspace(record);
     setTree(await api!.listTree(record.id));
     setStatus(`${record.name} 프로젝트를 열었습니다`);
+  };
+
+  const switchToRecentProject = async (projectPath: string) => {
+    if (!api?.bindProject) return;
+    const record = await api.bindProject(projectPath);
+    setWorkspace(record);
+    setTree(await api.listTree(record.id));
+    setStatus(`${record.name} 프로젝트를 열었습니다`);
+    setSettingsOpen(false);
   };
 
   const openFile = async (filePath: string) => {
@@ -240,6 +295,35 @@ export function App() {
       ? await api.previewImage(workspace.id, active.path)
       : await api.readFile(workspace.id, active.path);
     dispatch({ type: "reload", file });
+    setDiffAgainstDisk(undefined);
+  };
+
+  const keepActiveMine = async () => {
+    if (!active) return;
+    // 저장 시 낙관적 잠금(expectedRevision)이 통과하도록, 내용은 그대로 두고 revision만 최신
+    // 디스크 값으로 맞춘다 -- 안 하면 diskChanged를 내린 직후 저장이 file_conflict로 다시 막힌다.
+    if (api && workspace && !active.previewUrl) {
+      try {
+        const disk = await api.readFile(workspace.id, active.path);
+        dispatch({ type: "keepMine", path: active.path, revision: disk.revision });
+        setDiffAgainstDisk(undefined);
+        return;
+      } catch {
+        // 아래 폴백으로 진행
+      }
+    }
+    dispatch({ type: "keepMine", path: active.path });
+    setDiffAgainstDisk(undefined);
+  };
+
+  const showDiffAgainstDisk = async () => {
+    if (!api || !workspace || !active || active.previewUrl) return;
+    try {
+      const disk = await api.readFile(workspace.id, active.path);
+      setDiffAgainstDisk(disk.content);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "디스크 내용을 불러오지 못했습니다");
+    }
   };
 
   const runCommand = async () => {
@@ -277,6 +361,11 @@ export function App() {
           <button type="button" className="button-ghost project-button" onClick={() => void openProject()}>
             <Icon name="folder" /> 프로젝트 열기
           </button>
+          {api?.getSettings && (
+            <button type="button" className="button-ghost" onClick={() => setSettingsOpen(true)} aria-label="설정">
+              <Icon name="gear" />
+            </button>
+          )}
           {api?.platform === "win32" && (
             <div className="window-actions" aria-label="창 제어">
               <button type="button" onClick={() => void api.windowControl("minimize")} aria-label="창 최소화"><span className="minimize-symbol" /></button>
@@ -347,8 +436,17 @@ export function App() {
                       <strong>디스크에서 파일이 변경됐습니다</strong>
                       <span>저장하기 전에 사용할 버전을 선택하세요.</span>
                     </div>
+                    {!active.previewUrl && (
+                      <button
+                        type="button"
+                        className="button-ghost"
+                        onClick={() => (diffAgainstDisk === undefined ? void showDiffAgainstDisk() : setDiffAgainstDisk(undefined))}
+                      >
+                        {diffAgainstDisk === undefined ? "diff 비교" : "diff 닫기"}
+                      </button>
+                    )}
                     <button type="button" className="button-ghost" onClick={() => void reloadActive()}>디스크 내용 사용</button>
-                    <button type="button" className="button-primary-small" onClick={() => dispatch({ type: "keepMine", path: active.path })}>내 내용 유지</button>
+                    <button type="button" className="button-primary-small" onClick={() => void keepActiveMine()}>내 내용 유지</button>
                   </div>
                 )}
                 {active.previewUrl ? (
@@ -362,6 +460,21 @@ export function App() {
                       <span>{Math.max(1, Math.round(active.size / 1024))} KB</span>
                     </div>
                   </div>
+                ) : diffAgainstDisk !== undefined ? (
+                  <DiffEditor
+                    original={diffAgainstDisk}
+                    modified={active.content}
+                    language={active.language}
+                    theme="workspace-dark"
+                    beforeMount={configureMonaco}
+                    options={{
+                      readOnly: true,
+                      renderSideBySide: true,
+                      automaticLayout: true,
+                      fontFamily: "'Geist Mono', 'SFMono-Regular', Consolas, monospace",
+                      fontSize: 13,
+                    }}
+                  />
                 ) : <Editor
                   path={active.path}
                   value={active.content}
@@ -427,6 +540,9 @@ export function App() {
         </div>
         <button type="button" className="stop-button" onClick={() => void api?.cancelCommand()}><Icon name="stop" /> 중지</button>
       </footer>
+      {settingsOpen && api && (
+        <SettingsPanel api={api} onClose={() => setSettingsOpen(false)} onProjectSelected={(path) => void switchToRecentProject(path)} />
+      )}
     </main>
   );
 }

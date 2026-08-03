@@ -1,7 +1,7 @@
 # Workspace 전체 구현 TODO
 
 기준 문서: `plan/03_workspace.md` Workspace 개발 기획서 v2  
-최종 갱신: 2026-08-02
+최종 갱신: 2026-08-03
 
 ## 표기
 
@@ -36,7 +36,7 @@
 ### 김민영
 
 - [x] Mock ai-module이 `user_input`부터 callback까지 실제 인터페이스대로 동작하도록 보강 (`mocks/mock-agent-runtime.ts` -- tool/approval/session 스크립트 지원)
-- [ ] Mock EditorGateway HTTP/WebSocket 클라이언트 작성 -- `부분 완료`: `editor-gateway.test.ts`에 raw ws 테스트 헬퍼는 있지만, 다른 저장소(pet-app)가 재사용할 독립 모듈로는 아직 안 뺐다
+- [x] Mock EditorGateway HTTP/WebSocket 클라이언트 작성 (`mocks/mock-editor-gateway-client.ts` -- `connectMockEditorGateway`/`toEditorGatewayWsUrl`, 다른 저장소도 재사용 가능한 독립 모듈로 추출, `editor-gateway.test.ts`는 이제 이걸 얇게 감싸 쓴다)
 - [x] Mock 승인 요청/응답 시나리오 작성 (`pending-approval-store.test.ts`, `run-cancellation.test.ts`, `mock-agent-runtime.test.ts`의 `approve:` 스크립트)
 
 ### 공통
@@ -73,8 +73,8 @@
 
 ### 김민영
 
-- [ ] 파일 충돌 화면에 실제 diff 연결
-- [ ] `내 내용 유지`, `디스크 내용 사용`, `diff 비교` 전체 동작 완성
+- [x] 파일 충돌 화면에 실제 diff 연결 (`App.tsx` + `@monaco-editor/react`의 `DiffEditor`, side-by-side)
+- [x] `내 내용 유지`, `디스크 내용 사용`, `diff 비교` 전체 동작 완성 -- `내 내용 유지`가 revision을 최신 디스크 값으로 갱신하지 않아 다음 저장이 `file_conflict`로 다시 막히는 버그를 함께 고쳤다(`editor-state.ts`의 `keepMine` 액션에 `revision` 필드 추가). E2E(`tests/e2e/file-conflict-diff.spec.ts`)로 diff 버튼 표시·내 내용 유지 후 저장까지 검증
 
 ### 공통
 
@@ -112,7 +112,7 @@
 - [x] ACP 진행 상태 브로드캐스트
 - [ ] WKWebView에서 Editor View 로드 -- 클라이언트 트랜스포트(`renderer/gateway-transport.ts`, `gateway-workspace-api.ts`)는 준비됐지만 실제 pet-app WKWebView와의 통합 검증은 pet-app 쪽 작업 필요
 - [x] Electron 폴백 창도 동일 EditorGateway URL 사용
-- [ ] Editor View 재연결 시 열린 탭·활성 탭·작업 상태 복원 -- `부분 완료`: 서버(`state:restore`/`state:update`)와 클라이언트 API(`WorkspaceApi.restoreState/saveState`)는 구현·테스트 완료, App.tsx가 재연결 시 이걸 호출해 탭을 다시 여는 UI 연동은 아직 안 함
+- [x] Editor View 재연결 시 열린 탭·활성 탭·작업 상태 복원 (`App.tsx`가 게이트웨이 호스트에서 마운트 시 `restoreState()`를 호출해 탭을 다시 열고, 탭/활성 탭 변경 시 디바운스해 `saveState()`로 반영. `tests/e2e/editor-gateway-reconnect.spec.ts`로 새로고침 후 탭 복원 검증. 이 작업 중 asset(js/css) 요청이 token 없이 401로 막히던 실제 버그도 함께 고쳤다 -- index.html이 상대 경로로 asset을 참조해 브라우저가 쿼리스트링을 안 옮기므로, 진입 문서/WS만 token을 요구하도록 조정)
 
 ### 공통
 
@@ -177,9 +177,9 @@
 
 ### 김민영
 
-- [ ] `workspace_create_request`와 응답 처리
-- [ ] `session_create_request`와 응답 처리
-- [ ] 요청·응답 `request_id` 매칭 (공통 protocol PR로 `request_id` 계약이 확정된 뒤 진행)
+- [x] `workspace_create_request`와 응답 처리 (`WorkspaceRegistry.create` 재사용, `workspace_create`로 확정 응답 + `editor_view_ready`/`unavailable` 통지)
+- [x] `session_create_request`와 응답 처리 (`session-registry.ts`, `session_create(origin=user)`로 확정 응답. `open_task_session`의 agent 기원 세션도 같은 레지스트리에 기록해 일관성 유지). `tests/e2e/petbridge-create-requests.spec.ts`로 왕복 검증
+- [ ] 요청·응답 `request_id` 매칭 -- protocol v0.5.0에 `request_id` 필드 자체가 없어(공통 PR 대기) "정식" 매칭은 못 함. 지금은 메시지 도착 순서대로 순차 처리하고 확정 이벤트로만 응답
 - [x] `user_input`을 SessionRouter로 연결
 - [x] 승인·취소 GUI 메시지 연결 (`approval_response`/`run_cancel`)
 - [x] Editor View URL 준비 이벤트 전송 (`editor_view_ready`/`editor_view_unavailable`, 프로젝트 바인딩 시점 + pet-app 재연결 시점마다 재통지)
@@ -283,8 +283,8 @@
 - [ ] 확장 `run_cancel(workspace_id, session_id, run_id)` 처리 -- `PROTOCOL_EXTENSIONS_ENABLED=false`인 동안은 wire로 보내지 않는다는 기존 원칙을 따름, 공통 protocol PR 이후 진행
 - [x] 취소 시 ActiveRun → pet 도구 → ACP → 승인 순서 정리
 - [x] `agent_done(ok=false, summary="중단됨")` 전송 (정상 완료 경로와 경합해도 `RunRegistry.markDoneSent`로 정확히 한 번만 전송)
-- [ ] 설정 화면: API 키, 모델, 최근 프로젝트, 창 크기, 파일 제한, 로그 수준
-- [ ] Editor diff 화면
+- [x] 설정 화면: API 키, 모델, 최근 프로젝트, 창 크기, 파일 제한, 로그 수준 (`SettingsPanel.tsx` + `settings-controller.ts`/`settings-store.ts`, 폴백 셸 전용 -- 게이트웨이 호스트에는 노출 안 함. API 키는 이주한의 `SecretStore`(safeStorage) 그대로 재사용, 값은 렌더러/로그에 절대 노출 안 됨(hasApiKey 플래그만 왕복). 로그 수준은 `JsonlLogger`에 `minLevel` 필터를 추가해 실제로 동작. 파일 크기 제한은 다음 프로젝트 연결부터 반영(이미 연 FileService는 재적용 안 함). API 키 변경은 다음 Agent Host 재시작부터 반영(현재 구조상 실행 중인 Agent Host의 env는 갱신 못 함). `tests/e2e/settings-panel.spec.ts`로 검증
+- [x] Editor diff 화면 (위 W1 항목과 동일 구현)
 
 ### 이주한
 
@@ -333,7 +333,7 @@
 
 ### 김민영
 
-- [ ] 승인 대기 중 pet-app 연결 종료 시험 -- `rejectAll()` 단위 시험은 있지만(`pending-approval-store.test.ts`), 실제 PetBridge 연결 종료 이벤트와 묶은 통합 시험은 아직
+- [x] 승인 대기 중 pet-app 연결 종료 시험 (`petbridge-approval-integration.test.ts` -- 실제 `PetBridge`를 mock 소켓 서버에 붙이고 연결 종료 시 대기 승인이 `rejectAll()`로 자동 거부되는지, 연결이 살아있는 동안은 거부되지 않는지 둘 다 확인)
 - [x] 같은 세션 중복 사용자 입력 순서 시험 (`session-router.test.ts`)
 - [ ] `run_id`가 다른 취소 요청 오작동 방지 시험 -- 현재 protocol의 `run_cancel`은 `run_id`가 없어(session_id만) 해당되지 않음, 확장 계약이 정식화된 뒤 진행
 - [x] EditorGateway WebSocket 재연결 시험 (연결 종료 후 재연결해 `state:restore`로 상태 복원 확인)
@@ -390,8 +390,9 @@
 
 ### 김민영
 
-- (2026-08-02 갱신) EditorGateway, SessionRouter/RunRegistry, 도구 3종(petAppProxy/editorLocal), 승인·취소 브리지는 포트 계약대로 구현·테스트 완료. 실제 ai-module 태그가 나오면 `main/index.ts`의 `MockAgentRuntime` 한 줄만 교체하면 되도록 배선해둠
-- 남은 것: 실제 ai-module 태그 연결(저장소가 아직 비어 있어 대기), `workspace_create_request`/`session_create_request` 처리, 폴백 셸 승인 팝업 UI, Editor View 재연결 시 App.tsx의 탭 자동 복원(서버 API는 준비됨), diff와 설정 화면, state snapshot 생성·전달(공통 protocol PR 대기)
+- (2026-08-02, P0) EditorGateway, SessionRouter/RunRegistry, 도구 3종(petAppProxy/editorLocal), 승인·취소 브리지는 포트 계약대로 구현·테스트 완료. 실제 ai-module 태그가 나오면 `main/index.ts`의 `MockAgentRuntime` 한 줄만 교체하면 되도록 배선해둠
+- (2026-08-03, 2라운드) Editor View 재연결 탭 복원(App.tsx 연동 + E2E), 파일 충돌 diff 화면과 `내 내용 유지`의 revision 갱신 버그 수정, `workspace_create_request`/`session_create_request` 처리, 설정 화면(API 키/모델/최근 프로젝트/파일 제한/로그 수준), 승인-PetBridge 연결 종료 통합 시험, Mock EditorGateway 클라이언트 독립 모듈화까지 완료. 이 라운드에서 EditorGateway의 asset 401 버그와 `keepMine` revision 버그 등 실사용 시나리오(E2E)로만 드러나는 결함 두 건을 추가로 발견·수정함
+- 남은 것: 실제 ai-module 태그 연결(저장소가 아직 비어 있어 대기), 폴백 셸 승인 팝업 UI(채팅 UI가 pet-app으로 이관되며 형태 재정의 필요, 별도 논의 대상), state snapshot 생성·전달과 `request_id` 정식 매칭(공통 protocol PR 대기)
 
 ### 공통
 

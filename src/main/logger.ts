@@ -1,7 +1,8 @@
 import { appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
+import type { LogLevel } from "../shared/settings-contract.js";
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
+export type { LogLevel } from "../shared/settings-contract.js";
 
 export interface LogEntry {
   ts: string;
@@ -12,12 +13,15 @@ export interface LogEntry {
 }
 
 const REDACTED_KEYS = new Set(["apiKey", "api_key", "authorization", "content", "token"]);
+const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
 export interface JsonlLoggerOptions {
   maxFileSizeBytes?: number;
   retentionDays?: number;
   maxFiles?: number;
   now?: () => Date;
+  /** 설정 화면의 "로그 수준"(W7, 김민영) -- 기본값 debug는 기존 동작(전부 기록)과 동일하다. */
+  minLevel?: LogLevel;
 }
 
 function redact(value: unknown): unknown {
@@ -31,13 +35,22 @@ function redact(value: unknown): unknown {
 export class JsonlLogger {
   private pending: Promise<void> = Promise.resolve();
   private lastCleanupDay?: string;
+  private minLevel: LogLevel;
 
   constructor(
     private readonly logDirectory: string,
     private readonly options: JsonlLoggerOptions = {},
-  ) {}
+  ) {
+    this.minLevel = options.minLevel ?? "debug";
+  }
+
+  /** 설정 화면에서 로그 수준을 바꾸면 재시작 없이 반영하기 위한 진입점. */
+  setMinLevel(level: LogLevel): void {
+    this.minLevel = level;
+  }
 
   write(level: LogLevel, kind: string, data: Record<string, unknown> = {}): Promise<void> {
+    if (LEVEL_ORDER[level] < LEVEL_ORDER[this.minLevel]) return Promise.resolve();
     const operation = this.pending.then(() => this.writeEntry(level, kind, data));
     this.pending = operation.catch(() => undefined);
     return operation;

@@ -39,4 +39,28 @@ describe("JsonlLogger", () => {
     await logger.write("info", "cleanup");
     await expect(access(oldFile)).rejects.toThrow();
   });
+
+  it("minLevel보다 낮은 레벨은 기록하지 않는다", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "workspace-log-level-"));
+    const logger = new JsonlLogger(directory, { minLevel: "warn" });
+    await logger.write("debug", "ignored");
+    await logger.write("info", "ignored-too");
+    await logger.write("warn", "kept");
+    const file = path.join(directory, `${new Date().toISOString().slice(0, 10)}.jsonl`);
+    const output = await readFile(file, "utf8");
+    expect(output).not.toContain("ignored");
+    expect(output).toContain("kept");
+  });
+
+  it("setMinLevel로 재시작 없이 로그 수준을 바꿀 수 있다", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "workspace-log-setlevel-"));
+    const logger = new JsonlLogger(directory);
+    logger.setMinLevel("error");
+    await logger.write("warn", "still-ignored");
+    await logger.write("error", "kept");
+    const file = path.join(directory, `${new Date().toISOString().slice(0, 10)}.jsonl`);
+    const output = await readFile(file, "utf8");
+    expect(output).not.toContain("still-ignored");
+    expect(output).toContain("kept");
+  });
 });

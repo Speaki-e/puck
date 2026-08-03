@@ -14,6 +14,8 @@ export class WorkspaceController extends EventEmitter {
   constructor(
     readonly registry: WorkspaceRegistry,
     private readonly logger: JsonlLogger,
+    /** 설정 화면(W7)의 파일 크기 상한을 새로 여는 FileService에 반영하기 위한 훅. */
+    private readonly getEditableSizeLimit?: () => number,
   ) {
     super();
   }
@@ -58,6 +60,8 @@ export class WorkspaceController extends EventEmitter {
       return this.bindDefault(result.filePaths[0]);
     });
     ipcMain.handle("workspace:current", () => this.registry.get("default"));
+    // 설정 화면의 "최근 프로젝트" 목록에서 다이얼로그 없이 바로 전환하기 위한 진입점.
+    ipcMain.handle("workspace:bind-project", (_event, projectPath: string) => this.bindDefault(projectPath));
     ipcMain.handle("files:list-tree", async (_event, workspaceId: string) => (await this.service(workspaceId)).listTree());
     ipcMain.handle("files:read", async (_event, workspaceId: string, filePath: string) =>
       (await this.service(workspaceId)).readFile(filePath));
@@ -95,6 +99,7 @@ export class WorkspaceController extends EventEmitter {
     for (const channel of [
       "workspace:select-project",
       "workspace:current",
+      "workspace:bind-project",
       "files:list-tree",
       "files:read",
       "files:preview-image",
@@ -126,7 +131,7 @@ export class WorkspaceController extends EventEmitter {
 
   private async ensureService(record: WorkspaceRecord): Promise<FileService> {
     if (!record.realProjectPath) throw new Error("프로젝트 경로가 없습니다");
-    const service = await FileService.create(record.realProjectPath);
+    const service = await FileService.create(record.realProjectPath, this.getEditableSizeLimit?.());
     service.on("change", (event) => this.broadcast("files:changed", event));
     await service.startWatching();
     this.services.set(record.id, service);

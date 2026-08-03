@@ -216,19 +216,25 @@ export class EditorGateway {
       res.writeHead(404).end("unknown workspace");
       return;
     }
-    if (!this.verifyToken(url.searchParams.get("token"))) {
-      res.writeHead(401).end("invalid token");
-      return;
-    }
     if (rest === "") {
+      // 토큰 검증 전에 리다이렉트만 한다 -- 쿼리스트링(token 포함)을 그대로 옮겨 붙인다.
       res.writeHead(302, { Location: `${url.pathname}/${url.search}` });
       res.end();
       return;
     }
     if (rest === "/") {
+      // 진입 문서는 token이 반드시 필요하다 -- 여기서 WS용 token을 URL로 건네받는다.
+      if (!this.verifyToken(url.searchParams.get("token"))) {
+        res.writeHead(401).end("invalid token");
+        return;
+      }
       await this.serveFile(res, path.join(this.options.staticRoot, "index.html"));
       return;
     }
+    // 정적 asset(js/css/font)은 index.html이 상대 경로("./assets/...")로 참조하므로 브라우저가
+    // 쿼리스트링(token)을 자동으로 옮겨 붙이지 않는다 -- 요구하면 매 asset 요청이 401로 깨진다.
+    // asset 자체는 앱과 함께 배포되는 비민감 컴파일 산출물이라 token 없이 서빙해도 안전하다
+    // (127.0.0.1 고정 바인딩 + 실제 데이터가 오가는 WS/문서 진입점은 여전히 token으로 막혀 있음).
     const target = path.resolve(this.options.staticRoot, rest.slice(1));
     if (!this.isInsideStaticRoot(target)) {
       res.writeHead(403).end();

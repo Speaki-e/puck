@@ -17,6 +17,9 @@ import { PendingApprovalStore } from "./pending-approval-store.js";
 import { createAcpPermissionResolver } from "./acp-permission-bridge.js";
 import { cancelActiveRun, failAllActiveRuns } from "./run-cancellation.js";
 import { createEditorLocalExecutor, createPetAppProxyExecutor } from "./tool-executors.js";
+import { SessionRegistry } from "./session-registry.js";
+import { SettingsStore } from "./settings-store.js";
+import { SettingsController } from "./settings-controller.js";
 import { MockAgentRuntime } from "../mocks/mock-agent-runtime.js";
 import { resolveClaudeAgentCommand } from "../shared/acp-command.js";
 import { workingPathsFromUpdate, type AcpUpdatePayload } from "../shared/acp-update.js";
@@ -88,13 +91,20 @@ async function main(): Promise<void> {
   const registry = new WorkspaceRegistry(path.join(app.getPath("userData"), "workspaces.json"));
   const secrets = new SecretStore(path.join(app.getPath("userData"), "secrets.json"), safeStorage);
   const windowStateStore = new WindowStateStore(path.join(app.getPath("userData"), "window-state.json"));
+  const settingsStore = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
+  await settingsStore.load();
+  logger.setMinLevel(settingsStore.current.logLevel);
   const environmentApiKey = process.env.ANTHROPIC_API_KEY;
   if (environmentApiKey && secrets.available && !(await secrets.get("claudeApiKey"))) {
     await secrets.set("claudeApiKey", environmentApiKey);
   }
   const claudeApiKey = await secrets.get("claudeApiKey") ?? environmentApiKey;
-  const controller = new WorkspaceController(registry, logger);
+  const controller = new WorkspaceController(registry, logger, () => settingsStore.current.fileSizeLimitBytes);
   await controller.initialize(argumentValue("--project"));
+  const settingsController = new SettingsController(settingsStore, secrets, registry, windowStateStore, logger, (updated) => {
+    logger.setMinLevel(updated.logLevel);
+  });
+  settingsController.installIpc();
   const agentHostModulePath = app.isPackaged
     ? path.join(path.dirname(app.getAppPath()), "app.asar.unpacked", "dist-main", "agent-host", "index.cjs")
     : path.join(app.getAppPath(), "dist-main", "agent-host", "index.cjs");
@@ -125,12 +135,17 @@ async function main(): Promise<void> {
     fileServiceFor: (workspaceId) => controller.getFileService(workspaceId),
   });
   await editorGateway.start();
+  if (process.env.NODE_ENV === "test") {
+    const testHooks = (globalThis as typeof globalThis & { __workspaceTest?: Record<string, unknown> }).__workspaceTest;
+    if (testHooks) testHooks.editorGatewayUrl = (workspaceId: string) => editorGateway.url(workspaceId);
+  }
 
   const petBridge = new PetBridge({ socketPath: argumentValue("--bridge-socket"), logger });
 
   // SessionRouter/RunRegistry/PendingApprovalStore(W3, W7): 사용자 입력 라우팅과 실행·승인 생명주기.
   const sessionRouter = new SessionRouter();
   const runRegistry = new RunRegistry();
+  const sessionRegistry = new SessionRegistry();
   const pendingApprovals = new PendingApprovalStore({
     emit: ({ approvalId, summary, workspaceId, sessionId }) => {
       petBridge.sendEvent({
@@ -281,6 +296,7 @@ async function main(): Promise<void> {
             .then(resolve);
         },
         onSessionCreated: (newSessionId, title) => {
+          sessionRegistry.record(workspaceId, title, "agent", newSessionId);
           petBridge.send({ type: "session_create", workspace_id: workspaceId, session_id: newSessionId, title, origin: "agent" });
         },
         onDone: (ok, summary) => {
@@ -350,6 +366,19 @@ async function main(): Promise<void> {
         cancelActiveRun({ runRegistry, approvals: pendingApprovals, sendAgentDone }, String(message.session_id ?? "default"));
       } else if (message.type === "approval_response") {
         pendingApprovals.respond(String(message.approval_id ?? ""), Boolean(message.approved));
+      } else if (message.type === "workspace_create_request") {
+        // protocol v0.5.0에는 request_id가 없어 "정식" 매칭은 못 한다(공통 protocol PR 대기) --
+        // 메시지가 도착한 순서대로 처리하고 workspace_create로 확정 응답한다(W4).
+        const name = String(message.name ?? "Workspace");
+        const projectPath = typeof message.project_path === "string" ? message.project_path : undefined;
+        const record = await registry.create(name, projectPath);
+        petBridge.send({ type: "workspace_create", workspace_id: record.id, name: record.name, project_path: record.realProjectPath });
+        sendEditorViewStatus(record.id);
+      } else if (message.type === "session_create_request") {
+        const workspaceId = typeof message.workspace_id === "string" ? message.workspace_id : "default";
+        const title = String(message.title ?? "새 세션");
+        const record = sessionRegistry.record(workspaceId, title, "user");
+        petBridge.send({ type: "session_create", workspace_id: workspaceId, session_id: record.id, title: record.title, origin: "user" });
       }
     })().catch((error) => logger.write("warn", "bridge_message_route_failed", {
       type: message.type,
@@ -372,6 +401,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     event.preventDefault();
     shuttingDown = true;
+    settingsController.close();
     void Promise.all([
       petBridge.close(),
       agentHost.stop(),

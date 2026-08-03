@@ -1,5 +1,6 @@
 import type { FileContent, FileTreeEntry, SaveFileRequest, SaveFileResult } from "../shared/file-contract";
 import type { EditorViewState } from "../shared/editor-contract";
+import type { SettingsSnapshot, WorkspaceSettings } from "../shared/settings-contract";
 
 export interface RendererWorkspaceRecord {
   id: string;
@@ -16,6 +17,8 @@ export interface WorkspaceApi {
   platform: string;
   selectProject(): Promise<RendererWorkspaceRecord | undefined>;
   currentWorkspace(): Promise<RendererWorkspaceRecord | undefined>;
+  /** 설정 화면의 "최근 프로젝트"에서 다이얼로그 없이 바로 전환하기 위한 선택적 확장(폴백 셸 전용). */
+  bindProject?(projectPath: string): Promise<RendererWorkspaceRecord>;
   listTree(workspaceId: string): Promise<FileTreeEntry[]>;
   readFile(workspaceId: string, path: string): Promise<FileContent>;
   previewImage(workspaceId: string, path: string): Promise<FileContent>;
@@ -33,6 +36,14 @@ export interface WorkspaceApi {
    */
   restoreState?(): Promise<EditorViewState>;
   saveState?(state: EditorViewState): void;
+  /**
+   * 설정 화면(W7)용 선택적 확장 -- 폴백 셸(IPC)에서만 노출한다(plan 4.5: pet-app 쪽 설정은
+   * 02_pet-app.md 몫). 게이트웨이 호스트(WKWebView)에는 구현하지 않는다.
+   */
+  getSettings?(): Promise<SettingsSnapshot>;
+  updateSettings?(patch: Partial<WorkspaceSettings>): Promise<SettingsSnapshot>;
+  setApiKey?(key: string): Promise<{ hasApiKey: boolean }>;
+  clearApiKey?(): Promise<{ hasApiKey: boolean }>;
 }
 
 declare global {

@@ -17,7 +17,9 @@ export type EditorAction =
   | { type: "saved"; path: string; revision: string; size: number }
   | { type: "diskChanged"; path: string }
   | { type: "reload"; file: FileContent }
-  | { type: "keepMine"; path: string }
+  // revision(선택): 저장 시 낙관적 잠금이 최신 디스크 revision을 기준으로 통과하도록 갱신한다 --
+  // 없으면(기존 호출부 호환) revision은 그대로 두고 diskChanged만 내린다.
+  | { type: "keepMine"; path: string; revision?: string }
   | { type: "close"; path: string }
   | { type: "restore"; tabs: EditorTab[]; activePath?: string };
 
@@ -68,7 +70,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case "keepMine":
       return {
         ...state,
-        tabs: state.tabs.map((tab) => (tab.path === action.path ? { ...tab, diskChanged: false } : tab)),
+        tabs: state.tabs.map((tab) =>
+          tab.path === action.path
+            ? { ...tab, diskChanged: false, revision: action.revision ?? tab.revision }
+            : tab,
+        ),
       };
     case "close": {
       const index = state.tabs.findIndex((tab) => tab.path === action.path);

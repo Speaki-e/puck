@@ -116,8 +116,8 @@
 
 ### 공통
 
-- [ ] `editor_view_ready` URL을 PetAgentClient에 전달하는 계약 시험
-- [ ] 서로 다른 두 워크스페이스 URL과 WebSocket 격리 시험
+- [x] `editor_view_ready` URL을 PetAgentClient에 전달하는 계약 시험 (2026-08-03, 3라운드) `tests/e2e/editor-view-status-contract.spec.ts` -- 실제 PetBridge 소켓으로 `editor_view_ready`/`editor_view_unavailable`을 받아 workspace_id·url이 맞는지, 그 url이 실제로 200을 반환하는지까지 왕복 검증. project_path 있는/없는 워크스페이스 둘 다, 그리고 두 번째 워크스페이스 생성까지 포함
+- [x] 서로 다른 두 워크스페이스 URL과 WebSocket 격리 시험 (2026-08-03, 3라운드) `src/main/editor-gateway-isolation.test.ts` -- file:changed/acp:update/acp:working-paths 브로드캐스트, state:update/restore, open_in_editor 대기 탭, FileService 자체가 워크스페이스별로 격리되는지 확인. 이 테스트를 작성하다 `mocks/mock-editor-gateway-client.ts`의 실제 버그를 하나 발견해 같이 고쳤다 -- `next(timeoutMs)`가 타임아웃으로 reject된 뒤에도 그 waiter를 큐에서 제거하지 않아서, 그다음에 도착하는(관련 없는) 메시지가 죽은 Promise로 조용히 삼켜지고 후속 `next()` 호출이 자기 타임아웃까지 기다리게 되는 문제였다(다른 저장소도 이 mock 클라이언트를 재사용하므로 영향 범위가 있었음)
 
 **완료 기준:** PetAgentClient WKWebView와 Electron 폴백 창에서 동일 Editor View 사용
 
@@ -151,7 +151,7 @@
 
 ### 공통
 
-- [ ] 세션·워크스페이스 메타데이터 저장 형식 리뷰
+- [x] 세션·워크스페이스 메타데이터 저장 형식 리뷰 (2026-08-03, 3라운드) `docs/session-workspace-metadata-review.md` -- WorkspaceRegistry(영속)/SessionRegistry(비영속) 저장 형식·책임 경계 정리, state_snapshot 작업 시작 시 바꿔야 할 것(영속화 여부, 고아 레코드 정리, 보존 정책, 스냅샷 API)과 ai-module 연결 시 바꿔야 할 것(이중 저장 방지)을 분리해 기록. 코드 변경 없음(리뷰 문서, protocol PR 전에는 형식 확정이 의미 없다고 판단)
 - [ ] Agent Host 재시작 시 GUI에 복구 상태 전달
 
 **완료 기준:** Main을 막지 않고 세션 순서·병렬성·실행 상태가 정확히 유지됨
@@ -303,13 +303,13 @@
 
 ### 공통
 
-- [ ] 첨부 이미지 확장자와 실제 MIME 일치 검증
-- [ ] 첨부 최대 크기와 파일 존재 검증
-- [ ] 허용 임시 디렉터리·사용자 선택 파일 검증
-- [ ] 첨부 심볼릭 링크 이탈 방지
-- [ ] 임시 캡처 파일 삭제 책임을 pet-app과 확정
-- [ ] Editor View 종료 전 미저장 내용 경고
-- [ ] Editor View 임시 복구 데이터와 만료 정책
+- [x] 첨부 이미지 확장자와 실제 MIME 일치 검증 (2026-08-03, 3라운드) `src/main/attachment-validator.ts`(`validateAttachment`) -- file-service.ts의 매직 바이트 판별을 `shared/image-mime.ts`로 뽑아 재사용. `src/main/attachment-validator.test.ts`로 검증
+- [x] 첨부 최대 크기와 파일 존재 검증 (2026-08-03, 3라운드) 위와 동일 파일, `file_too_large`/`file_not_found` 에러 코드로 구분
+- [x] 허용 임시 디렉터리·사용자 선택 파일 검증 (2026-08-03, 3라운드) `AttachmentPolicy.allowedDirectories`(기본 OS 임시 디렉터리, realpath 정규화) + `allowedPaths`(사용자가 명시적으로 고른 개별 경로용 확장점, 지금은 빈 값 -- 첨부 파일 선택 UI 자체가 아직 없어 실제로 채워지는 경로는 없다)
+- [x] 첨부 심볼릭 링크 이탈 방지 (2026-08-03, 3라운드) file-service.ts의 경로 이탈 검사(`isInside`)를 `shared/path-containment.ts`로 뽑아 재사용, realpath 기준으로 허용 디렉터리 밖을 가리키는 심볼릭 링크를 `symlink_escape`로 별도 구분. 잘못된 확장자/위조 MIME/크기 초과/미존재/허용 범위 밖 경로/심볼릭 링크 이탈 6가지 모두 단위 테스트로 확인(`attachment-validator.test.ts`, 심볼릭 링크 테스트는 이 환경(Windows, 개발자 모드 없음)에서 symlink 생성 권한이 없어 런타임에 건너뛰지만 나머지 5개+정상 케이스는 항상 통과). `main/index.ts`의 `user_input` 처리에 `filterValidAttachments`로 연결해 실제로 걸러진 첨부만 ai-module로 넘어가게 배선했다
+- [ ] 임시 캡처 파일 삭제 책임을 pet-app과 확정 -- pet-app의 F14 드래그 캡처 자체가 아직 구현 전(02_pet-app.md에 "선택" 표기)이라 실제 삭제 시점/주체를 정할 대상이 없다. Workspace 쪽은 첨부를 읽기만 하고 지우지 않는다(검증 실패해도 파일은 그대로 둠) -- pet-app이 캡처 파일 생성 주체이므로 삭제 책임도 그쪽이 맞다고 보지만, 실제 F14 구현 시 다시 논의 필요
+- [x] Editor View 종료 전 미저장 내용 경고 (2026-08-03, 3라운드) `부분 완료`: Electron 폴백 창은 `main/index.ts`의 `createFallbackWindow`에서 `webContents.on("will-prevent-unload", ...)`을 새로 연결해 실제로 닫기를 막고 확인 대화상자를 띄우도록 고쳤다 -- 기존에는 `App.tsx`의 `beforeunload`가 `preventDefault()`를 해도 Electron이 `will-prevent-unload`를 아무도 안 들으면 그냥 닫아버리는 문제가 있었다(Electron 고유 동작, 실제로 안 막히고 있었음). WKWebView(게이트웨이 호스트) 쪽은 이 저장소에서 할 수 있는 부분(App.tsx의 표준 `beforeunload` 핸들러)은 이미 있지만, pet-app이 WKWebView를 닫을 때 실제로 확인창을 띄우려면 pet-app의 Swift `WKUIDelegate`가 beforeunload 확인 패널을 구현해야 한다 -- pet-app 쪽 작업이라 이번 라운드 범위 밖(다른 WKWebView 관련 항목들과 동일하게 cross-repo 의존)
+- [x] Editor View 임시 복구 데이터와 만료 정책 (2026-08-03, 3라운드) 점검 결과 정리는 지금까지 정리가 "같은 프로젝트를 다시 열 때"만 일어나는 lazy 방식이라, 한 번 열고 다시 열지 않은 프로젝트의 draft는 7일이 지나도 아무도 안 지우는 사각지대가 있었다 -- `src/renderer/draft-store.ts`의 `sweepExpiredDrafts()`를 앱 시작 시 한 번(App.tsx의 mount effect) 호출해 모든 `workspace:drafts:*` 키를 훑어 만료/손상 항목을 정리하도록 채웠다(`draft-store.test.ts`로 검증). 점검 중 별개로 발견한 것: EditorGateway가 포트 0(OS 임의 할당)으로 뜨기 때문에 재시작마다 origin이 바뀌어, "재시작 후에도 복구"가 필요한 시나리오(이 기능의 원래 목적)에서는 localStorage 자체에 접근할 수 없다(같은 세션 내 새로고침/재연결에는 영향 없음, `editor-gateway-reconnect.spec.ts`로 검증된 범위). 포트를 고정하려면 여러 Workspace 프로세스 동시 실행 시 포트 경합을 같이 풀어야 해서 이번 라운드에서 고치지 않고 `editor-gateway.ts`에 코멘트로 남겨뒀다 -- 별도 항목으로 다룰 것을 제안
 - [ ] 개인정보·API 키·프로젝트 경로 로그 정책 리뷰
 
 **완료 기준:** 승인·취소·재연결·크래시 후에도 작업 상태와 파일이 일관되게 복구됨
@@ -392,11 +392,12 @@
 
 - (2026-08-02, P0) EditorGateway, SessionRouter/RunRegistry, 도구 3종(petAppProxy/editorLocal), 승인·취소 브리지는 포트 계약대로 구현·테스트 완료. 실제 ai-module 태그가 나오면 `main/index.ts`의 `MockAgentRuntime` 한 줄만 교체하면 되도록 배선해둠
 - (2026-08-03, 2라운드) Editor View 재연결 탭 복원(App.tsx 연동 + E2E), 파일 충돌 diff 화면과 `내 내용 유지`의 revision 갱신 버그 수정, `workspace_create_request`/`session_create_request` 처리, 설정 화면(API 키/모델/최근 프로젝트/파일 제한/로그 수준), 승인-PetBridge 연결 종료 통합 시험, Mock EditorGateway 클라이언트 독립 모듈화까지 완료. 이 라운드에서 EditorGateway의 asset 401 버그와 `keepMine` revision 버그 등 실사용 시나리오(E2E)로만 드러나는 결함 두 건을 추가로 발견·수정함
-- 남은 것: 실제 ai-module 태그 연결(저장소가 아직 비어 있어 대기), 폴백 셸 승인 팝업 UI(채팅 UI가 pet-app으로 이관되며 형태 재정의 필요, 별도 논의 대상), state snapshot 생성·전달과 `request_id` 정식 매칭(공통 protocol PR 대기)
+- (2026-08-03, 3라운드) 첨부 파일 보안 정책 4건(확장자/MIME/크기/존재/경로/심볼릭 링크, `attachment-validator.ts` + 단위 테스트, `main/index.ts` 배선), `editor_view_ready`/`unavailable` 계약 E2E, 두 워크스페이스 WebSocket 격리 단위 테스트, Electron 폴백 창 미저장 경고(`will-prevent-unload` 연결 -- 기존엔 안 막히고 있던 버그), draft 만료 데이터 시작 시 sweep, 세션·워크스페이스 메타데이터 리뷰 문서까지 완료. 이 라운드에서 Mock EditorGateway 클라이언트의 타임아웃 waiter 누수 버그(`next()`가 타임아웃 후에도 waiter를 안 지워 다음 메시지를 삼킴)를 격리 테스트 작성 중 발견·수정함
+- 남은 것: 실제 ai-module 태그 연결(저장소가 아직 비어 있어 대기), 폴백 셸 승인 팝업 UI(채팅 UI가 pet-app으로 이관되며 형태 재정의 필요, 별도 논의 대상), state snapshot 생성·전달과 `request_id` 정식 매칭(공통 protocol PR 대기), WKWebView 쪽 미저장 경고 확인창(pet-app의 Swift WKUIDelegate 구현 필요, cross-repo), 임시 캡처 파일 삭제 책임(pet-app의 F14 드래그 캡처 자체가 아직 미구현), EditorGateway 포트 고정(재시작 후 draft 복구가 실제로 안 되는 근본 원인, 별도 항목 제안)
 
 ### 공통
 
 - protocol 확장 PR과 타입 리뷰
 - PetAgentClient/pet-app 전체 통합
-- 첨부 파일 보안 정책
+- 첨부 파일 보안 정책 (3라운드에서 검증 로직 4건 완료, 임시 캡처 파일 삭제 책임만 pet-app의 F14 구현 이후로 남음)
 - 필수 장애 시험과 최종 인수 테스트

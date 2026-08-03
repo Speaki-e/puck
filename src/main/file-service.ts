@@ -10,6 +10,8 @@ import {
   type SaveFileRequest,
   type SaveFileResult,
 } from "../shared/file-contract.js";
+import { detectImageMime, IMAGE_EXTENSION_MIME } from "../shared/image-mime.js";
+import { isPathInside } from "../shared/path-containment.js";
 
 export const DEFAULT_EDITABLE_SIZE_LIMIT = 2 * 1024 * 1024;
 export const DEFAULT_IMAGE_PREVIEW_SIZE_LIMIT = 10 * 1024 * 1024;
@@ -23,23 +25,6 @@ function isBinary(buffer: Buffer): boolean {
   const sample = buffer.subarray(0, Math.min(buffer.length, 8192));
   return sample.includes(0);
 }
-
-function imageMime(buffer: Buffer): string | undefined {
-  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
-  const header = buffer.subarray(0, 6).toString("ascii");
-  if (header === "GIF87a" || header === "GIF89a") return "image/gif";
-  if (buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
-  return undefined;
-}
-
-const IMAGE_EXTENSION_MIME = new Map([
-  [".png", "image/png"],
-  [".jpg", "image/jpeg"],
-  [".jpeg", "image/jpeg"],
-  [".gif", "image/gif"],
-  [".webp", "image/webp"],
-]);
 
 function languageFor(filePath: string): string | undefined {
   const extension = path.extname(filePath).toLowerCase();
@@ -113,7 +98,7 @@ export class FileService extends EventEmitter {
       throw new FileServiceError("file_too_large", "10MB를 초과하는 이미지는 미리 볼 수 없습니다");
     }
     const buffer = await readFile(target);
-    const detectedMime = imageMime(buffer);
+    const detectedMime = detectImageMime(buffer);
     const expectedMime = IMAGE_EXTENSION_MIME.get(path.extname(target).toLowerCase());
     if (!detectedMime || detectedMime !== expectedMime) {
       throw new FileServiceError("binary_file", "지원하는 이미지 형식과 실제 파일 내용이 일치하지 않습니다");
@@ -228,7 +213,6 @@ export class FileService extends EventEmitter {
   }
 
   private isInside(candidate: string): boolean {
-    const relative = path.relative(this.root, candidate);
-    return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+    return isPathInside(this.root, candidate);
   }
 }

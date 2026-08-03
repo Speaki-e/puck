@@ -1,9 +1,12 @@
-import { app, BrowserWindow, Menu, safeStorage, screen } from "electron";
+import { app, BrowserWindow, dialog, Menu, safeStorage, screen } from "electron";
 import path from "node:path";
+import os from "node:os";
+import { realpath } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import type * as acp from "@agentclientprotocol/sdk";
 import type { AgentCallbacks, Attachment, JSONValue } from "@speaki-e/protocol";
 import { JsonlLogger } from "./logger.js";
+import { filterValidAttachments, type AttachmentPolicy } from "./attachment-validator.js";
 import { WorkspaceRegistry } from "./workspace-registry.js";
 import { WorkspaceController } from "./workspace-controller.js";
 import { AgentHostController } from "./agent-host-controller.js";
@@ -75,6 +78,27 @@ async function createFallbackWindow(stateStore: WindowStateStore, editorUrl: str
     saveTimer = undefined;
     void persistBounds();
   });
+  // 미저장 탭 경고(W7 완료 기준): App.tsx의 beforeunload가 unload를 막으면 Electron은 그
+  // 시도를 webContents의 will-prevent-unload로만 알려준다 -- 이 이벤트를 아무도 듣지 않으면
+  // beforeunload의 preventDefault()는 창 닫기를 실제로는 막지 못한다(Electron 고유 동작).
+  // 여기서 직접 확인 대화상자를 띄우고, 사용자가 "닫기"를 고르면 다음 시도에서만 강제로 통과시킨다.
+  let forceClose = false;
+  window.webContents.on("will-prevent-unload", (event) => {
+    if (forceClose) return;
+    event.preventDefault();
+    const choice = dialog.showMessageBoxSync(window, {
+      type: "warning",
+      buttons: ["닫기", "취소"],
+      defaultId: 1,
+      cancelId: 1,
+      message: "저장하지 않은 변경사항이 있습니다",
+      detail: "지금 닫으면 저장하지 않은 변경 내용을 잃을 수 있습니다.",
+    });
+    if (choice === 0) {
+      forceClose = true;
+      window.close();
+    }
+  });
   window.setMenuBarVisibility(false);
   // EditorGateway가 서빙하는 것과 동일한 Editor View 번들을 폴백 창도 그대로 로드한다(W2 완료 기준
   // "폴백 창도 동일 EditorGateway URL 사용") -- contextBridge preload는 로드 URL이 http://든 file://든
@@ -88,6 +112,11 @@ async function main(): Promise<void> {
   await app.whenReady();
   Menu.setApplicationMenu(null);
   const logger = new JsonlLogger(path.join(app.getPath("userData"), "logs"));
+  // 첨부 파일 보안 정책(공통 W7): pet-app이 user_input.attachments로 보내는 경로는 신뢰할 수
+  // 없는 입력이다 -- OS 임시 디렉터리(드래그 캡처가 저장되는 곳, plan/02_pet-app.md F14) 안의
+  // 파일만 기본 허용한다. os.tmpdir() 자체가 심볼릭 링크인 플랫폼(macOS /tmp)을 고려해 realpath로
+  // 정규화해둔다 -- 그래야 attachment-validator.ts의 containment 검사가 정확히 맞물린다.
+  const attachmentPolicy: AttachmentPolicy = { allowedDirectories: [await realpath(os.tmpdir())] };
   const registry = new WorkspaceRegistry(path.join(app.getPath("userData"), "workspaces.json"));
   const secrets = new SecretStore(path.join(app.getPath("userData"), "secrets.json"), safeStorage);
   const windowStateStore = new WindowStateStore(path.join(app.getPath("userData"), "window-state.json"));
@@ -360,8 +389,11 @@ async function main(): Promise<void> {
       if (message.type === "user_input") {
         const workspaceId = typeof message.workspace_id === "string" ? message.workspace_id : "default";
         const sessionId = typeof message.session_id === "string" ? message.session_id : "default";
-        const attachments = Array.isArray(message.attachments) ? (message.attachments as Attachment[]) : undefined;
-        await handleUserInput(workspaceId, sessionId, String(message.text ?? ""), attachments);
+        const rawAttachments = Array.isArray(message.attachments) ? (message.attachments as Attachment[]) : undefined;
+        // 확장자/MIME 위조, 크기 초과, 미존재, 허용 범위 밖 경로, 심볼릭 링크 이탈을 여기서 전부
+        // 걸러낸다(공통 W7 완료 기준) -- 첨부 하나가 거부돼도 나머지 첨부/본문 텍스트는 그대로 처리한다.
+        const attachments = await filterValidAttachments(rawAttachments, attachmentPolicy, logger);
+        await handleUserInput(workspaceId, sessionId, String(message.text ?? ""), attachments.length ? attachments : undefined);
       } else if (message.type === "run_cancel") {
         cancelActiveRun({ runRegistry, approvals: pendingApprovals, sendAgentDone }, String(message.session_id ?? "default"));
       } else if (message.type === "approval_response") {

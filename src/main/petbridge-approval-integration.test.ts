@@ -58,7 +58,7 @@ describe("PendingApprovalStore <-> 실제 PetBridge 연결 종료 통합", () =>
         approval_id: input.approvalId,
       }),
     });
-    // main/index.ts가 petBridge.on("state", ...)에서 실제로 쓰는 것과 동일한 배선(W7 완료 기준).
+    // app/pet-bridge-router.ts가 연결 종료 시 사용하는 것과 동일한 승인 거부 배선(W7 완료 기준).
     bridge.on("state", (state: string) => {
       if (state === "disconnected" || state === "closed") approvals.rejectAll();
     });

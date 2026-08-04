@@ -1,30 +1,30 @@
 # Speaki-e Workspace
 
-PetAgent의 프로젝트 파일 편집과 Claude Agent ACP 실행을 담당하는 Electron 백엔드/폴백 에디터입니다. 이 저장소의 현재 구현은 Workspace 개발 기획서 v2 중 **이주한 담당 영역**을 대상으로 합니다.
+PetAgent의 로컬 AI 실행 백엔드이자 Monaco 기반 코드 에디터입니다. Electron 폴백 창과 PetAgentClient의 WKWebView가 같은 Editor View를 사용하며, Main 프로세스는 파일·브리지·앱 생명주기를, Agent Host Utility Process는 Claude Agent ACP 실행을 담당합니다.
 
-## 구현 범위
+## 현재 구현
 
-- Electron Main 및 보안 preload
-- Agent Host Utility Process와 비정상 종료 후 재시작
-- Monaco Editor, 파일 트리, 다중 탭, 외부 변경 알림
-- 프로젝트 경계·심볼릭 링크를 검증하는 FileService
-- revision 충돌 검사와 임시 파일 기반 원자적 저장
-- 공식 ACP TypeScript SDK 기반 Claude Agent ACP Adapter
-- 워크스페이스별 직렬 `CodeEditorQueue`
-- UDS/Windows Named Pipe 기반 `PetBridge`
-- 프로젝트 선택, 한 줄 명령, 실행 취소를 제공하는 폴백 셸
-- Electron `safeStorage` 기반 Claude API 키 저장
-- JSON Lines 로그와 Mock 계약 테스트
+- WorkspaceRegistry와 프로젝트 메타데이터 복구
+- 경로 이탈·심볼릭 링크 이탈을 차단하는 FileService
+- revision 충돌 검사와 임시 파일 교체 기반 저장
+- Monaco 파일 트리, 탭, 이미지 미리보기, 외부 변경 diff, 미저장 복구
+- 단일 HTTP/WebSocket EditorGateway와 워크스페이스별 격리
+- UDS/Windows Named Pipe PetBridge, 재연결, 승인·취소 라우팅
+- Electron Utility Process Agent Host와 비정상 종료 후 재시작
+- 공식 ACP SDK 기반 Claude Agent ACP Adapter와 워크스페이스별 직렬 큐
+- safeStorage 기반 API 키 보관, 설정, 구조화 로그와 민감값 마스킹
+- Vitest 계약/장애 테스트와 Playwright Electron E2E
 
-`EditorGateway`, 통합 Editor View 통신, `SessionRouter`, `RunRegistry`, 승인 브리지, diff, 설정 화면과 실제 `ai-module` 결합은 김민영 담당 영역이므로 포트와 메시지 경계만 제공하며 구현하지 않습니다.
+실제 `ai-module` 패키지는 아직 태그 버전이 없어 `MockAgentRuntime`이 임시로 연결되어 있습니다. 도구 실행 포트와 승인/취소 경계는 실제 계약에 맞춰져 있으며, 패키지가 준비되면 `src/main/app/agent-runtime-coordinator.ts`의 생성 지점을 교체합니다.
 
 ## 요구 환경
 
 - Node.js 22 이상
 - pnpm 11.18.0 (`corepack enable` 권장)
 - Claude API 키 또는 Claude Agent ACP가 사용할 수 있는 인증 환경
+- private `Speaki-e/protocol` 저장소 읽기 권한
 
-## 개발 실행
+## 설치와 실행
 
 ```powershell
 corepack pnpm install
@@ -32,42 +32,58 @@ $env:ANTHROPIC_API_KEY = "키"
 corepack pnpm start -- --project C:\path\to\project
 ```
 
-처음 전달된 `ANTHROPIC_API_KEY`는 운영체제 암호화 기능을 사용할 수 있을 때 `safeStorage`로 암호화해 사용자 데이터 디렉터리에 저장됩니다. Renderer, Editor View 및 로그에는 원문 키를 전달하지 않습니다. 환경 변수를 사용하지 않으면 Claude Agent ACP 자체의 인증 방식도 사용할 수 있습니다.
-
-UI 없이 Main과 브리지만 실행하려면 다음 명령을 사용합니다.
+UI 없이 백엔드와 브리지만 실행합니다.
 
 ```powershell
 corepack pnpm start:headless -- --project C:\path\to\project
 ```
 
-별도 소켓을 사용하는 Mock 또는 통합 환경에서는 `--bridge-socket <path>`를 추가합니다. Windows 기본값은 `\\.\pipe\PetAgent-bridge`, macOS 기본값은 `~/Library/Application Support/PetAgent/bridge.sock`입니다.
+Mock 또는 통합 환경에서 별도 브리지 주소를 사용하려면 `--bridge-socket <path>`를 추가합니다. 기본 주소는 Windows `\\.\pipe\PetAgent-bridge`, macOS `~/Library/Application Support/PetAgent/bridge.sock`입니다.
 
-## 검증과 패키징
+## 검증
 
 ```powershell
+corepack pnpm check:architecture
 corepack pnpm typecheck
 corepack pnpm test
 corepack pnpm build
 corepack pnpm test:e2e
+```
+
+`check:architecture`는 import cycle, 계층 역참조, 임시 Mock 경계 확산, 과도하게 커진 진입 파일을 검사합니다. GitHub Actions는 architecture → typecheck → unit → build → E2E 순서로 실행하며, private protocol 의존성을 받기 위한 읽기 전용 `PROTOCOL_PAT` secret이 필요합니다.
+
+패키징 명령은 다음과 같습니다.
+
+```powershell
 corepack pnpm package
-# Windows NSIS 설치 파일 + unpacked 앱 + 패키지 내부 ACP 검증
 corepack pnpm package:win
 ```
 
-단위 테스트는 경로 이탈, 바이너리·대용량 파일, revision 충돌, JSON Lines 분할 수신, PetBridge 연결 종료, ACP Mock 왕복·취소·크래시 복구, 같은 워크스페이스의 직렬 큐를 포함합니다. Playwright 테스트는 폴백 창, 격리된 preload, Agent Host 재시작, Main 이벤트 루프 응답성과 PetBridge 왕복을 실제 Electron에서 확인합니다. Windows 산출물은 `release/Workspace Setup <version>.exe`에 생성됩니다.
+## 코드 구조
 
-## 보안 및 파일 규칙
+```text
+src/
+├─ main/
+│  ├─ index.ts                    # 최소 Electron 진입점
+│  ├─ app/                        # 조립, 라우팅, 창/종료 생명주기
+│  ├─ *-controller.ts             # Electron/Workspace 조정자
+│  └─ *-service.ts, *-store.ts    # 파일·설정·상태 인프라
+├─ agent-host/                    # Utility Process, ACP Adapter, CodeEditorQueue
+├─ renderer/
+│  ├─ App.tsx                     # 편집 상태와 화면 조립
+│  ├─ components/                 # 표현 컴포넌트
+│  └─ gateway-*.ts                # WKWebView/EditorGateway 전송 계층
+├─ shared/                        # 프로세스 공통 계약과 순수 유틸리티
+└─ mocks/                         # 계약 테스트 및 ai-module 임시 구현
+```
 
-- 모든 프로젝트 경로는 `realpath`로 정규화합니다.
-- 읽기와 저장 시 루트 내부 경로인지 다시 검증하며 심볼릭 링크 이탈을 거부합니다.
-- 2MB 초과 텍스트는 읽기 전용이고 바이너리는 편집하지 않습니다.
-- 저장 시 `expectedRevision`이 현재 디스크 revision과 다르면 `file_conflict`를 반환합니다.
-- 저장 내용은 같은 디렉터리의 임시 파일에 쓴 뒤 교체합니다.
-- BrowserWindow는 `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`로 실행합니다.
-- ACP 자식 프로세스에는 필요한 최소 환경 변수만 전달합니다.
+상세 프로세스와 데이터 흐름은 [docs/architecture.md](docs/architecture.md), 이번 마무리 분석은 [docs/codebase-refactor.md](docs/codebase-refactor.md), 남은 외부 의존 작업은 [TODO.md](TODO.md)를 참고하세요.
 
-## 통합 경계
+## 핵심 보안 규칙
 
-공통 타입은 `src/shared`에 있습니다. `ports.ts`의 `AgentRuntime`, `ApprovalPort`, `SessionRouterPort`, `RunRegistryPort`가 후속 통합 지점입니다. 기획서가 권장하지만 protocol v0.5.0에 아직 없는 `state_snapshot_request`와 확장 `run_cancel`은 `protocol-extensions.ts`에 타입만 두었고 wire 전송은 비활성화했습니다. protocol 저장소의 계약이 배포된 뒤 플래그와 실제 브리지를 함께 갱신해야 합니다.
-
-자세한 구성은 [docs/architecture.md](docs/architecture.md)를 참고하세요.
+- 프로젝트 경로는 `realpath`로 정규화하고 모든 파일 요청에서 루트 포함 여부를 재검증합니다.
+- 저장은 `expectedRevision`이 현재 디스크 revision과 일치할 때만 허용합니다.
+- BrowserWindow는 `contextIsolation`, `sandbox`를 사용하고 Node 통합을 비활성화합니다.
+- Renderer와 로그에는 API 키 원문을 전달하지 않습니다.
+- 첨부 파일은 허용된 임시 디렉터리, MIME, 크기, 실제 경로를 검증합니다.
+- 현재 ACP 자식 프로세스는 cwd 경계만 사용하므로 OS 수준 파일시스템 샌드박싱은 출시 전 P1 보안 과제입니다.

@@ -79,7 +79,7 @@ protocol 저장소가 `swift/` 아래 파일을 다시 바꾸면, pet-app이 그
 3. `TOOL_REGISTRY`/`ToolTimeouts`(도구 이름, timeout, 인자 스키마)를 ai-module의 tool-use 루프가
    그대로 참조하는지, 아니면 자체 사본을 두는지 -- 자체 사본이면 pet-app과 같은 수동 동기화 문제가
    생긴다.
-4. `main/index.ts`의 `MockAgentRuntime`이 대체하고 있는 실제 `AgentRuntime`/`ApprovalPort` 포트
+4. `src/main/app/agent-runtime-coordinator.ts`의 `MockAgentRuntime`이 대체하고 있는 실제 `AgentRuntime`/`ApprovalPort` 포트
    계약(`shared/ports.ts`)과 ai-module의 실제 인터페이스가 일치하는지(W6 공통 "ai-module 인터페이스가
    현재 protocol 버전과 일치하는지 리뷰"의 실행판).
 

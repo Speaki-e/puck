@@ -1,50 +1,82 @@
 # Workspace 기술 구성
 
-## 프로세스
+## 프로세스 경계
 
 ```text
-Fallback Electron / PetAgentClient
-              │
-        Workspace Main
-        ├─ WorkspaceRegistry
-        ├─ FileService
-        ├─ PetBridge
-        ├─ SecretStore
-        └─ AgentHostController
-              │ MessagePort
-        Agent Host Utility Process
-        ├─ CodeEditorQueue
-        └─ AcpAdapter
+PetAgentClient / Fallback Electron
+              │ HTTP + WebSocket / IPC
+              ▼
+Workspace Main
+├─ app/workspace-application       composition root와 종료 처리
+├─ app/pet-bridge-router           pet-app 메시지 라우팅
+├─ app/agent-runtime-coordinator   임시 AI 실행 경계
+├─ WorkspaceRegistry / FileService
+├─ EditorGateway / PetBridge
+├─ SecretStore / SettingsStore
+└─ AgentHostController
+              │ MessagePort RPC
+              ▼
+Agent Host Utility Process
+├─ CodeEditorQueue
+├─ ACP permission bridge endpoint
+└─ AcpAdapter
               │ ACP JSON-RPC
-        Claude Agent ACP
+              ▼
+Claude Agent ACP child process
 ```
 
-Main은 Electron 생명주기, 파일 시스템, 로컬 UI와 소켓을 소유합니다. Agent Host는 ACP와 이후 `ai-module`이 Main 이벤트 루프를 막지 않도록 Utility Process에서 실행됩니다. Agent Host가 종료되면 대기 RPC를 실패시키고 1초 뒤 재시작하지만 FileService와 폴백 에디터는 유지됩니다.
+Main은 Electron 생명주기, 파일시스템, 로컬 HTTP/WebSocket, PetBridge, 암호화 저장소를 소유합니다. Agent Host는 ACP 실행을 별도 Utility Process에 격리합니다. Agent Host가 비정상 종료되면 대기 RPC와 ActiveRun을 실패 처리하고 재시작하지만 FileService와 Editor View는 유지됩니다.
+
+`src/main/index.ts`는 애플리케이션 시작과 치명적 오류 처리만 담당합니다. 실제 조립은 `src/main/app` 아래에 모아 도메인 모듈과 Electron 진입점을 분리했습니다.
+
+## 현재 AI 실행 경계
+
+기획서의 최종 구조에서는 ai-module, SessionRouter, RunRegistry가 Agent Host에 위치합니다. 현재는 배포 가능한 ai-module 태그가 없어 `app/agent-runtime-coordinator.ts`가 Main에서 다음 임시 역할을 한곳에 캡슐화합니다.
+
+- 세션 직렬화와 ActiveRun 관리
+- ai-module 승인 콜백과 ACP permission 연결
+- PetBridge agent 이벤트 정규화
+- `MockAgentRuntime` 생성
+
+실제 ai-module이 준비되면 이 모듈을 Agent Host RPC 어댑터로 치환하며, bootstrap과 PetBridge 라우터는 유지합니다.
 
 ## 파일 흐름
 
-파일을 열면 SHA-256 revision과 UTF-8 내용을 함께 반환합니다. 저장은 Renderer가 받은 revision을 `expectedRevision`으로 되돌려 보내는 낙관적 잠금 방식입니다. 외부 도구나 ACP가 먼저 파일을 바꾸면 저장을 거부하고 Editor가 내 내용 유지 또는 디스크 다시 열기를 선택하게 합니다.
+파일을 열면 SHA-256 revision과 UTF-8 내용을 반환합니다. Renderer는 저장 시 받은 revision을 `expectedRevision`으로 전달합니다. 외부 도구나 ACP가 먼저 파일을 바꾸면 저장을 거부하고, 사용자는 디스크 내용 사용·내 내용 유지·side-by-side diff 중 하나를 선택합니다.
 
-FileService는 요청 경로의 기존 부모까지 `realpath`로 확인합니다. 따라서 `..`, 절대 경로, 디렉터리 심볼릭 링크로 프로젝트 밖에 접근할 수 없습니다.
+FileService는 요청 경로의 기존 부모까지 `realpath`로 확인합니다. `..`, 절대 경로, 디렉터리 심볼릭 링크를 이용한 프로젝트 밖 접근을 차단하며, 저장은 같은 디렉터리의 임시 파일을 교체하는 방식으로 수행합니다.
+
+## Editor View
+
+Renderer는 파일 상태와 비동기 작업을 `App.tsx`에서 조정하고, 표현 책임은 `components`로 분리합니다.
+
+- `EditorSurface`: Monaco, 이미지 미리보기, 충돌 배너와 diff
+- `WorkspaceTitlebar`: 프로젝트/설정/창 제어
+- `CommandDock`: Agent 명령과 상태
+- `FileTree`, `EditorTabs`, `SettingsPanel`: 독립 화면 영역
+- `monaco-config.ts`: 공통 테마와 폰트 설정
+
+Electron 폴백 창은 preload IPC를 사용하고, WKWebView는 `gateway-transport.ts`를 사용하지만 둘 다 같은 `WorkspaceApi` 인터페이스와 Editor View 번들을 소비합니다.
 
 ## ACP 실행과 큐
 
 `CodeEditorQueue`는 워크스페이스 ID마다 별도 큐를 유지합니다. 동일 프로젝트의 쓰기 작업은 하나씩 실행하고 다른 프로젝트는 병렬 실행합니다. 대기 중 취소된 항목은 ACP로 전달하지 않으며 실행 중 취소는 `session/cancel` 후 응답이 없으면 프로세스를 종료합니다.
 
-`AcpAdapter`는 공식 `@agentclientprotocol/sdk`의 NDJSON stream을 사용합니다. 세션 업데이트를 Agent Host 이벤트로 정규화하고, 파일 워처와 실행 전후 스냅샷을 결합해 변경 파일을 수집하며, 실패 시 ACP stderr의 마지막 8KB만 결과 detail에 포함합니다.
+`AcpAdapter`는 공식 SDK의 NDJSON stream을 사용합니다. 세션 업데이트를 Agent Host 이벤트로 정규화하고, 파일 워처와 실행 전후 snapshot을 결합해 변경 파일을 수집하며, 실패 시 ACP stderr의 마지막 8KB만 detail에 포함합니다.
 
-1차 ACP 수명 주기 정책은 작업별 격리입니다. 각 `code_editor` 실행마다 프로세스와 세션을 새로 만들고 완료·취소·실패 시 즉시 종료합니다. 장기 세션 재사용보다 장애 격리와 프로젝트 간 상태 누출 방지를 우선하며, 같은 워크스페이스의 순서는 `CodeEditorQueue`가 보장합니다.
+현재 ACP 격리는 작업별 프로세스와 cwd 지정입니다. 절대경로를 통한 워크스페이스 외부 쓰기를 OS 수준에서 차단하지 못하므로 별도 샌드박싱이 필요합니다.
 
-승인 결정은 `PermissionResolver` 주입 지점입니다. 승인 브리지가 연결되기 전 기본 정책은 거부입니다.
+## PetBridge와 EditorGateway
 
-## PetBridge
+PetBridge는 연결 후 `client_hello(role="workspace")`를 전송하고 JSON Lines 분할/병합, timeout, 취소, 연결 종료 정리, 지수 backoff 재연결을 처리합니다. `app/pet-bridge-router.ts`는 메시지 해석과 application 명령 호출만 담당합니다.
 
-PetBridge는 연결 후 `client_hello(role="workspace")`를 전송합니다. JSON 한 줄이 여러 소켓 chunk로 분리되거나 여러 줄이 한 chunk로 들어와도 파싱합니다. 도구 요청은 UUID로 결과와 매칭하며 timeout·AbortSignal·연결 종료 시 정리됩니다. 재연결 간격은 1, 2, 4, 8, 16, 30초로 증가합니다.
+EditorGateway는 프로세스당 하나만 실행되며 workspace ID, token, Origin을 검증합니다. 파일 변경, ACP 업데이트, 작업 경로, Editor View 상태를 워크스페이스별 WebSocket 연결에 브로드캐스트합니다.
 
-## 후속 담당자 연결 지점
+## 구조 검증
 
-- EditorGateway는 FileService와 WorkspaceRegistry를 사용해 HTTP/WebSocket 계층을 구성합니다.
-- 실제 ai-module은 `AgentRuntime` 포트를 구현하고 Agent Host의 `runCodeEditor` 진입점에 연결합니다.
-- SessionRouter와 RunRegistry는 `workspaceId`, `sessionId`, `requestId`를 보존해 Agent Host RPC를 호출합니다.
-- 승인 브리지는 AcpAdapter의 `resolvePermission`에 연결합니다.
-- protocol 확장 메시지는 공통 protocol 릴리스 전에는 wire로 전송하지 않습니다.
+`scripts/check-architecture.mjs`는 다음을 CI에서 검사합니다.
+
+- 내부 import cycle 부재
+- shared/renderer/agent-host 계층 역참조 금지
+- Main에서 Mock 구현을 사용하는 임시 경계가 coordinator 밖으로 확산되지 않음
+- `main/index.ts`와 `renderer/App.tsx`가 다시 거대 진입 파일이 되지 않음

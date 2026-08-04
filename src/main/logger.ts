@@ -1,7 +1,21 @@
 import { appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
+import type { LogLevel } from "../shared/settings-contract.js";
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
+/**
+ * 로그에 프로젝트/첨부/소켓의 절대경로를 그대로 남기면 사용자 홈 디렉터리와 OS 사용자명이
+ * 새어나간다(공통 W7, 로그 정책 리뷰). REDACTED_KEYS는 키 이름 기준이라 `projectPath`처럼
+ * 디버깅에 값 자체가 필요한 필드는 못 가리므로, 마지막 세그먼트만 남겨 어떤 프로젝트/파일인지는
+ * 계속 구분하면서 상위 경로(홈 디렉터리 등)는 감춘다.
+ */
+export function basenameForLog(absolutePath: string): string;
+export function basenameForLog(absolutePath: string | undefined): string | undefined;
+export function basenameForLog(absolutePath: string | undefined): string | undefined {
+  if (absolutePath === undefined) return undefined;
+  return path.basename(absolutePath) || absolutePath;
+}
+
+export type { LogLevel } from "../shared/settings-contract.js";
 
 export interface LogEntry {
   ts: string;
@@ -12,12 +26,15 @@ export interface LogEntry {
 }
 
 const REDACTED_KEYS = new Set(["apiKey", "api_key", "authorization", "content", "token"]);
+const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
 export interface JsonlLoggerOptions {
   maxFileSizeBytes?: number;
   retentionDays?: number;
   maxFiles?: number;
   now?: () => Date;
+  /** 설정 화면의 "로그 수준"(W7, 김민영) -- 기본값 debug는 기존 동작(전부 기록)과 동일하다. */
+  minLevel?: LogLevel;
 }
 
 function redact(value: unknown): unknown {
@@ -31,13 +48,22 @@ function redact(value: unknown): unknown {
 export class JsonlLogger {
   private pending: Promise<void> = Promise.resolve();
   private lastCleanupDay?: string;
+  private minLevel: LogLevel;
 
   constructor(
     private readonly logDirectory: string,
     private readonly options: JsonlLoggerOptions = {},
-  ) {}
+  ) {
+    this.minLevel = options.minLevel ?? "debug";
+  }
+
+  /** 설정 화면에서 로그 수준을 바꾸면 재시작 없이 반영하기 위한 진입점. */
+  setMinLevel(level: LogLevel): void {
+    this.minLevel = level;
+  }
 
   write(level: LogLevel, kind: string, data: Record<string, unknown> = {}): Promise<void> {
+    if (LEVEL_ORDER[level] < LEVEL_ORDER[this.minLevel]) return Promise.resolve();
     const operation = this.pending.then(() => this.writeEntry(level, kind, data));
     this.pending = operation.catch(() => undefined);
     return operation;

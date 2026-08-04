@@ -10,10 +10,34 @@ import {
   type SaveFileRequest,
   type SaveFileResult,
 } from "../shared/file-contract.js";
+import { detectImageMime, IMAGE_EXTENSION_MIME } from "../shared/image-mime.js";
+import { isPathInside } from "../shared/path-containment.js";
 
 export const DEFAULT_EDITABLE_SIZE_LIMIT = 2 * 1024 * 1024;
 export const DEFAULT_IMAGE_PREVIEW_SIZE_LIMIT = 10 * 1024 * 1024;
-const DEFAULT_IGNORES = new Set([".git", "node_modules", "dist", "dist-main", "release"]);
+// 대형 프로젝트 파일 트리 성능/제외 패턴 정책(공통 W1) -- 이 에디터가 구문 강조를 지원하는
+// 언어(languageFor 참고: ts/js/py/rs/swift 등)의 표준 빌드 산출물·의존성·캐시 디렉터리를 기준으로
+// 골랐다. 자세한 근거는 docs/file-tree-performance.md 참고.
+const DEFAULT_IGNORES = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "dist-main",
+  "release",
+  ".next",
+  "build",
+  "target",
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".pytest_cache",
+  ".cache",
+  "coverage",
+  ".turbo",
+  "Pods",
+  ".build",
+  "DerivedData",
+]);
 
 function revision(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");
@@ -23,23 +47,6 @@ function isBinary(buffer: Buffer): boolean {
   const sample = buffer.subarray(0, Math.min(buffer.length, 8192));
   return sample.includes(0);
 }
-
-function imageMime(buffer: Buffer): string | undefined {
-  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
-  const header = buffer.subarray(0, 6).toString("ascii");
-  if (header === "GIF87a" || header === "GIF89a") return "image/gif";
-  if (buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
-  return undefined;
-}
-
-const IMAGE_EXTENSION_MIME = new Map([
-  [".png", "image/png"],
-  [".jpg", "image/jpeg"],
-  [".jpeg", "image/jpeg"],
-  [".gif", "image/gif"],
-  [".webp", "image/webp"],
-]);
 
 function languageFor(filePath: string): string | undefined {
   const extension = path.extname(filePath).toLowerCase();
@@ -113,7 +120,7 @@ export class FileService extends EventEmitter {
       throw new FileServiceError("file_too_large", "10MB를 초과하는 이미지는 미리 볼 수 없습니다");
     }
     const buffer = await readFile(target);
-    const detectedMime = imageMime(buffer);
+    const detectedMime = detectImageMime(buffer);
     const expectedMime = IMAGE_EXTENSION_MIME.get(path.extname(target).toLowerCase());
     if (!detectedMime || detectedMime !== expectedMime) {
       throw new FileServiceError("binary_file", "지원하는 이미지 형식과 실제 파일 내용이 일치하지 않습니다");
@@ -150,7 +157,19 @@ export class FileService extends EventEmitter {
     const temporary = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.${randomUUID()}.tmp`);
     try {
       await writeFile(temporary, next, { mode: metadata.mode });
-      await rename(temporary, target);
+      try {
+        await rename(temporary, target);
+      } catch (error) {
+        // Windows에서는 대상 파일을 다른 프로세스(예: 동시에 쓰고 있는 ACP 자식 프로세스)가 그 순간
+        // 붙잡고 있으면 rename이 EPERM/EBUSY로 거부된다(POSIX에서는 열려 있어도 rename이 그냥
+        // 성공하는 것과 다른 동작) -- revision 불일치와 마찬가지로 "디스크가 나 몰래 바뀌는 중"이라는
+        // 뜻이므로 같은 file_conflict로 정규화한다.
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "EPERM" || code === "EBUSY") {
+          throw new FileServiceError("file_conflict", "디스크 파일이 다른 프로세스에 의해 사용 중입니다");
+        }
+        throw error;
+      }
     } finally {
       await rm(temporary, { force: true }).catch(() => undefined);
     }
@@ -228,7 +247,6 @@ export class FileService extends EventEmitter {
   }
 
   private isInside(candidate: string): boolean {
-    const relative = path.relative(this.root, candidate);
-    return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+    return isPathInside(this.root, candidate);
   }
 }

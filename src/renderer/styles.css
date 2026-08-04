@@ -168,6 +168,22 @@ kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-botto
 .stop-button { display: inline-flex; height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 6px; background: #111; color: var(--body); font-size: 11px; cursor: pointer; }
 .stop-button:hover { border-color: #713838; color: #ff7770; background: #201313; }.stop-button .icon { width: 13px; height: 13px; }
 
+.settings-overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(5, 5, 5, .6); backdrop-filter: blur(2px); }
+.settings-panel { display: flex; width: min(440px, 92vw); max-height: 82vh; flex-direction: column; gap: 16px; overflow-y: auto; padding: 20px; border: 1px solid var(--hairline); border-radius: 12px; background: #101010; box-shadow: 0 24px 60px -20px rgba(0,0,0,.8); }
+.settings-panel header { display: flex; align-items: center; justify-content: space-between; }
+.settings-panel h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.settings-panel h3 { margin: 0 0 8px; color: var(--body); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.settings-panel section { border-top: 1px solid var(--hairline-soft); padding-top: 14px; }
+.settings-panel section:first-of-type { border-top: none; padding-top: 0; }
+.settings-panel input, .settings-panel select { width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 12px; }
+.settings-hint { margin: 6px 0 0; color: var(--mute); font-size: 11px; }
+.settings-row { display: flex; align-items: center; gap: 8px; }
+.settings-row input[type="range"] { flex: 1; height: auto; padding: 0; border: none; background: transparent; }
+.settings-row span { color: var(--body); font-family: "Geist Mono", monospace; font-size: 11px; white-space: nowrap; }
+.recent-projects { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.recent-projects button { display: flex; width: 100%; flex-direction: column; align-items: flex-start; gap: 2px; height: auto; padding: 8px 10px; text-align: left; }
+.recent-projects button span { color: var(--mute); font-size: 10px; }
+
 @keyframes pulse { 50% { opacity: .35; transform: scale(.75); } }
 
 @media (max-width: 980px) {

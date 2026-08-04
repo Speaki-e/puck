@@ -39,6 +39,10 @@ export class AgentHostController extends EventEmitter {
       if (event.event === "ready") {
         this.ready = true;
         this.emit("ready");
+        // spawn 시 "AI 기능 준비 중"(재시작이면 "AI 기능을 다시 시작하는 중")으로 바뀐 상태 텍스트를
+        // 정상으로 되돌린다 -- 이게 없으면 재시작 후에도 GUI가 계속 "다시 시작하는 중"에 머문다
+        // (공통 W3, Agent Host 재시작 시 GUI에 복구 상태 전달).
+        this.emit("status", "준비됨");
       }
       this.emit("event", event);
     });
@@ -93,6 +97,9 @@ export class AgentHostController extends EventEmitter {
     this.child = undefined;
     this.ready = false;
     void this.logger.write(code === 0 ? "info" : "error", "agent_host_exited", { code });
+    // SessionRouter/RunRegistry(김민영 W3/W7)가 진행 중이던 ActiveRun을 전부 실패 처리하려면
+    // 사람이 읽는 status 문자열이 아니라 명확한 이벤트가 필요해 추가했다.
+    this.emit("exited", { code, willRestart: !this.stopping });
     if (this.stopping) return;
     this.emit("status", "AI 기능을 다시 시작하는 중");
     if (this.restartTimer) clearTimeout(this.restartTimer);

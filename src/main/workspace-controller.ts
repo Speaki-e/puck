@@ -1,11 +1,12 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
+import { EventEmitter } from "node:events";
 import { FileService } from "./file-service.js";
 import { WorkspaceRegistry, type WorkspaceRecord } from "./workspace-registry.js";
 import type { SaveFileRequest } from "../shared/file-contract.js";
-import { JsonlLogger } from "./logger.js";
+import { basenameForLog, JsonlLogger } from "./logger.js";
 
-export class WorkspaceController {
+export class WorkspaceController extends EventEmitter {
   private readonly services = new Map<string, FileService>();
   private runAgent: (command: string, workspace: WorkspaceRecord) => Promise<{ requestId: string }> = async (command) => ({ requestId: `mock-${command}` });
   private cancelAgent: () => Promise<boolean> = async () => false;
@@ -13,7 +14,11 @@ export class WorkspaceController {
   constructor(
     readonly registry: WorkspaceRegistry,
     private readonly logger: JsonlLogger,
-  ) {}
+    /** 설정 화면(W7)의 파일 크기 상한을 새로 여는 FileService에 반영하기 위한 훅. */
+    private readonly getEditableSizeLimit?: () => number,
+  ) {
+    super();
+  }
 
   async initialize(projectPath?: string): Promise<void> {
     await this.registry.load();
@@ -43,6 +48,11 @@ export class WorkspaceController {
     return this.cancelAgent();
   }
 
+  /** EditorGateway(김민영 W2)가 같은 워크스페이스의 FileService 인스턴스를 재사용하기 위한 접점. */
+  getFileService(workspaceId: string): Promise<FileService> {
+    return this.service(workspaceId);
+  }
+
   installIpc(): void {
     ipcMain.handle("workspace:select-project", async () => {
       const result = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
@@ -50,6 +60,8 @@ export class WorkspaceController {
       return this.bindDefault(result.filePaths[0]);
     });
     ipcMain.handle("workspace:current", () => this.registry.get("default"));
+    // 설정 화면의 "최근 프로젝트" 목록에서 다이얼로그 없이 바로 전환하기 위한 진입점.
+    ipcMain.handle("workspace:bind-project", (_event, projectPath: string) => this.bindDefault(projectPath));
     ipcMain.handle("files:list-tree", async (_event, workspaceId: string) => (await this.service(workspaceId)).listTree());
     ipcMain.handle("files:read", async (_event, workspaceId: string, filePath: string) =>
       (await this.service(workspaceId)).readFile(filePath));
@@ -87,6 +99,7 @@ export class WorkspaceController {
     for (const channel of [
       "workspace:select-project",
       "workspace:current",
+      "workspace:bind-project",
       "files:list-tree",
       "files:read",
       "files:preview-image",
@@ -102,7 +115,10 @@ export class WorkspaceController {
     await this.services.get("default")?.close();
     this.services.delete("default");
     await this.ensureService(record);
-    await this.logger.write("info", "workspace_project_bound", { workspaceId: "default", projectPath: record.realProjectPath });
+    // 절대경로를 그대로 남기면 사용자 홈 디렉터리가 새어나간다(W7 공통 로그 정책 리뷰) -- 마지막 세그먼트만 기록.
+    await this.logger.write("info", "workspace_project_bound", { workspaceId: "default", projectPath: basenameForLog(record.realProjectPath) });
+    // EditorGateway(김민영 W4)가 editor_view_ready/unavailable을 pet-app에 보낼 수 있도록 알린다.
+    this.emit("project-bound", record);
     return record;
   }
 
@@ -116,7 +132,7 @@ export class WorkspaceController {
 
   private async ensureService(record: WorkspaceRecord): Promise<FileService> {
     if (!record.realProjectPath) throw new Error("프로젝트 경로가 없습니다");
-    const service = await FileService.create(record.realProjectPath);
+    const service = await FileService.create(record.realProjectPath, this.getEditableSizeLimit?.());
     service.on("change", (event) => this.broadcast("files:changed", event));
     await service.startWatching();
     this.services.set(record.id, service);

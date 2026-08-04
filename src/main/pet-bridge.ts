@@ -13,7 +13,7 @@ import {
   type ToolResult,
 } from "@speaki-e/protocol";
 import { JsonlParser } from "./jsonl-parser.js";
-import { JsonlLogger } from "./logger.js";
+import { basenameForLog, JsonlLogger } from "./logger.js";
 
 export interface PetBridgeOptions {
   socketPath?: string;
@@ -130,7 +130,8 @@ export class PetBridge extends EventEmitter {
       this.reconnectAttempt = 0;
       this.setState("connected");
       this.send({ type: "client_hello", role: "workspace" });
-      void this.options.logger.write("info", "pet_bridge_connected", { socketPath: this.socketPath });
+      // macOS 경로(os.homedir() 하위)는 사용자명을 포함한다(W7 공통 로그 정책 리뷰) -- 마지막 세그먼트만 기록.
+      void this.options.logger.write("info", "pet_bridge_connected", { socketPath: basenameForLog(this.socketPath) });
     });
     socket.on("data", (chunk) => this.handleData(chunk));
     socket.on("error", (error) => {

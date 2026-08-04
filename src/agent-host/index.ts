@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import type * as acp from "@agentclientprotocol/sdk";
 import type {
   AgentHostRequest,
   AgentHostResponse,
@@ -16,9 +18,8 @@ const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort
 if (!parentPort) throw new Error("Agent Host는 Electron Utility Process로 실행해야 합니다");
 
 const queue = new CodeEditorQueue();
-const adapter = new AcpAdapter({
-  onUpdate: (update) => emit("code_editor_update", JSON.parse(JSON.stringify(update)) as JSONValue),
-});
+/** permission_request의 requestId -> ACP resolvePermission을 이어서 끝낼 resolve(김민영 W5). */
+const pendingPermissions = new Map<string, (response: acp.RequestPermissionResponse) => void>();
 
 function respond(message: AgentHostResponse): void {
   parentPort!.postMessage(message);
@@ -28,6 +29,33 @@ function emit(event: AgentHostEvent["event"], payload: AgentHostEvent["payload"]
   parentPort!.postMessage({ kind: "event", event, payload } satisfies AgentHostEvent);
 }
 
+/**
+ * runCodeEditor 요청마다 새 AcpAdapter를 만든다(전에는 모듈 스코프에 하나만 있었다). CodeEditorQueue는
+ * 워크스페이스별로만 직렬화하고 서로 다른 워크스페이스는 병렬 실행하므로(4.2), 공유 인스턴스 하나로는
+ * onUpdate/resolvePermission이 "지금 이 이벤트가 어느 requestId/workspaceId 것인지" 구분할 수 없었다.
+ * 요청마다 만들면 onUpdate/resolvePermission 클로저가 자기 requestId를 들고 있어 안전하게 구분된다.
+ */
+function createAdapterFor(payload: { requestId: string; workspaceId: string; sessionId: string }): AcpAdapter {
+  return new AcpAdapter({
+    onUpdate: (update) => emit("code_editor_update", {
+      requestId: payload.requestId,
+      workspaceId: payload.workspaceId,
+      update: JSON.parse(JSON.stringify(update)),
+    } as JSONValue),
+    resolvePermission: (request) => new Promise<acp.RequestPermissionResponse>((resolve) => {
+      const permissionRequestId = randomUUID();
+      pendingPermissions.set(permissionRequestId, resolve);
+      emit("permission_request", {
+        requestId: permissionRequestId,
+        workspaceId: payload.workspaceId,
+        sessionId: payload.sessionId,
+        toolCall: JSON.parse(JSON.stringify(request.toolCall)),
+        options: JSON.parse(JSON.stringify(request.options)),
+      } as JSONValue);
+    }),
+  });
+}
+
 parentPort.on("message", async ({ data: message }) => {
   try {
     switch (message.method) {
@@ -35,6 +63,7 @@ parentPort.on("message", async ({ data: message }) => {
         respond({ kind: "response", id: message.id, ok: true, payload: { now: message.payload.now, hostNow: Date.now() } });
         break;
       case "runCodeEditor": {
+        const adapter = createAdapterFor(message.payload);
         const run = queue.enqueue({
           requestId: message.payload.requestId,
           workspaceId: message.payload.workspaceId,
@@ -60,6 +89,15 @@ parentPort.on("message", async ({ data: message }) => {
       case "cancelCodeEditor":
         respond({ kind: "response", id: message.id, ok: true, payload: { cancelled: queue.cancel(message.payload.requestId) } });
         break;
+      case "permissionResponse": {
+        const resolve = pendingPermissions.get(message.payload.requestId);
+        if (resolve) {
+          pendingPermissions.delete(message.payload.requestId);
+          resolve(message.payload.response as unknown as acp.RequestPermissionResponse);
+        }
+        respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
+        break;
+      }
       case "crashForTest":
         if (process.env.NODE_ENV !== "test") throw new Error("테스트 환경에서만 사용할 수 있습니다");
         setImmediate(() => process.exit(97));
@@ -75,6 +113,7 @@ parentPort.on("message", async ({ data: message }) => {
       }
       case "shutdown":
         queue.cancelAll();
+        pendingPermissions.clear();
         respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
         setImmediate(() => process.exit(0));
         break;

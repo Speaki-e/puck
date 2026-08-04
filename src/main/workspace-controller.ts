@@ -4,7 +4,7 @@ import { EventEmitter } from "node:events";
 import { FileService } from "./file-service.js";
 import { WorkspaceRegistry, type WorkspaceRecord } from "./workspace-registry.js";
 import type { SaveFileRequest } from "../shared/file-contract.js";
-import { JsonlLogger } from "./logger.js";
+import { basenameForLog, JsonlLogger } from "./logger.js";
 
 export class WorkspaceController extends EventEmitter {
   private readonly services = new Map<string, FileService>();
@@ -115,7 +115,8 @@ export class WorkspaceController extends EventEmitter {
     await this.services.get("default")?.close();
     this.services.delete("default");
     await this.ensureService(record);
-    await this.logger.write("info", "workspace_project_bound", { workspaceId: "default", projectPath: record.realProjectPath });
+    // 절대경로를 그대로 남기면 사용자 홈 디렉터리가 새어나간다(W7 공통 로그 정책 리뷰) -- 마지막 세그먼트만 기록.
+    await this.logger.write("info", "workspace_project_bound", { workspaceId: "default", projectPath: basenameForLog(record.realProjectPath) });
     // EditorGateway(김민영 W4)가 editor_view_ready/unavailable을 pet-app에 보낼 수 있도록 알린다.
     this.emit("project-bound", record);
     return record;

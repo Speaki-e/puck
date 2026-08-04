@@ -2,6 +2,19 @@ import { appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { LogLevel } from "../shared/settings-contract.js";
 
+/**
+ * 로그에 프로젝트/첨부/소켓의 절대경로를 그대로 남기면 사용자 홈 디렉터리와 OS 사용자명이
+ * 새어나간다(공통 W7, 로그 정책 리뷰). REDACTED_KEYS는 키 이름 기준이라 `projectPath`처럼
+ * 디버깅에 값 자체가 필요한 필드는 못 가리므로, 마지막 세그먼트만 남겨 어떤 프로젝트/파일인지는
+ * 계속 구분하면서 상위 경로(홈 디렉터리 등)는 감춘다.
+ */
+export function basenameForLog(absolutePath: string): string;
+export function basenameForLog(absolutePath: string | undefined): string | undefined;
+export function basenameForLog(absolutePath: string | undefined): string | undefined {
+  if (absolutePath === undefined) return undefined;
+  return path.basename(absolutePath) || absolutePath;
+}
+
 export type { LogLevel } from "../shared/settings-contract.js";
 
 export interface LogEntry {

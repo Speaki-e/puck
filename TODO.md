@@ -1,7 +1,7 @@
 # Workspace 전체 구현 TODO
 
 기준 문서: `plan/03_workspace.md` Workspace 개발 기획서 v2  
-최종 갱신: 2026-08-03
+최종 갱신: 2026-08-04
 
 ## 표기
 
@@ -41,9 +41,9 @@
 
 ### 공통
 
-- [ ] 저장소 간 protocol 버전 호환 매트릭스 작성
-- [ ] 잘못된 메시지, 알 수 없는 type, 누락 필드 계약 테스트
-- [ ] CI에서 typecheck → unit → E2E 순서 자동 실행
+- [x] 저장소 간 protocol 버전 호환 매트릭스 작성 (2026-08-04, 4라운드) `docs/protocol-compatibility-matrix.md` -- protocol(v0.5.0, HEAD `4244922`)·workspace(같은 커밋에 고정)·pet-app(Swift 파일 4개 수동 벤더링, diff로 스키마 동일 확인)·ai-module(코드 없음, "확인 불가"로 명시하고 코드가 생기면 다시 볼 목록 정리)까지 로컬에 체크아웃된 세 저장소를 직접 열어 확인. 코드 변경 없음
+- [x] 잘못된 메시지, 알 수 없는 type, 누락 필드 계약 테스트 (2026-08-04, 4라운드) `pet-bridge.test.ts`(깨진 JSON/알 수 없는 type/필수 필드 누락/대기 중이지 않은 tool_result 4건, 크래시 없이 로깅만 하고 다음 메시지는 정상 처리되는지까지 확인), `editor-gateway.test.ts`(형식 깨진 JSON/type 필드 누락/file:save 필수 필드 누락 3건 추가, 기존 "알 수 없는 type" 테스트와 함께 커버). 테스트를 짜다가 pet-bridge.test.ts의 mock 서버 소켓에 `data` 리스너가 없으면(paused 상태) FIN을 못 받아 `server.close()`가 영영 안 끝나는 실제 버그를 발견해 `setup()`에 `socket.resume()`을 추가해 고쳤다
+- [x] CI에서 typecheck → unit → E2E 순서 자동 실행 (2026-08-04, 4라운드) `.github/workflows/ci.yml` 신규 작성 -- `pnpm install(--frozen-lockfile)` → `pnpm typecheck` → `pnpm test` → `pnpm build` → xvfb 위에서 `pnpm test:e2e` 순서(ubuntu-latest, push to main + 모든 PR 트리거). YAML 문법은 `js-yaml`로 파싱 검증, 각 스텝 명령은 로컬에서 실제로 실행해 확인(`pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm test` 전부 통과). E2E 자체(`pnpm test:e2e`)는 이 로컬 Windows 환경의 Electron/Playwright 버전 조합 문제(`bad option: --remote-debugging-port=0`, 이번 라운드에서 추가한 테스트뿐 아니라 기존 폴백 창 테스트도 동일하게 실패 -- 사전에 있던 환경 문제)로 로컬에서 직접 실행 확인은 못 했다. ubuntu-latest CI 환경에서 실제로 통과하는지는 이 워크플로가 처음 돌 때 확인 필요
 
 **완료 기준:** 모든 Mock 사이에서 사용자 입력, 도구 요청, 승인, 취소, 완료 이벤트 왕복
 
@@ -79,7 +79,7 @@
 ### 공통
 
 - [ ] ACP와 사용자가 같은 파일을 동시에 수정하는 실제 통합 시험
-- [ ] 대규모 프로젝트 파일 트리 성능 및 제외 패턴 정책 확정
+- [x] 대규모 프로젝트 파일 트리 성능 및 제외 패턴 정책 확정 (2026-08-04, 4라운드) `docs/file-tree-performance.md` -- `DEFAULT_IGNORES`에 `.next`/`build`/`target`/`.venv`/`venv`/`__pycache__`/`.pytest_cache`/`.cache`/`coverage`/`.turbo`/`Pods`/`.build`/`DerivedData` 추가(이 에디터가 지원하는 언어의 표준 빌드/의존성/캐시 디렉터리 기준, `out`처럼 소스 폴더명으로도 흔한 이름은 의도적으로 제외). `file-service-large-tree.test.ts`로 제외 목록이 listTree/watch 양쪽에서 실제로 걸러지는지 회귀 테스트 추가. `scripts/benchmark-file-tree.mjs`로 실측(제외 적용 시 2천/2만 파일 규모에서 각각 3.9배/5.4배 빠름) -- 새 정책을 재설계하지 않고, 현재 방식이 감당 가능한 규모(수천~1만 파일대)와 그 이상일 때의 대응 방향(응답 상한, 디렉터리 단위 lazy loading, 병렬 I/O)을 문서에 정리만 해뒀다(구현 안 함)
 
 **완료 기준:** 외부 변경과 동시 수정 상황에서도 원본 손상 없이 편집·저장
 
@@ -152,7 +152,7 @@
 ### 공통
 
 - [x] 세션·워크스페이스 메타데이터 저장 형식 리뷰 (2026-08-03, 3라운드) `docs/session-workspace-metadata-review.md` -- WorkspaceRegistry(영속)/SessionRegistry(비영속) 저장 형식·책임 경계 정리, state_snapshot 작업 시작 시 바꿔야 할 것(영속화 여부, 고아 레코드 정리, 보존 정책, 스냅샷 API)과 ai-module 연결 시 바꿔야 할 것(이중 저장 방지)을 분리해 기록. 코드 변경 없음(리뷰 문서, protocol PR 전에는 형식 확정이 의미 없다고 판단)
-- [ ] Agent Host 재시작 시 GUI에 복구 상태 전달
+- [x] Agent Host 재시작 시 GUI에 복구 상태 전달 (2026-08-04, 4라운드) `agent-host-controller.ts`가 spawn 시 "AI 기능 준비 중", 비정상 종료 후 재시작 예약 시 "AI 기능을 다시 시작하는 중"까지는 이미 `App.tsx`의 상태 표시줄로 연결돼 있었는데, 재시작이 실제로 끝나는(`ready`) 시점에 정상 상태로 되돌리는 이벤트가 없어 재시작 후에도 GUI가 "다시 시작하는 중"에 계속 머무는 게 실제 갭이었다 -- `ready` 이벤트 핸들러에 `emit("status", "준비됨")`을 추가해 고쳤다. `agent-host-controller.test.ts`(electron 모듈을 목으로 대체해 spawn/ready/비정상종료/재시작 상태 전이 순서를 검증)로 단위 테스트, `tests/e2e/fallback-shell.spec.ts`에 폴백 창에서 크래시 후 상태 텍스트가 "다시 시작하는 중" → "준비됨"으로 돌아오는지 확인하는 E2E도 추가했으나 이 로컬 환경의 Electron/Playwright 버전 문제로 e2e 자체는 로컬에서 실행 확인을 못 했다(기존 e2e도 동일 문제로 실행 불가 -- 위 CI 항목 참고)
 
 **완료 기준:** Main을 막지 않고 세션 순서·병렬성·실행 상태가 정확히 유지됨
 
@@ -310,7 +310,7 @@
 - [ ] 임시 캡처 파일 삭제 책임을 pet-app과 확정 -- pet-app의 F14 드래그 캡처 자체가 아직 구현 전(02_pet-app.md에 "선택" 표기)이라 실제 삭제 시점/주체를 정할 대상이 없다. Workspace 쪽은 첨부를 읽기만 하고 지우지 않는다(검증 실패해도 파일은 그대로 둠) -- pet-app이 캡처 파일 생성 주체이므로 삭제 책임도 그쪽이 맞다고 보지만, 실제 F14 구현 시 다시 논의 필요
 - [x] Editor View 종료 전 미저장 내용 경고 (2026-08-03, 3라운드) `부분 완료`: Electron 폴백 창은 `main/index.ts`의 `createFallbackWindow`에서 `webContents.on("will-prevent-unload", ...)`을 새로 연결해 실제로 닫기를 막고 확인 대화상자를 띄우도록 고쳤다 -- 기존에는 `App.tsx`의 `beforeunload`가 `preventDefault()`를 해도 Electron이 `will-prevent-unload`를 아무도 안 들으면 그냥 닫아버리는 문제가 있었다(Electron 고유 동작, 실제로 안 막히고 있었음). WKWebView(게이트웨이 호스트) 쪽은 이 저장소에서 할 수 있는 부분(App.tsx의 표준 `beforeunload` 핸들러)은 이미 있지만, pet-app이 WKWebView를 닫을 때 실제로 확인창을 띄우려면 pet-app의 Swift `WKUIDelegate`가 beforeunload 확인 패널을 구현해야 한다 -- pet-app 쪽 작업이라 이번 라운드 범위 밖(다른 WKWebView 관련 항목들과 동일하게 cross-repo 의존)
 - [x] Editor View 임시 복구 데이터와 만료 정책 (2026-08-03, 3라운드) 점검 결과 정리는 지금까지 정리가 "같은 프로젝트를 다시 열 때"만 일어나는 lazy 방식이라, 한 번 열고 다시 열지 않은 프로젝트의 draft는 7일이 지나도 아무도 안 지우는 사각지대가 있었다 -- `src/renderer/draft-store.ts`의 `sweepExpiredDrafts()`를 앱 시작 시 한 번(App.tsx의 mount effect) 호출해 모든 `workspace:drafts:*` 키를 훑어 만료/손상 항목을 정리하도록 채웠다(`draft-store.test.ts`로 검증). 점검 중 별개로 발견한 것: EditorGateway가 포트 0(OS 임의 할당)으로 뜨기 때문에 재시작마다 origin이 바뀌어, "재시작 후에도 복구"가 필요한 시나리오(이 기능의 원래 목적)에서는 localStorage 자체에 접근할 수 없다(같은 세션 내 새로고침/재연결에는 영향 없음, `editor-gateway-reconnect.spec.ts`로 검증된 범위). 포트를 고정하려면 여러 Workspace 프로세스 동시 실행 시 포트 경합을 같이 풀어야 해서 이번 라운드에서 고치지 않고 `editor-gateway.ts`에 코멘트로 남겨뒀다 -- 별도 항목으로 다룰 것을 제안
-- [ ] 개인정보·API 키·프로젝트 경로 로그 정책 리뷰
+- [x] 개인정보·API 키·프로젝트 경로 로그 정책 리뷰 (2026-08-04, 4라운드) `docs/log-privacy-review.md` -- `logger.write(...)` 호출부 전수 확인. `REDACTED_KEYS`는 키 이름 기준이라 값 자체가 필요한 `projectPath`/`path`/`socketPath` 같은 필드의 절대경로 유출은 못 잡는다는 걸 확인하고, 실제 유출 3건(`workspace_project_bound`의 `realProjectPath`, `attachment_rejected`의 첨부 절대경로, `pet_bridge_connected`의 macOS `socketPath`)을 새로 만든 `basenameForLog()` 헬퍼(마지막 세그먼트만 기록)로 고쳤다. `logger.test.ts`에 단위 테스트 추가. 나머지(원본 그대로 남겨야 진단에 쓸모 있는 `invalid_protocol_message`의 raw value, `error.message`에 fs 경로가 섞일 수 있는 케이스들)는 범위 밖으로 판단해 문서에 근거를 적어뒀다
 
 **완료 기준:** 승인·취소·재연결·크래시 후에도 작업 상태와 파일이 일관되게 복구됨
 
@@ -344,7 +344,7 @@
 
 - [ ] PetAgentClient 종료·재실행 후 snapshot 복구 시험
 - [ ] 실제 pet-app과 잘못된 protocol 메시지 상호 운용 시험
-- [ ] 두 워크스페이스에서 ACP 병렬 작업 시험
+- [x] 두 워크스페이스에서 ACP 병렬 작업 시험 (2026-08-04, 4라운드) `code-editor-queue-acp-integration.test.ts` -- `code-editor-queue.test.ts`는 mock execute 함수로 큐 자체의 정책만 확인했었는데(W5), 실제 `CodeEditorQueue` + `AcpAdapter` + Mock ACP 자식 프로세스(`tests/fixtures/mock-acp-agent.mjs`) 조합으로 서로 다른 두 워크스페이스에 진짜 ACP 작업을 동시에 붙여 검증했다. 한 워크스페이스를 `WAIT`로 붙잡아 둔 채 다른 워크스페이스 작업이 기다리지 않고 끝나는지, 결과 파일이 각자 프로젝트 폴더에만 남는지(워크스페이스 격리) 둘 다 확인. 같은 워크스페이스 안에서는 여전히 순차 실행되는 것도 함께 검증
 - [ ] 장시간 실행·반복 재연결·메모리 누수 시험
 
 ---
@@ -401,3 +401,4 @@
 - PetAgentClient/pet-app 전체 통합
 - 첨부 파일 보안 정책 (3라운드에서 검증 로직 4건 완료, 임시 캡처 파일 삭제 책임만 pet-app의 F14 구현 이후로 남음)
 - 필수 장애 시험과 최종 인수 테스트
+- (2026-08-04, 4라운드) 외부 의존성 없이 바로 끝낼 수 있던 항목 7개 완료: pet-bridge/editor-gateway 잘못된 메시지 계약 테스트, 로그의 절대경로 유출 3건 수정(`basenameForLog`), 두 워크스페이스 ACP 병렬 통합 테스트, 파일 트리 제외 패턴 확장 및 성능 실측, Agent Host 재시작 후 GUI 상태 복구(`ready` 시 "준비됨" 재emit), CI 워크플로(`ci.yml`) 신규 작성, protocol 버전 호환 매트릭스 문서. 테스트를 짜다가 실사용에서만 드러나는 버그 2건도 발견·수정함: pet-bridge 테스트용 mock 소켓이 `data` 리스너 없이 paused 상태로 남아 `server.close()`가 안 끝나던 문제, `agent-host-controller.ts`가 재시작 완료 후에도 GUI 상태를 "다시 시작하는 중"에 방치하던 문제. 여전히 막힌 것: E2E(`pnpm test:e2e`)는 이 Windows 개발 환경의 Electron/Playwright 버전 조합 문제로 로컬 실행 확인을 못 했다(새로 만든 CI에서 처음 돌 때 검증 필요) -- 기존 e2e 테스트도 동일 환경 문제로 로컬에서 안 됨을 확인했으므로 이번에 손댄 코드 때문에 생긴 문제는 아니다

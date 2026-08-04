@@ -85,6 +85,44 @@ test("Agent Host가 반복 충돌해도 하나의 프로세스로 복구한다",
   }
 });
 
+test("Agent Host 재시작 상태가 폴백 창 GUI까지 전달되고 완료 후 정상으로 돌아온다", async () => {
+  const application = await electron.launch({
+    executablePath: electronPath,
+    args: [path.resolve(".")],
+    env: { ...process.env, NODE_ENV: "test" },
+  });
+  try {
+    const window = await application.firstWindow();
+    await window.waitForLoadState("load");
+    const statusText = window.locator(".status-text");
+    await expect(statusText).toHaveText("준비됨", { timeout: 15_000 });
+
+    const previousPid = await application.evaluate(() => (globalThis as any).__workspaceTest.agentHostPid()) as number;
+    await expect(application.evaluate(() => (globalThis as any).__workspaceTest.crashAgentHost())).resolves.toBe(true);
+
+    // 재시작되는 동안 GUI에 "재연결 중"에 해당하는 상태가 보여야 한다(agent-host-controller.ts의
+    // "AI 기능을 다시 시작하는 중").
+    await expect(statusText).toHaveText("AI 기능을 다시 시작하는 중", { timeout: 10_000 });
+
+    // 재시작이 끝나면(ready) 다시 "준비됨"으로 돌아오고, 새 Agent Host pid로 정상 요청도 된다.
+    await expect(statusText).toHaveText("준비됨", { timeout: 10_000 });
+    await expect.poll(
+      () => application.evaluate(async () => {
+        try {
+          const hook = (globalThis as any).__workspaceTest;
+          await hook.pingAgentHost();
+          return hook.agentHostPid();
+        } catch {
+          return undefined;
+        }
+      }).then((pid) => typeof pid === "number" && pid !== previousPid),
+      { timeout: 10_000 },
+    ).toBe(true);
+  } finally {
+    await application.close();
+  }
+});
+
 test("Agent Host가 CPU 작업 중이어도 Main 이벤트 루프는 응답한다", async () => {
   const application = await electron.launch({
     executablePath: electronPath,

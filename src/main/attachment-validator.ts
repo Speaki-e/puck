@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Attachment } from "@speaki-e/protocol";
 import { detectImageMime, IMAGE_EXTENSION_MIME } from "../shared/image-mime.js";
 import { isPathInsideAny } from "../shared/path-containment.js";
-import type { JsonlLogger } from "./logger.js";
+import { basenameForLog, type JsonlLogger } from "./logger.js";
 
 export type AttachmentErrorCode =
   | "invalid_attachment"
@@ -114,7 +114,12 @@ export async function filterValidAttachments(
       kept.push({ ...attachment, path: validated.path });
     } catch (error) {
       if (!(error instanceof AttachmentValidationError)) throw error;
-      await logger.write("warn", "attachment_rejected", { code: error.code, path: attachment?.path });
+      // 첨부 절대경로는 OS 임시 디렉터리·사용자 홈 디렉터리를 포함해 사용자명이 새어나간다
+      // (W7 공통 로그 정책 리뷰) -- 마지막 세그먼트만 기록.
+      await logger.write("warn", "attachment_rejected", {
+        code: error.code,
+        path: typeof attachment?.path === "string" ? basenameForLog(attachment.path) : undefined,
+      });
     }
   }
   return kept;

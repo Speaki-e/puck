@@ -226,4 +226,53 @@ describe("EditorGateway", () => {
     expect(opened).toMatchObject({ type: "editor:open-tab", payload: { path: "main.ts" } });
     connection.socket.close();
   });
+
+  it("형식이 깨진 JSON 메시지를 받아도 크래시 없이 error로 응답하고 연결을 유지한다", async () => {
+    const { gateway } = await setup();
+    const token = tokenFromUrl(gateway.url("default"));
+    const connection = await connect(gateway, "default", token);
+
+    connection.socket.send("{ this is not json");
+    const response = await connection.next();
+    expect(response.type).toBe("error");
+    expect((response.payload as { code: string }).code).toBe("invalid_message");
+
+    // 연결은 계속 살아 있어 이어서 정상 요청을 처리한다.
+    const tree = await requestOnce(connection, { requestId: "after-bad-json", workspaceId: "default", type: "file:list-tree", payload: null });
+    expect(tree.requestId).toBe("after-bad-json");
+    connection.socket.close();
+  });
+
+  it("type 필드가 없는 메시지를 받아도 크래시 없이 error로 응답한다", async () => {
+    const { gateway } = await setup();
+    const token = tokenFromUrl(gateway.url("default"));
+    const connection = await connect(gateway, "default", token);
+
+    connection.socket.send(JSON.stringify({ requestId: "no-type", workspaceId: "default", payload: null }));
+    const response = await connection.next();
+    expect(response.type).toBe("error");
+    expect((response.payload as { code: string }).code).toBe("invalid_message");
+    connection.socket.close();
+  });
+
+  it("file:save에 필수 필드가 누락되면 크래시 없이 invalid_request로 응답한다", async () => {
+    const { gateway } = await setup();
+    const token = tokenFromUrl(gateway.url("default"));
+    const connection = await connect(gateway, "default", token);
+
+    // content/expectedRevision이 빠져 있다.
+    const response = await requestOnce(connection, {
+      requestId: "bad-save",
+      workspaceId: "default",
+      type: "file:save",
+      payload: { path: "main.ts" },
+    });
+    expect(response.type).toBe("error");
+    expect((response.payload as { code: string }).code).toBe("invalid_request");
+
+    // 연결은 계속 살아 있어 이어서 정상 요청을 처리한다.
+    const tree = await requestOnce(connection, { requestId: "after-bad-save", workspaceId: "default", type: "file:list-tree", payload: null });
+    expect(tree.requestId).toBe("after-bad-save");
+    connection.socket.close();
+  });
 });

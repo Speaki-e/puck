@@ -15,7 +15,29 @@ import { isPathInside } from "../shared/path-containment.js";
 
 export const DEFAULT_EDITABLE_SIZE_LIMIT = 2 * 1024 * 1024;
 export const DEFAULT_IMAGE_PREVIEW_SIZE_LIMIT = 10 * 1024 * 1024;
-const DEFAULT_IGNORES = new Set([".git", "node_modules", "dist", "dist-main", "release"]);
+// 대형 프로젝트 파일 트리 성능/제외 패턴 정책(공통 W1) -- 이 에디터가 구문 강조를 지원하는
+// 언어(languageFor 참고: ts/js/py/rs/swift 등)의 표준 빌드 산출물·의존성·캐시 디렉터리를 기준으로
+// 골랐다. 자세한 근거는 docs/file-tree-performance.md 참고.
+const DEFAULT_IGNORES = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "dist-main",
+  "release",
+  ".next",
+  "build",
+  "target",
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".pytest_cache",
+  ".cache",
+  "coverage",
+  ".turbo",
+  "Pods",
+  ".build",
+  "DerivedData",
+]);
 
 function revision(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: typecheck → unit → e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests (vitest)
+        run: pnpm test
+
+      # Electron(Chromium 기반)이 리눅스에서 뜨려면 Playwright가 관리하는 브라우저용 공유
+      # 라이브러리(libgtk, libnss3, libasound2 등)가 필요하다 -- Electron은 별도 브라우저
+      # 바이너리를 받지 않으므로(자체 내장) `install-deps`만 실행하고 브라우저 다운로드는 생략한다.
+      - name: Install Playwright OS dependencies
+        run: pnpm exec playwright install-deps
+
+      # ubuntu-latest 러너 이미지에 xvfb가 항상 들어있다고 보장할 수 없어 명시적으로 설치한다
+      # (이미 있으면 apt가 그냥 스킵한다).
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Build (renderer + main + agent-host)
+        run: pnpm build
+
+      # E2E는 실제 Electron 창을 띄우므로 GitHub Actions의 헤드리스 러너에는 디스플레이가 없다 --
+      # xvfb로 가상 디스플레이를 만들어준다(macOS/Windows 러너에는 필요 없지만 이 워크플로는
+      # ubuntu-latest만 쓴다).
+      - name: E2E tests (Playwright + Electron, via xvfb)
+        run: xvfb-run --auto-servernum -- pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

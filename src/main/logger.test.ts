@@ -2,7 +2,7 @@ import { access, mkdtemp, readFile, readdir, utimes, writeFile } from "node:fs/p
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { JsonlLogger } from "./logger.js";
+import { basenameForLog, JsonlLogger } from "./logger.js";
 
 describe("JsonlLogger", () => {
   it("민감한 값과 파일 내용을 마스킹한다", async () => {
@@ -62,5 +62,14 @@ describe("JsonlLogger", () => {
     const output = await readFile(file, "utf8");
     expect(output).not.toContain("still-ignored");
     expect(output).toContain("kept");
+  });
+
+  it("basenameForLog는 절대경로에서 사용자 홈 디렉터리를 감추고 마지막 세그먼트만 남긴다", () => {
+    const projectPath = path.join(os.homedir(), "projects", "my-app");
+    expect(basenameForLog(projectPath)).toBe("my-app");
+    expect(basenameForLog(projectPath)).not.toContain(os.homedir());
+
+    const attachmentPath = path.join(os.tmpdir(), "attachments", "capture.png");
+    expect(basenameForLog(attachmentPath)).toBe("capture.png");
   });
 });

@@ -26,6 +26,14 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # package.json이 private 저장소인 protocol을 git 의존성(특정 커밋 고정)으로 참조한다.
+      # 로컬에서는 개발자 계정의 git 자격증명이 이미 접근 권한을 갖고 있어 조용히 되지만, CI
+      # 러너는 매번 새 환경이라 별도 인증 없이는 fetch가 "could not read Username" 에러로
+      # 실패한다. PROTOCOL_PAT은 최소한 Speaki-e/protocol에 대한 읽기 권한만 있는 PAT을
+      # 저장소 Settings > Secrets and variables > Actions에 등록해야 한다.
+      - name: Configure git credentials for private git dependency (protocol)
+        run: git config --global url."https://x-access-token:${{ secrets.PROTOCOL_PAT }}@github.com/".insteadOf "https://github.com/"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

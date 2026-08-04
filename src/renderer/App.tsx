@@ -1,12 +1,15 @@
-import Editor, { DiffEditor, type BeforeMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { FileTreeEntry } from "../shared/file-contract";
-import { FileTree } from "./components/FileTree";
+import { CommandDock } from "./components/CommandDock";
+import { EditorSurface } from "./components/EditorSurface";
 import { EditorTabs } from "./components/EditorTabs";
+import { FileTree } from "./components/FileTree";
+import { Icon } from "./components/Icon";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { WorkspaceTitlebar } from "./components/WorkspaceTitlebar";
+import { DRAFT_TTL_MS, draftKey, readDraft, removeDraft, type StoredDrafts, sweepExpiredDrafts } from "./draft-store";
 import { editorReducer, isDirty } from "./editor-state";
 import type { RendererWorkspaceRecord } from "./workspace-api";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { DRAFT_TTL_MS, draftKey, readDraft, removeDraft, type StoredDrafts, sweepExpiredDrafts } from "./draft-store";
 
 const initialState = { tabs: [] };
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
@@ -14,47 +17,6 @@ const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
 function isImagePath(filePath: string): boolean {
   return IMAGE_EXTENSIONS.has(filePath.split(".").at(-1)?.toLowerCase() ?? "");
 }
-
-function Icon({ name }: { name: "folder" | "save" | "play" | "stop" | "sparkle" | "branch" | "gear" }) {
-  const paths = {
-    folder: <><path d="M3 5.5h5l1.5 2H21v10.5a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z" /><path d="M1.5 9h20" /></>,
-    save: <><path d="M4 3h13l3 3v15H4z" /><path d="M8 3v6h8V3M8 21v-7h8v7" /></>,
-    play: <path d="m8 5 11 7-11 7Z" />,
-    stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
-    sparkle: <><path d="m12 2 1.3 4.2A6 6 0 0 0 17.8 11L22 12l-4.2 1.3a6 6 0 0 0-4.5 4.5L12 22l-1.3-4.2a6 6 0 0 0-4.5-4.5L2 12l4.2-1.3a6 6 0 0 0 4.5-4.5Z" /></>,
-    branch: <><circle cx="6" cy="5" r="2" /><circle cx="18" cy="6" r="2" /><circle cx="6" cy="19" r="2" /><path d="M6 7v10M8 8c2 5 8 1 8-1" /></>,
-    gear: <><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" /></>,
-  };
-  return <svg className="icon" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
-}
-
-const configureMonaco: BeforeMount = (monaco) => {
-  monaco.editor.defineTheme("workspace-dark", {
-    base: "vs-dark",
-    inherit: true,
-    rules: [
-      { token: "comment", foreground: "737373", fontStyle: "italic" },
-      { token: "keyword", foreground: "C084FC" },
-      { token: "string", foreground: "7DD3FC" },
-      { token: "number", foreground: "FBBF24" },
-      { token: "type", foreground: "60A5FA" },
-    ],
-    colors: {
-      "editor.background": "#101010",
-      "editor.foreground": "#e7e7e7",
-      "editorLineNumber.foreground": "#4f4f4f",
-      "editorLineNumber.activeForeground": "#a3a3a3",
-      "editor.lineHighlightBackground": "#151515",
-      "editor.selectionBackground": "#173f70",
-      "editor.inactiveSelectionBackground": "#182c43",
-      "editorIndentGuide.background1": "#252525",
-      "editorIndentGuide.activeBackground1": "#404040",
-      "editorCursor.foreground": "#f5f5f5",
-      "editorWhitespace.foreground": "#292929",
-      "editorGutter.background": "#101010",
-    },
-  });
-};
 
 export function App() {
   const api = window.workspace;
@@ -310,47 +272,18 @@ export function App() {
   };
 
   const title = useMemo(() => workspace?.projectPath?.split(/[\\/]/).at(-1) ?? "Workspace", [workspace]);
-  const breadcrumbs = active?.path.split("/") ?? [];
   const dirtyCount = state.tabs.filter(isDirty).length;
 
   return (
     <main className="workspace-shell">
-      <header className="titlebar">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none">
-              <circle cx="6" cy="7" r="2.25" />
-              <circle cx="18" cy="7" r="2.25" />
-              <circle cx="12" cy="17" r="2.25" />
-              <path d="M8 8.2 10.8 15M16 8.2 13.2 15M8.2 7h7.6" />
-            </svg>
-          </span>
-          <span className="brand-name">Workspace</span>
-          <span className="alpha-badge">ALPHA</span>
-        </div>
-        <div className="project-identity" title={workspace?.projectPath}>
-          <span className={`project-dot ${workspace ? "connected" : ""}`} />
-          <strong>{title}</strong>
-          <span className="project-path">{workspace?.projectPath ?? "프로젝트가 연결되지 않음"}</span>
-        </div>
-        <div className="titlebar-actions">
-          <button type="button" className="button-ghost project-button" onClick={() => void openProject()}>
-            <Icon name="folder" /> 프로젝트 열기
-          </button>
-          {api?.getSettings && (
-            <button type="button" className="button-ghost" onClick={() => setSettingsOpen(true)} aria-label="설정">
-              <Icon name="gear" />
-            </button>
-          )}
-          {api?.platform === "win32" && (
-            <div className="window-actions" aria-label="창 제어">
-              <button type="button" onClick={() => void api.windowControl("minimize")} aria-label="창 최소화"><span className="minimize-symbol" /></button>
-              <button type="button" onClick={() => void api.windowControl("maximize")} aria-label="창 최대화"><span className="maximize-symbol" /></button>
-              <button type="button" className="window-close" onClick={() => void api.windowControl("close")} aria-label="창 닫기"><span className="close-symbol" /></button>
-            </div>
-          )}
-        </div>
-      </header>
+      <WorkspaceTitlebar
+        api={api}
+        title={title}
+        projectPath={workspace?.projectPath}
+        connected={Boolean(workspace)}
+        onOpenProject={() => void openProject()}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
 
       <section className="editor-layout">
         <aside className="sidebar">
@@ -381,141 +314,31 @@ export function App() {
             }}
           />
 
-          <div className="editor-toolbar">
-            <nav className="breadcrumbs" aria-label="현재 파일 경로">
-              {breadcrumbs.length ? breadcrumbs.map((part, index) => (
-                <span key={`${part}-${index}`} className={index === breadcrumbs.length - 1 ? "current" : ""}>
-                  {part}{index < breadcrumbs.length - 1 && <b>/</b>}
-                </span>
-              )) : <span className="muted">파일을 선택하세요</span>}
-            </nav>
-            {active && <span className="language-badge">{active.language}</span>}
-            {active?.readOnly && <span className="readonly-badge">READ ONLY</span>}
-            <button
-              type="button"
-              className="button-ghost save-button"
-              onClick={() => void saveActive()}
-              disabled={!active || active.readOnly || !isDirty(active)}
-              title="저장 (Ctrl/Cmd + S)"
-            >
-              <Icon name="save" /> 저장
-            </button>
-          </div>
-
-          <div className="editor-stage">
-            {active ? (
-              <>
-                {active.diskChanged && (
-                  <div className="conflict-banner" role="alert">
-                    <div className="conflict-symbol">!</div>
-                    <div className="conflict-copy">
-                      <strong>디스크에서 파일이 변경됐습니다</strong>
-                      <span>저장하기 전에 사용할 버전을 선택하세요.</span>
-                    </div>
-                    {!active.previewUrl && (
-                      <button
-                        type="button"
-                        className="button-ghost"
-                        onClick={() => (diffAgainstDisk === undefined ? void showDiffAgainstDisk() : setDiffAgainstDisk(undefined))}
-                      >
-                        {diffAgainstDisk === undefined ? "diff 비교" : "diff 닫기"}
-                      </button>
-                    )}
-                    <button type="button" className="button-ghost" onClick={() => void reloadActive()}>디스크 내용 사용</button>
-                    <button type="button" className="button-primary-small" onClick={() => void keepActiveMine()}>내 내용 유지</button>
-                  </div>
-                )}
-                {active.previewUrl ? (
-                  <div className="image-preview">
-                    <div className="image-preview-canvas">
-                      <img src={active.previewUrl} alt={active.path.split("/").at(-1)} />
-                    </div>
-                    <div className="image-metadata">
-                      <strong>{active.path.split("/").at(-1)}</strong>
-                      <span>{active.mimeType}</span>
-                      <span>{Math.max(1, Math.round(active.size / 1024))} KB</span>
-                    </div>
-                  </div>
-                ) : diffAgainstDisk !== undefined ? (
-                  <DiffEditor
-                    original={diffAgainstDisk}
-                    modified={active.content}
-                    language={active.language}
-                    theme="workspace-dark"
-                    beforeMount={configureMonaco}
-                    options={{
-                      readOnly: true,
-                      renderSideBySide: true,
-                      automaticLayout: true,
-                      fontFamily: "'Geist Mono', 'SFMono-Regular', Consolas, monospace",
-                      fontSize: 13,
-                    }}
-                  />
-                ) : <Editor
-                  path={active.path}
-                  value={active.content}
-                  language={active.language}
-                  theme="workspace-dark"
-                  beforeMount={configureMonaco}
-                  onChange={(value) => dispatch({ type: "edit", path: active.path, content: value ?? "" })}
-                  options={{
-                    readOnly: active.readOnly,
-                    automaticLayout: true,
-                    minimap: { enabled: true, renderCharacters: false, maxColumn: 90, scale: 0.8 },
-                    fontFamily: "'Geist Mono', 'SFMono-Regular', Consolas, monospace",
-                    fontSize: 13,
-                    lineHeight: 21,
-                    fontLigatures: true,
-                    padding: { top: 20, bottom: 20 },
-                    scrollBeyondLastLine: false,
-                    smoothScrolling: true,
-                    cursorSmoothCaretAnimation: "on",
-                    bracketPairColorization: { enabled: true },
-                    guides: { bracketPairs: true, indentation: true },
-                    renderLineHighlight: "all",
-                    overviewRulerBorder: false,
-                  }}
-                />}
-              </>
-            ) : (
-              <div className="empty-editor">
-                <div className="mesh-orb" aria-hidden><span /><span /><span /></div>
-                <span className="eyebrow">LIGHTWEIGHT CODE WORKSPACE</span>
-                <h1>프로젝트를 열고,<br />아이디어를 코드로 만드세요.</h1>
-                <p>왼쪽 탐색기에서 파일을 선택하거나 Agent에게<br />원하는 변경을 자연어로 요청할 수 있습니다.</p>
-                <div className="empty-actions">
-                  <button type="button" className="button-primary" onClick={() => void openProject()}><Icon name="folder" /> 프로젝트 열기</button>
-                  <span><kbd>Ctrl</kbd><b>+</b><kbd>S</kbd> 빠른 저장</span>
-                </div>
-              </div>
+          <EditorSurface
+            active={active}
+            diffAgainstDisk={diffAgainstDisk}
+            onEdit={(content) => active && dispatch({ type: "edit", path: active.path, content })}
+            onSave={() => void saveActive()}
+            onToggleDiff={() => (
+              diffAgainstDisk === undefined
+                ? void showDiffAgainstDisk()
+                : setDiffAgainstDisk(undefined)
             )}
-          </div>
+            onReload={() => void reloadActive()}
+            onKeepMine={() => void keepActiveMine()}
+            onOpenProject={() => void openProject()}
+          />
         </section>
       </section>
 
-      <footer className="command-dock">
-        <div className="status-block">
-          <span className="status-pulse" />
-          <div>
-            <span className="eyebrow">STATUS</span>
-            <span className="status-text" aria-label="현재 상태">{status}</span>
-          </div>
-        </div>
-        <div className="command-composer">
-          <span className="composer-icon"><Icon name="sparkle" /></span>
-          <input
-            value={command}
-            onChange={(event) => setCommand(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") void runCommand(); }}
-            placeholder={workspace ? "Agent에게 코드 작업을 요청하세요…" : "먼저 프로젝트를 열어주세요"}
-            aria-label="에이전트 명령"
-            disabled={!workspace}
-          />
-          <span className="enter-hint">ENTER</span>
-          <button type="button" className="run-button" onClick={() => void runCommand()} disabled={!workspace || !command.trim()} aria-label="명령 실행"><Icon name="play" /></button>
-        </div>
-        <button type="button" className="stop-button" onClick={() => void api?.cancelCommand()}><Icon name="stop" /> 중지</button>
-      </footer>
+      <CommandDock
+        status={status}
+        command={command}
+        enabled={Boolean(workspace)}
+        onCommandChange={setCommand}
+        onRun={() => void runCommand()}
+        onCancel={() => void api?.cancelCommand()}
+      />
       {settingsOpen && api && (
         <SettingsPanel api={api} onClose={() => setSettingsOpen(false)} onProjectSelected={(path) => void switchToRecentProject(path)} />
       )}

@@ -78,7 +78,7 @@
 
 ### 공통
 
-- [ ] ACP와 사용자가 같은 파일을 동시에 수정하는 실제 통합 시험
+- [x] ACP와 사용자가 같은 파일을 동시에 수정하는 실제 통합 시험 (2026-08-04, 5라운드) `src/agent-host/acp-user-concurrent-edit.test.ts` -- Mock ACP 자식 프로세스(FileService를 거치지 않고 직접 파일에 쓴다, 실제 ACP처럼)와 FileService.saveFile(revision 검사 + 임시 파일 후 rename, 기존 구현 그대로 사용, 새 잠금 메커니즘 없음)이 같은 파일을 두고 부딪히는 세 시나리오 검증: (1) 사용자 저장 성공 후 ACP가 덮어쓰면 디스크는 ACP 내용 그대로이고 FileService의 chokidar watcher가 change 이벤트를 실제로 발생시킨다(EditorGateway가 이걸 file:changed로 브로드캐스트하는 배선은 W2에서 이미 검증됨), (2) ACP가 먼저 쓴 뒤 사용자가 낡은 revision으로 저장을 시도하면 file_conflict로 막히고 ACP 내용이 보존된다, (3) `Promise.all`로 진짜 동시에 부딪혀도 최종 디스크 내용이 항상 완전한 값이고(부분/혼합 내용 없음) 폴링 중 관측되는 값도 완전한 값이거나 ACP 자체의 truncate+write 순간의 빈 문자열(우리 쪽 결함이 아니라 원자적 저장을 거치지 않는 외부 프로세스 특유의 현상)뿐이다. 테스트를 짜다가 실제 버그를 하나 발견해 고쳤다 -- Windows에서 `rename(temporary, target)`이 다른 프로세스가 그 순간 대상 파일을 쓰고 있으면 `file_conflict`가 아니라 raw `EPERM`을 그대로 던졌다(5번 중 2번꼴로 재현). `file-service.ts`의 saveFile에 EPERM/EBUSY를 file_conflict로 정규화하는 코드를 추가해 고쳤다(새 잠금 메커니즘이 아니라 기존 에러 코드 체계에 케이스 하나 추가하는 수준의 수정, 원 소유자 이주한의 파일이라 수정 전 사용자에게 확인받음)
 - [x] 대규모 프로젝트 파일 트리 성능 및 제외 패턴 정책 확정 (2026-08-04, 4라운드) `docs/file-tree-performance.md` -- `DEFAULT_IGNORES`에 `.next`/`build`/`target`/`.venv`/`venv`/`__pycache__`/`.pytest_cache`/`.cache`/`coverage`/`.turbo`/`Pods`/`.build`/`DerivedData` 추가(이 에디터가 지원하는 언어의 표준 빌드/의존성/캐시 디렉터리 기준, `out`처럼 소스 폴더명으로도 흔한 이름은 의도적으로 제외). `file-service-large-tree.test.ts`로 제외 목록이 listTree/watch 양쪽에서 실제로 걸러지는지 회귀 테스트 추가. `scripts/benchmark-file-tree.mjs`로 실측(제외 적용 시 2천/2만 파일 규모에서 각각 3.9배/5.4배 빠름) -- 새 정책을 재설계하지 않고, 현재 방식이 감당 가능한 규모(수천~1만 파일대)와 그 이상일 때의 대응 방향(응답 상한, 디렉터리 단위 lazy loading, 병렬 I/O)을 문서에 정리만 해뒀다(구현 안 함)
 
 **완료 기준:** 외부 변경과 동시 수정 상황에서도 원본 손상 없이 편집·저장
@@ -224,8 +224,9 @@
 
 ### 공통
 
-- [ ] ACP가 사용할 수 있는 경로가 WorkspaceRegistry 경로와 일치하는지 통합 검증
-- [ ] 모델이 전달한 `project_path`를 무시하는 보안 테스트
+- [x] ACP가 사용할 수 있는 경로가 WorkspaceRegistry 경로와 일치하는지 통합 검증 (2026-08-04, 5라운드) `src/agent-host/acp-workspace-path-boundary.test.ts` -- W6의 "세션 workspace를 기준으로 실제 project path 강제"(이미 완료)는 Main 프로세스 tool-executor 레이어에서 모델이 보낸 project_path를 무시하고 `workspace.realProjectPath`를 쓴다는 걸 단위 테스트로 확인할 뿐이라 겹치지 않는다고 판단했다 -- 여기서는 그 값이 실제로 `AcpAdapter`의 `spawn(..., {cwd})`까지, 즉 자식 프로세스 레벨까지 그대로 전달되는지를 확인한다. 실제 `WorkspaceRegistry`로 워크스페이스를 만들고 그 `realProjectPath`를 `AcpAdapter.run`에 넘겨 spawn에 전달된 cwd가 정확히 일치하는지(spy) + Mock ACP가 그 cwd 기준으로 쓴 결과물이 실제로 그 경로 밑에 나타나는지 이중으로 확인. 두 번째 테스트로 워크스페이스 경계 밖 절대경로 쓰기 시도(Mock ACP에 `ESCAPE:<path>` 시나리오 추가, `tests/fixtures/mock-acp-agent.mjs`)도 검증 -- **중요한 갭 발견**: `AcpAdapter`는 spawn에 cwd만 지정할 뿐 OS 수준 샌드박싱이 전혀 없어서, 절대경로 쓰기 자체는 실제로 성공한다(파일이 워크스페이스 밖에 진짜로 생긴다). `changedFiles` 결과 목록에는 `relativeProjectPath`가 걸러내 안 잡히므로(결과가 새지 않는다는 것까지는 확인됨) 이번 항목의 완료 기준은 충족하지만, "차단"까지는 안 된다는 걸 별도 항목으로 아래 남긴다(사용자 확인받음, TODO.md 신규 항목 참고)
+- [x] 모델이 전달한 `project_path`를 무시하는 보안 테스트 -- 이미 커버됨. W6의 "세션 workspace를 기준으로 실제 project path 강제"(`tool-executors.test.ts`, `deps.projectPath`만 쓰고 args의 project_path는 절대 안 씀)가 정확히 이 항목이다. 같은 걸 두 섹션에 중복 기재해뒀던 것으로 보여 정리만 함(2026-08-04, 5라운드)
+- [ ] **신규(2026-08-04, 5라운드)** ACP 자식 프로세스에 실제 파일시스템 샌드박싱(예: 플랫폼별 제한된 토큰/chroot 유사 기법, 또는 최소한 쓰기 대상 경로를 워크스페이스 안으로 검증하는 프록시) 적용 -- 지금은 cwd 지정이 전부라 오작동하거나 악의적인 ACP가 절대경로로 워크스페이스 밖에 실제로 쓸 수 있다(위 항목의 `acp-workspace-path-boundary.test.ts`가 이 갭을 그대로 보여줌). 결과 보고(changedFiles)만 새지 않을 뿐 파일 시스템 쓰기 자체는 막지 못한다. 실제 Claude Agent ACP가 이 정도 자유도로 동작하는 게 맞는지, 막아야 한다면 어느 레이어(Agent Host? OS?)에서 막을지부터 논의 필요 -- 이번 라운드 범위 밖(발견만 하고 사용자 확인 받아 새 항목으로 분리)
 
 **완료 기준:** 실제 자연어 명령으로 프로젝트 파일 수정, 결과 요약, 변경 목록, 취소 성공
 
@@ -345,7 +346,7 @@
 - [ ] PetAgentClient 종료·재실행 후 snapshot 복구 시험
 - [ ] 실제 pet-app과 잘못된 protocol 메시지 상호 운용 시험
 - [x] 두 워크스페이스에서 ACP 병렬 작업 시험 (2026-08-04, 4라운드) `code-editor-queue-acp-integration.test.ts` -- `code-editor-queue.test.ts`는 mock execute 함수로 큐 자체의 정책만 확인했었는데(W5), 실제 `CodeEditorQueue` + `AcpAdapter` + Mock ACP 자식 프로세스(`tests/fixtures/mock-acp-agent.mjs`) 조합으로 서로 다른 두 워크스페이스에 진짜 ACP 작업을 동시에 붙여 검증했다. 한 워크스페이스를 `WAIT`로 붙잡아 둔 채 다른 워크스페이스 작업이 기다리지 않고 끝나는지, 결과 파일이 각자 프로젝트 폴더에만 남는지(워크스페이스 격리) 둘 다 확인. 같은 워크스페이스 안에서는 여전히 순차 실행되는 것도 함께 검증
-- [ ] 장시간 실행·반복 재연결·메모리 누수 시험
+- [x] 장시간 실행·반복 재연결·메모리 누수 시험 (2026-08-04, 5라운드) `src/main/editor-gateway-connection-churn.test.ts` -- EditorGateway WebSocket을 300회 연결·해제 반복하며 매 반복마다 서버 쪽 연결 목록(`state.connections`)이 정확히 0으로 돌아오는지 확인(관측을 위해 `EditorGateway.connectionCount()` 최소 접근자 추가, `CodeEditorQueue.position()`과 같은 기존 관측용 공개 메서드 패턴). heap은 50회마다 샘플링해 반복 횟수에 비례해 계속 자라지 않는지 널널한 임계값으로 스모크 체크(정밀 프로파일링 도구는 새로 안 씀). `pending-approval-store`/`run-registry`/`session-registry`는 EditorGateway의 WS 연결·해제와 코드상 연동돼 있지 않아(`editor-gateway.ts`의 `handleConnection`/`forget`이 건드리는 건 워크스페이스별 connections Set뿐) 이번 시험 범위에서 제외함(사용자 확인받음) -- 세 registry는 PetBridge/AgentHost/승인 흐름에 연결돼 있고 그 경로들은 이미 `petbridge-approval-integration.test.ts`(W7) 등 다른 시험으로 커버돼 있음
 
 ---
 
@@ -393,7 +394,8 @@
 - (2026-08-02, P0) EditorGateway, SessionRouter/RunRegistry, 도구 3종(petAppProxy/editorLocal), 승인·취소 브리지는 포트 계약대로 구현·테스트 완료. 실제 ai-module 태그가 나오면 `main/index.ts`의 `MockAgentRuntime` 한 줄만 교체하면 되도록 배선해둠
 - (2026-08-03, 2라운드) Editor View 재연결 탭 복원(App.tsx 연동 + E2E), 파일 충돌 diff 화면과 `내 내용 유지`의 revision 갱신 버그 수정, `workspace_create_request`/`session_create_request` 처리, 설정 화면(API 키/모델/최근 프로젝트/파일 제한/로그 수준), 승인-PetBridge 연결 종료 통합 시험, Mock EditorGateway 클라이언트 독립 모듈화까지 완료. 이 라운드에서 EditorGateway의 asset 401 버그와 `keepMine` revision 버그 등 실사용 시나리오(E2E)로만 드러나는 결함 두 건을 추가로 발견·수정함
 - (2026-08-03, 3라운드) 첨부 파일 보안 정책 4건(확장자/MIME/크기/존재/경로/심볼릭 링크, `attachment-validator.ts` + 단위 테스트, `main/index.ts` 배선), `editor_view_ready`/`unavailable` 계약 E2E, 두 워크스페이스 WebSocket 격리 단위 테스트, Electron 폴백 창 미저장 경고(`will-prevent-unload` 연결 -- 기존엔 안 막히고 있던 버그), draft 만료 데이터 시작 시 sweep, 세션·워크스페이스 메타데이터 리뷰 문서까지 완료. 이 라운드에서 Mock EditorGateway 클라이언트의 타임아웃 waiter 누수 버그(`next()`가 타임아웃 후에도 waiter를 안 지워 다음 메시지를 삼킴)를 격리 테스트 작성 중 발견·수정함
-- 남은 것: 실제 ai-module 태그 연결(저장소가 아직 비어 있어 대기), 폴백 셸 승인 팝업 UI(채팅 UI가 pet-app으로 이관되며 형태 재정의 필요, 별도 논의 대상), state snapshot 생성·전달과 `request_id` 정식 매칭(공통 protocol PR 대기), WKWebView 쪽 미저장 경고 확인창(pet-app의 Swift WKUIDelegate 구현 필요, cross-repo), 임시 캡처 파일 삭제 책임(pet-app의 F14 드래그 캡처 자체가 아직 미구현), EditorGateway 포트 고정(재시작 후 draft 복구가 실제로 안 되는 근본 원인, 별도 항목 제안)
+- (2026-08-04, 5라운드, **마지막 라운드**) 이 라운드에 배정된 항목 3개 모두 완료: (1) ACP와 사용자의 동시 파일 수정 실제 통합 시험(`acp-user-concurrent-edit.test.ts`) -- 테스트를 짜다가 Windows에서 `file-service.ts`의 원자적 저장이 다른 프로세스와 rename이 겹치면 `file_conflict`가 아니라 raw `EPERM`을 그대로 던지는 실제 버그를 발견, 사용자 확인 후 EPERM/EBUSY를 file_conflict로 정규화해 고쳤다. (2) ACP 프로세스 cwd가 WorkspaceRegistry의 realProjectPath와 정확히 일치하는지 통합 검증(`acp-workspace-path-boundary.test.ts`, W6의 tool-executor 레이어 검증과는 다른 레이어임을 먼저 확인) -- 검증 중 AcpAdapter가 spawn에 cwd만 지정할 뿐 OS 수준 파일시스템 샌드박싱이 전혀 없다는 걸 발견(절대경로로 워크스페이스 밖에 실제로 쓸 수 있음, changedFiles 결과에만 안 잡힘), 사용자 확인 후 새 TODO 항목(W5 공통)으로 분리해 남겼다. (3) EditorGateway WebSocket 300회 연결·해제 반복 시험(`editor-gateway-connection-churn.test.ts`) -- 서버 쪽 연결 목록이 매 반복 0으로 돌아오는지, heap이 반복에 비례해 계속 자라지 않는지 확인. `pending-approval-store`/`run-registry`/`session-registry`는 WS 연결·해제와 무관해 범위에서 제외(사용자 확인받음). 세 항목 모두 시작 전 진행 순서·범위 판단이 필요한 지점을 먼저 사용자에게 확인받고 진행함
+- **진짜로 남은 건 전부 외부 의존**: 실제 ai-module 태그 연결(ai-module 저장소가 아직 `.gitignore` 커밋 하나뿐이라 설치할 대상 자체가 없음 -- ai-module 저장소/팀의 몫), 폴백 셸 승인 팝업 UI(채팅 UI가 pet-app으로 이관되며 형태 재정의가 먼저 필요, 별도 논의 대상), state snapshot 생성·전달과 `request_id` 정식 매칭(공통 protocol PR이 `state_snapshot`/`request_id` 계약을 확정해야 시작 가능), WKWebView 쪽 미저장 경고 확인창(pet-app의 Swift `WKUIDelegate` 구현 필요, cross-repo), 임시 캡처 파일 삭제 책임(pet-app의 F14 드래그 캡처 자체가 아직 미구현), EditorGateway 포트 고정(여러 Workspace 프로세스 동시 실행 시 포트 경합까지 함께 풀어야 해서 별도 항목 제안 상태), ACP 파일시스템 샌드박싱(이번 라운드에 새로 발견, 실제 Claude Agent ACP가 이 정도 자유도로 동작하는 게 맞는지부터 논의 필요 -- 코드만으로 결정할 수 없는 설계 판단). Workspace 저장소 안에서 코드만으로 끝낼 수 있는 항목은 이번 라운드로 소진됨
 
 ### 공통
 

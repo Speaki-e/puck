@@ -3,6 +3,29 @@
 기준 문서: `plan/03_workspace.md` Workspace 개발 기획서 v2  
 최종 갱신: 2026-08-04
 
+## 코드베이스 마무리 리팩터링 (`refactor/codebase`)
+
+분석 기준: `plan-main/03_workspace.md`, 현재 `main` 브랜치, 소스/테스트/문서 정적 분석
+
+### P0 — 이번 브랜치에서 완료
+
+- [x] **Main composition root 분리**: `src/main/index.ts`에 섞였던 CLI 파싱, 폴백 창, 런타임 조립, Agent/PetBridge 라우팅, 종료 처리를 `src/main/app`의 독립 모듈로 분리했다. 진입점은 시작/치명적 실패 처리만 남겼다.
+- [x] **Renderer App 역할 축소**: Monaco 공통 설정과 titlebar/command dock/editor surface를 분리해 `App.tsx`가 편집 상태와 화면 조립에 집중하도록 정리했다.
+- [x] **저장소 검증 자동화 복구**: 실제 트리에서 누락된 CI 워크플로를 복구하고 architecture → typecheck → unit → build → E2E 순서를 명시했다.
+- [x] **문서와 실제 구현 동기화**: README, architecture 문서, protocol 호환 문서의 담당 범위·프로세스 경계·실행 명령·현재 파일 경로를 갱신했다.
+- [x] **구조 회귀 방지**: 소스 import cycle, 계층 역참조, 거대 진입 파일 회귀를 검사하는 무의존성 스크립트를 추가하고 CI에 연결했다.
+
+검증 메모: `node scripts/check-architecture.mjs`, 전체 TS/TSX 구문 변환, runtime options 스모크, CI YAML 파싱은 통과했다. 외부 네트워크가 차단된 작업 환경이라 `pnpm install/typecheck/test/build/test:e2e`는 이 브랜치에서 재실행하지 못했으며 CI에서 확인해야 한다.
+
+### P1 — 외부 계약/실환경이 준비되면 완료
+
+- [ ] **AI 실행 경계 확정**: 기획서의 Agent Host 소유 원칙과 현재 Main의 `SessionRouter`/`RunRegistry`/`MockAgentRuntime` 임시 배치를 실제 `ai-module` 태그 기준으로 정리한다.
+- [ ] **wire 메시지 런타임 검증**: EditorGateway/PetBridge의 `unknown` payload 및 다수의 이중 캐스트를 protocol의 판별 유니언 또는 런타임 스키마 검증으로 치환한다.
+- [ ] **ACP 파일시스템 격리**: cwd 지정만으로는 막지 못하는 워크스페이스 외부 절대경로 쓰기를 OS 샌드박스 또는 검증 프록시로 차단한다.
+- [ ] **protocol snapshot/request_id 통합**: `state_snapshot`, `request_id`, `run_id` 계약이 배포되면 임시 확장 타입과 순서 의존 라우팅을 제거한다.
+- [ ] **실환경 인수 검증**: 실제 Claude 인증, pet-app WKWebView/bridge.sock, macOS 패키징에서 단독 및 전체 왕복 시나리오를 통과시킨다.
+
+
 ## 표기
 
 - [x] 구현 및 현재 자동 테스트 완료
@@ -15,7 +38,7 @@
 - [ ] **공통** protocol PR: `state_snapshot`, `request_id`, 확장 `run_cancel(run_id)` 계약 확정
 - [x] **김민영** 단일 HTTP/WebSocket `EditorGateway` 구현
 - [x] **김민영** `SessionRouter`와 `RunRegistry` 구현
-- [ ] **김민영** 실제 태그 버전 `ai-module`을 Agent Host에 연결 -- `부분 완료`: ai-module 저장소가 아직 `.gitignore` 커밋 하나뿐이라(태그 없음) 설치 불가. `AgentRuntime`/`ApprovalPort` 포트와 `petAppProxy`/`editorLocal` 실행기는 실제 계약대로 배선 완료, `MockAgentRuntime`으로 임시 대체(`main/index.ts`의 TODO 주석 참고). ai-module은 실행 위치를 Main 프로세스로 정함(TODO.md 기존 문구와 plan 문서가 갈렸던 부분 -- Main으로 확정)
+- [ ] **김민영** 실제 태그 버전 `ai-module`을 Agent Host에 연결 -- `부분 완료`: ai-module 저장소가 아직 `.gitignore` 커밋 하나뿐이라(태그 없음) 설치 불가. `AgentRuntime`/`ApprovalPort` 포트와 `petAppProxy`/`editorLocal` 실행기는 실제 계약대로 배선 완료했고, 현재는 `src/main/app/agent-runtime-coordinator.ts`가 `MockAgentRuntime`을 임시 연결한다. 기획서 4장의 최종 소유 경계는 Agent Host이며, 실제 패키지가 준비되면 coordinator를 Agent Host RPC 어댑터로 치환한다.
 - [x] **김민영** 승인·취소 브리지를 ai-module/ACP/PetBridge와 연결
 - [ ] **공통** PetAgentClient → Workspace → ai-module → ACP → Editor View 전체 왕복 테스트
 - [ ] **이주한** 실제 Claude 인증 환경에서 자연어 파일 수정·취소·ACP 크래시 검증
@@ -43,7 +66,7 @@
 
 - [x] 저장소 간 protocol 버전 호환 매트릭스 작성 (2026-08-04, 4라운드) `docs/protocol-compatibility-matrix.md` -- protocol(v0.5.0, HEAD `4244922`)·workspace(같은 커밋에 고정)·pet-app(Swift 파일 4개 수동 벤더링, diff로 스키마 동일 확인)·ai-module(코드 없음, "확인 불가"로 명시하고 코드가 생기면 다시 볼 목록 정리)까지 로컬에 체크아웃된 세 저장소를 직접 열어 확인. 코드 변경 없음
 - [x] 잘못된 메시지, 알 수 없는 type, 누락 필드 계약 테스트 (2026-08-04, 4라운드) `pet-bridge.test.ts`(깨진 JSON/알 수 없는 type/필수 필드 누락/대기 중이지 않은 tool_result 4건, 크래시 없이 로깅만 하고 다음 메시지는 정상 처리되는지까지 확인), `editor-gateway.test.ts`(형식 깨진 JSON/type 필드 누락/file:save 필수 필드 누락 3건 추가, 기존 "알 수 없는 type" 테스트와 함께 커버). 테스트를 짜다가 pet-bridge.test.ts의 mock 서버 소켓에 `data` 리스너가 없으면(paused 상태) FIN을 못 받아 `server.close()`가 영영 안 끝나는 실제 버그를 발견해 `setup()`에 `socket.resume()`을 추가해 고쳤다
-- [x] CI에서 typecheck → unit → E2E 순서 자동 실행 (2026-08-04, 4라운드) `.github/workflows/ci.yml` 신규 작성 -- `pnpm install(--frozen-lockfile)` → `pnpm typecheck` → `pnpm test` → `pnpm build` → xvfb 위에서 `pnpm test:e2e` 순서(ubuntu-latest, push to main + 모든 PR 트리거). YAML 문법은 `js-yaml`로 파싱 검증, 각 스텝 명령은 로컬에서 실제로 실행해 확인(`pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm test` 전부 통과). E2E 자체(`pnpm test:e2e`)는 이 로컬 Windows 환경의 Electron/Playwright 버전 조합 문제(`bad option: --remote-debugging-port=0`, 이번 라운드에서 추가한 테스트뿐 아니라 기존 폴백 창 테스트도 동일하게 실패 -- 사전에 있던 환경 문제)로 로컬에서 직접 실행 확인은 못 했다. ubuntu-latest CI 환경에서 실제로 통과하는지는 이 워크플로가 처음 돌 때 확인 필요
+- [x] CI에서 architecture → typecheck → unit → build → E2E 순서 자동 실행 (`.github/workflows/ci.yml`) -- private protocol 저장소 인증(`PROTOCOL_PAT`), frozen lockfile 설치, Linux xvfb E2E, Playwright 리포트 업로드를 포함한다. 이번 리팩터링 환경은 외부 네트워크가 차단되어 의존성 설치 기반 명령은 재실행하지 못했고, 대신 architecture 검사·TypeScript 구문 변환·런타임 옵션 스모크·YAML 파싱을 통과했다. 전체 명령은 CI의 첫 실행에서 최종 확인한다.
 
 **완료 기준:** 모든 Mock 사이에서 사용자 입력, 도구 요청, 승인, 취소, 완료 이벤트 왕복
 
@@ -147,7 +170,7 @@
 - [x] 동일 세션 중복 실행 정책 구현 (`DuplicateActiveRunError`)
 - [x] 실행과 승인 요청 연결 (`attachApproval`/`approvalsFor`)
 - [x] Agent Host 종료 시 모든 ActiveRun 실패 처리 (`AgentHostController`에 `exited` 이벤트 추가 + `failAllActiveRuns`)
-- [x] AI 이벤트를 protocol 이벤트로 정규화 (`main/index.ts`의 `agentHost.on("event", ...)` -- `code_editor_update`를 requestId/workspaceId로 감싸도록 Agent Host도 함께 고쳤다)
+- [x] AI 이벤트를 protocol 이벤트로 정규화 (`src/main/app/agent-runtime-coordinator.ts`의 Agent Host event 라우팅 -- `code_editor_update`를 requestId/workspaceId로 감싸도록 Agent Host도 함께 고쳤다)
 
 ### 공통
 
@@ -236,8 +259,8 @@
 
 ### 김민영
 
-- [ ] 합의된 실제 태그 버전 `ai-module` 설치 -- 저장소에 태그도 코드도 없어(2026-08-02 기준 `.gitignore` 커밋 1개) 설치할 대상이 없다. 아래 항목들은 실제 포트 계약(`shared/ports.ts`)대로 배선해뒀고, `MockAgentRuntime`을 임시 구현체로 연결했다(`main/index.ts`의 TODO 주석 참고)
-- [ ] Agent Host 안에서 ai-module 초기화 -- Main 프로세스에서 구동하는 쪽으로 확정(plan/03_workspace.md 4.1 원문 채택). ai-module 자체가 없어 초기화 대상도 없음
+- [ ] 합의된 실제 태그 버전 `ai-module` 설치 -- 저장소에 태그도 코드도 없어(2026-08-02 기준 `.gitignore` 커밋 1개) 설치할 대상이 없다. 아래 항목들은 실제 포트 계약(`shared/ports.ts`)대로 배선했고, `src/main/app/agent-runtime-coordinator.ts`에서 `MockAgentRuntime`을 임시 구현체로 연결했다.
+- [ ] Agent Host 안에서 ai-module 초기화 -- `plan/03_workspace.md` 4.1~4.2의 원칙대로 AI 응답 생성과 세션/실행 관리는 최종적으로 Agent Host가 소유한다. 현재는 설치 가능한 ai-module이 없어 Main의 coordinator에 임시 캡슐화되어 있다.
 - [ ] Claude API 키와 모델을 필요한 시점에만 전달 -- ai-module이 없어 아직 전달할 대상이 없다(ACP/Agent Host 쪽 키 전달은 이주한이 이미 구현)
 - [x] `petAppProxy` 구현 및 PetBridge 연결 (`tool-executors.ts`의 `createPetAppProxyExecutor`)
 - [x] `editorLocal` 구현 및 EditorGateway 연결 (`createEditorLocalExecutor`)
@@ -251,7 +274,7 @@
 - [x] `read_file` 구현
 - [x] 프로젝트 내부 읽기 전용 접근
 - [x] 대용량·바이너리·인코딩 오류 표준화
-- [x] ai-module callback을 PetAgentClient 이벤트로 전달 (`AgentCallbacks` -> `petBridge.sendEvent`, `main/index.ts`)
+- [x] ai-module callback을 PetAgentClient 이벤트로 전달 (`AgentCallbacks` → `petBridge.sendEvent`, `src/main/app/agent-runtime-coordinator.ts`)
 
 ### 이주한
 
@@ -307,9 +330,9 @@
 - [x] 첨부 이미지 확장자와 실제 MIME 일치 검증 (2026-08-03, 3라운드) `src/main/attachment-validator.ts`(`validateAttachment`) -- file-service.ts의 매직 바이트 판별을 `shared/image-mime.ts`로 뽑아 재사용. `src/main/attachment-validator.test.ts`로 검증
 - [x] 첨부 최대 크기와 파일 존재 검증 (2026-08-03, 3라운드) 위와 동일 파일, `file_too_large`/`file_not_found` 에러 코드로 구분
 - [x] 허용 임시 디렉터리·사용자 선택 파일 검증 (2026-08-03, 3라운드) `AttachmentPolicy.allowedDirectories`(기본 OS 임시 디렉터리, realpath 정규화) + `allowedPaths`(사용자가 명시적으로 고른 개별 경로용 확장점, 지금은 빈 값 -- 첨부 파일 선택 UI 자체가 아직 없어 실제로 채워지는 경로는 없다)
-- [x] 첨부 심볼릭 링크 이탈 방지 (2026-08-03, 3라운드) file-service.ts의 경로 이탈 검사(`isInside`)를 `shared/path-containment.ts`로 뽑아 재사용, realpath 기준으로 허용 디렉터리 밖을 가리키는 심볼릭 링크를 `symlink_escape`로 별도 구분. 잘못된 확장자/위조 MIME/크기 초과/미존재/허용 범위 밖 경로/심볼릭 링크 이탈 6가지 모두 단위 테스트로 확인(`attachment-validator.test.ts`, 심볼릭 링크 테스트는 이 환경(Windows, 개발자 모드 없음)에서 symlink 생성 권한이 없어 런타임에 건너뛰지만 나머지 5개+정상 케이스는 항상 통과). `main/index.ts`의 `user_input` 처리에 `filterValidAttachments`로 연결해 실제로 걸러진 첨부만 ai-module로 넘어가게 배선했다
+- [x] 첨부 심볼릭 링크 이탈 방지 (2026-08-03, 3라운드) file-service.ts의 경로 이탈 검사(`isInside`)를 `shared/path-containment.ts`로 뽑아 재사용, realpath 기준으로 허용 디렉터리 밖을 가리키는 심볼릭 링크를 `symlink_escape`로 별도 구분. 잘못된 확장자/위조 MIME/크기 초과/미존재/허용 범위 밖 경로/심볼릭 링크 이탈 6가지 모두 단위 테스트로 확인(`attachment-validator.test.ts`, 심볼릭 링크 테스트는 이 환경(Windows, 개발자 모드 없음)에서 symlink 생성 권한이 없어 런타임에 건너뛰지만 나머지 5개+정상 케이스는 항상 통과). `src/main/app/pet-bridge-router.ts`의 `user_input` 처리에 `filterValidAttachments`로 연결해 실제로 걸러진 첨부만 ai-module로 넘어가게 배선했다
 - [ ] 임시 캡처 파일 삭제 책임을 pet-app과 확정 (2026-08-04 갱신: F14는 pet-app에서 2026-08-01에 이미 구현 완료됨 -- `Shaydi/Input/ScreenRegionCapture.swift`가 `FileManager.default.temporaryDirectory`에 캡처 파일을 생성해 attachment로 전달, `pet-app/PROGRESS.md` "quick-capture panel moves to bottom-center, and F14 drag-capture attachments finally land" 항목 참고. 다만 삭제 로직은 코드 어디에도 없음 -- pet-app도 지우지 않고, Workspace 쪽도 첨부를 읽기만 하고 지우지 않는다(검증 실패해도 파일은 그대로 둠). "F14 구현 전이라 대상이 없다"는 기존 사유는 더 이상 유효하지 않으므로, 이제는 실제로 삭제 책임 주체를 정하는 논의 자체를 진행해야 함
-- [x] Editor View 종료 전 미저장 내용 경고 (2026-08-03, 3라운드) `부분 완료`: Electron 폴백 창은 `main/index.ts`의 `createFallbackWindow`에서 `webContents.on("will-prevent-unload", ...)`을 새로 연결해 실제로 닫기를 막고 확인 대화상자를 띄우도록 고쳤다 -- 기존에는 `App.tsx`의 `beforeunload`가 `preventDefault()`를 해도 Electron이 `will-prevent-unload`를 아무도 안 들으면 그냥 닫아버리는 문제가 있었다(Electron 고유 동작, 실제로 안 막히고 있었음). WKWebView(게이트웨이 호스트) 쪽은 이 저장소에서 할 수 있는 부분(App.tsx의 표준 `beforeunload` 핸들러)은 이미 있지만, pet-app이 WKWebView를 닫을 때 실제로 확인창을 띄우려면 pet-app의 Swift `WKUIDelegate`가 beforeunload 확인 패널을 구현해야 한다 -- pet-app 쪽 작업이라 이번 라운드 범위 밖(다른 WKWebView 관련 항목들과 동일하게 cross-repo 의존)
+- [x] Editor View 종료 전 미저장 내용 경고 (2026-08-03, 3라운드) `부분 완료`: Electron 폴백 창은 `src/main/app/fallback-window.ts`에서 `webContents.on("will-prevent-unload", ...)`을 연결해 실제로 닫기를 막고 확인 대화상자를 띄우도록 고쳤다 -- 기존에는 `App.tsx`의 `beforeunload`가 `preventDefault()`를 해도 Electron이 `will-prevent-unload`를 아무도 안 들으면 그냥 닫아버리는 문제가 있었다(Electron 고유 동작, 실제로 안 막히고 있었음). WKWebView(게이트웨이 호스트) 쪽은 이 저장소에서 할 수 있는 부분(App.tsx의 표준 `beforeunload` 핸들러)은 이미 있지만, pet-app이 WKWebView를 닫을 때 실제로 확인창을 띄우려면 pet-app의 Swift `WKUIDelegate`가 beforeunload 확인 패널을 구현해야 한다 -- pet-app 쪽 작업이라 이번 라운드 범위 밖(다른 WKWebView 관련 항목들과 동일하게 cross-repo 의존)
 - [x] Editor View 임시 복구 데이터와 만료 정책 (2026-08-03, 3라운드) 점검 결과 정리는 지금까지 정리가 "같은 프로젝트를 다시 열 때"만 일어나는 lazy 방식이라, 한 번 열고 다시 열지 않은 프로젝트의 draft는 7일이 지나도 아무도 안 지우는 사각지대가 있었다 -- `src/renderer/draft-store.ts`의 `sweepExpiredDrafts()`를 앱 시작 시 한 번(App.tsx의 mount effect) 호출해 모든 `workspace:drafts:*` 키를 훑어 만료/손상 항목을 정리하도록 채웠다(`draft-store.test.ts`로 검증). 점검 중 별개로 발견한 것: EditorGateway가 포트 0(OS 임의 할당)으로 뜨기 때문에 재시작마다 origin이 바뀌어, "재시작 후에도 복구"가 필요한 시나리오(이 기능의 원래 목적)에서는 localStorage 자체에 접근할 수 없다(같은 세션 내 새로고침/재연결에는 영향 없음, `editor-gateway-reconnect.spec.ts`로 검증된 범위). 포트를 고정하려면 여러 Workspace 프로세스 동시 실행 시 포트 경합을 같이 풀어야 해서 이번 라운드에서 고치지 않고 `editor-gateway.ts`에 코멘트로 남겨뒀다 -- 별도 항목으로 다룰 것을 제안
 - [x] 개인정보·API 키·프로젝트 경로 로그 정책 리뷰 (2026-08-04, 4라운드) `docs/log-privacy-review.md` -- `logger.write(...)` 호출부 전수 확인. `REDACTED_KEYS`는 키 이름 기준이라 값 자체가 필요한 `projectPath`/`path`/`socketPath` 같은 필드의 절대경로 유출은 못 잡는다는 걸 확인하고, 실제 유출 3건(`workspace_project_bound`의 `realProjectPath`, `attachment_rejected`의 첨부 절대경로, `pet_bridge_connected`의 macOS `socketPath`)을 새로 만든 `basenameForLog()` 헬퍼(마지막 세그먼트만 기록)로 고쳤다. `logger.test.ts`에 단위 테스트 추가. 나머지(원본 그대로 남겨야 진단에 쓸모 있는 `invalid_protocol_message`의 raw value, `error.message`에 fs 경로가 섞일 수 있는 케이스들)는 범위 밖으로 판단해 문서에 근거를 적어뒀다
 
@@ -391,16 +414,16 @@
 
 ### 김민영
 
-- (2026-08-02, P0) EditorGateway, SessionRouter/RunRegistry, 도구 3종(petAppProxy/editorLocal), 승인·취소 브리지는 포트 계약대로 구현·테스트 완료. 실제 ai-module 태그가 나오면 `main/index.ts`의 `MockAgentRuntime` 한 줄만 교체하면 되도록 배선해둠
+- (2026-08-02, P0) EditorGateway, SessionRouter/RunRegistry, 도구 3종(petAppProxy/editorLocal), 승인·취소 브리지는 포트 계약대로 구현·테스트 완료. 실제 ai-module 태그가 나오면 `src/main/app/agent-runtime-coordinator.ts`의 runtime 생성 경계를 Agent Host RPC 어댑터로 교체하도록 정리함
 - (2026-08-03, 2라운드) Editor View 재연결 탭 복원(App.tsx 연동 + E2E), 파일 충돌 diff 화면과 `내 내용 유지`의 revision 갱신 버그 수정, `workspace_create_request`/`session_create_request` 처리, 설정 화면(API 키/모델/최근 프로젝트/파일 제한/로그 수준), 승인-PetBridge 연결 종료 통합 시험, Mock EditorGateway 클라이언트 독립 모듈화까지 완료. 이 라운드에서 EditorGateway의 asset 401 버그와 `keepMine` revision 버그 등 실사용 시나리오(E2E)로만 드러나는 결함 두 건을 추가로 발견·수정함
-- (2026-08-03, 3라운드) 첨부 파일 보안 정책 4건(확장자/MIME/크기/존재/경로/심볼릭 링크, `attachment-validator.ts` + 단위 테스트, `main/index.ts` 배선), `editor_view_ready`/`unavailable` 계약 E2E, 두 워크스페이스 WebSocket 격리 단위 테스트, Electron 폴백 창 미저장 경고(`will-prevent-unload` 연결 -- 기존엔 안 막히고 있던 버그), draft 만료 데이터 시작 시 sweep, 세션·워크스페이스 메타데이터 리뷰 문서까지 완료. 이 라운드에서 Mock EditorGateway 클라이언트의 타임아웃 waiter 누수 버그(`next()`가 타임아웃 후에도 waiter를 안 지워 다음 메시지를 삼킴)를 격리 테스트 작성 중 발견·수정함
+- (2026-08-03, 3라운드) 첨부 파일 보안 정책 4건(확장자/MIME/크기/존재/경로/심볼릭 링크, `attachment-validator.ts` + 단위 테스트, `src/main/app/pet-bridge-router.ts` 배선), `editor_view_ready`/`unavailable` 계약 E2E, 두 워크스페이스 WebSocket 격리 단위 테스트, Electron 폴백 창 미저장 경고(`will-prevent-unload` 연결 -- 기존엔 안 막히고 있던 버그), draft 만료 데이터 시작 시 sweep, 세션·워크스페이스 메타데이터 리뷰 문서까지 완료. 이 라운드에서 Mock EditorGateway 클라이언트의 타임아웃 waiter 누수 버그(`next()`가 타임아웃 후에도 waiter를 안 지워 다음 메시지를 삼킴)를 격리 테스트 작성 중 발견·수정함
 - (2026-08-04, 5라운드, **마지막 라운드**) 이 라운드에 배정된 항목 3개 모두 완료: (1) ACP와 사용자의 동시 파일 수정 실제 통합 시험(`acp-user-concurrent-edit.test.ts`) -- 테스트를 짜다가 Windows에서 `file-service.ts`의 원자적 저장이 다른 프로세스와 rename이 겹치면 `file_conflict`가 아니라 raw `EPERM`을 그대로 던지는 실제 버그를 발견, 사용자 확인 후 EPERM/EBUSY를 file_conflict로 정규화해 고쳤다. (2) ACP 프로세스 cwd가 WorkspaceRegistry의 realProjectPath와 정확히 일치하는지 통합 검증(`acp-workspace-path-boundary.test.ts`, W6의 tool-executor 레이어 검증과는 다른 레이어임을 먼저 확인) -- 검증 중 AcpAdapter가 spawn에 cwd만 지정할 뿐 OS 수준 파일시스템 샌드박싱이 전혀 없다는 걸 발견(절대경로로 워크스페이스 밖에 실제로 쓸 수 있음, changedFiles 결과에만 안 잡힘), 사용자 확인 후 새 TODO 항목(W5 공통)으로 분리해 남겼다. (3) EditorGateway WebSocket 300회 연결·해제 반복 시험(`editor-gateway-connection-churn.test.ts`) -- 서버 쪽 연결 목록이 매 반복 0으로 돌아오는지, heap이 반복에 비례해 계속 자라지 않는지 확인. `pending-approval-store`/`run-registry`/`session-registry`는 WS 연결·해제와 무관해 범위에서 제외(사용자 확인받음). 세 항목 모두 시작 전 진행 순서·범위 판단이 필요한 지점을 먼저 사용자에게 확인받고 진행함
-- **진짜로 남은 건 전부 외부 의존**: 실제 ai-module 태그 연결(ai-module 저장소가 아직 `.gitignore` 커밋 하나뿐이라 설치할 대상 자체가 없음 -- ai-module 저장소/팀의 몫), 폴백 셸 승인 팝업 UI(채팅 UI가 pet-app으로 이관되며 형태 재정의가 먼저 필요, 별도 논의 대상), state snapshot 생성·전달과 `request_id` 정식 매칭(공통 protocol PR이 `state_snapshot`/`request_id` 계약을 확정해야 시작 가능), WKWebView 쪽 미저장 경고 확인창(pet-app의 Swift `WKUIDelegate` 구현 필요, cross-repo), 임시 캡처 파일 삭제 책임(pet-app의 F14 드래그 캡처 자체가 아직 미구현), EditorGateway 포트 고정(여러 Workspace 프로세스 동시 실행 시 포트 경합까지 함께 풀어야 해서 별도 항목 제안 상태), ACP 파일시스템 샌드박싱(이번 라운드에 새로 발견, 실제 Claude Agent ACP가 이 정도 자유도로 동작하는 게 맞는지부터 논의 필요 -- 코드만으로 결정할 수 없는 설계 판단). Workspace 저장소 안에서 코드만으로 끝낼 수 있는 항목은 이번 라운드로 소진됨
+- **진짜로 남은 건 전부 외부 의존**: 실제 ai-module 태그 연결(ai-module 저장소가 아직 `.gitignore` 커밋 하나뿐이라 설치할 대상 자체가 없음 -- ai-module 저장소/팀의 몫), 폴백 셸 승인 팝업 UI(채팅 UI가 pet-app으로 이관되며 형태 재정의가 먼저 필요, 별도 논의 대상), state snapshot 생성·전달과 `request_id` 정식 매칭(공통 protocol PR이 `state_snapshot`/`request_id` 계약을 확정해야 시작 가능), WKWebView 쪽 미저장 경고 확인창(pet-app의 Swift `WKUIDelegate` 구현 필요, cross-repo), 임시 캡처 파일 삭제 책임(F14 캡처는 구현됐지만 pet-app/Workspace 어느 쪽도 삭제하지 않음), EditorGateway 포트 고정(여러 Workspace 프로세스 동시 실행 시 포트 경합까지 함께 풀어야 해서 별도 항목 제안 상태), ACP 파일시스템 샌드박싱(이번 라운드에 새로 발견, 실제 Claude Agent ACP가 이 정도 자유도로 동작하는 게 맞는지부터 논의 필요 -- 코드만으로 결정할 수 없는 설계 판단). Workspace 저장소 안에서 코드만으로 끝낼 수 있는 항목은 이번 라운드로 소진됨
 
 ### 공통
 
 - protocol 확장 PR과 타입 리뷰
 - PetAgentClient/pet-app 전체 통합
-- 첨부 파일 보안 정책 (3라운드에서 검증 로직 4건 완료, 임시 캡처 파일 삭제 책임만 pet-app의 F14 구현 이후로 남음)
+- 첨부 파일 보안 정책 (3라운드에서 검증 로직 4건 완료, 구현된 F14 임시 캡처 파일의 삭제 책임만 미확정)
 - 필수 장애 시험과 최종 인수 테스트
 - (2026-08-04, 4라운드) 외부 의존성 없이 바로 끝낼 수 있던 항목 7개 완료: pet-bridge/editor-gateway 잘못된 메시지 계약 테스트, 로그의 절대경로 유출 3건 수정(`basenameForLog`), 두 워크스페이스 ACP 병렬 통합 테스트, 파일 트리 제외 패턴 확장 및 성능 실측, Agent Host 재시작 후 GUI 상태 복구(`ready` 시 "준비됨" 재emit), CI 워크플로(`ci.yml`) 신규 작성, protocol 버전 호환 매트릭스 문서. 테스트를 짜다가 실사용에서만 드러나는 버그 2건도 발견·수정함: pet-bridge 테스트용 mock 소켓이 `data` 리스너 없이 paused 상태로 남아 `server.close()`가 안 끝나던 문제, `agent-host-controller.ts`가 재시작 완료 후에도 GUI 상태를 "다시 시작하는 중"에 방치하던 문제. 여전히 막힌 것: E2E(`pnpm test:e2e`)는 이 Windows 개발 환경의 Electron/Playwright 버전 조합 문제로 로컬 실행 확인을 못 했다(새로 만든 CI에서 처음 돌 때 검증 필요) -- 기존 e2e 테스트도 동일 환경 문제로 로컬에서 안 됨을 확인했으므로 이번에 손댄 코드 때문에 생긴 문제는 아니다

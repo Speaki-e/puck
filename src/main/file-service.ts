@@ -157,7 +157,19 @@ export class FileService extends EventEmitter {
     const temporary = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.${randomUUID()}.tmp`);
     try {
       await writeFile(temporary, next, { mode: metadata.mode });
-      await rename(temporary, target);
+      try {
+        await rename(temporary, target);
+      } catch (error) {
+        // Windows에서는 대상 파일을 다른 프로세스(예: 동시에 쓰고 있는 ACP 자식 프로세스)가 그 순간
+        // 붙잡고 있으면 rename이 EPERM/EBUSY로 거부된다(POSIX에서는 열려 있어도 rename이 그냥
+        // 성공하는 것과 다른 동작) -- revision 불일치와 마찬가지로 "디스크가 나 몰래 바뀌는 중"이라는
+        // 뜻이므로 같은 file_conflict로 정규화한다.
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "EPERM" || code === "EBUSY") {
+          throw new FileServiceError("file_conflict", "디스크 파일이 다른 프로세스에 의해 사용 중입니다");
+        }
+        throw error;
+      }
     } finally {
       await rm(temporary, { force: true }).catch(() => undefined);
     }

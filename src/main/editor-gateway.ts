@@ -79,6 +79,11 @@ export class EditorGateway {
     return this.boundPort;
   }
 
+  /** 연결 반복/누수 시험용 관측 지점(공통 "필수 장애 시험" 항목) -- 워크스페이스별 살아있는 소켓 수. */
+  connectionCount(workspaceId: string): number {
+    return this.workspaces.get(workspaceId)?.connections.size ?? 0;
+  }
+
   /** pet-app/폴백 창이 로드할 URL. 토큰이 쿼리스트링에 포함된다(WKWebView는 커스텀 헤더를 못 붙이므로). */
   url(workspaceId: string): string {
     return `http://127.0.0.1:${this.boundPort}/editor/${encodeURIComponent(workspaceId)}/?token=${this.token}`;

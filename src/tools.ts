@@ -1,120 +1,99 @@
 /**
- * ai-module A1 — mock 도구 정의 + mock 실행기.
+ * ai-module A2 — protocol 도구 레지스트리 → Anthropic API 도구 정의 변환.
  *
- * TODO(A2): 아래 도구 정의는 임시로 하드코딩한 것이다.
- *   A2에서 protocol 패키지 import로 교체 예정 —
- *   교체 시 TOOLS 배열만 갈아끼우면 되도록 executeTool()의 디스패치는
- *   도구 이름(문자열) 기준으로만 분기하게 유지한다.
- *
- * 이 단계의 실행기는 아무것도 실제로 실행하지 않는다. run_shell도 가짜 결과만
- * 돌려준다 — 승인 게이트는 A6에서 붙인다.
+ * 도구 목록은 이제 protocol의 TOOL_REGISTRY가 유일한 출처다. 이 파일은
+ * 레지스트리를 Anthropic의 tools 파라미터 형식으로 옮기기만 하고, 도구를
+ * 추가/삭제/수정하지 않는다 — 도구가 늘거나 스펙이 바뀌면 protocol만 고친다.
  */
 import type Anthropic from "@anthropic-ai/sdk";
+import { TOOL_REGISTRY, type ToolDefinition, type ToolParam } from "@speaki-e/protocol/src/index.js";
 
-/** 도구 실행 결과. 성공/실패가 판별 가능한 유니온이어야 tool_result의 is_error를 결정할 수 있다. */
-export type ToolExecutionResult =
-  | { ok: true; detail: string }
-  | { ok: false; error: string };
-
-/**
- * Anthropic API의 tools 파라미터로 그대로 전달되는 도구 정의.
- *
- * description은 모델이 "언제" 이 도구를 부를지 판단하는 유일한 근거다.
- * 무엇을 하는지뿐 아니라 호출 조건까지 적어야 잡담에 도구를 끌어다 쓰지 않는다.
- */
-export const TOOLS: Anthropic.Tool[] = [
-  {
-    name: "launch_app",
-    description:
-      "지정한 앱을 사용자의 컴퓨터에서 실행한다. 사용자가 특정 앱을 켜 달라고 요청했을 때 호출한다.",
-    input_schema: {
-      type: "object",
-      properties: {
-        app_name: {
-          type: "string",
-          description: "실행할 앱 이름 (예: Safari, 메모)",
-        },
-      },
-      required: ["app_name"],
-    },
-  },
-  {
-    name: "get_weather",
-    description:
-      "지정한 도시의 현재 날씨를 조회한다. 사용자가 날씨나 기온을 물었을 때 호출한다.",
-    input_schema: {
-      type: "object",
-      properties: {
-        city: {
-          type: "string",
-          description: "날씨를 조회할 도시 이름 (예: 서울, 부산)",
-        },
-      },
-      required: ["city"],
-    },
-  },
-  {
-    name: "run_shell",
-    description:
-      "셸 명령을 실행한다. 파일 조작이나 시스템 작업처럼 명령줄로만 처리할 수 있는 요청에 호출한다.",
-    input_schema: {
-      type: "object",
-      properties: {
-        command: {
-          type: "string",
-          description: "실행할 셸 명령 전체",
-        },
-      },
-      required: ["command"],
-    },
-  },
-];
+/** 이름 → 정의 조회용 인덱스. 레지스트리는 상수이므로 모듈 로드 시 한 번만 만든다. */
+const BY_NAME: ReadonlyMap<string, ToolDefinition> = new Map(
+  TOOL_REGISTRY.map((def) => [def.name, def]),
+);
 
 /**
- * mock 실행기. 실제로는 아무것도 실행하지 않고 가짜 결과를 반환한다.
+ * TOOL_REGISTRY를 Anthropic API의 tools 파라미터 형식으로 변환한다.
  *
- * 예외를 던지지 않는다 — 모든 실패는 { ok: false } 결과로 표현된다.
- * 호출부가 모든 tool_use id에 대해 반드시 tool_result를 만들어야 하기 때문이다.
- *
- * @param name 모델이 호출한 도구 이름
- * @param args 파싱된 도구 입력. 모델이 보내는 값이므로 스키마를 신뢰하지 않고 검사한다.
+ * description은 모델이 "언제" 이 도구를 부를지 판단하는 유일한 근거이므로
+ * 레지스트리 값을 그대로 넘긴다 — 여기서 임의로 다듬지 않는다.
+ * executor/approval/timeoutSec는 API로 보내지 않는다. 모델이 알아야 할 정보가
+ * 아니라 우리 쪽 디스패치/승인 라우팅용 메타데이터다.
  */
-export function executeTool(name: string, args: unknown): ToolExecutionResult {
-  switch (name) {
-    case "launch_app": {
-      const appName = readString(args, "app_name");
-      if (appName === undefined) return invalidInput("app_name");
-      return { ok: true, detail: `${appName} 실행됨 (mock)` };
+export function toAnthropicTools(): Anthropic.Tool[] {
+  return TOOL_REGISTRY.map((def) => ({
+    name: def.name,
+    description: def.description,
+    input_schema: {
+      type: "object" as const,
+      properties: Object.fromEntries(
+        def.params.map((param) => [
+          param.name,
+          { type: param.type, description: param.description },
+        ]),
+      ),
+      // 필수 파라미터가 없으면 required 키 자체를 넣지 않는다 (빈 배열은 무의미).
+      ...requiredNames(def.params),
+    },
+  }));
+}
+
+/** 모델이 호출한 이름에 대응하는 레지스트리 정의. 없으면 undefined (= unknown_tool). */
+export function getToolDef(name: string): ToolDefinition | undefined {
+  return BY_NAME.get(name);
+}
+
+/**
+ * 모델이 보낸 입력이 레지스트리 스펙에 맞는지 검사한다.
+ *
+ * strict 스키마를 걸지 않았으므로 모델은 필수 필드를 빠뜨리거나 타입이 다른
+ * 값을 보낼 수 있다. 그대로 실행기로 넘기면 "undefined 앱 실행" 같은 결과가
+ * 나오므로 여기서 걸러 invalid_input으로 되돌려준다.
+ *
+ * 참고: launch_app의 app_name/bundle_id처럼 "둘 중 하나는 필수" 규칙은
+ * ToolParam으로 표현되지 않는다(둘 다 required:false). 그런 교차 조건은
+ * 실행기 쪽 책임으로 남긴다.
+ *
+ * @returns 문제가 된 필드 이름. 이상이 없으면 undefined.
+ */
+export function validateArgs(def: ToolDefinition, args: unknown): string | undefined {
+  // 파라미터가 없는 도구는 모델이 {}를 보내든 아무것도 안 보내든 통과시킨다.
+  if (def.params.length === 0) return undefined;
+
+  const record = args !== null && typeof args === "object" ? (args as Record<string, unknown>) : undefined;
+  if (record === undefined) return def.params.find((p) => p.required)?.name;
+
+  for (const param of def.params) {
+    const value = record[param.name];
+    if (value === undefined || value === null) {
+      if (param.required) return param.name;
+      continue;
     }
-    case "get_weather": {
-      const city = readString(args, "city");
-      if (city === undefined) return invalidInput("city");
-      return { ok: true, detail: `${city}는 맑음, 24도 (mock)` };
+    if (!matchesType(value, param.type)) return param.name;
+    // 빈 문자열은 값을 안 준 것과 같다 — 필수 파라미터라면 실패로 본다.
+    if (param.required && param.type === "string" && (value as string).trim() === "") {
+      return param.name;
     }
-    case "run_shell": {
-      const command = readString(args, "command");
-      if (command === undefined) return invalidInput("command");
-      return { ok: true, detail: `명령 실행됨 (mock): ${command}` };
-    }
-    default:
-      return { ok: false, error: "unknown_tool" };
+  }
+  return undefined;
+}
+
+/** ToolParam.type(JSON 값 종류)과 실제 값이 맞는지 확인한다. */
+function matchesType(value: unknown, type: ToolParam["type"]): boolean {
+  switch (type) {
+    case "string":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "object":
+      return typeof value === "object" && !Array.isArray(value);
   }
 }
 
-/**
- * args에서 문자열 필드를 안전하게 꺼낸다.
- *
- * strict: true를 걸지 않았으므로 모델이 필수 필드를 빠뜨릴 수 있다.
- * 그 경우 "undefined는 맑음" 같은 결과를 만들지 않고 실패로 처리한다.
- */
-function readString(args: unknown, key: string): string | undefined {
-  if (typeof args !== "object" || args === null) return undefined;
-  const value = (args as Record<string, unknown>)[key];
-  if (typeof value !== "string" || value.trim() === "") return undefined;
-  return value;
-}
-
-/** 필수 입력이 비었을 때의 실패 결과. 어떤 필드가 문제였는지 모델에게 알려 재시도할 수 있게 한다. */
-function invalidInput(field: string): ToolExecutionResult {
-  return { ok: false, error: `invalid_input: ${field}` };
+function requiredNames(params: readonly ToolParam[]): { required?: string[] } {
+  const names = params.filter((param) => param.required).map((param) => param.name);
+  return names.length > 0 ? { required: names } : {};
 }

@@ -6,6 +6,7 @@
  * 인자가 없으면 기본 명령을 사용한다.
  */
 import { createClient } from "./client.js";
+import { mockPetApp, mockWorkspace } from "./mock-executors.js";
 import type { RunCallbacks } from "./types.js";
 
 const DEFAULT_COMMAND = "안녕, 자기소개 해줘";
@@ -32,9 +33,11 @@ async function main(): Promise<void> {
       // 버퍼링 없이 즉시 출력해야 글자가 실시간으로 흘러나온다.
       process.stdout.write(text);
     },
-    onToolCallStart({ name, input }) {
+    onToolCallStart({ name, input, executor }) {
       // 앞의 텍스트 스트림이 개행 없이 끝나므로 \n으로 줄을 띄운다.
       console.log(`\n[tool_call] ${name} ${JSON.stringify(input)}`);
+      // 레지스트리에 없는 도구는 executor가 undefined다 — 그 경우 라우팅 자체가 없다.
+      if (executor) console.log(`[dispatch] ${name} → ${executor}`);
     },
     onToolResult({ content }) {
       // content는 이미 실행 결과 객체의 JSON 문자열이다 — 다시 감싸면 이중 인코딩된다.
@@ -46,7 +49,13 @@ async function main(): Promise<void> {
     },
   };
 
-  const client = createClient(apiKey, model);
+  // 실제 실행기(pet-app 소켓 프록시 / workspace 인프로세스 실행기) 자리에
+  // mock을 주입한다. 디스패치 경로는 실제와 동일하다.
+  const client = createClient({
+    apiKey,
+    model,
+    executors: { "pet-app": mockPetApp, workspace: mockWorkspace },
+  });
   await client.run(command, callbacks, controller.signal);
 
   process.off("SIGINT", onSigint);

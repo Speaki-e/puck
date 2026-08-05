@@ -19,9 +19,11 @@ export interface ToolCallInfo {
 export interface ToolResultInfo {
   /** 대응하는 ToolCallInfo.id. */
   id: string;
-  /** 도구 실행 성공 여부. */
+  /** 실행된 도구 이름. 여러 도구가 한 턴에 호출될 때 결과를 짝지어 보기 위한 것. */
+  name: string;
+  /** 도구 실행 성공 여부. false면 tool_result에 is_error 플래그가 붙는다. */
   ok: boolean;
-  /** 모델에게 돌려줄 결과 텍스트. */
+  /** 모델에게 돌려줄 결과 텍스트. A1에서는 실행 결과 객체의 JSON.stringify 결과. */
   content: string;
 }
 
@@ -37,10 +39,10 @@ export interface RunCallbacks {
    */
   onDone(ok: boolean, summary?: string): void;
 
-  /** A0에서는 호출되지 않음 — 타입만 선언. */
+  /** 모델이 도구를 호출했을 때, 실행 직전에 호출. (A1부터 호출됨) */
   onToolCallStart?(call: ToolCallInfo): void;
 
-  /** A0에서는 호출되지 않음 — 타입만 선언. */
+  /** 도구 실행이 끝났을 때, 결과를 모델에 돌려주기 직전에 호출. (A1부터 호출됨) */
   onToolResult?(result: ToolResultInfo): void;
 }
 

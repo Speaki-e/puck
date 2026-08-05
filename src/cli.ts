@@ -32,6 +32,14 @@ async function main(): Promise<void> {
       // 버퍼링 없이 즉시 출력해야 글자가 실시간으로 흘러나온다.
       process.stdout.write(text);
     },
+    onToolCallStart({ name, input }) {
+      // 앞의 텍스트 스트림이 개행 없이 끝나므로 \n으로 줄을 띄운다.
+      console.log(`\n[tool_call] ${name} ${JSON.stringify(input)}`);
+    },
+    onToolResult({ content }) {
+      // content는 이미 실행 결과 객체의 JSON 문자열이다 — 다시 감싸면 이중 인코딩된다.
+      console.log(`[tool_result] ${content}`);
+    },
     onDone(ok, summary) {
       process.stdout.write(`\n[done ok=${ok}${summary ? ` ${summary}` : ""}]\n`);
       if (!ok) process.exitCode = 1;

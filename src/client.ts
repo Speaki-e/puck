@@ -1,7 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { JSONValue, ToolDefinition } from "@speaki-e/protocol/src/index.js";
 
-import { TOOLS, executeTool, type ToolExecutionResult } from "./tools.js";
-import type { AiClient, RunCallbacks } from "./types.js";
+import { getToolDef, toAnthropicTools, validateArgs } from "./tools.js";
+import type {
+  AiClient,
+  ClientOptions,
+  ExecutorMap,
+  LocalToolErrorCode,
+  RunCallbacks,
+  ToolExecutionResult,
+} from "./types.js";
 
 /**
  * 스트리밍 요청이므로 넉넉하게 잡는다. max_tokens는 상한일 뿐
@@ -18,13 +26,13 @@ const MAX_TURNS = 10;
 /**
  * Claude 스트리밍 클라이언트를 생성한다.
  *
- * API 키와 모델명은 모듈 내부에 저장하지 않고 호출부에서 주입받는다.
- *
- * @param apiKey Anthropic API 키 (CLI에서는 ANTHROPIC_API_KEY 환경변수)
- * @param model  모델 ID (예: "claude-sonnet-4-6")
+ * API 키/모델/실행기를 전부 주입받는다 — 모듈 내부에 저장하지 않고, 도구를
+ * 직접 실행하지도 않는다. 어떤 도구가 어느 실행기로 가는지는 protocol의
+ * TOOL_REGISTRY가 정하고, 이 모듈은 그 라우팅만 수행한다.
  */
-export function createClient(apiKey: string, model: string): AiClient {
+export function createClient({ apiKey, model, executors }: ClientOptions): AiClient {
   const anthropic = new Anthropic({ apiKey });
+  const tools = toAnthropicTools();
 
   return {
     async run(command, callbacks, signal) {
@@ -39,7 +47,7 @@ export function createClient(apiKey: string, model: string): AiClient {
             {
               model,
               max_tokens: DEFAULT_MAX_TOKENS,
-              tools: TOOLS,
+              tools,
               messages,
             },
             // AbortSignal을 SDK에 그대로 전달 — 중간 중단이 실제 HTTP 요청까지 전파된다.
@@ -74,10 +82,11 @@ export function createClient(apiKey: string, model: string): AiClient {
 
           // 여러 개면 전부 순차 실행하고, 모든 id에 대한 tool_result를 한 user
           // 메시지에 모아서 보낸다. 나눠 보내면 모델이 병렬 호출을 그만두게 된다.
-          messages.push({
-            role: "user",
-            content: toolUses.map((block) => runOneTool(block, callbacks)),
-          });
+          const results: Anthropic.ToolResultBlockParam[] = [];
+          for (const block of toolUses) {
+            results.push(await runOneTool(block, executors, callbacks, signal));
+          }
+          messages.push({ role: "user", content: results });
         }
 
         callbacks.onDone(false, "max_turns_exceeded");
@@ -90,28 +99,34 @@ export function createClient(apiKey: string, model: string): AiClient {
 }
 
 /**
- * tool_use 블록 하나를 실행하고 대응하는 tool_result 블록을 만든다.
+ * tool_use 블록 하나를 레지스트리 기준으로 라우팅해 실행하고, 대응하는
+ * tool_result 블록을 만든다.
  *
  * 이 함수는 절대 예외를 던지지 않는다. tool_use 블록이 여러 개일 때 하나가
  * 실패해서 그 id의 tool_result를 빠뜨리면, 다음 API 호출이
  * "tool_use ids were found without tool_result blocks"로 거부된다.
  * 그래서 실행기 예외와 콜백 예외를 모두 여기서 흡수한다.
  */
-function runOneTool(
+async function runOneTool(
   block: Anthropic.ToolUseBlock,
+  executors: ExecutorMap,
   callbacks: RunCallbacks,
-): Anthropic.ToolResultBlockParam {
-  let result: ToolExecutionResult;
+  signal?: AbortSignal,
+): Promise<Anthropic.ToolResultBlockParam> {
+  const def = getToolDef(block.name);
+
   try {
     callbacks.onToolCallStart?.({
       id: block.id,
       name: block.name,
       input: block.input,
+      ...(def ? { executor: def.executor } : {}),
     });
-    result = executeTool(block.name, block.input);
-  } catch (err) {
-    result = { ok: false, error: describeError(err) };
+  } catch {
+    // 로그 콜백이 실패해도 도구 실행과 tool_result 생성은 계속돼야 한다.
   }
+
+  const result = await dispatch(def, block, executors, signal);
 
   // 결과는 문자열로만 돌려줄 수 있으므로 JSON으로 직렬화한다.
   const content = JSON.stringify(result);
@@ -134,6 +149,65 @@ function runOneTool(
     // 실패한 결과에만 붙인다. 모델이 재시도할지 다른 방법을 쓸지 판단하는 신호다.
     ...(result.ok ? {} : { is_error: true }),
   };
+}
+
+/**
+ * 레지스트리 정의에 따라 실행기를 고르고 호출한다.
+ *
+ * 실패는 전부 { ok: false } 결과로 표현하고 예외를 던지지 않는다.
+ */
+async function dispatch(
+  def: ToolDefinition | undefined,
+  block: Anthropic.ToolUseBlock,
+  executors: ExecutorMap,
+  signal?: AbortSignal,
+): Promise<ToolExecutionResult> {
+  // 1) 레지스트리에 없는 이름 — 모델이 지어낸 도구이거나 레지스트리가 바뀐 경우.
+  if (def === undefined) {
+    return fail("unknown_tool", `${block.name}은(는) 등록된 도구가 아닙니다.`);
+  }
+
+  // 2) "ai-module"은 디스패치 대상이 아니라 인라인 처리 표식이다.
+  // TODO: 3.7절 open_task_session 인라인 처리, A5 이후.
+  //   새 세션 id 할당 → brief로 히스토리 시드 → onSessionCreated 통지까지
+  //   여기서 직접 처리하고, 소켓으로는 절대 내보내지 않는다.
+  if (def.executor === "ai-module") {
+    return fail("not_implemented_yet", `${def.name}은(는) 아직 구현되지 않았습니다.`);
+  }
+
+  // TODO: A6 승인 게이트에서 def.approval 사용.
+  //   required / required_with_whitelist면 여기서 onApprovalRequired로 사용자
+  //   확인을 받고, 거부되면 denied_by_user로 되돌린다. acp_internal은 통과.
+  // TODO: def.timeoutSec — 실행기 호출에 타임아웃을 걸고 초과 시 timeout 반환.
+  //   지금은 mock이 즉시 응답하므로 걸지 않는다.
+
+  const executor = executors[def.executor];
+  if (executor === undefined) {
+    return fail("executor_not_available", `${def.executor} 실행기가 주입되지 않았습니다.`);
+  }
+
+  // 스키마를 strict로 걸지 않았으므로 모델 입력을 그대로 믿지 않는다.
+  const badField = validateArgs(def, block.input);
+  if (badField !== undefined) {
+    return fail("invalid_input", `${badField} 값이 없거나 형식이 올바르지 않습니다.`);
+  }
+
+  try {
+    // block.input은 API가 파싱해 준 JSON이므로 JSONValue다.
+    return await executor.execute(def.name, block.input as JSONValue, signal);
+  } catch (err) {
+    // 중단으로 인한 실패도 여기서 결과로 흡수한다. 그래야 이 턴의 모든 tool_use에
+    // tool_result가 채워지고, 실제 종료는 다음 API 호출의 abort로 이어진다.
+    return fail("execution_failed", describeError(err));
+  }
+}
+
+/** 실패 결과. error 코드는 모델이 재시도 여부를 판단하는 신호이므로 detail과 분리한다. */
+function fail(error: LocalToolErrorCode, detail: string): ToolExecutionResult {
+  // ToolExecutionResult.error는 protocol의 ToolResultErrorCode로 좁혀져 있지만,
+  // invalid_input/not_implemented_yet/executor_not_available은 디스패치 이전에
+  // ai-module 안에서만 발생해 소켓을 건너지 않는다. LocalToolErrorCode 참조.
+  return { ok: false, error, detail } as ToolExecutionResult;
 }
 
 /** 에러를 한 줄 요약 문자열로 변환한다. */

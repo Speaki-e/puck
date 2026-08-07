@@ -124,7 +124,58 @@ AI: 공식 Anthropic TypeScript SDK (@anthropic-ai/sdk) 스트리밍 — 자체 
 - 태그 규칙: 인터페이스 변경 시 minor 이상, workspace 통합 마일스톤마다 태그 필수
 - README에 CLI 사용법 (목 실행기 실행, 케이스 회귀 돌리기) 필수
 
-## 6. 리스크
+## 6. CLI 사용법 (A3 구현 기준)
+
+공통: `ANTHROPIC_API_KEY` 필수(없으면 종료 코드 1), `ANTHROPIC_MODEL` 선택(기본 `claude-sonnet-4-6`). `npm run cli`은 `tsx --env-file=.env`로 실행되므로 저장소 루트의 `.env`를 읽는다. 실행기는 목(mock) 고정.
+
+### 모드 1 — 단발 실행
+
+```
+npm run cli "사파리 켜줘"
+```
+
+응답 텍스트 스트리밍 + `[tool_call]` / `[dispatch]` / `[tool_result]` / `[done]` 로그를 stdout에 출력. 종료 코드는 run 성공 시 0, 실패(`ok=false` — 중단·API 오류·max_turns 등) 시 1.
+
+### 모드 2 — 대화형 REPL
+
+```
+npm run cli
+```
+
+프롬프트 `ai-module> `. 특수 명령:
+
+- `/tools` — protocol `TOOL_REGISTRY`를 표로 출력 (name/executor/approval/timeout, API 호출 없음)
+- `/help` — 특수 명령 안내
+- `/exit` — 종료
+
+실행 중 Ctrl+C는 그 run만 중단하고(`[done ok=false aborted]`) 프롬프트로 돌아온다. 프롬프트 상태에서 Ctrl+C는 종료. 종료 코드는 항상 0.
+
+A5 전까지 대화 히스토리가 없으므로 **각 입력은 서로 독립된 run**이다 — 모델은 이전 턴을 기억하지 못한다.
+
+### 모드 3 — 시퀀스 출력 (A4 회귀 테스트 기반)
+
+```
+npm run cli -- --seq "사파리 켜줘"
+```
+
+**stdout에는 JSON 한 줄만** 나간다(파이프 전용). 사람이 읽는 로그는 stderr로 분리된다.
+
+```json
+{"command":"사파리 켜줘","sequence":[{"tool":"launch_app","args":{"app_name":"Safari"}}],"ok":true,"stopReason":"end_turn"}
+```
+
+| 필드 | 타입 | 의미 |
+| --- | --- | --- |
+| `command` | string | 입력한 명령 원문 |
+| `sequence` | `{tool: string, args: unknown}[]` | 호출된 도구를 호출 순서대로. 없으면 `[]`. 인자 검증 실패로 실행되지 않은 호출도 포함(모델이 시도한 것 자체가 회귀 대상) |
+| `ok` | boolean | 루프가 `end_turn`으로 끝났는지. 개별 도구 실패는 반영되지 않음 |
+| `stopReason` | string | 성공 시 `stop_reason`, 실패 시 요약(`aborted`, `max_turns_exceeded`, `api error (...)` 등) |
+
+종료 코드는 **항상 0**이다(실패도 JSON으로 보고). API 키 누락, `--seq`에 명령 미지정처럼 애초에 실행이 불가능한 경우만 1이며 그때는 stdout에 아무것도 쓰지 않는다.
+
+npm 플래그 주의: `npm run cli --seq "명령"`에서 npm이 `--seq`를 자기 config로 삼켜 스크립트에 전달하지 않는다(대신 `npm_config_seq=true`). CLI가 두 경로를 모두 인식하므로 위 형태와 `npm run cli -- --seq "명령"`, `npx tsx --env-file=.env src/cli.ts --seq "명령"`이 모두 같게 동작한다.
+
+## 7. 리스크
 
 - 상급자 부재 → CLI 우선의 완만한 난이도 곡선 + 통합 시 이주한 리뷰
 - 에이전트→Claude Code 이중 위임 혼선 → 시스템 프롬프트 규칙 1 + read_file 열람 전용 한정

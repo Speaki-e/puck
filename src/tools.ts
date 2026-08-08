@@ -45,6 +45,14 @@ export function getToolDef(name: string): ToolDefinition | undefined {
 }
 
 /**
+ * 레지스트리 전체를 레지스트리 순서 그대로 반환한다. (CLI /tools 출력용)
+ * protocol import 경로를 이 파일 하나로 묶어두기 위한 통로다.
+ */
+export function allTools(): readonly ToolDefinition[] {
+  return TOOL_REGISTRY;
+}
+
+/**
  * 모델이 보낸 입력이 레지스트리 스펙에 맞는지 검사한다.
  *
  * strict 스키마를 걸지 않았으므로 모델은 필수 필드를 빠뜨리거나 타입이 다른

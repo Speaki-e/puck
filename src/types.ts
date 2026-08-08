@@ -101,6 +101,20 @@ export interface RunCallbacks {
   onToolResult?(result: ToolResultInfo): void;
 
   /**
+   * 위험한 도구를 실행하기 직전에 호출. (A6부터, 기획서 3.3)
+   * 시그니처는 protocol AgentCallbacks.onApprovalRequired와 같다.
+   *
+   * resolve(true)면 실행하고, resolve(false)면 실행기를 호출하지 않은 채
+   * tool_result(error=denied_by_user)를 모델에 돌려준다.
+   *
+   * 이 콜백을 붙이지 않으면 승인이 필요한 도구는 전부 거부된다 —
+   * 물어볼 방법이 없는데 실행하면 게이트가 없는 것과 같다.
+   *
+   * @param summary 사용자가 무엇을 허용하는지 판단할 한 줄 요약(실행될 명령 원문 포함).
+   */
+  onApprovalRequired?(summary: string, resolve: (approved: boolean) => void): void;
+
+  /**
    * 모델이 스스로 open_task_session을 호출해 새 작업 세션이 열렸을 때 호출.
    * (A5부터, 기획서 3.7) 시그니처는 protocol AgentCallbacks.onSessionCreated와 같다.
    *

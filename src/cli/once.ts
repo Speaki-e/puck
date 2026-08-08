@@ -8,6 +8,7 @@
  */
 import { DEFAULT_SESSION_ID } from "../session-store.js";
 import type { AiClient } from "../types.js";
+import { askApproval } from "./approve.js";
 import { createLogCallbacks } from "./log.js";
 
 export async function runOnce(client: AiClient, command: string): Promise<number> {
@@ -25,6 +26,10 @@ export async function runOnce(client: AiClient, command: string): Promise<number
     {},
     {
       ...log,
+      onApprovalRequired(summary, resolve) {
+        // 단발 모드에는 열려 있는 readline이 없다 — 물을 때만 잠깐 만든다.
+        askApproval(summary, resolve, { out: process.stdout, signal: controller.signal });
+      },
       onDone(ok, summary) {
         log.onDone(ok, summary);
         if (!ok) exitCode = 1;

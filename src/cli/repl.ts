@@ -11,6 +11,7 @@ import * as readline from "node:readline";
 import { DEFAULT_SESSION_ID } from "../session-store.js";
 import { allTools } from "../tools.js";
 import type { AiClient, Context } from "../types.js";
+import { askApproval } from "./approve.js";
 import { createLogCallbacks } from "./log.js";
 
 /** 스트림 주입은 테스트용이다. 실제 실행에서는 기본값(process.stdin/stdout)을 쓴다. */
@@ -42,9 +43,18 @@ export async function runRepl(client: AiClient, io: ReplIo = {}): Promise<number
   const setPrompt = (): void => rl.setPrompt(`ai-module[${sessionId}]> `);
   setPrompt();
 
+  // 진행 중인 run이 있을 때만 값이 있다. Ctrl+C가 "run 중단"인지 "REPL 종료"인지
+  // 가르는 기준이자, 승인 대기를 함께 풀어주는 신호다.
+  let running: AbortController | undefined;
+
   const log = createLogCallbacks({ out: output, streamText: true, printDone: true });
   const callbacks = {
     ...log,
+    onApprovalRequired(summary: string, resolve: (approved: boolean) => void) {
+      // 이미 열려 있는 REPL readline을 재사용한다. question은 그 줄을 가로채므로
+      // 답변이 다음 명령으로 흘러들어가지 않는다.
+      askApproval(summary, resolve, { rl, out: output, signal: running?.signal });
+    },
     onSessionCreated(created: string, title: string) {
       // pet-app 사이드바가 새 세션으로 전환되는 동작을 CLI에서 흉내 낸다.
       output.write(`\n[새 세션 생성: ${created} (${title})] — 이후 명령은 이 세션에서 진행됩니다.\n`);
@@ -62,10 +72,6 @@ export async function runRepl(client: AiClient, io: ReplIo = {}): Promise<number
   const prompt = (): void => {
     if (!closed) rl.prompt();
   };
-
-  // 진행 중인 run이 있을 때만 값이 있다. Ctrl+C가 "run 중단"인지 "REPL 종료"인지
-  // 가르는 유일한 기준이다.
-  let running: AbortController | undefined;
 
   const interrupt = (): void => {
     if (running !== undefined) {

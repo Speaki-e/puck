@@ -160,7 +160,10 @@ npm run cli
 ```
 npm run cli --seq "사파리 켜줘"
 npm run cli --seq --session=t1 "사파리 켜줘"
+npm run cli --seq --approve=all "빌드 폴더 지워줘"
 ```
+
+`--approve`는 대화형 입력이 불가능한 `--seq`에서 승인 요청을 어떻게 처리할지 정한다. `all`이면 전부 허용, 그 외 값과 미지정은 전부 거부(`none`)다 — 회귀 테스트가 위험한 명령을 실수로 통과시키지 않도록 기본값이 거부다.
 
 **stdout에는 JSON 한 줄만** 나간다(파이프 전용). 사람이 읽는 로그는 stderr로 분리된다.
 
@@ -175,11 +178,40 @@ npm run cli --seq --session=t1 "사파리 켜줘"
 | `sequence` | `{tool: string, args: unknown}[]` | 호출된 도구를 호출 순서대로. 없으면 `[]`. 인자 검증 실패로 실행되지 않은 호출도 포함 |
 | `ok` | boolean | 루프가 `end_turn`으로 끝났는지. 개별 도구 실패는 반영되지 않음 |
 | `stopReason` | string | 성공 시 `stop_reason`, 실패 시 요약(`aborted`, `max_turns_exceeded`, `api error (...)` 등) |
+| `approvals` | `{tool, summary, approved}[]` | 발생한 승인 요청 전건. 없으면 `[]`(필드는 항상 존재) |
 | `createdSession` | `{id, title}` (선택) | `open_task_session`이 발생했을 때만 존재 |
 
 종료 코드는 **항상 0**(실패도 JSON으로 보고). API 키 누락·명령 미지정처럼 실행 자체가 불가능한 경우만 1이며 그때는 stdout에 아무것도 쓰지 않는다.
 
 npm 플래그 주의: npm이 `--seq` / `--session=` 을 자기 config로 삼켜 스크립트에 전달하지 않는다(대신 `npm_config_seq` / `npm_config_session`). CLI가 두 경로를 모두 인식하므로 위 형태와 `npm run cli -- --seq "명령"`, `npx tsx --env-file=.env src/cli.ts --seq "명령"`이 모두 같게 동작한다.
+
+### 승인 게이트 (A6)
+
+위험한 도구는 실행기를 호출하기 **전에** 사용자 승인을 받는다. 거부하면 실행기를 아예 호출하지 않고 모델에게 `tool_result(ok=false, error="denied_by_user")`를 돌려준다 — `denied_by_user`는 소켓을 지나지 않는 모델 전용 값이므로, 여기서 막지 못하면 위험한 명령이 이미 pet-app으로 나간 뒤가 된다.
+
+판정 기준은 protocol 레지스트리의 `approval.kind`다:
+
+| kind | 대상 도구 | 동작 |
+| --- | --- | --- |
+| `not_required` | launch_app, read_file, point_at, open_task_session 등 | 그냥 실행 |
+| `required` | click_element, run_applescript | 항상 승인 요구 |
+| `required_with_whitelist` | run_shell | 아래 규칙 |
+| `acp_internal` | code_editor | 통과 (Claude Code의 자체 승인 흐름이 처리) |
+
+**run_shell 화이트리스트 (`data/whitelist.json`)**
+
+1. **셸 메타문자가 하나라도 있으면 화이트리스트와 무관하게 무조건 승인을 요구한다.** 대상: ``; & | < > $ ` ( ) [ ] { } * ? ! # \`` 와 개행/캐리지리턴. `ls; rm -rf ~`처럼 허용 명령으로 시작해 다른 명령을 이어 붙이는 경로를 전부 막기 위한 것이다(접두 매칭 금지).
+2. 메타문자가 없을 때만 토큰 **완전 일치**를 본다.
+   - `first_token_commands` — 첫 토큰이 일치하면 통과(뒤 인자는 자유). `ls`, `cat`, `pwd`, `echo`, `which`, `head`, `tail`, `wc`, `date`, `whoami`
+   - `two_token_commands` — 앞 **두** 토큰이 일치해야 통과. `git status`, `git log`, `git diff`, `git branch`, `git show`. `git` 단독은 통과하지 않으므로 `git push` / `git reset --hard`는 승인을 받는다.
+   - `open`은 읽기성이 아니라 임의 실행이므로 **절대 넣지 않는다**(기획서 3.3).
+3. 파일이 없거나 깨졌으면 빈 화이트리스트로 물러선다 — 모든 셸 명령이 승인 대상이 되고, 이유는 stderr에 남는다.
+
+**승인 UI**
+
+- 단발/REPL: `⚠️ 승인 필요: <요약>` 뒤에 `허용하시겠습니까? [y/N]: `. `y`/`yes`만 허용이고 **엔터·그 외 입력·입력 종료(EOF)·Ctrl+C는 전부 거부**다.
+- `--seq`: `--approve=all|none`(기본 none)으로 정하고, 결정을 `approvals` 배열에 기록한다.
+- 승인 콜백(`onApprovalRequired`)을 붙이지 않은 호출부에서는 승인이 필요한 도구가 전부 거부된다 — 물어볼 수 없는데 실행하면 게이트가 없는 것과 같다.
 
 ### 세션과 히스토리 (A5)
 

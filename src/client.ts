@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import type { JSONValue, ToolDefinition } from "@speaki-e/protocol/src/index.js";
 
+import { describeApproval, loadWhitelist, needsApproval, type Whitelist } from "./approval.js";
 import { buildSystemPrompt, loadBasePrompt } from "./context.js";
 import { DEFAULT_SESSION_ID, SessionStore } from "./session-store.js";
 import { getToolDef, toAnthropicTools, validateArgs } from "./tools.js";
@@ -43,6 +44,7 @@ export function createClient({ apiKey, model, executors }: ClientOptions): AiCli
   const anthropic = new Anthropic({ apiKey });
   const tools = toAnthropicTools();
   const basePrompt = loadBasePrompt();
+  const whitelist = loadWhitelist();
   const store = new SessionStore((sessionId, waiting) => {
     // stdout은 --seq의 JSON 전용이라 건드리지 않는다.
     process.stderr.write(`[queued session=${sessionId} waiting=${waiting}]\n`);
@@ -124,7 +126,7 @@ export function createClient({ apiKey, model, executors }: ClientOptions): AiCli
         // 메시지에 모아서 보낸다. 나눠 보내면 모델이 병렬 호출을 그만두게 된다.
         const results: Anthropic.ToolResultBlockParam[] = [];
         for (const block of toolUses) {
-          results.push(await runOneTool(block, executors, store, callbacks, signal));
+          results.push(await runOneTool(block, executors, whitelist, store, callbacks, signal));
         }
         messages.push({ role: "user", content: results });
       }
@@ -176,6 +178,7 @@ export function createClient({ apiKey, model, executors }: ClientOptions): AiCli
 async function runOneTool(
   block: Anthropic.ToolUseBlock,
   executors: ExecutorMap,
+  whitelist: Whitelist,
   store: SessionStore,
   callbacks: RunCallbacks,
   signal?: AbortSignal,
@@ -193,7 +196,7 @@ async function runOneTool(
     // 로그 콜백이 실패해도 도구 실행과 tool_result 생성은 계속돼야 한다.
   }
 
-  const result = await dispatch(def, block, executors, store, callbacks, signal);
+  const result = await dispatch(def, block, executors, whitelist, store, callbacks, signal);
 
   // 결과는 문자열로만 돌려줄 수 있으므로 JSON으로 직렬화한다.
   const content = JSON.stringify(result);
@@ -227,6 +230,7 @@ async function dispatch(
   def: ToolDefinition | undefined,
   block: Anthropic.ToolUseBlock,
   executors: ExecutorMap,
+  whitelist: Whitelist,
   store: SessionStore,
   callbacks: RunCallbacks,
   signal?: AbortSignal,
@@ -249,9 +253,6 @@ async function dispatch(
     return openTaskSession(block.input as Record<string, string>, store, callbacks);
   }
 
-  // TODO: A6 승인 게이트에서 def.approval 사용.
-  //   required / required_with_whitelist면 여기서 onApprovalRequired로 사용자
-  //   확인을 받고, 거부되면 denied_by_user로 되돌린다. acp_internal은 통과.
   // TODO: def.timeoutSec — 실행기 호출에 타임아웃을 걸고 초과 시 timeout 반환.
   //   지금은 mock이 즉시 응답하므로 걸지 않는다.
 
@@ -261,9 +262,20 @@ async function dispatch(
   }
 
   // 스키마를 strict로 걸지 않았으므로 모델 입력을 그대로 믿지 않는다.
+  // 승인보다 먼저 본다 — 형식이 깨진 호출로 사용자를 깨울 이유가 없다.
   const badField = validateArgs(def, block.input);
   if (badField !== undefined) {
     return fail("invalid_input", `${badField} 값이 없거나 형식이 올바르지 않습니다.`);
+  }
+
+  // 승인 게이트(기획서 3.3). 거부되면 실행기를 호출하지 않는 것이 핵심이다 —
+  // denied_by_user는 소켓을 지나지 않는 모델 전용 값이므로, 여기서 막지 못하면
+  // 위험한 명령이 이미 pet-app으로 나간 뒤가 된다.
+  if (needsApproval(def, block.input, whitelist)) {
+    const approved = await requestApproval(describeApproval(def, block.input), callbacks, signal);
+    if (!approved) {
+      return fail("denied_by_user", `${def.name} 실행이 사용자에 의해 거부되었습니다.`);
+    }
   }
 
   try {
@@ -274,6 +286,47 @@ async function dispatch(
     // tool_result가 채워지고, 실제 종료는 다음 API 호출의 abort로 이어진다.
     return fail("execution_failed", describeError(err));
   }
+}
+
+/**
+ * 사용자에게 승인을 묻고 답을 기다린다.
+ *
+ * 안전 기본값은 항상 거부다:
+ * - 콜백을 붙이지 않은 호출부(승인 UI가 없는 환경)에서는 묻지 않고 거부한다.
+ *   물어볼 수 없는데 실행하면 게이트가 없는 것과 같다.
+ * - 대기 중에 abort되면 즉시 거부로 풀어 pending이 남지 않게 한다.
+ * - 콜백이 예외를 던져도 거부로 처리한다.
+ *
+ * resolve가 여러 번 호출돼도 첫 번째만 반영한다 — UI가 중복 호출해도
+ * 이 프라미스가 두 번 풀리지 않아야 한다.
+ */
+function requestApproval(
+  summary: string,
+  callbacks: RunCallbacks,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const ask = callbacks.onApprovalRequired;
+  if (ask === undefined) return Promise.resolve(false);
+  if (signal?.aborted) return Promise.resolve(false);
+
+  return new Promise<boolean>((settle) => {
+    let settled = false;
+    const finish = (approved: boolean): void => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      settle(approved);
+    };
+    const onAbort = (): void => finish(false);
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    try {
+      ask(summary, finish);
+    } catch {
+      finish(false);
+    }
+  });
 }
 
 /**

@@ -24,6 +24,22 @@ export interface SeqCreatedSession {
   title: string;
 }
 
+/** 승인 요청 한 건. 요청이 없었으면 빈 배열이다. */
+export interface SeqApproval {
+  /** 승인을 요구한 도구 이름. */
+  tool: string;
+  /** 사용자에게 보였을 요약. */
+  summary: string;
+  /** --approve 정책에 따른 결정. */
+  approved: boolean;
+}
+
+/**
+ * --seq는 대화형 입력이 불가능하므로 승인 정책을 미리 정한다.
+ * 기본은 none(전부 거부) — 회귀 테스트가 위험한 명령을 실제로 통과시키면 안 된다.
+ */
+export type ApprovePolicy = "all" | "none";
+
 /** --seq가 stdout에 출력하는 JSON 한 줄의 스키마. */
 export interface SeqOutput {
   command: string;
@@ -35,6 +51,8 @@ export interface SeqOutput {
   ok: boolean;
   /** 성공 시 stop_reason, 실패 시 실패 요약 문자열. */
   stopReason: string;
+  /** 발생한 승인 요청 전건. 없으면 빈 배열(필드는 항상 존재한다). */
+  approvals: SeqApproval[];
   /** open_task_session이 발생했을 때만 존재한다. */
   createdSession?: SeqCreatedSession;
 }
@@ -43,15 +61,21 @@ export async function runSeq(
   client: AiClient,
   command: string,
   sessionId: string,
+  approve: ApprovePolicy,
 ): Promise<number> {
   const controller = new AbortController();
   const onSigint = () => controller.abort();
   process.on("SIGINT", onSigint);
 
   const sequence: SeqEntry[] = [];
+  const approvals: SeqApproval[] = [];
   let createdSession: SeqCreatedSession | undefined;
   let ok = false;
   let stopReason = "unknown";
+
+  // 승인 콜백은 도구 이름을 받지 않는다(protocol 시그니처가 summary/resolve뿐).
+  // 루프가 도구를 순차 실행하므로 "직전에 시작된 도구"가 곧 승인 대상이다.
+  let pendingTool = "unknown";
 
   await client.run(
     command,
@@ -62,7 +86,14 @@ export async function runSeq(
       onTextChunk() {},
       onToolCallStart(call) {
         sequence.push({ tool: call.name, args: call.input });
+        pendingTool = call.name;
         process.stderr.write(`${formatToolCall(call)}\n`);
+      },
+      onApprovalRequired(summary, resolve) {
+        const approved = approve === "all";
+        approvals.push({ tool: pendingTool, summary, approved });
+        process.stderr.write(`[approval] ${summary} → ${approved ? "allow" : "deny"}\n`);
+        resolve(approved);
       },
       onToolResult(result) {
         process.stderr.write(`${formatToolResult(result)}\n`);
@@ -89,6 +120,7 @@ export async function runSeq(
     sequence,
     ok,
     stopReason,
+    approvals,
     ...(createdSession ? { createdSession } : {}),
   };
   process.stdout.write(`${JSON.stringify(output)}\n`);

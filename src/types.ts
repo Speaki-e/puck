@@ -4,12 +4,23 @@
  * 이 시그니처는 이후 단계(도구 호출, 대화 히스토리, 승인 게이트)에서 확장될 예정이므로
  * 필드를 제거하거나 이름을 바꾸지 말고 추가만 할 것.
  */
-import type { ToolExecutor, ToolExecutorKind, ToolResultErrorCode } from "@speaki-e/protocol/src/index.js";
+import type {
+  Attachment,
+  Context,
+  ToolExecutor,
+  ToolExecutorKind,
+  ToolResultErrorCode,
+} from "@speaki-e/protocol/src/index.js";
 
 // ToolExecutor는 protocol이 이미 정의하고 있다(agent-interface.ts). 자체 정의하지 않고
 // 그대로 재수출한다 — 호출부가 protocol 경로를 몰라도 되게 하기 위한 편의 재수출일 뿐,
 // 이 파일이 원본이 아니다.
-export type { ToolExecutor, ToolExecutionResult } from "@speaki-e/protocol/src/index.js";
+export type {
+  Attachment,
+  Context,
+  ToolExecutor,
+  ToolExecutionResult,
+} from "@speaki-e/protocol/src/index.js";
 
 /**
  * 실제로 디스패치되는 실행기 종류. "ai-module"은 open_task_session 하나를 위한
@@ -88,15 +99,42 @@ export interface RunCallbacks {
 
   /** 도구 실행이 끝났을 때, 결과를 모델에 돌려주기 직전에 호출. (A1부터 호출됨) */
   onToolResult?(result: ToolResultInfo): void;
+
+  /**
+   * 모델이 스스로 open_task_session을 호출해 새 작업 세션이 열렸을 때 호출.
+   * (A5부터, 기획서 3.7) 시그니처는 protocol AgentCallbacks.onSessionCreated와 같다.
+   *
+   * 호출자(workspace)는 이걸 session_create(origin=agent) 소켓 이벤트로 바꿔
+   * pet-app 사이드바에 새 세션을 띄운다. CLI는 현재 세션을 그쪽으로 전환한다.
+   */
+  onSessionCreated?(sessionId: string, title: string): void;
 }
 
 /** createClient()가 반환하는 클라이언트. (A2 기준: 도구 실행은 주입된 실행기가 담당) */
 export interface AiClient {
   /**
-   * 명령 문자열을 Claude에 보내고 응답을 콜백으로 스트리밍한다.
-   * 예외를 던지지 않는다 — 모든 실패는 onDone(false, message)로 보고된다.
+   * A0~A3 호환 형태. sessionId는 "default", context는 {}로 취급된다.
    *
+   * 예외를 던지지 않는다 — 모든 실패는 onDone(false, message)로 보고된다.
    * @param signal 중간 중단용. abort 시 onDone(false, "aborted")로 종료.
    */
   run(command: string, callbacks: RunCallbacks, signal?: AbortSignal): Promise<void>;
+
+  /**
+   * protocol AgentRun과 같은 인자 순서
+   * (command, sessionId, context, callbacks, attachments?, signal?).
+   *
+   * 같은 sessionId로 실행 중에 다시 호출하면 그 세션 안에서만 직렬 큐잉된다 —
+   * 앞의 run이 끝난 뒤 순서대로 처리되고, 다른 sessionId의 run은 막지 않는다.
+   *
+   * @param attachments A5에서는 무시된다. TODO: 이미지 첨부 처리(F14 드래그 캡처).
+   */
+  run(
+    command: string,
+    sessionId: string,
+    context: Context,
+    callbacks: RunCallbacks,
+    attachments?: Attachment[],
+    signal?: AbortSignal,
+  ): Promise<void>;
 }

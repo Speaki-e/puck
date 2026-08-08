@@ -1,16 +1,30 @@
 /**
- * 테스트용 진입점.
+ * ai-module A3/A5 — CLI 테스트 진입점.
  *
- *   npx tsx src/cli.ts "질문 내용"
+ *   npm run cli "명령"                        단발 실행 (텍스트 스트리밍 + 도구 로그)
+ *   npm run cli                               대화형 REPL (세션/컨텍스트 지원)
+ *   npm run cli --seq "명령"                  시퀀스 JSON 한 줄만 stdout에 출력
+ *   npm run cli --seq --session=t1 "명령"     세션을 지정해서 시퀀스 출력
  *
- * 인자가 없으면 기본 명령을 사용한다.
+ * 종료 코드: 단발 모드만 실행 실패 시 1. REPL/--seq는 0(설정 오류 제외).
+ * 자세한 규약은 README "6. CLI 사용법" 참고.
  */
 import { createClient } from "./client.js";
 import { mockPetApp, mockWorkspace } from "./mock-executors.js";
-import type { RunCallbacks } from "./types.js";
+import { DEFAULT_SESSION_ID } from "./session-store.js";
+import { runOnce } from "./cli/once.js";
+import { runRepl } from "./cli/repl.js";
+import { runSeq } from "./cli/seq.js";
 
-const DEFAULT_COMMAND = "안녕, 자기소개 해줘";
 const DEFAULT_MODEL = "claude-sonnet-4-6";
+
+type Mode = "once" | "repl" | "seq";
+
+interface ParsedArgs {
+  mode: Mode;
+  command: string;
+  sessionId: string;
+}
 
 async function main(): Promise<void> {
   const apiKey = process.env["ANTHROPIC_API_KEY"];
@@ -20,34 +34,17 @@ async function main(): Promise<void> {
     return;
   }
 
+  const { mode, command, sessionId } = parseArgs(process.argv.slice(2));
+
+  if (mode === "seq" && command === "") {
+    // --seq는 검증할 명령이 있어야 의미가 있다. 빈 JSON을 흘려보내면
+    // 회귀 스크립트가 통과한 것으로 오해한다.
+    console.error('사용법: npm run cli --seq [--session=<id>] "명령"');
+    process.exitCode = 1;
+    return;
+  }
+
   const model = process.env["ANTHROPIC_MODEL"] ?? DEFAULT_MODEL;
-  const command = process.argv.slice(2).join(" ").trim() || DEFAULT_COMMAND;
-
-  // Ctrl+C로 스트리밍 중간 중단 (AbortSignal 경로 확인용)
-  const controller = new AbortController();
-  const onSigint = () => controller.abort();
-  process.on("SIGINT", onSigint);
-
-  const callbacks: RunCallbacks = {
-    onTextChunk(text) {
-      // 버퍼링 없이 즉시 출력해야 글자가 실시간으로 흘러나온다.
-      process.stdout.write(text);
-    },
-    onToolCallStart({ name, input, executor }) {
-      // 앞의 텍스트 스트림이 개행 없이 끝나므로 \n으로 줄을 띄운다.
-      console.log(`\n[tool_call] ${name} ${JSON.stringify(input)}`);
-      // 레지스트리에 없는 도구는 executor가 undefined다 — 그 경우 라우팅 자체가 없다.
-      if (executor) console.log(`[dispatch] ${name} → ${executor}`);
-    },
-    onToolResult({ content }) {
-      // content는 이미 실행 결과 객체의 JSON 문자열이다 — 다시 감싸면 이중 인코딩된다.
-      console.log(`[tool_result] ${content}`);
-    },
-    onDone(ok, summary) {
-      process.stdout.write(`\n[done ok=${ok}${summary ? ` ${summary}` : ""}]\n`);
-      if (!ok) process.exitCode = 1;
-    },
-  };
 
   // 실제 실행기(pet-app 소켓 프록시 / workspace 인프로세스 실행기) 자리에
   // mock을 주입한다. 디스패치 경로는 실제와 동일하다.
@@ -56,9 +53,50 @@ async function main(): Promise<void> {
     model,
     executors: { "pet-app": mockPetApp, workspace: mockWorkspace },
   });
-  await client.run(command, callbacks, controller.signal);
 
-  process.off("SIGINT", onSigint);
+  switch (mode) {
+    case "seq":
+      process.exitCode = await runSeq(client, command, sessionId);
+      return;
+    case "repl":
+      process.exitCode = await runRepl(client);
+      return;
+    case "once":
+      process.exitCode = await runOnce(client, command);
+      return;
+  }
 }
 
-main();
+/**
+ * 인자를 모드와 명령으로 가른다.
+ *
+ * `npm run cli --seq "명령"`에서 npm은 `--seq`를 자신의 config 플래그로
+ * 삼켜 스크립트까지 전달하지 않고 npm_config_seq=true만 남긴다(--session도
+ * 마찬가지로 npm_config_session에 실린다). 그래서 두 경로를 모두 본다 —
+ * 직접 실행(`npx tsx src/cli.ts --seq "명령"`)과 npm 경유 실행이 같게
+ * 동작해야 한다.
+ */
+function parseArgs(argv: string[]): ParsedArgs {
+  const seq = argv.includes("--seq") || process.env["npm_config_seq"] === "true";
+
+  const sessionArg = argv.find((arg) => arg.startsWith("--session="));
+  const sessionId =
+    sessionArg?.slice("--session=".length) ||
+    process.env["npm_config_session"] ||
+    DEFAULT_SESSION_ID;
+
+  const command = argv
+    .filter((arg) => arg !== "--seq" && !arg.startsWith("--session="))
+    .join(" ")
+    .trim();
+
+  if (seq) return { mode: "seq", command, sessionId };
+  // 명령 없이 실행하면 REPL. (A2까지는 기본 명령을 대신 실행했다.)
+  return { mode: command === "" ? "repl" : "once", command, sessionId };
+}
+
+main().catch((err: unknown) => {
+  // createClient는 prompts/system.md를 못 읽으면 던진다. 스택 대신 한 줄로 보고한다.
+  console.error(err instanceof Error ? err.message : String(err));
+  process.exitCode = 1;
+});

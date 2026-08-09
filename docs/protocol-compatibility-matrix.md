@@ -47,13 +47,13 @@ repo의 이 파일을 미러링한다"고 명시돼 있다):
 
 | protocol repo | pet-app 복사본 |
 |---|---|
-| `swift/BridgeMessages.swift` | `Shaydi/Bridge/BridgeMessages.swift` |
-| `swift/JSONValue.swift` | `Shaydi/Bridge/JSONValue.swift` |
-| `swift/ToolRegistry.swift` | `Shaydi/Tools/ToolRegistry.swift` |
-| `swift/ToolTimeouts.swift` | `Shaydi/Tools/ToolTimeouts.swift` |
+| `swift/BridgeMessages.swift` | `Puck/Bridge/BridgeMessages.swift` |
+| `swift/JSONValue.swift` | `Puck/Bridge/JSONValue.swift` |
+| `swift/ToolRegistry.swift` | `Puck/Tools/ToolRegistry.swift` |
+| `swift/ToolTimeouts.swift` | `Puck/Tools/ToolTimeouts.swift` |
 
 네 파일을 `diff`로 직접 비교한 결과, **스키마/로직에는 차이가 없다** -- 다른 부분은 전부 파일 헤더
-주석(프로젝트명이 protocol repo 기준 "protocol"인지 pet-app 기준 "Shaydi"인지, 작성자 표기, 2026-08-01
+주석(프로젝트명이 protocol repo 기준 "protocol"인지 pet-app 기준 "Puck"인지, 작성자 표기, 2026-08-01
 "PetAgent → Shaydi" 이름 변경 반영)뿐이다. 즉 지금 이 순간 pet-app의 Swift 쪽 protocol 이해는
 workspace가 참조하는 것과 **같은 스키마(0.5.0, 커밋 `4244922`)**를 가리키고 있다.
 
@@ -93,10 +93,10 @@ cd ../protocol && git log -1 --format="%h %s" && node -p "require('./package.jso
 grep '"@speaki-e/protocol"' ../workspace/package.json
 
 # pet-app 벤더 사본과 diff
-diff ../protocol/swift/BridgeMessages.swift ../pet-app/Shaydi/Bridge/BridgeMessages.swift
-diff ../protocol/swift/JSONValue.swift ../pet-app/Shaydi/Bridge/JSONValue.swift
-diff ../protocol/swift/ToolRegistry.swift ../pet-app/Shaydi/Tools/ToolRegistry.swift
-diff ../protocol/swift/ToolTimeouts.swift ../pet-app/Shaydi/Tools/ToolTimeouts.swift
+diff ../protocol/swift/BridgeMessages.swift ../pet-app/Puck/Bridge/BridgeMessages.swift
+diff ../protocol/swift/JSONValue.swift ../pet-app/Puck/Bridge/JSONValue.swift
+diff ../protocol/swift/ToolRegistry.swift ../pet-app/Puck/Tools/ToolRegistry.swift
+diff ../protocol/swift/ToolTimeouts.swift ../pet-app/Puck/Tools/ToolTimeouts.swift
 
 # ai-module에 코드가 생겼는지
 ls ../ai-module

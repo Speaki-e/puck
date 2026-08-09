@@ -1,4 +1,4 @@
-name: Shaydi
+name: Puck
 options:
   bundleIdPrefix: com.speaki-e
   deploymentTarget:
@@ -14,31 +14,31 @@ settings:
     DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
 
 targets:
-  Shaydi:
+  Puck:
     type: application
     platform: macOS
     sources:
-      - path: Shaydi
+      - path: Puck
         excludes:
           - Resources/Info.plist
-          - Resources/Shaydi.entitlements
+          - Resources/Puck.entitlements
           - Resources/Avatars
           - Resources/Toys
       # Folder reference, not a group: the avatar package must keep its
       # Avatars/<name>/{manifest.json,*.usdz,sounds/} layout inside the app
       # bundle. As a group, Xcode flattens every file into Resources/ and
       # AvatarInstaller has nothing structured to copy out.
-      - path: Shaydi/Resources/Avatars
+      - path: Puck/Resources/Avatars
         type: folder
         buildPhase: resources
       # Folder reference for the same reason as Avatars: each toy keeps its
       # own directory in the bundle, so ToyCatalogue can look artwork up by
       # toy name instead of relying on every file having a unique flat name.
-      - path: Shaydi/Resources/Toys
+      - path: Puck/Resources/Toys
         type: folder
         buildPhase: resources
     info:
-      path: Shaydi/Resources/Info.plist
+      path: Puck/Resources/Info.plist
       properties:
         LSUIElement: true
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
@@ -50,57 +50,57 @@ targets:
         NSAppleEventsUsageDescription: "Needs to control other apps to run the run_applescript tool."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.Shaydi
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.Puck
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: Shaydi/Resources/Shaydi.entitlements
+        CODE_SIGN_ENTITLEMENTS: Puck/Resources/Puck.entitlements
     scheme:
       testTargets:
-        - ShaydiTests
+        - PuckTests
       commandLineArguments:
-        "-ShaydiUITestMode": false
+        "-PuckUITestMode": false
 
   # F13 (2026-07-30): the Claude-Desktop-style client window used to live
-  # in-process inside Shaydi; it's now this separate, regular (Dock-
+  # in-process inside Puck; it's now this separate, regular (Dock-
   # resident) app instead, so it gets a real Dock icon / Cmd+Tab / Spotlight
   # presence that an LSUIElement app can't have (byeolki: "별도의 앱으로
   # 해서 dock에 상시 표시"). It shares ClientWindow/Localization and the
-  # wire-protocol subset of Bridge/ directly from Shaydi's sources rather
+  # wire-protocol subset of Bridge/ directly from Puck's sources rather
   # than through a separate framework target -- at this project's size a
   # real framework would mean marking ~17 files' worth of types/members
   # `public` for no real benefit, so both targets just compile the same
   # source files independently.
-  ShaydiAgent:
+  PuckClient:
     type: application
     platform: macOS
     sources:
-      - path: ShaydiAgent
+      - path: PuckClient
         excludes:
           - Resources/Info.plist
-          - Resources/ShaydiAgent.entitlements
-      - path: Shaydi/ClientWindow
-      - path: Shaydi/Localization
+          - Resources/PuckClient.entitlements
+      - path: Puck/ClientWindow
+      - path: Puck/Localization
       # AgentSettingsView reuses SettingsSection/SettingsStackedRow rather
       # than hand-duplicating their padding/typography (2026-08-02, byeolki:
       # "패딩이나 폰트사이즈, 높이 같은게 아직 안 맞는 부분이 있는거 같은데").
-      # Only this one file, not all of Shaydi/Settings -- the rest depends on
-      # SettingsStore/AppAppearance/AvatarManagementView, which are Shaydi's.
-      - path: Shaydi/Settings/SettingsComponents.swift
+      # Only this one file, not all of Puck/Settings -- the rest depends on
+      # SettingsStore/AppAppearance/AvatarManagementView, which are Puck's.
+      - path: Puck/Settings/SettingsComponents.swift
       # F15 (2026-07-31): the agent loop. Compiled into this app, not
-      # Shaydi -- the pet executes tools, the client decides which ones.
-      - path: Shaydi/Agent
-      - path: Shaydi/Tools/ToolRegistry.swift
-      - path: Shaydi/Tools/ToolTimeouts.swift
-      - path: Shaydi/Resources/Assets.xcassets
-      - path: Shaydi/Bridge/BridgeMessages.swift
-      - path: Shaydi/Bridge/JSONValue.swift
-      - path: Shaydi/Bridge/BridgeConnection.swift
-      - path: Shaydi/Bridge/BridgeSocketPath.swift
-      - path: Shaydi/Bridge/BridgeSocketClient.swift
-      - path: Shaydi/Bridge/UserInputSender.swift
-      - path: Shaydi/App/CompanionAppLauncher.swift
-      - path: Shaydi/App/AppIdentity.swift
+      # Puck -- the pet executes tools, the client decides which ones.
+      - path: Puck/Agent
+      - path: Puck/Tools/ToolRegistry.swift
+      - path: Puck/Tools/ToolTimeouts.swift
+      - path: Puck/Resources/Assets.xcassets
+      - path: Puck/Bridge/BridgeMessages.swift
+      - path: Puck/Bridge/JSONValue.swift
+      - path: Puck/Bridge/BridgeConnection.swift
+      - path: Puck/Bridge/BridgeSocketPath.swift
+      - path: Puck/Bridge/BridgeSocketClient.swift
+      - path: Puck/Bridge/UserInputSender.swift
+      - path: Puck/App/CompanionAppLauncher.swift
+      - path: Puck/App/AppIdentity.swift
     info:
-      path: ShaydiAgent/Resources/Info.plist
+      path: PuckClient/Resources/Info.plist
       properties:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         # Same pumpkin, stamped "client": two Dock icons from the same mark
@@ -108,25 +108,25 @@ targets:
         CFBundleIconName: AppIconClient
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.ShaydiAgent
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckClient
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIconClient
-        CODE_SIGN_ENTITLEMENTS: ShaydiAgent/Resources/ShaydiAgent.entitlements
+        CODE_SIGN_ENTITLEMENTS: PuckClient/Resources/PuckClient.entitlements
 
-  ShaydiTests:
+  PuckTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: ShaydiTests
+      - path: PuckTests
       # Compiled straight into the test bundle rather than reached through
-      # @testable import: it belongs to ShaydiAgent, and adding it to the
-      # Shaydi target instead would change the pet's binary (and with it
+      # @testable import: it belongs to PuckClient, and adding it to the
+      # Puck target instead would change the pet's binary (and with it
       # its ad-hoc signature, i.e. its Accessibility grant) for a file the
       # pet never uses.
-      - path: ShaydiAgent/ClientMainMenu.swift
+      - path: PuckClient/ClientMainMenu.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.ShaydiTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckTests
         # Xcode 26 refuses to code sign a test bundle with no Info.plist.
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
-      - target: Shaydi
+      - target: Puck

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Generates Shaydi.xcodeproj from project.yml.
+# Generates Puck.xcodeproj from project.yml.
 #
 # DEVELOPMENT_TEAM is per-developer and must NOT be committed: a free Apple ID
 # personal team has exactly one member, so hardcoding one person's team ID in

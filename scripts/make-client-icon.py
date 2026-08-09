@@ -11,7 +11,7 @@ import pathlib
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 SRC = REPO / "design" / "client-icon-source-1024.png"
-OUT = REPO / "Shaydi/Resources/Assets.xcassets/AppIconClient.appiconset"
+OUT = REPO / "Puck/Resources/Assets.xcassets/AppIconClient.appiconset"
 
 CANVAS = 1024
 CONTENT = 824           # Big Sur content square

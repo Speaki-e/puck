@@ -1,15 +1,15 @@
-# Shaydi 디자인 시스템 (현재 구현 기준)
+# Puck 디자인 시스템 (현재 구현 기준)
 
 F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제로 존재하는 값 그대로** 기록한 문서다.
 새 디자인 제안이 아니라 현황 스냅샷이며, 값이 바뀌면 이 문서가 아니라 아래 소스가 먼저 바뀐다.
 
 | 역할 | 파일 |
 |---|---|
-| 색 토큰 (3세트) | `Shaydi/ClientWindow/ClientPalette.swift` |
-| 타입·간격·모양 토큰 | `Shaydi/ClientWindow/ClientTheme.swift` |
-| 테마 선택/동기화 | `Shaydi/ClientWindow/ClientThemeStyle.swift` |
-| 표면(글래스/플랫) 분기 | `Shaydi/ClientWindow/GlassSurface.swift` |
-| 팔레트 주입 | `Shaydi/ClientWindow/ClientPaletteEnvironment.swift` |
+| 색 토큰 (3세트) | `Puck/ClientWindow/ClientPalette.swift` |
+| 타입·간격·모양 토큰 | `Puck/ClientWindow/ClientTheme.swift` |
+| 테마 선택/동기화 | `Puck/ClientWindow/ClientThemeStyle.swift` |
+| 표면(글래스/플랫) 분기 | `Puck/ClientWindow/GlassSurface.swift` |
+| 팔레트 주입 | `Puck/ClientWindow/ClientPaletteEnvironment.swift` |
 
 원칙 하나: **뷰는 시스템 색/폰트를 직접 쓰지 않는다.** 전부 `ClientPalette`(색)와 `ClientTheme`(그 외)에서 나온다.
 
@@ -27,8 +27,8 @@ F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제�
 
 - 글래스에 라이트 변형은 없다. 반투명은 어두운 바탕 위에서만 제대로 읽힌다.
 - 기본값(파싱 실패 시 폴백)은 `.dark` — 이 앱이 원래 갖고 있던 룩.
-- 저장 위치는 Shaydi 쪽 `SettingsStore`(`Shaydi.clientThemeStyle`). 채팅 창 안이 아니라 **메뉴막대 → Shaydi 설정 → "채팅 테마"** 에서 바꾼다.
-- ShaydiAgent는 별도 프로세스라 UserDefaults를 못 읽는다. `ClientThemeStyle.crossProcessChangeNotification`으로 브로드캐스트하되 **값을 notification userInfo에 실어 보낸다** — `UserDefaults.set()` 직후 다른 프로세스에서 읽으면 아직 옛 값일 수 있는 실제 레이스가 있었다.
+- 저장 위치는 Puck 쪽 `SettingsStore`(`Puck.clientThemeStyle`). 채팅 창 안이 아니라 **메뉴막대 → Puck 설정 → "채팅 테마"** 에서 바꾼다.
+- PuckClient는 별도 프로세스라 UserDefaults를 못 읽는다. `ClientThemeStyle.crossProcessChangeNotification`으로 브로드캐스트하되 **값을 notification userInfo에 실어 보낸다** — `UserDefaults.set()` 직후 다른 프로세스에서 읽으면 아직 옛 값일 수 있는 실제 레이스가 있었다.
 - 앱 전체 외관(`AppAppearance`: system/light/dark, 펫 오버레이·노치·설정창)은 이것과 **별개 설정**이다.
 
 ## 2. 색 토큰
@@ -213,6 +213,6 @@ HStack(spacing: 0)
 
 ## 10. 이 문서에 없는 것
 
-- 펫 오버레이(F1)·노치(`Shaydi/Notch/`)·텍스트 입력 버블(F6)은 `ClientTheme` 토큰을 쓰지 않는 별개 표면이다. 노치는 실측 지오메트리(`NotchGeometry`, 폴백 170×24)로 그린다.
+- 펫 오버레이(F1)·노치(`Puck/Notch/`)·텍스트 입력 버블(F6)은 `ClientTheme` 토큰을 쓰지 않는 별개 표면이다. 노치는 실측 지오메트리(`NotchGeometry`, 폴백 170×24)로 그린다.
 - 에디터 뷰(`EditorWebView`)는 아직 어디에도 호스팅되지 않는다("에디터는 따로 할거라 토글 빼").
 - 다크/글래스 팔레트의 `success`/`failure`/`warning`은 아직 시스템 색(`.green`/`.red`/`.orange`) 그대로다. 라이트 테마도 동일.

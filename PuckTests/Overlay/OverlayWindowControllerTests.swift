@@ -1,0 +1,49 @@
+//
+//  OverlayWindowControllerTests.swift
+//  Puck
+//
+//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  Verifies one window is created per real display and positioned using
+//  AppKit frames (not the normalized, Y-down movement-logic space).
+//
+
+import XCTest
+@testable import Puck
+
+final class OverlayWindowControllerTests: XCTestCase {
+    func test_start_createsOneWindowPerDisplay_positionedAtItsAppKitFrame() throws {
+        let screenManager = try XCTUnwrap(ScreenManager())
+        let controller = OverlayWindowController(screenManager: screenManager)
+
+        controller.start()
+        defer { controller.stop() }
+
+        XCTAssertEqual(controller.windows.count, screenManager.current.appKitFrames.count)
+        for (window, frame) in zip(controller.windows, screenManager.current.appKitFrames) {
+            XCTAssertEqual(window.frame, frame)
+        }
+    }
+
+    func test_stop_ordersOutAndClearsWindows() throws {
+        let screenManager = try XCTUnwrap(ScreenManager())
+        let controller = OverlayWindowController(screenManager: screenManager)
+
+        controller.start()
+        controller.stop()
+
+        XCTAssertTrue(controller.windows.isEmpty)
+    }
+
+    func test_start_firesOnWindowsRebuilt_soConsumersCanReparentTheAvatar() throws {
+        let screenManager = try XCTUnwrap(ScreenManager())
+        let controller = OverlayWindowController(screenManager: screenManager)
+
+        var rebuiltCount = 0
+        controller.onWindowsRebuilt = { rebuiltCount += 1 }
+
+        controller.start()
+        defer { controller.stop() }
+
+        XCTAssertEqual(rebuiltCount, 1)
+    }
+}

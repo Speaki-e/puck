@@ -9,8 +9,9 @@
 # Usage:
 #   scripts/rename-app.sh <OldPetName> <NewPetName> <OldClientName> <NewClientName>
 #
-# Example (this repo's own history):
+# Examples (this repo's own history):
 #   scripts/rename-app.sh PetAgent Shaydi PetAgentClient ShaydiAgent
+#   scripts/rename-app.sh Shaydi Puck ShaydiAgent PuckClient
 #
 # What this does NOT do:
 #   - Touch the actual PRODUCT_BUNDLE_IDENTIFIER strings' *meaning* --
@@ -68,7 +69,7 @@ git mv "$OLD_CLIENT" "$NEW_CLIENT"
 [ -d "$OLD_TESTS" ] && git mv "$OLD_TESTS" "$NEW_TESTS"
 
 # @main entry-point files conventionally carry the app name in their own
-# filename (ShaydiApp.swift, ShaydiAgentApp.swift) -- their contents were
+# filename (PuckApp.swift, PuckClientApp.swift) -- their contents were
 # already renamed above, so just the filenames need to catch up.
 [ -f "$NEW_PET/App/${OLD_PET}App.swift" ] && \
     git mv "$NEW_PET/App/${OLD_PET}App.swift" "$NEW_PET/App/${NEW_PET}App.swift"

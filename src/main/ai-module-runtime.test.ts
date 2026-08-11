@@ -129,22 +129,4 @@ describe("AiModuleRuntime", () => {
     expect(events).toEqual([["done", false, "Claude API 키가 설정되어 있지 않습니다"]]);
   });
 
-  it("forwards the configured local Anthropic endpoint to the client", async () => {
-    let received: ClientOptions | undefined;
-    const runtime = new AiModuleRuntime({
-      getApiKey: async () => "test-key",
-      getModel: () => "test-model",
-      getBaseURL: () => "http://127.0.0.1:8787",
-      petAppProxy: noopExecutor(),
-      editorLocalFor: () => noopExecutor(),
-      clientFactory: (options) => {
-        received = options;
-        return { run: async () => {} } as AiClient;
-      },
-    });
-
-    await runtime.run("hello", "default", {}, callbacks([]));
-
-    expect(received?.baseURL).toBe("http://127.0.0.1:8787");
-  });
 });

@@ -26,7 +26,6 @@ interface ExecutorScope {
 export interface AiModuleRuntimeOptions {
   getApiKey(): Promise<string | undefined>;
   getModel(): string;
-  getBaseURL?(): string | undefined;
   petAppProxy: ToolExecutor;
   editorLocalFor(sessionId: string, context: Context): ToolExecutor;
   clientFactory?: ClientFactory;
@@ -80,15 +79,13 @@ export class AiModuleRuntime implements AgentRuntime {
     }
 
     const model = this.options.getModel();
-    const baseURL = this.options.getBaseURL?.();
-    const key = `${apiKey}\u0000${model}\u0000${baseURL ?? ""}`;
+    const key = `${apiKey}\u0000${model}`;
     if (this.clientState?.key === key) return this.clientState.client;
 
     const create = this.options.clientFactory ?? createClient;
     const client = create({
       apiKey,
       model,
-      baseURL,
       executors: {
         "pet-app": this.options.petAppProxy,
         workspace: {

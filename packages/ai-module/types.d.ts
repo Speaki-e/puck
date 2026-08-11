@@ -13,7 +13,7 @@ export type { Attachment, Context, ToolExecutor, ToolExecutionResult } from "@sp
 export type DispatchableExecutorKind = Exclude<ToolExecutorKind, "ai-module">;
 export type ExecutorMap = Partial<Record<DispatchableExecutorKind, ToolExecutor>>;
 export type LocalToolErrorCode = ToolResultErrorCode | "invalid_input" | "not_implemented_yet" | "executor_not_available";
-export interface ClientOptions { apiKey: string; model: string; baseURL?: string; executors: ExecutorMap; }
+export interface ClientOptions { apiKey: string; model: string; executors: ExecutorMap; }
 export interface ToolCallInfo { id: string; name: string; input: unknown; executor?: ToolExecutorKind; }
 export interface ToolResultInfo { id: string; name: string; ok: boolean; content: string; }
 export interface RunCallbacks {

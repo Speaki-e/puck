@@ -27,7 +27,6 @@ interface AgentRuntimeCoordinatorDeps {
   logger: JsonlLogger;
   getClaudeApiKey?(): Promise<string | undefined>;
   getModel?(): string;
-  getBaseURL?(): string | undefined;
   useMockAiModule?: boolean;
 }
 
@@ -105,7 +104,6 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
     const created = new AiModuleRuntime({
       getApiKey: deps.getClaudeApiKey ?? (async () => process.env.ANTHROPIC_API_KEY),
       getModel: deps.getModel ?? (() => "claude-sonnet-4-5"),
-      getBaseURL: deps.getBaseURL,
       petAppProxy,
       editorLocalFor: (sessionId) => editorLocalFor(workspaceId, sessionId),
     });

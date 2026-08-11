@@ -99,7 +99,6 @@ export async function startWorkspaceApplication(): Promise<void> {
     logger,
     getClaudeApiKey: async () => await secrets.get("claudeApiKey") ?? process.env.ANTHROPIC_API_KEY,
     getModel: () => settingsStore.current.model,
-    getBaseURL: () => loopbackAnthropicBaseURL(process.env.ANTHROPIC_BASE_URL),
     useMockAiModule: process.env.NODE_ENV === "test" || process.env.WORKSPACE_MOCK_AI === "1",
   });
   installPetBridgeRouter({
@@ -137,16 +136,4 @@ export async function startWorkspaceApplication(): Promise<void> {
       saveWindowState(),
     ]).finally(() => app.exit(0));
   });
-}
-
-/** Development-only: permits an Anthropic-compatible mock on the local machine. */
-function loopbackAnthropicBaseURL(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  try {
-    const url = new URL(value);
-    const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
-    return url.protocol === "http:" && loopback ? url.toString().replace(/\/$/, "") : undefined;
-  } catch {
-    return undefined;
-  }
 }

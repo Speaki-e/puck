@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "dev:renderer": "vite --host 127.0.0.1",
+    "mock:anthropic": "node scripts/mock-anthropic.mjs",
     "generate:icon": "electron scripts/generate-icon.cjs",
     "start": "npm run build && electron .",
     "start:headless": "npm run build && electron . --headless",

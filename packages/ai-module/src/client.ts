@@ -42,8 +42,8 @@ const MAX_TURNS = 10;
  * 세션 히스토리는 이 클라이언트 인스턴스가 들고 있다. 인스턴스를 새로 만들면
  * 이전 대화는 남지 않는다.
  */
-export function createClient({ apiKey, model, executors }: ClientOptions): AiClient {
-  const anthropic = new Anthropic({ apiKey });
+export function createClient({ apiKey, model, baseURL, executors }: ClientOptions): AiClient {
+  const anthropic = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
   const tools = toAnthropicTools();
   const basePrompt = loadBasePrompt();
   const whitelist = loadWhitelist();
@@ -190,7 +190,7 @@ async function buildUserContent(
       blocks.push({ type: "text", text: `[첨부 이미지를 읽지 못했습니다: ${path.basename(attachment.path)}]` });
     }
   }
-  return blocks as Anthropic.MessageParam["content"];
+  return blocks as unknown as Anthropic.MessageParam["content"];
 }
 
 function imageMediaType(filePath: string): "image/jpeg" | "image/png" | "image/gif" | "image/webp" | undefined {

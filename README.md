@@ -34,6 +34,8 @@ $env:ANTHROPIC_API_KEY = "키"
 corepack pnpm start -- --project C:\path\to\project
 ```
 
+실제 키 없이 ai-module의 Anthropic SDK 연결만 점검하려면 별도 터미널에서 `corepack pnpm mock:anthropic`을 실행하고, 앱 시작 터미널에 `ANTHROPIC_API_KEY=test`와 `ANTHROPIC_BASE_URL=http://127.0.0.1:8787`을 설정한다. 이 endpoint는 loopback HTTP 주소만 허용하며 mock은 텍스트 스트리밍 응답만 반환한다.
+
 UI 없이 백엔드와 브리지만 실행합니다.
 
 ```powershell

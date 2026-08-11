@@ -54,6 +54,8 @@ export interface ClientOptions {
   apiKey: string;
   /** 모델 ID (예: "claude-sonnet-4-6"). */
   model: string;
+  /** Optional Anthropic API base URL for integration testing. */
+  baseURL?: string;
   /** executor kind별 실행기. 실제 구현(소켓 프록시)이든 mock이든 무관하다. */
   executors: ExecutorMap;
 }

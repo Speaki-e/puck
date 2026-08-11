@@ -9,7 +9,7 @@ PetAgentClient / Fallback Electron
 Workspace Main
 ├─ app/workspace-application       composition root와 종료 처리
 ├─ app/pet-bridge-router           pet-app 메시지 라우팅
-├─ app/agent-runtime-coordinator   임시 AI 실행 경계
+├─ app/agent-runtime-coordinator   AI 실행/세션 조정 경계
 ├─ WorkspaceRegistry / FileService
 ├─ EditorGateway / PetBridge
 ├─ SecretStore / SettingsStore
@@ -31,14 +31,16 @@ Main은 Electron 생명주기, 파일시스템, 로컬 HTTP/WebSocket, PetBridge
 
 ## 현재 AI 실행 경계
 
-기획서의 최종 구조에서는 ai-module, SessionRouter, RunRegistry가 Agent Host에 위치합니다. 현재는 배포 가능한 ai-module 태그가 없어 `app/agent-runtime-coordinator.ts`가 Main에서 다음 임시 역할을 한곳에 캡슐화합니다.
+기획서의 최종 구조에서는 ai-module, SessionRouter, RunRegistry가 Agent Host에 위치합니다. 현재는 v6 ai-module을 `packages/ai-module`에 포함해 실제 실행에 사용하되, 실행 경계는 Main의 `app/agent-runtime-coordinator.ts`에 유지합니다.
 
 - 세션 직렬화와 ActiveRun 관리
 - ai-module 승인 콜백과 ACP permission 연결
 - PetBridge agent 이벤트 정규화
-- `MockAgentRuntime` 생성
+- Workspace별 `AiModuleRuntime`/Claude client 재사용으로 세션 히스토리 유지
+- AsyncLocalStorage 기반 세션별 `editorLocal` 실행기 격리
+- 테스트(`NODE_ENV=test`/`WORKSPACE_MOCK_AI=1`)에서만 `MockAgentRuntime` 사용
 
-실제 ai-module이 준비되면 이 모듈을 Agent Host RPC 어댑터로 치환하며, bootstrap과 PetBridge 라우터는 유지합니다.
+다음 구조 단계에서는 ai-module과 SessionRouter/RunRegistry를 Agent Host로 옮깁니다. 이때 bootstrap과 PetBridge 라우터는 유지하고 Agent Host↔Main 도구 실행 RPC를 추가합니다.
 
 ## 파일 흐름
 

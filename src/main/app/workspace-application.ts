@@ -97,6 +97,9 @@ export async function startWorkspaceApplication(): Promise<void> {
     petBridge,
     registry,
     logger,
+    getClaudeApiKey: async () => await secrets.get("claudeApiKey") ?? process.env.ANTHROPIC_API_KEY,
+    getModel: () => settingsStore.current.model,
+    useMockAiModule: process.env.NODE_ENV === "test" || process.env.WORKSPACE_MOCK_AI === "1",
   });
   installPetBridgeRouter({
     bridge: petBridge,

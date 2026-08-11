@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type * as acp from "@agentclientprotocol/sdk";
 import type { AgentCallbacks, Attachment, JSONValue } from "@speaki-e/protocol";
 import { MockAgentRuntime } from "../../mocks/mock-agent-runtime.js";
+import { AiModuleRuntime } from "../ai-module-runtime.js";
 import { workingPathsFromUpdate, type AcpUpdatePayload } from "../../shared/acp-update.js";
 import { createAcpPermissionResolver } from "../acp-permission-bridge.js";
 import type { AgentHostController } from "../agent-host-controller.js";
@@ -24,6 +25,9 @@ interface AgentRuntimeCoordinatorDeps {
   petBridge: PetBridge;
   registry: WorkspaceRegistry;
   logger: JsonlLogger;
+  getClaudeApiKey?(): Promise<string | undefined>;
+  getModel?(): string;
+  useMockAiModule?: boolean;
 }
 
 export interface AgentRuntimeCoordinator {
@@ -75,6 +79,37 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
   });
   const petAppProxy = createPetAppProxyExecutor(petBridge);
   const codeEditorRequests = new Map<string, { workspaceId: string; sessionId: string }>();
+  const aiRuntimes = new Map<string, AiModuleRuntime>();
+
+  const editorLocalFor = (workspaceId: string, sessionId: string) => {
+    const workspace = registry.get(workspaceId);
+    return createEditorLocalExecutor({
+      workspaceId,
+      sessionId,
+      // 모델이 보낸 project_path는 신뢰하지 않고 현재 Workspace의 실제 경로로 고정한다.
+      projectPath: workspace?.realProjectPath ?? "",
+      agentHost,
+      editorGateway,
+      fileServiceFor: (id) => controller.getFileService(id),
+      trackCodeEditorRequest: (requestId) => {
+        codeEditorRequests.set(requestId, { workspaceId, sessionId });
+        return () => codeEditorRequests.delete(requestId);
+      },
+    });
+  };
+
+  const aiRuntimeFor = (workspaceId: string): AiModuleRuntime => {
+    const existing = aiRuntimes.get(workspaceId);
+    if (existing) return existing;
+    const created = new AiModuleRuntime({
+      getApiKey: deps.getClaudeApiKey ?? (async () => process.env.ANTHROPIC_API_KEY),
+      getModel: deps.getModel ?? (() => "claude-sonnet-4-5"),
+      petAppProxy,
+      editorLocalFor: (sessionId) => editorLocalFor(workspaceId, sessionId),
+    });
+    aiRuntimes.set(workspaceId, created);
+    return created;
+  };
 
   const sendAgentDone = (input: { workspaceId: string; sessionId: string; ok: boolean; summary: string }) => {
     petBridge.sendEvent({
@@ -178,22 +213,6 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
         event: "agent_thinking",
       });
 
-      const editorLocal = createEditorLocalExecutor({
-        workspaceId,
-        sessionId,
-        // Never trust project_path supplied by the model; bind execution to the selected workspace.
-        projectPath: workspace.realProjectPath ?? "",
-        agentHost,
-        editorGateway,
-        fileServiceFor: (id) => controller.getFileService(id),
-        trackCodeEditorRequest: (requestId) => {
-          codeEditorRequests.set(requestId, { workspaceId, sessionId });
-          return () => codeEditorRequests.delete(requestId);
-        },
-      });
-
-      // Replace this construction with the tagged ai-module implementation when it is published.
-      const agentRuntime = new MockAgentRuntime({ petAppProxy, editorLocal });
       const callbacks: AgentCallbacks = {
         onTextChunk: (chunk) => {
           petBridge.sendEvent({
@@ -251,6 +270,11 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
       };
 
       try {
+        const useMock = deps.useMockAiModule ?? process.env.NODE_ENV === "test";
+        const agentRuntime = useMock
+          ? new MockAgentRuntime({ petAppProxy, editorLocal: editorLocalFor(workspaceId, sessionId) })
+          : aiRuntimeFor(workspaceId);
+
         await agentRuntime.run(
           text,
           sessionId,

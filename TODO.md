@@ -1,5 +1,7 @@
 # Workspace 전체 구현 TODO
 
+> **2026-08-12 ai-module v6 통합:** `packages/ai-module` 실제 런타임 연결, Workspace별 세션 히스토리 유지, 승인 게이트/`open_task_session`, 이미지 attachment 전달까지 연결 완료. 남은 핵심은 실제 pet-app+Claude 인증 환경 E2E와 ACP OS 수준 샌드박싱이다.
+
 기준 문서: `plan/03_workspace.md` Workspace 개발 기획서 v2  
 최종 갱신: 2026-08-04
 

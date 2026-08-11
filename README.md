@@ -14,8 +14,10 @@ PetAgent의 로컬 AI 실행 백엔드이자 Monaco 기반 코드 에디터입�
 - 공식 ACP SDK 기반 Claude Agent ACP Adapter와 워크스페이스별 직렬 큐
 - safeStorage 기반 API 키 보관, 설정, 구조화 로그와 민감값 마스킹
 - Vitest 계약/장애 테스트와 Playwright Electron E2E
+- ai-module v6 실제 Claude 스트리밍/tool-use/세션 히스토리/승인 게이트 통합
+- 이미지 attachment를 Claude 멀티모달 입력으로 전달
 
-실제 `ai-module` 패키지는 아직 태그 버전이 없어 `MockAgentRuntime`이 임시로 연결되어 있습니다. 도구 실행 포트와 승인/취소 경계는 실제 계약에 맞춰져 있으며, 패키지가 준비되면 `src/main/app/agent-runtime-coordinator.ts`의 생성 지점을 교체합니다.
+`packages/ai-module`에 v6 적용본을 함께 포함하고 실제 실행 경로에 연결했습니다. 테스트 환경(`NODE_ENV=test`) 또는 `WORKSPACE_MOCK_AI=1`에서만 기존 `MockAgentRuntime`을 사용합니다. Workspace별 ai-module 클라이언트를 재사용해 세션 히스토리를 유지하고, 세션별 `editorLocal` 실행기는 AsyncLocalStorage로 격리합니다.
 
 ## 요구 환경
 
@@ -74,7 +76,9 @@ src/
 │  ├─ components/                 # 표현 컴포넌트
 │  └─ gateway-*.ts                # WKWebView/EditorGateway 전송 계층
 ├─ shared/                        # 프로세스 공통 계약과 순수 유틸리티
-└─ mocks/                         # 계약 테스트 및 ai-module 임시 구현
+└─ mocks/                         # 계약 테스트용 Mock 구현
+packages/
+└─ ai-module/                     # v6 Claude agent core (Workspace 통합본)
 ```
 
 상세 프로세스와 데이터 흐름은 [docs/architecture.md](docs/architecture.md), 이번 마무리 분석은 [docs/codebase-refactor.md](docs/codebase-refactor.md), 남은 외부 의존 작업은 [TODO.md](TODO.md)를 참고하세요.

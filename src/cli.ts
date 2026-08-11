@@ -53,7 +53,6 @@ async function main(): Promise<void> {
   const client = createClient({
     apiKey,
     model,
-    baseURL: process.env["ANTHROPIC_BASE_URL"],
     executors: { "pet-app": mockPetApp, workspace: mockWorkspace },
   });
 

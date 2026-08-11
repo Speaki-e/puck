@@ -141,7 +141,7 @@ export interface AiClient {
    * 같은 sessionId로 실행 중에 다시 호출하면 그 세션 안에서만 직렬 큐잉된다 —
    * 앞의 run이 끝난 뒤 순서대로 처리되고, 다른 sessionId의 run은 막지 않는다.
    *
-   * @param attachments A5에서는 무시된다. TODO: 이미지 첨부 처리(F14 드래그 캡처).
+   * @param attachments Workspace가 검증한 이미지 첨부. Claude 멀티모달 입력으로 전달한다.
    */
   run(
     command: string,

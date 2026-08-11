@@ -1,51 +1,51 @@
 /**
  * ai-module A5 — 컨텍스트 주입.
  *
- * Context는 protocol이 정의한다(agent-interface.ts). 여기서는 그 값을 모델이
- * 읽을 수 있는 한 덩어리 요약으로 바꿔 시스템 프롬프트에 붙이는 일만 한다.
- *
- * 기본 시스템 프롬프트 원문은 prompts/system.md에서 관리한다 — 프롬프트 튜닝이
- * 코드 변경 없이 이뤄져야 하기 때문이다(기획서 3.5, 담당: 정가은).
+ * Context는 protocol이 정의한다. 기본 프롬프트는 prompts/system.md를 우선 읽되,
+ * Electron/esbuild 단일 번들처럼 패키지 자산 경로를 잃는 환경에서도 행동 규칙이
+ * 사라지지 않도록 동일한 안전 프롬프트를 코드 폴백으로 보관한다.
  */
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 import type { Context, WindowInfo } from "@speaki-e/protocol/src/index.js";
 
 export type { Context, WindowInfo };
 
-/** src/에서 실행하든 dist/에서 실행하든 저장소 루트의 prompts/를 가리킨다. */
-const SYSTEM_PROMPT_PATH = new URL("../prompts/system.md", import.meta.url);
-
-/** 요약이 길어져 본문을 밀어내지 않도록 목록형 필드는 앞에서 몇 개만 싣는다. */
 const MAX_LIST_ITEMS = 5;
+
+const FALLBACK_SYSTEM_PROMPT = `너는 사용자의 데스크톱에서 함께 일하는 에이전트다. 아래 규칙을 지켜라.
+
+## 행동 규칙
+
+1. 코딩 작업은 반드시 \`code_editor\` 도구로 위임한다. 직접 파일을 수정하지 않는다.
+   파일 내용을 확인할 때는 \`read_file\`을 열람 전용으로만 사용한다.
+2. \`click_element\`는 일반 UI 요소에만 쓴다. 시스템 권한을 묻는 다이얼로그에는 동작하지 않으므로,
+   그 경우 \`point_at\`으로 위치를 가리키고 사용자가 직접 누르도록 안내한다.
+3. 응답은 간결하게, 수행 결과 중심으로 쓴다.
+4. 일상 대화 중 코딩이나 작업성 요청이 명확해지면 그 자리에서 작업 도구를 바로 쓰지 말고,
+   먼저 \`open_task_session\`으로 새 작업 세션을 연 뒤 그 세션에서 진행한다.`;
 
 /**
  * 기본 시스템 프롬프트를 읽는다.
  *
- * 파일이 없으면 던진다 — 행동 규칙 없이 도구를 쥐여주면 모델이 코딩 작업을
- * code_editor 대신 run_shell로 처리하는 등 규칙 위반이 그대로 실행된다.
+ * - SPEAKI_AI_MODULE_ROOT가 있으면 그 경로를 최우선으로 사용한다.
+ * - ESM 패키지로 직접 실행하면 모듈 위치 기준 prompts/system.md를 사용한다.
+ * - 패키지가 단일 번들로 포함돼 파일 자산이 없으면 안전 규칙의 내장 사본을 사용한다.
  */
 export function loadBasePrompt(): string {
-  try {
-    return readFileSync(SYSTEM_PROMPT_PATH, "utf8").trim();
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`prompts/system.md를 읽을 수 없습니다: ${detail}`);
+  for (const candidate of assetCandidates("prompts/system.md")) {
+    try {
+      return readFileSync(candidate, "utf8").trim();
+    } catch {
+      // 다음 후보를 확인한다.
+    }
   }
+  return FALLBACK_SYSTEM_PROMPT;
 }
 
-/**
- * 기본 프롬프트에 현재 상황과 세션 브리프를 덧붙인다.
- *
- * 붙일 게 없으면 기본 프롬프트를 그대로 돌려준다 — 빈 "[현재 상황]" 머리말은
- * 모델에게 "상황 정보가 있다"는 잘못된 신호를 준다.
- *
- * @param basePrompt   prompts/system.md 원문
- * @param context      호출부가 수집한 현재 상황. 비어 있어도 된다.
- * @param sessionBrief 작업 세션의 시드 컨텍스트 (open_task_session의 brief).
- *                     protocol이 "first system message"라고 규정하므로 대화
- *                     히스토리가 아니라 시스템 프롬프트 쪽에 싣는다.
- */
+/** 기본 프롬프트에 현재 상황과 세션 브리프를 덧붙인다. */
 export function buildSystemPrompt(
   basePrompt: string,
   context: Context,
@@ -55,15 +55,29 @@ export function buildSystemPrompt(
   return sections.filter((section) => section !== undefined && section !== "").join("\n\n");
 }
 
-/** Context를 한 줄 요약으로. 실을 값이 하나도 없으면 undefined. */
+function assetCandidates(relativePath: string): string[] {
+  const candidates: string[] = [];
+  const configuredRoot = process.env["SPEAKI_AI_MODULE_ROOT"];
+  if (configuredRoot) candidates.push(path.resolve(configuredRoot, relativePath));
+
+  // ESM 패키지로 실행될 때는 실제 패키지 자산을 읽는다. esbuild가 CJS 단일 번들로
+  // 묶는 환경에서는 import.meta.url이 비어 있을 수 있으므로 그때는 안전 폴백을 쓴다.
+  try {
+    if (import.meta.url) {
+      candidates.push(fileURLToPath(new URL(`../${relativePath}`, import.meta.url)));
+    }
+  } catch {
+    // 번들 환경: 내장 프롬프트로 폴백.
+  }
+  return [...new Set(candidates)];
+}
+
 function describeContext(context: Context): string | undefined {
   const parts: string[] = [];
 
   if (context.frontmostApp) parts.push(`최전면 앱: ${context.frontmostApp}`);
   if (context.openWindows?.length) parts.push(`열린 창: ${describeWindows(context.openWindows)}`);
-  if (context.editorOpenFiles?.length) {
-    parts.push(`열린 파일: ${joinCapped(context.editorOpenFiles)}`);
-  }
+  if (context.editorOpenFiles?.length) parts.push(`열린 파일: ${joinCapped(context.editorOpenFiles)}`);
   if (context.recentActions?.length) parts.push(`최근 작업: ${joinCapped(context.recentActions)}`);
   if (context.projectPath) parts.push(`프로젝트 경로: ${context.projectPath}`);
 
@@ -71,14 +85,11 @@ function describeContext(context: Context): string | undefined {
 
   const lines = [`[현재 상황] ${parts.join(" / ")}`];
   if (context.projectPath) {
-    // 자동 주입의 목적 자체가 "모델이 매번 경로를 지정하지 않게 하는 것"이므로
-    // 값만 주지 말고 어디에 쓸 값인지까지 못박는다.
     lines.push(`code_editor를 호출할 때 project_path는 ${context.projectPath} 를 사용하라.`);
   }
   return lines.join("\n");
 }
 
-/** 창 정보는 "앱 - 제목" 형태로 줄인다. frame 좌표는 모델에게 의미가 없다. */
 function describeWindows(windows: readonly WindowInfo[]): string {
   return joinCapped(
     windows.map((win) => (win.title ? `${win.owner_name} - ${win.title}` : win.owner_name)),

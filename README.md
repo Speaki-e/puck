@@ -124,9 +124,9 @@ AI: 공식 Anthropic TypeScript SDK (@anthropic-ai/sdk) 스트리밍 — 자체 
 - 태그 규칙: 인터페이스 변경 시 minor 이상, workspace 통합 마일스톤마다 태그 필수
 - README에 CLI 사용법 (목 실행기 실행, 케이스 회귀 돌리기) 필수
 
-## 6. CLI 사용법 (A3 구현 기준)
+## 6. CLI 사용법 (A5 구현 기준)
 
-공통: `ANTHROPIC_API_KEY` 필수(없으면 종료 코드 1), `ANTHROPIC_MODEL` 선택(기본 `claude-sonnet-4-6`). `npm run cli`은 `tsx --env-file=.env`로 실행되므로 저장소 루트의 `.env`를 읽는다. 실행기는 목(mock) 고정.
+공통: `ANTHROPIC_API_KEY` 필수(없으면 종료 코드 1), `ANTHROPIC_MODEL` 선택(기본 `claude-sonnet-4-6`). `npm run cli`은 `tsx --env-file=.env`로 실행되므로 저장소 루트의 `.env`를 읽는다. 실행기는 목(mock) 고정. 시스템 프롬프트 원문은 `prompts/system.md`이며, 없으면 시작 시 에러로 종료한다.
 
 ### 모드 1 — 단발 실행
 
@@ -134,7 +134,7 @@ AI: 공식 Anthropic TypeScript SDK (@anthropic-ai/sdk) 스트리밍 — 자체 
 npm run cli "사파리 켜줘"
 ```
 
-응답 텍스트 스트리밍 + `[tool_call]` / `[dispatch]` / `[tool_result]` / `[done]` 로그를 stdout에 출력. 종료 코드는 run 성공 시 0, 실패(`ok=false` — 중단·API 오류·max_turns 등) 시 1.
+응답 텍스트 스트리밍 + `[tool_call]` / `[dispatch]` / `[tool_result]` / `[done]` 로그를 stdout에 출력. 세션은 `default` 고정. 종료 코드는 run 성공 시 0, 실패 시 1.
 
 ### 모드 2 — 대화형 REPL
 
@@ -142,38 +142,82 @@ npm run cli "사파리 켜줘"
 npm run cli
 ```
 
-프롬프트 `ai-module> `. 특수 명령:
+프롬프트는 `ai-module[<세션 id>]> `. 특수 명령:
 
-- `/tools` — protocol `TOOL_REGISTRY`를 표로 출력 (name/executor/approval/timeout, API 호출 없음)
-- `/help` — 특수 명령 안내
-- `/exit` — 종료
+- `/tools` — protocol `TOOL_REGISTRY`를 표로 출력 (API 호출 없음)
+- `/session` — 현재 세션 표시 / `/session <id>` — 세션 전환(없는 id면 새 대화 시작)
+- `/ctx` — 현재 컨텍스트 표시 / `/ctx k=v ...` — 설정 / `/ctx clear` — 초기화
+  - 설정 가능: `frontmostApp`, `projectPath`, `editorOpenFiles`(쉼표 구분), `recentActions`(쉼표 구분).
+    `openWindows`는 `WindowInfo` 객체 배열이라 key=value로 표현할 수 없어 제외.
+- `/help`, `/exit`
+
+같은 세션에서는 **이전 대화를 기억한다.** 세션이 다르면 히스토리는 완전히 분리된다. 모델이 `open_task_session`을 호출하면 `[새 세션 생성: <id> (<title>)]`을 출력하고 현재 세션을 그쪽으로 자동 전환한다(pet-app 사이드바 전환 시뮬레이션).
 
 실행 중 Ctrl+C는 그 run만 중단하고(`[done ok=false aborted]`) 프롬프트로 돌아온다. 프롬프트 상태에서 Ctrl+C는 종료. 종료 코드는 항상 0.
-
-A5 전까지 대화 히스토리가 없으므로 **각 입력은 서로 독립된 run**이다 — 모델은 이전 턴을 기억하지 못한다.
 
 ### 모드 3 — 시퀀스 출력 (A4 회귀 테스트 기반)
 
 ```
-npm run cli -- --seq "사파리 켜줘"
+npm run cli --seq "사파리 켜줘"
+npm run cli --seq --session=t1 "사파리 켜줘"
+npm run cli --seq --approve=all "빌드 폴더 지워줘"
 ```
+
+`--approve`는 대화형 입력이 불가능한 `--seq`에서 승인 요청을 어떻게 처리할지 정한다. `all`이면 전부 허용, 그 외 값과 미지정은 전부 거부(`none`)다 — 회귀 테스트가 위험한 명령을 실수로 통과시키지 않도록 기본값이 거부다.
 
 **stdout에는 JSON 한 줄만** 나간다(파이프 전용). 사람이 읽는 로그는 stderr로 분리된다.
 
 ```json
-{"command":"사파리 켜줘","sequence":[{"tool":"launch_app","args":{"app_name":"Safari"}}],"ok":true,"stopReason":"end_turn"}
+{"command":"사파리 켜줘","session":"t1","sequence":[{"tool":"launch_app","args":{"app_name":"Safari"}}],"ok":true,"stopReason":"end_turn"}
 ```
 
 | 필드 | 타입 | 의미 |
 | --- | --- | --- |
 | `command` | string | 입력한 명령 원문 |
-| `sequence` | `{tool: string, args: unknown}[]` | 호출된 도구를 호출 순서대로. 없으면 `[]`. 인자 검증 실패로 실행되지 않은 호출도 포함(모델이 시도한 것 자체가 회귀 대상) |
+| `session` | string | 실행한 세션 id (`--session=<id>`, 기본 `default`) |
+| `sequence` | `{tool: string, args: unknown}[]` | 호출된 도구를 호출 순서대로. 없으면 `[]`. 인자 검증 실패로 실행되지 않은 호출도 포함 |
 | `ok` | boolean | 루프가 `end_turn`으로 끝났는지. 개별 도구 실패는 반영되지 않음 |
 | `stopReason` | string | 성공 시 `stop_reason`, 실패 시 요약(`aborted`, `max_turns_exceeded`, `api error (...)` 등) |
+| `approvals` | `{tool, summary, approved}[]` | 발생한 승인 요청 전건. 없으면 `[]`(필드는 항상 존재) |
+| `createdSession` | `{id, title}` (선택) | `open_task_session`이 발생했을 때만 존재 |
 
-종료 코드는 **항상 0**이다(실패도 JSON으로 보고). API 키 누락, `--seq`에 명령 미지정처럼 애초에 실행이 불가능한 경우만 1이며 그때는 stdout에 아무것도 쓰지 않는다.
+종료 코드는 **항상 0**(실패도 JSON으로 보고). API 키 누락·명령 미지정처럼 실행 자체가 불가능한 경우만 1이며 그때는 stdout에 아무것도 쓰지 않는다.
 
-npm 플래그 주의: `npm run cli --seq "명령"`에서 npm이 `--seq`를 자기 config로 삼켜 스크립트에 전달하지 않는다(대신 `npm_config_seq=true`). CLI가 두 경로를 모두 인식하므로 위 형태와 `npm run cli -- --seq "명령"`, `npx tsx --env-file=.env src/cli.ts --seq "명령"`이 모두 같게 동작한다.
+npm 플래그 주의: npm이 `--seq` / `--session=` 을 자기 config로 삼켜 스크립트에 전달하지 않는다(대신 `npm_config_seq` / `npm_config_session`). CLI가 두 경로를 모두 인식하므로 위 형태와 `npm run cli -- --seq "명령"`, `npx tsx --env-file=.env src/cli.ts --seq "명령"`이 모두 같게 동작한다.
+
+### 승인 게이트 (A6)
+
+위험한 도구는 실행기를 호출하기 **전에** 사용자 승인을 받는다. 거부하면 실행기를 아예 호출하지 않고 모델에게 `tool_result(ok=false, error="denied_by_user")`를 돌려준다 — `denied_by_user`는 소켓을 지나지 않는 모델 전용 값이므로, 여기서 막지 못하면 위험한 명령이 이미 pet-app으로 나간 뒤가 된다.
+
+판정 기준은 protocol 레지스트리의 `approval.kind`다:
+
+| kind | 대상 도구 | 동작 |
+| --- | --- | --- |
+| `not_required` | launch_app, read_file, point_at, open_task_session 등 | 그냥 실행 |
+| `required` | click_element, run_applescript | 항상 승인 요구 |
+| `required_with_whitelist` | run_shell | 아래 규칙 |
+| `acp_internal` | code_editor | 통과 (Claude Code의 자체 승인 흐름이 처리) |
+
+**run_shell 화이트리스트 (`data/whitelist.json`)**
+
+1. **셸 메타문자가 하나라도 있으면 화이트리스트와 무관하게 무조건 승인을 요구한다.** 대상: ``; & | < > $ ` ( ) [ ] { } * ? ! # \`` 와 개행/캐리지리턴. `ls; rm -rf ~`처럼 허용 명령으로 시작해 다른 명령을 이어 붙이는 경로를 전부 막기 위한 것이다(접두 매칭 금지).
+2. 메타문자가 없을 때만 토큰 **완전 일치**를 본다.
+   - `first_token_commands` — 첫 토큰이 일치하면 통과(뒤 인자는 자유). `ls`, `cat`, `pwd`, `echo`, `which`, `head`, `tail`, `wc`, `date`, `whoami`
+   - `two_token_commands` — 앞 **두** 토큰이 일치해야 통과. `git status`, `git log`, `git diff`, `git branch`, `git show`. `git` 단독은 통과하지 않으므로 `git push` / `git reset --hard`는 승인을 받는다.
+   - `open`은 읽기성이 아니라 임의 실행이므로 **절대 넣지 않는다**(기획서 3.3).
+3. 파일이 없거나 깨졌으면 빈 화이트리스트로 물러선다 — 모든 셸 명령이 승인 대상이 되고, 이유는 stderr에 남는다.
+
+**승인 UI**
+
+- 단발/REPL: `⚠️ 승인 필요: <요약>` 뒤에 `허용하시겠습니까? [y/N]: `. `y`/`yes`만 허용이고 **엔터·그 외 입력·입력 종료(EOF)·Ctrl+C는 전부 거부**다.
+- `--seq`: `--approve=all|none`(기본 none)으로 정하고, 결정을 `approvals` 배열에 기록한다.
+- 승인 콜백(`onApprovalRequired`)을 붙이지 않은 호출부에서는 승인이 필요한 도구가 전부 거부된다 — 물어볼 수 없는데 실행하면 게이트가 없는 것과 같다.
+
+### 세션과 히스토리 (A5)
+
+- 히스토리는 클라이언트 인스턴스의 메모리에만 있다. 프로세스가 끝나면 사라진다(로컬 저장은 후순위).
+- **정상 종료(`end_turn`)한 턴만** 히스토리에 커밋된다. 중단·에러·`max_turns_exceeded`로 끝난 턴은 통째로 버린다 — `tool_result` 없는 `tool_use`가 남으면 다음 API 호출이 거부되기 때문이다.
+- 같은 sessionId로 run이 겹치면 그 세션 안에서만 직렬 큐잉되고 stderr에 `[queued session=<id> waiting=<n>]`이 찍힌다. 다른 세션끼리는 병렬로 돈다.
 
 ## 7. 리스크
 

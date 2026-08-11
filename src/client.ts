@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { JSONValue, ToolDefinition } from "@speaki-e/protocol/src/index.js";
@@ -56,6 +58,7 @@ export function createClient({ apiKey, model, executors }: ClientOptions): AiCli
     sessionId: string,
     context: Context,
     callbacks: RunCallbacks,
+    attachments?: Attachment[],
     signal?: AbortSignal,
   ): Promise<void> {
     // 큐에서 기다리는 동안 중단됐을 수 있다. API를 부르기 전에 걸러낸다.
@@ -70,7 +73,7 @@ export function createClient({ apiKey, model, executors }: ClientOptions): AiCli
     // 히스토리 전체를 매 턴 다시 보낸다.
     const messages: Anthropic.MessageParam[] = [
       ...session.history,
-      { role: "user", content: command },
+      { role: "user", content: await buildUserContent(command, attachments) },
     ];
     const system = buildSystemPrompt(basePrompt, context, session.brief);
 
@@ -152,7 +155,6 @@ export function createClient({ apiKey, model, executors }: ClientOptions): AiCli
       fifth?: Attachment[],
       sixth?: AbortSignal,
     ): Promise<void> {
-      // TODO: attachments(fifth)는 A5에서 무시한다. 이미지 첨부 처리는 이후 단계.
       const legacy = typeof second !== "string";
       const sessionId = legacy ? DEFAULT_SESSION_ID : second;
       const context = legacy ? {} : ((third as Context | undefined) ?? {});
@@ -160,10 +162,56 @@ export function createClient({ apiKey, model, executors }: ClientOptions): AiCli
       const signal = legacy ? (third as AbortSignal | undefined) : sixth;
 
       return store.enqueue(sessionId, () =>
-        runTurn(command, sessionId, context, callbacks, signal),
+        runTurn(command, sessionId, context, callbacks, legacy ? undefined : fifth, signal),
       );
     },
   };
+}
+
+/** Workspace가 검증한 이미지 첨부를 Claude 멀티모달 user content로 변환한다. */
+async function buildUserContent(
+  command: string,
+  attachments?: Attachment[],
+): Promise<Anthropic.MessageParam["content"]> {
+  if (!attachments?.length) return command;
+
+  const blocks: Array<Record<string, unknown>> = [{ type: "text", text: command }];
+  for (const attachment of attachments) {
+    if (attachment.type !== "image" || !attachment.path) continue;
+    const mediaType = imageMediaType(attachment.path);
+    if (!mediaType) continue;
+    try {
+      const data = (await readFile(attachment.path)).toString("base64");
+      blocks.push({
+        type: "image",
+        source: { type: "base64", media_type: mediaType, data },
+      });
+    } catch {
+      blocks.push({
+        type: "text",
+        text: `[첨부 이미지를 읽지 못했습니다: ${path.basename(attachment.path)}]`,
+      });
+    }
+  }
+  return blocks as Anthropic.MessageParam["content"];
+}
+
+function imageMediaType(
+  filePath: string,
+): "image/jpeg" | "image/png" | "image/gif" | "image/webp" | undefined {
+  switch (path.extname(filePath).toLowerCase()) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".gif":
+      return "image/gif";
+    case ".webp":
+      return "image/webp";
+    default:
+      return undefined;
+  }
 }
 
 /**

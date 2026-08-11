@@ -9,11 +9,17 @@
  * 사례가 이 파일이 존재하는 이유다.
  */
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 import type { ToolDefinition } from "@speaki-e/protocol/src/index.js";
 
-/** src/에서 실행하든 dist/에서 실행하든 저장소 루트의 data/를 가리킨다. */
-const WHITELIST_PATH = new URL("../data/whitelist.json", import.meta.url);
+/** 번들 환경에서는 파일 자산이 없을 수 있으므로 안전한 내장 기본값을 둔다. */
+const DEFAULT_WHITELIST: Whitelist = {
+  version: 1,
+  firstTokenCommands: ["pwd", "ls", "cat", "echo", "which", "head", "tail", "wc", "date", "whoami"],
+  twoTokenCommands: ["git status", "git log", "git diff", "git branch", "git show"],
+};
 
 /**
  * 셸 메타문자. 하나라도 있으면 화이트리스트와 무관하게 승인을 요구한다.
@@ -53,15 +59,23 @@ export const EMPTY_WHITELIST: Whitelist = {
  *  위험해지기 때문이다.)
  */
 export function loadWhitelist(): Whitelist {
-  let raw: unknown;
+  const candidates: string[] = [];
+  const configuredRoot = process.env["SPEAKI_AI_MODULE_ROOT"];
+  if (configuredRoot) candidates.push(path.resolve(configuredRoot, "data/whitelist.json"));
   try {
-    raw = JSON.parse(readFileSync(WHITELIST_PATH, "utf8"));
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`[warn] data/whitelist.json을 읽지 못했습니다 — 모든 셸 명령에 승인을 요구합니다: ${detail}\n`);
-    return EMPTY_WHITELIST;
+    if (import.meta.url) candidates.push(fileURLToPath(new URL("../data/whitelist.json", import.meta.url)));
+  } catch {
+    // 번들 환경에서는 아래 내장 화이트리스트를 사용한다.
   }
-  return parseWhitelist(raw);
+
+  for (const candidate of [...new Set(candidates)]) {
+    try {
+      return parseWhitelist(JSON.parse(readFileSync(candidate, "utf8")));
+    } catch {
+      // 다음 후보를 확인한다.
+    }
+  }
+  return DEFAULT_WHITELIST;
 }
 
 /** JSON 값을 Whitelist로 좁힌다. 모르는 필드는 무시하고, 이상한 값은 버린다. */

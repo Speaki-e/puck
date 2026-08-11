@@ -3,8 +3,12 @@
  *
  * A2까지의 동작을 그대로 유지한다: 텍스트 스트리밍 + 도구 로그를 stdout에
  * 내보내고, 실패로 끝나면 종료 코드 1.
+ *
+ * 한 번만 실행하므로 히스토리가 쌓일 일이 없다. 세션은 default 고정.
  */
+import { DEFAULT_SESSION_ID } from "../session-store.js";
 import type { AiClient } from "../types.js";
+import { askApproval } from "./approve.js";
 import { createLogCallbacks } from "./log.js";
 
 export async function runOnce(client: AiClient, command: string): Promise<number> {
@@ -18,13 +22,20 @@ export async function runOnce(client: AiClient, command: string): Promise<number
 
   await client.run(
     command,
+    DEFAULT_SESSION_ID,
+    {},
     {
       ...log,
+      onApprovalRequired(summary, resolve) {
+        // 단발 모드에는 열려 있는 readline이 없다 — 물을 때만 잠깐 만든다.
+        askApproval(summary, resolve, { out: process.stdout, signal: controller.signal });
+      },
       onDone(ok, summary) {
         log.onDone(ok, summary);
         if (!ok) exitCode = 1;
       },
     },
+    undefined,
     controller.signal,
   );
 

@@ -90,6 +90,11 @@ targets:
       - path: Puck/Agent
       - path: Puck/Tools/ToolRegistry.swift
       - path: Puck/Tools/ToolTimeouts.swift
+      # protocol section 7's `src: "agent"` log lines (2026-08-12). Both apps
+      # write to the same logs directory so one `id` joins the agent's
+      # tool_call/tool_result with pet-app's tool_exec_start/end -- without
+      # the agent half a failed call is an id with no tool name and no reason.
+      - path: Puck/Tools/ToolExecutionLogger.swift
       - path: Puck/Resources/Assets.xcassets
       - path: Puck/Bridge/BridgeMessages.swift
       - path: Puck/Bridge/JSONValue.swift

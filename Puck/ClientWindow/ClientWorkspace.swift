@@ -19,4 +19,11 @@ struct ClientWorkspace: Identifiable, Equatable {
     /// served (protocol 3.5); nil until then or if unavailable.
     var editorViewURL: URL?
     var editorUnavailableReason: EditorViewUnavailableReason?
+
+    /// The editor toggle's enabled state. A URL only ever arrives via
+    /// protocol 3.5's editor_view_ready, which workspace only sends for a
+    /// workspace it actually bound a project_path to -- so this covers both
+    /// "pure-chat workspace" and "workspace isn't connected yet" without
+    /// pet-app second-guessing either.
+    var canOpenEditor: Bool { editorViewURL != nil }
 }

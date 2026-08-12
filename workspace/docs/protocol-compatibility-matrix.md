@@ -1,5 +1,9 @@
 # 저장소 간 protocol 버전 호환 매트릭스
 
+> **참고 — 2026-08-12.** protocol/pet-app/workspace/ai-module이 puck 모노레포로 합쳐지면서 이 문서가
+> 전제한 "저장소마다 독립된 protocol 버전 pin"이라는 문제 자체가 사라졌다 -- 전부 같은 커밋을
+> 공유한다. 아래는 합치기 전 시점의 드리프트 점검 기록으로 남겨둔다.
+
 TODO.md W0/공통 "저장소 간 protocol 버전 호환 매트릭스 작성" 항목의 산출물이다. 코드 변경은 없다.
 이 저장소(workspace)가 쓰는 `@speaki-e/protocol` 버전과, 그 protocol을 실제로 공유하는 다른
 저장소(pet-app, ai-module)가 지금 어떤 버전을 기대/반영하고 있는지 로컬에 체크아웃된 세 저장소

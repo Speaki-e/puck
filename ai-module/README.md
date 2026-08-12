@@ -1,3 +1,8 @@
+> **폐기 — 2026-08-12.** 이 모듈은 착수되지 못한 채 puck 모노레포로 통합됐다. 에이전트 코어 역할은
+> pet-app의 F15 두뇌(`pet-app/Puck/Agent/AgentRunner.swift`)가 정식으로 대신하며, workspace는
+> `DirectCodeEditorRuntime`으로 code_editor 하나만 실행한다. 자세한 배경은 `../docs/decisions.md`,
+> 설계 기록은 `../../plan/04_ai-module.md`(마찬가지로 폐기 표시됨) 참고. 아래는 원래 계획 문서다.
+
 # Speaki-e ai-module
 
 Puck의 에이전트 코어입니다. Anthropic Messages API 스트리밍과 tool-use 루프를 처리하고, 실행 자체는 호출자가 주입한 executor에 맡깁니다. UI·소켓·파일시스템을 직접 다루지 않습니다.

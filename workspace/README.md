@@ -1,19 +1,16 @@
 # Speaki-e Workspace
 
-Puck의 로컬 워크스페이스 앱입니다. Monaco 에디터, 프로젝트 파일 관리, PetBridge, Claude Agent ACP와 `ai-module` 실행을 한 Electron 앱 안에서 연결합니다.
+Puck의 로컬 코드 에디터입니다. Monaco 에디터, 프로젝트 파일 관리, PetBridge, Claude Agent ACP를 한 Electron 앱 안에서 연결합니다. "무엇을 할지" 판단은 하지 않습니다 -- PuckClient(pet-app)의 에이전트가 이미 코딩 작업으로 분류해 보낸 지시문을 `code_editor` 도구 하나로 실행할 뿐입니다(자세한 배경은 [`../docs/decisions.md`](../docs/decisions.md)).
 
 ## 구성
 
 ```text
-PuckClient ── PetBridge ── Workspace ── ai-module ── Claude API
-                                  │
-                                  └── Claude Agent ACP ── 프로젝트 파일
+PuckClient(에이전트 판단) ── PetBridge ── Workspace ── Claude Agent ACP ── 프로젝트 파일
 ```
 
 - **Main process**: 파일·세션·설정·브리지·앱 생명주기
-- **Agent Host**: Claude Agent ACP와 코딩 작업 큐
+- **Agent Host**: `user_input`을 `code_editor` 한 번으로 실행하는 `DirectCodeEditorRuntime`, Claude Agent ACP와 코딩 작업 큐
 - **EditorGateway**: Electron 창과 WKWebView가 공유하는 Editor View
-- **ai-module**: 스트리밍, tool-use, 승인, 세션 히스토리를 담당하는 에이전트 코어
 
 ## 요구 사항
 

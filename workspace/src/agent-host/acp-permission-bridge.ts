@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import type { JSONValue } from "@speaki-e/protocol";
-import type { PermissionResolver } from "../agent-host/acp-adapter.js";
+import type { PermissionResolver } from "./acp-adapter.js";
 import type { ApprovalPort } from "../shared/ports.js";
 
 function summarize(toolCall: acp.ToolCallUpdate): string {

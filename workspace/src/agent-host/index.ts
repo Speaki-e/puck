@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
-import type * as acp from "@agentclientprotocol/sdk";
 import type {
   AgentHostRequest,
   AgentHostResponse,
   AgentHostEvent,
 } from "../shared/agent-host-protocol.js";
-import type { JSONValue } from "@speaki-e/protocol";
+import type { Attachment, JSONValue, ToolExecutionResult } from "@speaki-e/protocol";
 import { AcpAdapter } from "./acp-adapter.js";
 import { CodeEditorQueue, QueueCancelledError } from "./code-editor-queue.js";
+import { createAgentRunner, type ExecutorKind } from "./agent-runner.js";
 
 interface UtilityParentPort {
   postMessage(message: unknown): void;
@@ -18,8 +18,6 @@ const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort
 if (!parentPort) throw new Error("Agent Host는 Electron Utility Process로 실행해야 합니다");
 
 const queue = new CodeEditorQueue();
-/** permission_request의 requestId -> ACP resolvePermission을 이어서 끝낼 resolve(김민영 W5). */
-const pendingPermissions = new Map<string, (response: acp.RequestPermissionResponse) => void>();
 
 function respond(message: AgentHostResponse): void {
   parentPort!.postMessage(message);
@@ -28,6 +26,64 @@ function respond(message: AgentHostResponse): void {
 function emit(event: AgentHostEvent["event"], payload: AgentHostEvent["payload"]): void {
   parentPort!.postMessage({ kind: "event", event, payload } satisfies AgentHostEvent);
 }
+
+interface PendingMainCall<T> {
+  resolve(value: T): void;
+  reject(error: Error): void;
+  timer: NodeJS.Timeout;
+}
+
+/**
+ * Main에 뭔가를 위임하고(이벤트) 답을 기다리는(요청) 왕복 하나를 만든다 -- 요청마다 새 requestId를
+ * 먼저 만들고, 그 id로 payload를 구성하도록 호출자에게 넘겨준다(payload 안에 자기 id를 실어야 하므로).
+ */
+function callMain<T>(
+  event: AgentHostEvent["event"],
+  buildPayload: (requestId: string) => JSONValue,
+  pending: Map<string, PendingMainCall<T>>,
+  timeoutMs: number,
+): Promise<T> {
+  const requestId = randomUUID();
+  const result = new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pending.delete(requestId);
+      reject(new Error(`Main 응답 시간 초과: ${event}`));
+    }, timeoutMs);
+    pending.set(requestId, { resolve, reject, timer });
+  });
+  emit(event, buildPayload(requestId));
+  return result;
+}
+
+const toolExecutePending = new Map<string, PendingMainCall<ToolExecutionResult>>();
+const runtimeConfigPending = new Map<string, PendingMainCall<{ apiKey?: string; model: string }>>();
+
+const agentRunner = createAgentRunner({
+  emit,
+  useMockAiModule: process.env.NODE_ENV === "test" || process.env.WORKSPACE_MOCK_AI === "1",
+  directCodeEditor: process.env.WORKSPACE_DIRECT_CODE_EDITOR === "1",
+  executeToolOnMain: (executorKind: ExecutorKind, tool, args, workspaceId, sessionId, signal) => {
+    let requestIdForAbort: string | undefined;
+    const result = callMain<ToolExecutionResult>(
+      "tool_execute_request",
+      (requestId) => {
+        requestIdForAbort = requestId;
+        return { requestId, executorKind, tool, args, workspaceId, sessionId } as unknown as JSONValue;
+      },
+      toolExecutePending,
+      600_000,
+    );
+    const onAbort = () => { if (requestIdForAbort) emit("tool_execute_cancel", { requestId: requestIdForAbort } as unknown as JSONValue); };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    return result.finally(() => signal?.removeEventListener("abort", onAbort));
+  },
+  getRuntimeConfig: () => callMain<{ apiKey?: string; model: string }>(
+    "runtime_config_request",
+    (requestId) => ({ requestId } as unknown as JSONValue),
+    runtimeConfigPending,
+    10_000,
+  ),
+});
 
 /**
  * runCodeEditor 요청마다 새 AcpAdapter를 만든다(전에는 모듈 스코프에 하나만 있었다). CodeEditorQueue는
@@ -42,17 +98,10 @@ function createAdapterFor(payload: { requestId: string; workspaceId: string; ses
       workspaceId: payload.workspaceId,
       update: JSON.parse(JSON.stringify(update)),
     } as JSONValue),
-    resolvePermission: (request) => new Promise<acp.RequestPermissionResponse>((resolve) => {
-      const permissionRequestId = randomUUID();
-      pendingPermissions.set(permissionRequestId, resolve);
-      emit("permission_request", {
-        requestId: permissionRequestId,
-        workspaceId: payload.workspaceId,
-        sessionId: payload.sessionId,
-        toolCall: JSON.parse(JSON.stringify(request.toolCall)),
-        options: JSON.parse(JSON.stringify(request.options)),
-      } as JSONValue);
-    }),
+    // ACP 승인도 ai-module의 onApprovalRequired와 같은 PendingApprovalStore를 탄다(agent-runner.ts) --
+    // 예전에는 이 리졸버가 Main에 있어서 별도 permission_request/permissionResponse 왕복이 필요했지만,
+    // 이제 승인 저장소 자체가 Agent Host에 있으므로 여기서 직접 부른다.
+    resolvePermission: agentRunner.permissionResolverFor({ workspaceId: payload.workspaceId, sessionId: payload.sessionId }),
   });
 }
 
@@ -89,11 +138,51 @@ parentPort.on("message", async ({ data: message }) => {
       case "cancelCodeEditor":
         respond({ kind: "response", id: message.id, ok: true, payload: { cancelled: queue.cancel(message.payload.requestId) } });
         break;
-      case "permissionResponse": {
-        const resolve = pendingPermissions.get(message.payload.requestId);
-        if (resolve) {
-          pendingPermissions.delete(message.payload.requestId);
-          resolve(message.payload.response as unknown as acp.RequestPermissionResponse);
+      case "runAgent": {
+        const payload = message.payload;
+        void agentRunner
+          .runAgent({
+            workspaceId: payload.workspaceId,
+            sessionId: payload.sessionId,
+            text: payload.text,
+            attachments: payload.attachments as unknown as Attachment[] | undefined,
+            projectPath: payload.projectPath,
+          })
+          .catch(() => undefined);
+        respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
+        break;
+      }
+      case "cancelAgentSession":
+        respond({ kind: "response", id: message.id, ok: true, payload: { cancelled: agentRunner.cancelSession(message.payload.sessionId) } });
+        break;
+      case "respondToApproval":
+        respond({
+          kind: "response",
+          id: message.id,
+          ok: true,
+          payload: { handled: agentRunner.respondToApproval(message.payload.approvalId, message.payload.approved) },
+        });
+        break;
+      case "rejectPendingApprovals":
+        agentRunner.rejectPendingApprovals();
+        respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
+        break;
+      case "toolExecuteResponse": {
+        const pending = toolExecutePending.get(message.payload.requestId);
+        if (pending) {
+          toolExecutePending.delete(message.payload.requestId);
+          clearTimeout(pending.timer);
+          pending.resolve(message.payload.result as unknown as ToolExecutionResult);
+        }
+        respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
+        break;
+      }
+      case "runtimeConfigResponse": {
+        const pending = runtimeConfigPending.get(message.payload.requestId);
+        if (pending) {
+          runtimeConfigPending.delete(message.payload.requestId);
+          clearTimeout(pending.timer);
+          pending.resolve({ apiKey: message.payload.apiKey, model: message.payload.model });
         }
         respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
         break;
@@ -113,7 +202,7 @@ parentPort.on("message", async ({ data: message }) => {
       }
       case "shutdown":
         queue.cancelAll();
-        pendingPermissions.clear();
+        agentRunner.shutdown();
         respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
         setImmediate(() => process.exit(0));
         break;

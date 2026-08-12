@@ -9,38 +9,38 @@ PuckClient / Fallback Electron
 Workspace Main
 ├─ app/workspace-application       composition root와 종료 처리
 ├─ app/pet-bridge-router           pet-app 메시지 라우팅
-├─ app/agent-runtime-coordinator   AI 실행/세션 조정 경계
+├─ app/agent-runtime-coordinator   Agent Host <-> petBridge 이벤트 릴레이 + 도구 실행 RPC 처리
 ├─ WorkspaceRegistry / FileService
 ├─ EditorGateway / PetBridge
 ├─ SecretStore / SettingsStore
 └─ AgentHostController
-              │ MessagePort RPC
+              │ MessagePort RPC (양방향: runAgent/cancelAgentSession/respondToApproval ↓,
+              │                          agent_*/tool_execute_request/runtime_config_request ↑)
               ▼
 Agent Host Utility Process
+├─ agent-runner (SessionRouter, RunRegistry, PendingApprovalStore, AiModuleRuntime)
 ├─ CodeEditorQueue
-├─ ACP permission bridge endpoint
 └─ AcpAdapter
               │ ACP JSON-RPC
               ▼
 Claude Agent ACP child process
 ```
 
-Main은 Electron 생명주기, 파일시스템, 로컬 HTTP/WebSocket, PetBridge, 암호화 저장소를 소유합니다. Agent Host는 ACP 실행을 별도 Utility Process에 격리합니다. Agent Host가 비정상 종료되면 대기 RPC와 ActiveRun을 실패 처리하고 재시작하지만 FileService와 Editor View는 유지됩니다.
+Main은 Electron 생명주기, 파일시스템, 로컬 HTTP/WebSocket, PetBridge, 암호화 저장소를 소유합니다. Agent Host는 ai-module 실행과 ACP 실행을 별도 Utility Process에 격리합니다. Agent Host가 비정상 종료되면 재시작하고, Main은 진행 중이던 `runAgent` 호출이 없으면 조용히, 있으면(내부 in-flight 추적) 해당 세션에 `agent_done(ok=false)`를 보내 정리합니다. FileService와 Editor View는 Main에 남아 있으므로 영향받지 않습니다.
 
 `src/main/index.ts`는 애플리케이션 시작과 치명적 오류 처리만 담당합니다. 실제 조립은 `src/main/app` 아래에 모아 도메인 모듈과 Electron 진입점을 분리했습니다.
 
-## 현재 AI 실행 경계
+## AI 실행 경계
 
-기획서의 최종 구조에서는 ai-module, SessionRouter, RunRegistry가 Agent Host에 위치합니다. 현재는 v6 ai-module을 `packages/ai-module`에 포함해 실제 실행에 사용하되, 실행 경계는 Main의 `app/agent-runtime-coordinator.ts`에 유지합니다.
+ai-module, SessionRouter, RunRegistry, PendingApprovalStore는 Agent Host의 `agent-runner.ts`에 있습니다(docs/architecture.md 이전 판이 "다음 구조 단계"로 예고했던 이동이 완료됨).
 
-- 세션 직렬화와 ActiveRun 관리
-- ai-module 승인 콜백과 ACP permission 연결
-- PetBridge agent 이벤트 정규화
-- Workspace별 `AiModuleRuntime`/Claude client 재사용으로 세션 히스토리 유지
-- AsyncLocalStorage 기반 세션별 `editorLocal` 실행기 격리
-- 테스트(`NODE_ENV=test`/`WORKSPACE_MOCK_AI=1`)에서만 `MockAgentRuntime` 사용
-
-다음 구조 단계에서는 ai-module과 SessionRouter/RunRegistry를 Agent Host로 옮깁니다. 이때 bootstrap과 PetBridge 라우터는 유지하고 Agent Host↔Main 도구 실행 RPC를 추가합니다.
+- 세션 직렬화(SessionRouter)와 ActiveRun 관리(RunRegistry)가 Agent Host 프로세스 안에서 이루어집니다.
+- ai-module의 `onApprovalRequired`와 ACP의 `request_permission`이 같은 `PendingApprovalStore`를 거쳐 같은 `agent_approval_request`/`respondToApproval` 왕복으로 나갑니다 -- 예전처럼 ACP 전용 `permission_request`/`permissionResponse` 짝이 따로 있지 않습니다.
+- petAppProxy(pet-app 도구 위임)와 editorLocal(code_editor/open_in_editor/read_file)은 Main에만 있는 petBridge/FileService/EditorGateway가 필요하므로, Agent Host는 `tool_execute_request` 이벤트로 실행을 위임하고 Main은 `toolExecuteResponse`로 결과를 돌려줍니다. `code_editor` 자체는 Agent Host 안에서 바로 처리되던 `runCodeEditor` RPC를 그대로 한 번 더 타므로(Main을 거쳐 되돌아옴) 약간의 왕복 비용이 있지만, 이 도구는 원래도 수 초~수 분 걸리는 작업이라 무시할 만합니다.
+- Claude API 키/모델은 Main의 SecretStore/SettingsStore가 소유하므로(설정 화면에서 실행 중에도 바뀔 수 있음), Agent Host는 run마다 `runtime_config_request`로 최신 값을 물어봅니다.
+- Workspace별 `AiModuleRuntime`/Claude client 재사용으로 세션 히스토리를 유지합니다.
+- AsyncLocalStorage 기반 세션별 `editorLocal` 실행기 격리는 그대로입니다.
+- 테스트(`NODE_ENV=test`/`WORKSPACE_MOCK_AI=1`)에서는 Agent Host 안에서 `MockAgentRuntime`을 사용합니다.
 
 ## 파일 흐름
 
@@ -80,5 +80,5 @@ EditorGateway는 프로세스당 하나만 실행되며 workspace ID, token, Ori
 
 - 내부 import cycle 부재
 - shared/renderer/agent-host 계층 역참조 금지
-- Main에서 Mock 구현을 사용하는 임시 경계가 coordinator 밖으로 확산되지 않음
+- Agent Host에서 Mock 구현(MockAgentRuntime)을 사용하는 임시 경계가 agent-runner 밖으로 확산되지 않음
 - `main/index.ts`와 `renderer/App.tsx`가 다시 거대 진입 파일이 되지 않음

@@ -45,12 +45,13 @@ F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제�
 | surfaceBorder | `#EEE9F0` (Gray/+5) |
 | textPrimary | `#332B36` (Gray/-3) |
 | textSecondary | `#695E6E` (Gray/0) |
-| accent | `rgb(0.80, 0.42, 0.12)` |
+| accent | `#ed8c33` |
 
 ### dark — workspace(Electron 클라이언트 창)의 실제 팔레트와 픽셀 단위로 일치
 
 workspace가 디자인 기준이 됐다(`docs/decisions.md` 2026-08-12). 아래 값은 workspace의
-`src/renderer/styles.css` `--canvas`/`--surface`/`--hairline`/`--ink`/`--mute`/`--blue`를 그대로 옮긴 것이다.
+`src/renderer/styles.css` `--canvas`/`--surface`/`--hairline`/`--ink`/`--mute`를 그대로 옮긴 것이다.
+accent만 예외 — workspace의 point color 자체가 (`--brand`로) 이 앱의 호박 주황에 맞춰졌다.
 
 | 토큰 | 값 |
 |---|---|
@@ -59,16 +60,14 @@ workspace가 디자인 기준이 됐다(`docs/decisions.md` 2026-08-12). 아래 
 | surfaceBorder | `#292929` (workspace `--hairline`) |
 | textPrimary | `#ededed` (workspace `--ink`) |
 | textSecondary | `#777777` (workspace `--mute`) |
-| accent | `#3291ff` (workspace `--blue`) |
+| accent | `#ed8c33` (workspace `--brand`) |
 
 ### glass
 
-**아직 워크스페이스 전환 이전 값 그대로다** (2026-08-12 `.dark` 갱신 때 `.glass`는 건드리지 않음) —
 background `#161616`, `surface`/`surfaceBorder`는 `white.opacity(0.06 / 0.12)`, 텍스트는 `white` /
-`white.opacity(0.6)`, `usesGlassSurfaces = true`. 즉 지금은 `.dark`와 `.glass`의 background가
-**서로 다르다**(`#090909` vs `#161616`) — 예전엔 같았지만 이 문서가 그 사실을 자동으로 보장해주진
-않는다. `.glass`의 accent도 여전히 호박 주황(`rgb(0.93, 0.55, 0.20)`)이다.
-단 `surface`/`surfaceBorder`는 **macOS 26 미만 폴백(`.regularMaterial`)의 틴트일 뿐**이고, macOS 26+에서는 무시되고 진짜 `glassEffect`가 그려진다.
+`white.opacity(0.6)`, `usesGlassSurfaces = true`. background는 `.dark`(`#090909`)와 다르다 — 워크스페이스
+전환(2026-08-12) 때 `.glass`는 건드리지 않았기 때문. accent는 `.dark`/`.light`와 같은 `#ed8c33`.
+`surface`/`surfaceBorder`는 **macOS 26 미만 폴백(`.regularMaterial`)의 틴트일 뿐**이고, macOS 26+에서는 무시되고 진짜 `glassEffect`가 그려진다.
 
 ### accent 사용 규칙
 
@@ -80,8 +79,9 @@ accent는 **의도적으로 유일하게 튀는 색**이다. 쓰는 곳은 다�
 - 메시지 말풍선 배경 (`accent.opacity(0.06)`)
 - 사용자 아바타 배경 (`accent.opacity(0.16)`)
 
-`.dark`만 workspace의 파란 accent(`#3291ff`)로 바뀌었다. `.light`/`.glass`는 예전 값(호박 주황 계열)
-그대로다 — 세 팔레트가 서로 다른 accent를 쓰는 상태이니 새로 손댈 때는 팔레트별로 확인할 것.
+세 팔레트(`.light`/`.dark`/`.glass`) 전부, 그리고 workspace(`--brand`)까지 같은 `#ed8c33` 호박 주황
+하나로 통일돼 있다(2026-08-13, "포인트 컬러는 워크스페이스, client 상관없이 주황색으로 통합") —
+앱이나 테마와 무관하게 accent를 손댈 땐 이 한 값만 바꾸면 된다.
 
 ## 3. 타이포그래피
 

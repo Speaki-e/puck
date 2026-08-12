@@ -12,11 +12,36 @@
 import SwiftUI
 import WebKit
 
+/// One live WKWebView per workspace, kept across editor-toggle and
+/// workspace switches. Without this each toggle makes a fresh web view and
+/// Monaco reloads from scratch -- scroll position, open tabs and any
+/// unsaved edit in the editor go with it, which makes the toggle feel like
+/// it closed the editor rather than hid it. The plan calls this a view
+/// state toggle within one window (02_pet-app.md F13), so the editor has to
+/// survive it.
+///
+/// ponytail: no eviction -- one web view per workspace the user actually
+/// opened the editor for, freed only when PuckClient quits. Add an LRU cap
+/// if someone works across enough projects for the memory to show.
+@MainActor
+final class EditorWebViewPool {
+    static let shared = EditorWebViewPool()
+    private var webViewsByWorkspace: [String: WKWebView] = [:]
+
+    func webView(forWorkspace workspaceId: String) -> WKWebView {
+        if let existing = webViewsByWorkspace[workspaceId] { return existing }
+        let created = WKWebView()
+        webViewsByWorkspace[workspaceId] = created
+        return created
+    }
+}
+
 struct EditorWebView: NSViewRepresentable {
+    let workspaceId: String
     let url: URL
 
     func makeNSView(context: Context) -> WKWebView {
-        WKWebView()
+        EditorWebViewPool.shared.webView(forWorkspace: workspaceId)
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {

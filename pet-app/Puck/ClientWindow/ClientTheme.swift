@@ -13,12 +13,9 @@
 import SwiftUI
 
 enum ClientTheme {
-    // 2026-08-12: workspace (the source of truth now, see ClientPalette) sets
-    // its type in Geist -- a neutral/grotesque sans, not SF Rounded's soft
-    // "friendly chat app" feel. pet-app doesn't bundle the Geist font file
-    // (that's a separate asset-embedding task), so this drops `design:
-    // .rounded` in favor of the system default design as the closer-available
-    // approximation rather than pulling in a new font dependency here.
+    // workspace (the source of truth, see ClientPalette) sets its type in
+    // Geist, which pet-app doesn't bundle -- the system default design is
+    // the closer approximation without adding a font dependency here.
     enum Typography {
         static let sectionHeader = Font.system(.caption).weight(.semibold)
         static let workspaceName = Font.system(.body).weight(.medium)
@@ -57,10 +54,8 @@ enum ClientTheme {
         static let spacingSmall: CGFloat = 6
         static let spacingMedium: CGFloat = 10
         static let spacingLarge: CGFloat = 16
-        /// 2026-08-12: pulled down from the Figma-matched 24/24/12 to
-        /// workspace's own sharper radii (src/renderer/styles.css: 12px
-        /// panels, 6px buttons/rows) now that workspace is the design source
-        /// of truth (see ClientPalette).
+        /// Matches workspace's own radii (src/renderer/styles.css: 12px
+        /// panels, 6px buttons/rows) -- see ClientPalette.
         static let bubbleCornerRadius: CGFloat = 10
         static let cardCornerRadius: CGFloat = 12
         static let rowCornerRadius: CGFloat = 6

@@ -55,14 +55,11 @@ export interface AgentRunner {
 }
 
 /**
- * 2026-08-12, byeolki: "workspace는 일반 에디터고, 모든 AI 처리는 puckclient가 함." ai-module
- * 실행 루프(SessionRouter/RunRegistry를 Agent Host로 옮긴 직전 판)는 걷어냈다 -- workspace는 이제
- * "무엇을 할지" 판단하지 않고, pet-app의 CodeEditorDelegate(Puck/Agent/CodeEditorDelegate.swift)가
- * 이미 코딩 작업이라고 판단해서 보낸 user_input 하나를 code_editor 한 번으로 곧장 실행하기만 한다
- * (예전의 --direct-code-editor 모드가 유일한 경로가 됨). SessionRouter(세션당 직렬화)와
- * RunRegistry(취소/ActiveRun 추적)는 이 단일 실행에도 여전히 의미가 있어 남겨뒀다. petAppProxy와
- * ai-module 전용 승인 경로는 삭제 -- pet-app 도구 호출은 전부 pet-app 자신의 AgentRunner.swift가
- * 처리하고 workspace를 거치지 않는다.
+ * workspace는 "무엇을 할지" 판단하지 않는다 -- pet-app의 CodeEditorDelegate가 이미 코딩
+ * 작업이라고 판단해서 보낸 user_input 하나를 code_editor 한 번으로 곧장 실행할 뿐이다(옛
+ * --direct-code-editor 모드가 유일한 경로가 됨, docs/architecture.md 참고). SessionRouter(세션당
+ * 직렬화)와 RunRegistry(취소/ActiveRun 추적)는 이 단일 실행에도 여전히 필요해 남아 있다. pet-app
+ * 도구 호출은 pet-app 자신의 AgentRunner.swift가 처리하며 workspace를 거치지 않는다.
  */
 export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
   const sessionRouter = new SessionRouter();

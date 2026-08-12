@@ -1,5 +1,12 @@
 # Puck 디자인 시스템 (현재 구현 기준)
 
+> **범위 축소 — 2026-08-13.** F13 클라이언트 창(사이드바·탑바·채팅창)은 `chat-web/`(React/
+> Tailwind/shadcn)로 옮겨갔고 `ChatView.swift`/`ClientSidebarView.swift`는 삭제됐다 — 아래 문서가
+> 설명하는 구조(사이드바/탑바/메시지 버블 레이아웃)는 더 이상 실제 코드가 아니다(`docs/decisions.md`
+> 참고). `ClientPalette`/`ClientTheme`/`GlassSurface` 자체는 여전히 살아있지만, 이제 소비자는
+> **Puck.app의 Settings 화면**(`Puck/Settings/*.swift`)뿐이다 — 색 토큰(§2)은 여전히 유효하지만
+> 그 외(사이드바 폭, 말풍선 레이아웃 등)는 chat-web의 CSS(`chat-web/src/styles.css`)가 새 기준이다.
+
 F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제로 존재하는 값 그대로** 기록한 문서다.
 새 디자인 제안이 아니라 현황 스냅샷이며, 값이 바뀌면 이 문서가 아니라 아래 소스가 먼저 바뀐다.
 

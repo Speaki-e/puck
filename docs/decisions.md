@@ -4,7 +4,33 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
-## 2026-08-13: PuckClient's chat UI is moving to web (React/Tailwind/shadcn)
+## 2026-08-13: PuckClient's chat UI moved to web (React/Tailwind/shadcn) -- done
+
+Landed in full: `chat-web/` (sidebar, top bar, transcript, streaming, tool
+calls, approvals, session/workspace switching) replaces
+`ChatView.swift`/`ClientSidebarView.swift`, which are deleted.
+`ClientChatBridge.swift`/`ClientChatBridgeMessages.swift` are the JS↔Swift
+bridge (`chat-web/src/lib/bridge-types.ts` mirrors the Swift side by hand).
+`ClientWindowStore`/`ChatSession` are unchanged -- `AppDelegate.swift` now
+routes chat events through `chatBridge.applyEvent(...)` (which folds into the
+store itself, then pushes the exact delta) instead of calling
+`ClientWindowStore.handleChatEvent` directly, and pushes a blanket
+`refreshWorkspacesAndSessions()` after every other store mutation (new
+workspace/session, editor URL, task-session moves) -- the store isn't
+Combine-observed because its session list (`sessionOrder`/`sessionsByKey`)
+isn't `@Published`, only individual fields like `workspaces` are, so passive
+observation would silently miss session-list changes. `AgentSettingsView`
+(API key entry) stays native, opened the same way via
+`NSApp.sendAction(Selector(("showSettings:")))`, now triggered by
+`action:openSettings` from the web sidebar instead of a SwiftUI button.
+Editor-open state moved from `ClientWindowView`'s local `@State` to
+`ClientChatBridge` (`isEditorOpen` + `setEditorOpenChangeHandler`), since the
+toggle now lives in the web sidebar but still has to drive the native
+`HSplitView` layout choice. Verified end-to-end via the accessibility tree
+(not screenshots) after a real `state:hydrate` round-trip through the actual
+`ClientWindowStore` -- 957/957 `PuckTests` still pass.
+
+### (original scoping notes, kept for context)
 
 Native SwiftUI iteration on PuckClient's chat window couldn't hit a specific
 visual target (Orca/Zed-inspired, minimalist, shadcn) at any reasonable

@@ -14,10 +14,15 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let bridgeClient = BridgeSocketClient()
     private lazy var userInputSender = UserInputSender(transport: { [weak self] in self?.bridgeClient })
     private lazy var clientWindowStore = ClientWindowStore(sender: userInputSender)
+    /// Second consumer of clientWindowStore's mutations, alongside the store
+    /// itself -- see ClientChatBridge's own header comment for why this is
+    /// pushed to imperatively rather than Combine-observed.
+    private lazy var chatBridge = ClientChatBridge(store: clientWindowStore)
     /// F15 (2026-07-31): the agent runs in this process now -- see AgentHost.
     private lazy var agentHost = AgentHost(broadcast: { [weak self] message in
         self?.bridgeClient.broadcast(message) ?? false
@@ -56,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: title,
                 userMessage: userMessage
             )
+            self?.chatBridge.refreshWorkspacesAndSessions()
         }
 
         showWindow()
@@ -124,12 +130,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func handle(_ message: BridgeMessage) {
         switch message {
         case .event(let event, let workspaceId, let sessionId):
-            clientWindowStore.handleChatEvent(event, workspaceId: workspaceId, sessionId: sessionId)
+            // Folds into clientWindowStore internally, then pushes the exact
+            // delta to chat-web -- see ClientChatBridge.applyEvent's own
+            // comment for why this replaces a direct handleChatEvent call.
+            chatBridge.applyEvent(event, workspaceId: workspaceId, sessionId: sessionId)
             // workspace's agent_done is also how a delegated code_editor call
             // finds out it finished (CodeEditorDelegate).
             agentHost.handle(event, sessionId: sessionId)
         case .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
             clientWindowStore.handleClientUpdate(message)
+            chatBridge.refreshWorkspacesAndSessions()
         case .toolResult(let result):
             // The reply to a tool this app's agent dispatched. pet-app sends
             // it back on the same connection, so it arrives here rather than
@@ -142,6 +152,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // actually landed in a session -- an unknown workspace/session
             // would pop an empty window for nothing.
             if clientWindowStore.showUserMessage(input.text, workspaceId: input.workspaceId, sessionId: input.sessionId) {
+                chatBridge.pushUserMessageEcho(
+                    workspaceId: input.workspaceId ?? ClientWindowStore.defaultWorkspaceId,
+                    sessionId: input.sessionId ?? ClientWindowStore.defaultSessionId
+                )
                 showWindow()
                 // F15: and it is a command, not just text to display -- the
                 // pet's bubble and its push-to-talk are inputs to the same
@@ -193,7 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // bottom-left corner, so this keeps the explicit contentRect
             // instead of relying on center() alone.
             let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 1440, height: 900))
-            let hosting = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
+            let hosting = NSHostingController(rootView: ClientWindowView(store: clientWindowStore, chatBridge: chatBridge))
             // NSHostingController defaults to sizingOptions
             // .preferredContentSize, i.e. it keeps pushing the SwiftUI
             // fitting size onto the window -- which is why the window opened

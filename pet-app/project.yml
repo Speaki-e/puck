@@ -1,0 +1,137 @@
+name: Puck
+options:
+  bundleIdPrefix: com.speaki-e
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: true
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+
+targets:
+  Puck:
+    type: application
+    platform: macOS
+    sources:
+      - path: Puck
+        excludes:
+          - Resources/Info.plist
+          - Resources/Puck.entitlements
+          - Resources/Avatars
+          - Resources/Toys
+      # Folder reference, not a group: the avatar package must keep its
+      # Avatars/<name>/{manifest.json,*.usdz,sounds/} layout inside the app
+      # bundle. As a group, Xcode flattens every file into Resources/ and
+      # AvatarInstaller has nothing structured to copy out.
+      - path: Puck/Resources/Avatars
+        type: folder
+        buildPhase: resources
+      # Folder reference for the same reason as Avatars: each toy keeps its
+      # own directory in the bundle, so ToyCatalogue can look artwork up by
+      # toy name instead of relying on every file having a unique flat name.
+      - path: Puck/Resources/Toys
+        type: folder
+        buildPhase: resources
+    info:
+      path: Puck/Resources/Info.plist
+      properties:
+        LSUIElement: true
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        # Without this the compiled asset catalog is in the bundle but macOS
+        # never looks for an icon in it -- both apps shipped iconless.
+        CFBundleIconName: AppIcon
+        NSMicrophoneUsageDescription: "Used to recognize voice commands via Push-to-Talk (PTT)."
+        NSSpeechRecognitionUsageDescription: "Used to convert spoken commands into text."
+        NSAppleEventsUsageDescription: "Needs to control other apps to run the run_applescript tool."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.Puck
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Puck/Resources/Puck.entitlements
+    scheme:
+      testTargets:
+        - PuckTests
+      commandLineArguments:
+        "-PuckUITestMode": false
+
+  # F13 (2026-07-30): the Claude-Desktop-style client window used to live
+  # in-process inside Puck; it's now this separate, regular (Dock-
+  # resident) app instead, so it gets a real Dock icon / Cmd+Tab / Spotlight
+  # presence that an LSUIElement app can't have (byeolki: "별도의 앱으로
+  # 해서 dock에 상시 표시"). It shares ClientWindow/Localization and the
+  # wire-protocol subset of Bridge/ directly from Puck's sources rather
+  # than through a separate framework target -- at this project's size a
+  # real framework would mean marking ~17 files' worth of types/members
+  # `public` for no real benefit, so both targets just compile the same
+  # source files independently.
+  PuckClient:
+    type: application
+    platform: macOS
+    sources:
+      - path: PuckClient
+        excludes:
+          - Resources/Info.plist
+          - Resources/PuckClient.entitlements
+      - path: Puck/ClientWindow
+      - path: Puck/Localization
+      # AgentSettingsView reuses SettingsSection/SettingsStackedRow rather
+      # than hand-duplicating their padding/typography (2026-08-02, byeolki:
+      # "패딩이나 폰트사이즈, 높이 같은게 아직 안 맞는 부분이 있는거 같은데").
+      # Only this one file, not all of Puck/Settings -- the rest depends on
+      # SettingsStore/AppAppearance/AvatarManagementView, which are Puck's.
+      - path: Puck/Settings/SettingsComponents.swift
+      # F15 (2026-07-31): the agent loop. Compiled into this app, not
+      # Puck -- the pet executes tools, the client decides which ones.
+      - path: Puck/Agent
+      - path: Puck/Tools/ToolRegistry.swift
+      - path: Puck/Tools/ToolTimeouts.swift
+      # protocol section 7's `src: "agent"` log lines (2026-08-12). Both apps
+      # write to the same logs directory so one `id` joins the agent's
+      # tool_call/tool_result with pet-app's tool_exec_start/end -- without
+      # the agent half a failed call is an id with no tool name and no reason.
+      - path: Puck/Tools/ToolExecutionLogger.swift
+      - path: Puck/Resources/Assets.xcassets
+      - path: Puck/Bridge/BridgeMessages.swift
+      - path: Puck/Bridge/JSONValue.swift
+      - path: Puck/Bridge/BridgeConnection.swift
+      - path: Puck/Bridge/BridgeSocketPath.swift
+      - path: Puck/Bridge/BridgeSocketClient.swift
+      - path: Puck/Bridge/UserInputSender.swift
+      - path: Puck/App/CompanionAppLauncher.swift
+      - path: Puck/App/AppIdentity.swift
+    info:
+      path: PuckClient/Resources/Info.plist
+      properties:
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        # Same pumpkin, stamped "client": two Dock icons from the same mark
+        # are otherwise impossible to tell apart (byeolki, 2026-07-30).
+        CFBundleIconName: AppIconClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckClient
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIconClient
+        CODE_SIGN_ENTITLEMENTS: PuckClient/Resources/PuckClient.entitlements
+
+  PuckTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PuckTests
+      # Compiled straight into the test bundle rather than reached through
+      # @testable import: it belongs to PuckClient, and adding it to the
+      # Puck target instead would change the pet's binary (and with it
+      # its ad-hoc signature, i.e. its Accessibility grant) for a file the
+      # pet never uses.
+      - path: PuckClient/ClientMainMenu.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckTests
+        # Xcode 26 refuses to code sign a test bundle with no Info.plist.
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Puck

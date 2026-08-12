@@ -1,0 +1,199 @@
+//
+//  GPTClient.swift
+//  Puck
+//
+//  F15 · owner: 박해영 (Haeyoung Park)
+//  A thin OpenAI Chat Completions client with tool calling.
+//
+//  byeolki (2026-07-31): "client에 gpt api를 연결해서 이제 펫이 막 화면을
+//  컨트롤 하고 날씨 앱 막 켜주고". plan/04_ai-module.md specifies this brain
+//  as a TypeScript module against the Claude API, hosted by workspace -- but
+//  workspace and ai-module are both still empty repos, the chat client is
+//  Swift now, and the key the team has is an OpenAI one. So the loop lives
+//  here for the moment; see AgentRunner's header for what that costs.
+//
+//  No SDK, same reasoning as plan/04_ai-module.md section 4 gives for the
+//  Claude client: a tool-use loop needs three request fields and reads two
+//  response fields, and a dependency for that is a dependency to keep
+//  updated. Non-streaming for a first pass -- the pet reacts to tool calls,
+//  not to tokens, so streaming buys nothing until the chat view wants a
+//  typing effect.
+//
+
+import Foundation
+
+/// One entry of the conversation as the API models it.
+enum GPTMessage {
+    case system(String)
+    case user(String)
+    /// What the model said, plus any tool calls it asked for. Both can be
+    /// present: a model may narrate and then call.
+    case assistant(text: String?, toolCalls: [GPTToolCall])
+    /// The reply to one tool call, keyed by the id the model gave it.
+    case tool(callId: String, content: String)
+}
+
+struct GPTToolCall: Equatable {
+    let id: String
+    let name: String
+    /// Raw JSON text, exactly as the model emitted it -- parsed by the caller,
+    /// which is the only place that knows what shape the tool wants.
+    let argumentsJSON: String
+}
+
+/// What one turn produced: text to show, and calls to run. An empty
+/// `toolCalls` means the model is done.
+struct GPTTurn {
+    let text: String?
+    let toolCalls: [GPTToolCall]
+}
+
+/// A tool as offered to the model: the registry's shape plus the description
+/// text, which the registry deliberately does not carry (see ToolRegistry).
+struct GPTToolSpec {
+    let name: String
+    let description: String
+    let parameters: [ToolRegistry.Parameter]
+}
+
+enum GPTError: LocalizedError {
+    case notConfigured
+    case http(status: Int, body: String)
+    case malformedResponse(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notConfigured:
+            return "OpenAI API 키가 설정되지 않았습니다."
+        case .http(let status, let body):
+            return "OpenAI API \(status): \(body)"
+        case .malformedResponse(let what):
+            return "OpenAI 응답을 해석할 수 없습니다: \(what)"
+        }
+    }
+}
+
+final class GPTClient {
+    /// Read per request, not captured once: a key typed into Settings has to
+    /// take effect without quitting the app, and this is a file read.
+    private let configuration: () -> AgentConfiguration
+    private let session: URLSession
+    private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
+
+    init(configuration: @escaping () -> AgentConfiguration, session: URLSession = .shared) {
+        self.configuration = configuration
+        self.session = session
+    }
+
+    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        let configuration = configuration()
+        guard let apiKey = configuration.apiKey, !apiKey.isEmpty else { throw GPTError.notConfigured }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 60
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "model": configuration.model,
+            "messages": messages.map(Self.encode),
+            "tools": tools.map(Self.encode),
+            // One call per turn. AgentRunner performs a turn's calls
+            // sequentially anyway, and asking for a *sequence* (2026-08-12:
+            // open_task_session then code_editor) is what made the model
+            // write the whole plan out as a python snippet instead of calling
+            // anything -- with batching off it makes the first call, sees its
+            // result, and then makes the next.
+            "parallel_tool_calls": false,
+        ])
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw GPTError.malformedResponse("not an HTTP response")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            // The body is where OpenAI puts the actual reason (bad key,
+            // unknown model, rate limit) -- a bare status code sends whoever
+            // is debugging this to the wrong place.
+            throw GPTError.http(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+        return try Self.decodeTurn(from: data)
+    }
+
+    // MARK: - Wire encoding
+
+    private static func encode(_ message: GPTMessage) -> [String: Any] {
+        switch message {
+        case .system(let text):
+            return ["role": "system", "content": text]
+        case .user(let text):
+            return ["role": "user", "content": text]
+        case .assistant(let text, let toolCalls):
+            var payload: [String: Any] = ["role": "assistant"]
+            // Must be present even when nil, and must be null rather than ""
+            // -- an assistant turn that only called tools has no content, and
+            // the API rejects the message if the key is missing entirely.
+            payload["content"] = text ?? NSNull()
+            if !toolCalls.isEmpty {
+                payload["tool_calls"] = toolCalls.map { call in
+                    [
+                        "id": call.id,
+                        "type": "function",
+                        "function": ["name": call.name, "arguments": call.argumentsJSON],
+                    ]
+                }
+            }
+            return payload
+        case .tool(let callId, let content):
+            return ["role": "tool", "tool_call_id": callId, "content": content]
+        }
+    }
+
+    private static func encode(_ tool: GPTToolSpec) -> [String: Any] {
+        var properties: [String: Any] = [:]
+        var required: [String] = []
+        for parameter in tool.parameters {
+            properties[parameter.name] = ["type": parameter.type.rawValue]
+            if parameter.isRequired { required.append(parameter.name) }
+        }
+        return [
+            "type": "function",
+            "function": [
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": [
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                ],
+            ],
+        ]
+    }
+
+    // MARK: - Wire decoding
+
+    private static func decodeTurn(from data: Data) throws -> GPTTurn {
+        guard
+            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let choices = root["choices"] as? [[String: Any]],
+            let message = choices.first?["message"] as? [String: Any]
+        else {
+            throw GPTError.malformedResponse("no choices[0].message")
+        }
+
+        let text = message["content"] as? String
+        let calls = (message["tool_calls"] as? [[String: Any]] ?? []).compactMap { call -> GPTToolCall? in
+            guard
+                let id = call["id"] as? String,
+                let function = call["function"] as? [String: Any],
+                let name = function["name"] as? String
+            else {
+                return nil
+            }
+            // Absent arguments is the model calling a no-parameter tool; that
+            // is an empty object, not a failure to decode.
+            return GPTToolCall(id: id, name: name, argumentsJSON: function["arguments"] as? String ?? "{}")
+        }
+        return GPTTurn(text: text, toolCalls: calls)
+    }
+}

@@ -1,0 +1,211 @@
+//
+//  AppDelegate.swift
+//  Puck
+//
+//  Shared · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  Coordinates the init order: permission self-check -> overlay -> bridge
+//  server -> global hotkeys.
+//
+
+import AppKit
+import CoreGraphics
+import Foundation
+import SwiftUI
+
+final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, PetPointingCoordinating {
+    let settingsStore = SettingsStore()
+
+    var screenManager: ScreenManager?
+    var overlayController: OverlayWindowController?
+    var characterController: CharacterController?
+    var avatar: SpriteAvatar?
+    var sfxPlayer: SFXPlayer?
+    var clickThroughController: ClickThroughController?
+    /// byeolki's request, 2026-07-29: menu bar Hide/Show toggle.
+    var isCharacterHidden = false
+    var spaceChangeObserver: NSObjectProtocol?
+    var avatarHitboxSize: CGSize = .zero
+    /// Unscaled manifest.hitbox -- recomputes avatarHitboxSize when Settings'
+    /// size slider live-applies a new scale (applyLiveAvatarScale).
+    var baseHitboxSize: CGSize = .zero
+    var characterBody: CharacterBody?
+    let pendingPointTracker = PendingPointTracker()
+    var focusModeObserver: FocusModeObserver?
+
+    /// OverlayWindowController creates one window per display, but every
+    /// ground/roamable/click-through computation in this file is scoped to
+    /// a single display -- multi-monitor support is not implemented, this
+    /// just names the existing single-display assumption in one place
+    /// instead of repeating `overlayController?.windows.first` at each site.
+    var primaryWindow: NSWindow? { overlayController?.windows.first }
+
+    // One shared instance per FSM state, reused for every transition into it.
+    // CharacterController.transition's same-state no-op guard is reference
+    // equality (StateHandler: AnyObject) -- constructing a fresh instance per
+    // transition (e.g. `IdleState()` each time) defeated that guard, silently
+    // resetting IdleState's WanderScheduler timer and replaying loop clip/SFX
+    // on every repeated same-kind event.
+    let idleState = IdleState()
+    let walkState = WalkState()
+    let climbState = ClimbState()
+    let walkOnTopState = WalkOnTopState()
+    let fallState = FallState()
+    let landState = LandState()
+    let moveToState = MoveToState()
+    let typeState = TypeState()
+    let pointState = PointState()
+    let listenState = ListenState()
+    let reactClickState = ReactClickState()
+    let reactDragState = ReactDragState()
+    // Double-tap "petting" interaction (2026-07-29, more interactions).
+    let pettingState = PettingState()
+    let spinState = SpinState()
+    // F13 (2026-07-29): Option+Shift+Space pins the character while the
+    // client window is open, same "capture then restore" pattern as
+    // stateBeforeListen below.
+    let pinnedState = PinnedState()
+    var stateBeforePin: StateHandler?
+    /// Recognises the cursor being rubbed over the pet's head. Owned here
+    /// rather than by ClickThroughController so that type stays about hit
+    /// testing, matching how gesture -> FSM mapping already works.
+    var headPetDetector = HeadPetDetector()
+    /// Where the toy sat relative to the cursor when it was picked up.
+    var toyGrabOffset: CGPoint = .zero
+    /// How far above the pet's head a spun toy floats.
+    static let spinHoverGap: CGFloat = 14
+
+    /// The toy's throw speed, measured the same way the pet's is.
+    var toyThrowVelocity = CursorVelocityTracker()
+    /// Mouse events don't arrive on a clock, so the tracker's dt comes from
+    /// the gap between them.
+    var lastToyDragTime: TimeInterval?
+    // F3 ceiling-crawling (2026-07-29): WanderScheduler's .climbToCeiling outcome.
+    let climbToCeilingState = ClimbToCeilingState()
+    let ceilingState = CeilingState()
+    // F12 (optional, lowest priority): ball-toy interaction.
+    let chaseBallState = ChaseBallState()
+    let juggleBallState = JuggleBallState()
+    let kickBallState = KickBallState()
+    /// Every toy that's out, and which one the pet is playing with. The FSM
+    /// states above still only ever deal with one toy -- `toyBox.focused`.
+    var toyBox: ToyBox?
+    /// When the pet last finished playing. Play used to restart the instant
+    /// the thrown toy settled, so a toy left out meant the pet did nothing
+    /// else ever again (byeolki: "장난감을 너무 많이 가지고 놀진 않게 약간
+    /// 시간을 가지게", 2026-07-30).
+    var toyPlayEndedAt: TimeInterval?
+    /// How long the pet goes without picking a toy up again. Long enough for
+    /// a wander or two in between, short enough that a toy put out for it
+    /// doesn't feel ignored.
+    static let toyPlayCooldown: TimeInterval = 20
+    /// Had enough of toys for the moment.
+    var isRestingFromToys: Bool {
+        guard let toyPlayEndedAt else { return false }
+        return CACurrentMediaTime() - toyPlayEndedAt < Self.toyPlayCooldown
+    }
+    /// The toy the cursor picked up, decided once on mouse-down. Held for the
+    /// whole gesture for the same reason ClickThroughController holds its
+    /// subject: the toy moves while being dragged, so re-testing per event
+    /// could hand the rest of the drag to a different one.
+    var grabbedToy: BallController?
+
+    let frameClock = FrameClock()
+    var idleFrameRate = IdleFrameRatePolicy()
+    // Shared: PointAtHandler starts a pointing session on it, and the frame
+    // clock ticks the same instance so the release timeout can elapse.
+    let pointingController = PointingController()
+
+    var windowListWatcher: WindowListWatcher?
+    var toolExecutor: ToolExecutor?
+
+    var bridgeServer: BridgeServer?
+    var bridgeMessageRouter: BridgeMessageRouter?
+    /// Still used directly by voice/PTT (F7) -- the F13 client window that
+    /// used to also route through this moved out to PuckClient, its own
+    /// process, as of 2026-07-30.
+    lazy var userInputSender = UserInputSender { [weak self] in self?.bridgeServer }
+
+    var hotkeyManager: GlobalHotkeyManager?
+    var voiceInputController: VoiceInputController?
+    var stateBeforeListen: StateHandler?
+
+    var menuBarController: MenuBarController?
+    var textInputBubbleWindow: TextInputBubbleWindow?
+    var notchWindowController: NotchWindowController?
+    var notchStatusStore: NotchStatusStore?
+    var nowPlayingMonitor: NowPlayingMonitor?
+    var batteryMonitor: BatteryMonitor?
+
+    // The following three properties are declared here rather than in the
+    // extension file that uses them, because Swift extensions cannot add
+    // stored instance properties to a class -- only computed properties and
+    // methods. Each is otherwise "owned" by one extension's logic.
+    /// Flushed by BridgeServer.onGUIPresenceChanged; only ever the most
+    /// recent submission, since an older one being delivered late alongside
+    /// it would be noise, not history.
+    var pendingClientMirror: BridgeMessage?
+    /// True from the moment guidance starts until its bubble expires.
+    var isGuidingPermission = false
+    /// Set once a capture completes, cleared on submit/cancel/dismiss --
+    /// see AppDelegate+HotkeysVoice.swift's showTextInputBubble(). At most
+    /// one: the panel has room for a single thumbnail, and multi-image
+    /// messages aren't something the quick-capture bubble needs to support.
+    var pendingBubbleAttachment: Attachment?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Only ever one pet: a second launch (double-click, or a Debug build
+        // next to an installed copy -- same bundle id either way) quits
+        // itself instead of stacking a second character and menu bar item.
+        // Not under XCTest -- the test runner hosts this same app, and the
+        // guard tripping on an already-running pet kills the whole test run.
+        let processInfo = ProcessInfo.processInfo
+        let isHostingTests = processInfo.environment["XCTestSessionIdentifier"] != nil
+        let peers = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? AppIdentity.puckBundleID)
+        if !isHostingTests, peers.contains(where: { $0.processIdentifier != processInfo.processIdentifier }) {
+            NSApp.terminate(nil)
+            return
+        }
+
+        requestPermissions()
+        setUpAppearance()
+        setUpClientThemeStyle()
+
+        // byeolki: "둘이 같이 가야하는거임" -- PuckClient (the F13 client
+        // window, now a separate Dock-resident app) is useless without this
+        // process hosting bridge.sock, so each launches the other.
+        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.puckClientBundleID)
+
+        setUpMenuBar()
+        setUpOverlayAndAvatar()
+        setUpNotch()
+        setUpWindowSensing()
+        setUpToolExecutor()
+        setUpBridgeServer()
+        setUpGlobalHotkeys()
+        setUpFrameLoop()
+        setUpSpaceChangeObserving()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Everything started in applicationDidFinishLaunching gets torn down
+        // here. BridgeServer is the one that matters beyond this process:
+        // stop() removes the lock file and unlinks the socket, and skipping it
+        // left a lock file naming this (now dead) PID in Application Support.
+        // A dead PID is currently recovered from at next launch, but if the OS
+        // recycles that PID onto any live process, start() refuses forever with
+        // .alreadyRunning and nothing tells the user which file to delete.
+        frameClock.stop()
+        notchWindowController?.stop()
+        nowPlayingMonitor?.stop()
+        batteryMonitor?.stop()
+        hotkeyManager?.stop()
+        voiceInputController?.pushToTalkUp()
+        bridgeServer?.stop()
+        windowListWatcher?.stop()
+        focusModeObserver?.stopObserving()
+        clickThroughController?.stopMonitoring()
+        if let spaceChangeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(spaceChangeObserver)
+        }
+    }
+}

@@ -38,7 +38,7 @@ TODO.md W3/공통 "세션·워크스페이스 메타데이터 저장 형식 리�
 ## state_snapshot(재시작 복원)이 시작될 때 바꿔야 할 것
 
 1. **영속화 여부 결정**: `SessionRegistry`도 `WorkspaceRegistry`처럼 디스크에 쓸지, 아니면
-   PetAgentClient가 재연결할 때마다 "이번 프로세스가 아는 세션"만 스냅샷으로 보내고 pet-app이
+   PuckClient가 재연결할 때마다 "이번 프로세스가 아는 세션"만 스냅샷으로 보내고 pet-app이
    자기 쪽 히스토리를 소스 오브 트루스로 삼을지 먼저 정해야 한다. 후자라면 `SessionRegistry`는
    지금 형태 그대로도 충분할 수 있다 — snapshot 생성 시점의 스냅샷일 뿐 영속화가 필요 없어진다.
 2. **영속화하기로 하면** `WorkspaceRegistry`와 같은 패턴(임시 파일 + `rename`, `version` 필드)을

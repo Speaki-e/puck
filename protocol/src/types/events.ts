@@ -1,7 +1,7 @@
 /**
  * Socket message types (protocol docs/socket.md, plan/01_protocol.md section 3).
  * Wire format: JSON Lines over the pet-app <-> workspace Unix Domain Socket.
- * Mirrors pet-app/PetAgent/Bridge/{BridgeMessages,JSONValue}.swift.
+ * Mirrors pet-app/Puck/Bridge/{BridgeMessages,JSONValue}.swift.
  */
 
 /** Free-form JSON tree for fields whose shape varies per tool (args/data/detail). */
@@ -211,7 +211,7 @@ export interface RunCancel {
 /**
  * Who is on the other end of a bridge.sock connection: `workspace` (the
  * agent backend) or `gui` (a chat/editor client -- historically pet-app
- * itself, now also PetAgentClient once the F13 client window moved to its
+ * itself, now also PuckClient once the F13 client window moved to its
  * own process, 2026-07-30). pet-app relays by role once more than one
  * connection role can be open at a time: user_input/workspace_create_request/
  * session_create_request/approval_response/run_cancel go to the workspace

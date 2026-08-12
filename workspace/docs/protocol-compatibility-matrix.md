@@ -54,7 +54,7 @@ repo의 이 파일을 미러링한다"고 명시돼 있다):
 
 네 파일을 `diff`로 직접 비교한 결과, **스키마/로직에는 차이가 없다** -- 다른 부분은 전부 파일 헤더
 주석(프로젝트명이 protocol repo 기준 "protocol"인지 pet-app 기준 "Puck"인지, 작성자 표기, 2026-08-01
-"PetAgent → Shaydi" 이름 변경 반영)뿐이다. 즉 지금 이 순간 pet-app의 Swift 쪽 protocol 이해는
+"Puck → Shaydi" 이름 변경 반영)뿐이다. 즉 지금 이 순간 pet-app의 Swift 쪽 protocol 이해는
 workspace가 참조하는 것과 **같은 스키마(0.5.0, 커밋 `4244922`)**를 가리키고 있다.
 
 **주의할 점:** 이건 npm의 lockfile 같은 강제 장치가 아니라 사람이 복사해서 유지하는 방식이다.

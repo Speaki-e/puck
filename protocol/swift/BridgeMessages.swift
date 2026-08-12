@@ -141,7 +141,7 @@ enum EditorViewUnavailableReason: String, Codable {
 
 /// Who is on the other end of a bridge.sock connection: workspace (the agent backend)
 /// or gui (a chat/editor client -- historically pet-app itself, now also
-/// PetAgentClient once the F13 client window moved to its own process, 2026-07-30).
+/// PuckClient once the F13 client window moved to its own process, 2026-07-30).
 /// pet-app relays by role once more than one connection role can be open at a time:
 /// userInput/workspaceCreateRequest/sessionCreateRequest/approvalResponse/runCancel go
 /// to the workspace connection; event/workspaceCreate/sessionCreate/editorViewReady/

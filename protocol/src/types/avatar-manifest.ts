@@ -1,6 +1,6 @@
 /**
  * Avatar manifest.json schema (protocol docs/avatar-manifest.md, plan/01_protocol.md
- * section 6). Mirrors pet-app/PetAgent/Avatar/AvatarManifest.swift.
+ * section 6). Mirrors pet-app/Puck/Avatar/AvatarManifest.swift.
  *
  * Primary avatar type is 2D sprites (PNG) rather than 3D usdz.
  * `bounce_intensity` and `emotions` are additive, optional fields --

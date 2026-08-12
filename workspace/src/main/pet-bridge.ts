@@ -30,8 +30,8 @@ interface PendingDispatch {
 export type PetBridgeState = "disconnected" | "connecting" | "connected" | "closed";
 
 export function defaultBridgeSocketPath(): string {
-  if (process.platform === "win32") return "\\\\.\\pipe\\PetAgent-bridge";
-  return path.join(os.homedir(), "Library", "Application Support", "PetAgent", "bridge.sock");
+  if (process.platform === "win32") return "\\\\.\\pipe\\Puck-bridge";
+  return path.join(os.homedir(), "Library", "Application Support", "Puck", "bridge.sock");
 }
 
 export class PetBridge extends EventEmitter {

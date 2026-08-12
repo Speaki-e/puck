@@ -100,6 +100,12 @@ export async function startWorkspaceApplication(): Promise<void> {
     getClaudeApiKey: async () => await secrets.get("claudeApiKey") ?? process.env.ANTHROPIC_API_KEY,
     getModel: () => settingsStore.current.model,
     useMockAiModule: process.env.NODE_ENV === "test" || process.env.WORKSPACE_MOCK_AI === "1",
+    directCodeEditor: options.directCodeEditor,
+    // 키가 없으면 플래그만으로는 켜지 않는다 -- 켜진 척하고 매 편집마다 401을
+    // 받느니, 기본 경로(ACP)로 남아 있는 편이 낫다.
+    openAiCodeEditor: options.openAiCodeEditor && process.env.OPENAI_API_KEY
+      ? { apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL || "gpt-4o" }
+      : undefined,
   });
   installPetBridgeRouter({
     bridge: petBridge,

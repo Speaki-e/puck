@@ -5,6 +5,7 @@ import "./monaco";
 import "./styles.css";
 import { createGatewayTransport, parseGatewayWorkspaceId } from "./gateway-transport";
 import { createGatewayWorkspaceApi } from "./gateway-workspace-api";
+import { TooltipProvider } from "./components/ui/tooltip";
 
 // 폴백 셸(Electron)에서는 preload가 이 시점 이전에 이미 window.workspace를 심어둔다(contextBridge).
 // pet-app의 WKWebView처럼 preload가 없는 호스트에서만 EditorGateway용 WebSocket 구현으로 채운다
@@ -17,6 +18,8 @@ if (!window.workspace) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <TooltipProvider delayDuration={300}>
+      <App />
+    </TooltipProvider>
   </StrictMode>,
 );

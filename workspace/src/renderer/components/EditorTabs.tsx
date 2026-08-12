@@ -1,5 +1,6 @@
 import type { EditorTab } from "../editor-state";
 import { isDirty } from "../editor-state";
+import { Button } from "./ui/button";
 
 interface Props {
   tabs: EditorTab[];
@@ -23,7 +24,7 @@ export function EditorTabs({ tabs, activePath, onActivate, onClose }: Props) {
                 <span className="tab-name">{tab.path.split("/").at(-1)}</span>
                 {isDirty(tab) && <span className="dirty-dot" title="저장하지 않은 변경" />}
               </button>
-              <button type="button" className="tab-close" onClick={() => onClose(tab.path)} aria-label={`${tab.path} 닫기`}>×</button>
+              <Button type="button" variant="ghost" size="icon-sm" className="tab-close" onClick={() => onClose(tab.path)} aria-label={`${tab.path} 닫기`}>×</Button>
             </div>
           );
         })}

@@ -1,5 +1,8 @@
 import type { WorkspaceApi } from "../workspace-api";
 import { Icon } from "./Icon";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface WorkspaceTitlebarProps {
   api?: WorkspaceApi;
@@ -30,7 +33,7 @@ export function WorkspaceTitlebar({
           </svg>
         </span>
         <span className="brand-name">Workspace</span>
-        <span className="alpha-badge">ALPHA</span>
+        <Badge variant="outline" className="alpha-badge">ALPHA</Badge>
       </div>
       <div className="project-identity" title={projectPath}>
         <span className={`project-dot ${connected ? "connected" : ""}`} />
@@ -38,13 +41,18 @@ export function WorkspaceTitlebar({
         <span className="project-path">{projectPath ?? "프로젝트가 연결되지 않음"}</span>
       </div>
       <div className="titlebar-actions">
-        <button type="button" className="button-ghost project-button" onClick={onOpenProject}>
+        <Button type="button" variant="ghost" className="project-button" onClick={onOpenProject}>
           <Icon name="folder" /> 프로젝트 열기
-        </button>
+        </Button>
         {api?.getSettings && (
-          <button type="button" className="button-ghost" onClick={onOpenSettings} aria-label="설정">
-            <Icon name="gear" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" onClick={onOpenSettings} aria-label="설정">
+                <Icon name="gear" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>설정</TooltipContent>
+          </Tooltip>
         )}
         {api?.platform === "win32" && (
           <div className="window-actions" aria-label="창 제어">

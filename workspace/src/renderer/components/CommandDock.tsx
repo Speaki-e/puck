@@ -1,4 +1,6 @@
 import { Icon } from "./Icon";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 interface CommandDockProps {
   status: string;
@@ -28,7 +30,7 @@ export function CommandDock({
       </div>
       <div className="command-composer">
         <span className="composer-icon"><Icon name="sparkle" /></span>
-        <input
+        <Input
           value={command}
           onChange={(event) => onCommandChange(event.target.value)}
           onKeyDown={(event) => { if (event.key === "Enter") onRun(); }}
@@ -37,7 +39,7 @@ export function CommandDock({
           disabled={!enabled}
         />
         <span className="enter-hint">ENTER</span>
-        <button
+        <Button
           type="button"
           className="run-button"
           onClick={onRun}
@@ -45,11 +47,11 @@ export function CommandDock({
           aria-label="명령 실행"
         >
           <Icon name="play" />
-        </button>
+        </Button>
       </div>
-      <button type="button" className="stop-button" onClick={onCancel}>
+      <Button type="button" variant="outline" className="stop-button" onClick={onCancel}>
         <Icon name="stop" /> 중지
-      </button>
+      </Button>
     </footer>
   );
 }

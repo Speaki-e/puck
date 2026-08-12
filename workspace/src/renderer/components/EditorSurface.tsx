@@ -3,6 +3,8 @@ import type { EditorTab } from "../editor-state";
 import { isDirty } from "../editor-state";
 import { configureMonaco, MONACO_FONT_FAMILY } from "../monaco-config";
 import { Icon } from "./Icon";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 
 interface EditorSurfaceProps {
   active?: EditorTab;
@@ -37,17 +39,18 @@ export function EditorSurface({
             </span>
           )) : <span className="muted">파일을 선택하세요</span>}
         </nav>
-        {active && <span className="language-badge">{active.language}</span>}
-        {active?.readOnly && <span className="readonly-badge">READ ONLY</span>}
-        <button
+        {active && <Badge variant="outline" className="language-badge">{active.language}</Badge>}
+        {active?.readOnly && <Badge variant="outline" className="readonly-badge">READ ONLY</Badge>}
+        <Button
           type="button"
-          className="button-ghost save-button"
+          variant="ghost"
+          className="save-button"
           onClick={onSave}
           disabled={!active || active.readOnly || !isDirty(active)}
           title="저장 (Ctrl/Cmd + S)"
         >
           <Icon name="save" /> 저장
-        </button>
+        </Button>
       </div>
 
       <div className="editor-stage">
@@ -61,12 +64,12 @@ export function EditorSurface({
                   <span>저장하기 전에 사용할 버전을 선택하세요.</span>
                 </div>
                 {!active.previewUrl && (
-                  <button type="button" className="button-ghost" onClick={onToggleDiff}>
+                  <Button type="button" variant="ghost" onClick={onToggleDiff}>
                     {diffAgainstDisk === undefined ? "diff 비교" : "diff 닫기"}
-                  </button>
+                  </Button>
                 )}
-                <button type="button" className="button-ghost" onClick={onReload}>디스크 내용 사용</button>
-                <button type="button" className="button-primary-small" onClick={onKeepMine}>내 내용 유지</button>
+                <Button type="button" variant="ghost" onClick={onReload}>디스크 내용 사용</Button>
+                <Button type="button" onClick={onKeepMine}>내 내용 유지</Button>
               </div>
             )}
             {active.previewUrl ? (
@@ -130,9 +133,9 @@ export function EditorSurface({
             <h1>프로젝트를 열고,<br />아이디어를 코드로 만드세요.</h1>
             <p>왼쪽 탐색기에서 파일을 선택하거나 Agent에게<br />원하는 변경을 자연어로 요청할 수 있습니다.</p>
             <div className="empty-actions">
-              <button type="button" className="button-primary" onClick={onOpenProject}>
+              <Button type="button" className="button-primary" onClick={onOpenProject}>
                 <Icon name="folder" /> 프로젝트 열기
-              </button>
+              </Button>
               <span><kbd>Ctrl</kbd><b>+</b><kbd>S</kbd> 빠른 저장</span>
             </div>
           </div>

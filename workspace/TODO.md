@@ -1,8 +1,12 @@
 # Workspace 전체 구현 TODO
 
-> **2026-08-12 ai-module v6 통합:** `packages/ai-module` 실제 런타임 연결, Workspace별 세션 히스토리 유지, 승인 게이트/`open_task_session`, 이미지 attachment 전달까지 연결 완료. 남은 핵심은 실제 pet-app+Claude 인증 환경 E2E와 ACP OS 수준 샌드박싱이다.
+> **2026-08-12 방향 전환:** ai-module은 결국 만들어지지 않았고, workspace의 AI 실행 경계는 그 자리를
+> 대신하게 된 pet-app의 F15 두뇌에 맞춰 다시 좁혀졌다 -- 자세한 배경은 `../docs/decisions.md`. 아래
+> 항목 중 ai-module 통합을 전제로 한 것들(특히 W6)은 더 이상 다음 할 일이 아니라 완료된 최종 상태를
+> 설명하는 히스토리로 읽는다: `MockAgentRuntime`은 `DirectCodeEditorRuntime`으로 교체되어 남아 있는
+> 임시 구현이 아니게 됐다.
 
-기준 문서: `plan/03_workspace.md` Workspace 개발 기획서 v2  
+기준 문서: `plan/03_workspace.md` Workspace 개발 기획서 v2 (2026-08-12 이후로는 `../plan/03_workspace.md` 상단 재정의 참고)
 최종 갱신: 2026-08-04
 
 ## 코드베이스 마무리 리팩터링 (`refactor/codebase`)

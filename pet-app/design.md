@@ -47,21 +47,28 @@ F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제�
 | textSecondary | `#695E6E` (Gray/0) |
 | accent | `rgb(0.80, 0.42, 0.12)` |
 
-### dark
+### dark — workspace(Electron 클라이언트 창)의 실제 팔레트와 픽셀 단위로 일치
+
+workspace가 디자인 기준이 됐다(`docs/decisions.md` 2026-08-12). 아래 값은 workspace의
+`src/renderer/styles.css` `--canvas`/`--surface`/`--hairline`/`--ink`/`--mute`/`--blue`를 그대로 옮긴 것이다.
 
 | 토큰 | 값 |
 |---|---|
-| background | `#161616` |
-| surface | `#1F1F1F` |
-| surfaceBorder | `#2A2A2A` |
-| textPrimary | `rgb(0.949, 0.949, 0.941)` |
-| textSecondary | `rgb(0.549, 0.549, 0.549)` |
-| accent | `rgb(0.93, 0.55, 0.20)` |
+| background | `#090909` (workspace `--canvas`) |
+| surface | `#111111` (workspace `--surface`) |
+| surfaceBorder | `#292929` (workspace `--hairline`) |
+| textPrimary | `#ededed` (workspace `--ink`) |
+| textSecondary | `#777777` (workspace `--mute`) |
+| accent | `#3291ff` (workspace `--blue`) |
 
 ### glass
 
-background는 dark와 동일(`#161616`), `surface`/`surfaceBorder`는 `white.opacity(0.06 / 0.12)`, 텍스트는 `white` / `white.opacity(0.6)`, `usesGlassSurfaces = true`.
-단 이 `surface`/`surfaceBorder`는 **macOS 26 미만 폴백(`.regularMaterial`)의 틴트일 뿐**이고, macOS 26+에서는 무시되고 진짜 `glassEffect`가 그려진다.
+**아직 워크스페이스 전환 이전 값 그대로다** (2026-08-12 `.dark` 갱신 때 `.glass`는 건드리지 않음) —
+background `#161616`, `surface`/`surfaceBorder`는 `white.opacity(0.06 / 0.12)`, 텍스트는 `white` /
+`white.opacity(0.6)`, `usesGlassSurfaces = true`. 즉 지금은 `.dark`와 `.glass`의 background가
+**서로 다르다**(`#090909` vs `#161616`) — 예전엔 같았지만 이 문서가 그 사실을 자동으로 보장해주진
+않는다. `.glass`의 accent도 여전히 호박 주황(`rgb(0.93, 0.55, 0.20)`)이다.
+단 `surface`/`surfaceBorder`는 **macOS 26 미만 폴백(`.regularMaterial`)의 틴트일 뿐**이고, macOS 26+에서는 무시되고 진짜 `glassEffect`가 그려진다.
 
 ### accent 사용 규칙
 
@@ -73,24 +80,27 @@ accent는 **의도적으로 유일하게 튀는 색**이다. 쓰는 곳은 다�
 - 메시지 말풍선 배경 (`accent.opacity(0.06)`)
 - 사용자 아바타 배경 (`accent.opacity(0.16)`)
 
-Figma 레퍼런스의 전송 버튼은 중립 검정이지만, accent(호박 주황)는 **이 앱 고유의 브랜드 색**이라 "Figma 색 맞추기" 범위에서 일부러 제외했다.
+`.dark`만 workspace의 파란 accent(`#3291ff`)로 바뀌었다. `.light`/`.glass`는 예전 값(호박 주황 계열)
+그대로다 — 세 팔레트가 서로 다른 accent를 쓰는 상태이니 새로 손댈 때는 팔레트별로 확인할 것.
 
 ## 3. 타이포그래피
 
-전부 `Font.system`, 대부분 `design: .rounded`. 본문(`messageBody`)과 `mono`만 예외.
+전부 `Font.system`, 기본 디자인. workspace가 Geist(그로테스크 산세리프)를 쓰지만 pet-app이 그 폰트
+파일을 번들하지 않아서(2026-08-12), `design: .rounded`를 걷어내고 시스템 기본을 그 대체로 쓴다 —
+SF Rounded의 "친근한 챗앱" 톤은 더 이상 없다. `mono`만 monospaced로 예외.
 
 | 토큰 | 정의 | 용도 |
 |---|---|---|
-| `greeting` | largeTitle · rounded · bold | 빈 상태 인사말 |
-| `greetingSubtitle` | body · rounded | 인사말 아래 한 줄 |
-| `workspaceName` | body · rounded · medium | 워크스페이스명, 세션 선택 pill, 새 채팅 |
-| `sessionTitle` | callout · rounded | 세션 행, 설정 행 라벨 |
-| `toolLabel` | callout · rounded · medium | 툴 호출 라벨 |
-| `summary` | callout · rounded · semibold | 완료 요약 |
-| `messageBody` | body (기본 디자인) | 메시지 본문, 입력 필드 |
-| `sectionHeader` | caption · rounded · semibold | 섹션 헤더, 배너 |
-| `caption` | caption · rounded | 디스클레이머, 인라인 액션 |
-| `senderLabel` | caption2 · rounded · semibold | "나" / 앱 이름 |
+| `greeting` | largeTitle · bold | 빈 상태 인사말 |
+| `greetingSubtitle` | body | 인사말 아래 한 줄 |
+| `workspaceName` | body · medium | 워크스페이스명, 세션 선택 pill, 새 채팅 |
+| `sessionTitle` | callout | 세션 행, 설정 행 라벨 |
+| `toolLabel` | callout · medium | 툴 호출 라벨 |
+| `summary` | callout · semibold | 완료 요약 |
+| `messageBody` | body | 메시지 본문, 입력 필드 |
+| `sectionHeader` | caption · semibold | 섹션 헤더, 배너 |
+| `caption` | caption | 디스클레이머, 인라인 액션 |
+| `senderLabel` | caption2 · semibold | "나" / 앱 이름 |
 | `mono` | caption · monospaced | 툴 인자·결과, 승인 요약 |
 
 전부 시스템 텍스트 스타일 기반이라 **동적 타입(사용자 글자 크기)을 따라간다.** 고정 pt 폰트는 아바타 글리프 두 곳(11pt, `Image(systemName:)`)뿐.
@@ -98,21 +108,21 @@ Figma 레퍼런스의 전송 버튼은 중립 검정이지만, accent(호박 주
 ## 4. 간격·크기·모양
 
 ```
-spacingSmall   6      bubbleCornerRadius  24
-spacingMedium  10     cardCornerRadius    24
-spacingLarge   16     rowCornerRadius     12
-                      panel corner        28
+spacingSmall   6      bubbleCornerRadius  10
+spacingMedium  10     cardCornerRadius    12
+spacingLarge   16     rowCornerRadius      6
+                      panel corner        12
 sidebarWidthExpanded   220      contentMaxWidth   720
 sidebarWidthCollapsed   68      bubbleMaxWidth    420
 railButtonSize          36      avatarSize         22
-windowMinWidth         760      windowMinHeight   520
+windowMinWidth         960      windowMinHeight   640
 ```
 
-- 사이드바 220/68은 Figma 레퍼런스 실측값.
-- 라운딩 24는 slothGPT 챗봇킷 레퍼런스의 카드/버블 값. 네비 행만 12로 별개.
+- 사이드바 220/68은 Figma 레퍼런스 실측값(이 부분은 workspace 전환과 무관하게 유지).
+- 코너 라운딩은 2026-08-12부로 workspace의 실제 radii(`src/renderer/styles.css`: 패널 12px, 버튼/행 6px)를 따른다 — 예전엔 Figma 레퍼런스의 24/24/12를 썼다.
 - 모양은 전부 `style: .continuous`이고 `ClientTheme.Shapes`(`bubble`/`card`/`row`/`panel`)에 한 번만 선언한다 — 코너 스타일이 표면마다 어긋나면 창이 한 시스템으로 안 보인다.
 - `bubbleMaxWidth`(420)가 `contentMaxWidth`(720)보다 훨씬 좁은 건 의도다. 창이 넓어도 한 줄이 길면 읽기 나빠진다.
-- `windowMinWidth/Height`는 SwiftUI `.frame(minWidth:)`와 AppKit `NSWindow.minSize`가 **같은 상수 하나**를 읽는다. 예전엔 640/420 vs 760/520으로 어긋나 SwiftUI 최소값이 도달 불가능했다.
+- `windowMinWidth/Height`는 SwiftUI `.frame(minWidth:)`와 AppKit `NSWindow.minSize`가 **같은 상수 하나**를 읽는다. 기본 창 크기(`PuckClient/AppDelegate.swift`)도 1440x900으로 커졌다 — 에디터 패널이 열리면 사이드바+파일트리+Monaco+채팅이 폭을 다투기 때문.
 
 ## 5. 표면 — 글래스 대 플랫
 

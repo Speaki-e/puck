@@ -41,6 +41,10 @@ struct ChatView: View {
                             ChatTimelineEntryRow(entry: entry)
                                 .id(entry.id)
                         }
+                        if session.isRunning {
+                            ThinkingRow()
+                                .id(Self.thinkingRowId)
+                        }
                     }
                     .frame(maxWidth: ClientTheme.Metrics.contentMaxWidth)
                     .frame(maxWidth: .infinity)
@@ -56,6 +60,14 @@ struct ChatView: View {
                 .onChange(of: session.timeline.count) {
                     guard let lastId = session.timeline.last?.id else { return }
                     withAnimation { proxy.scrollTo(lastId, anchor: .bottom) }
+                }
+                // The thinking row appears and disappears without the
+                // timeline count changing, and it is the bottom-most thing in
+                // the transcript while it is there -- without this the view
+                // stays parked above it.
+                .onChange(of: session.isRunning) {
+                    guard session.isRunning else { return }
+                    withAnimation { proxy.scrollTo(Self.thinkingRowId, anchor: .bottom) }
                 }
                 // safeAreaInset, not a VStack row below the scroll view: the
                 // transcript has to scroll *under* the input card for it to
@@ -86,7 +98,14 @@ struct ChatView: View {
     private var inputBar: some View {
         VStack(spacing: ClientTheme.Metrics.spacingSmall) {
             HStack(spacing: ClientTheme.Metrics.spacingMedium) {
-                TextField("메시지를 입력하세요", text: $draftText, onCommit: send)
+                // .onSubmit, not the deprecated `onCommit:` initializer: with
+                // onCommit the AppKit text field writes its own (pre-send)
+                // string back into the binding *after* the closure runs, so
+                // send()'s `draftText = ""` was undone and the prompt stayed
+                // in the field after Enter. The send button was unaffected,
+                // which is why it only showed up on Enter.
+                TextField("메시지를 입력하세요", text: $draftText)
+                    .onSubmit(send)
                     .textFieldStyle(.plain)
                     .font(ClientTheme.Typography.messageBody)
                     .foregroundStyle(palette.textPrimary)
@@ -138,13 +157,44 @@ struct ChatView: View {
         .background(palette.background)
     }
 
+    private static let thinkingRowId = "thinking"
+
     private func send() {
         let text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         session.appendUserMessage(text)
         let delivery = store.sendMessage(text, source: .text)
         showDisconnectedBanner = (delivery == .workspaceDisconnected)
+        // Nothing is coming when the send didn't land, and a spinner that
+        // never resolves is worse than the banner that says why.
+        if delivery != .workspaceDisconnected { session.markWaitingForAgent() }
         draftText = ""
+    }
+}
+
+/// The run is alive but has produced nothing to show yet -- between the send
+/// and the first text_chunk, and again between a tool result and whatever the
+/// model says next. Sits at the foot of the transcript for as long as
+/// `isRunning` holds.
+///
+/// A plain native spinner rather than a custom three-dot animation: it is the
+/// same indeterminate-progress affordance the rest of macOS uses, it costs no
+/// animation code, and it keeps working if this view is ever rendered in
+/// reduced-motion.
+private struct ThinkingRow: View {
+    @Environment(\.clientPalette) private var palette
+
+    var body: some View {
+        HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+            ProgressView()
+                .controlSize(.small)
+            Text("생각 중…")
+                .font(ClientTheme.Typography.caption)
+                .foregroundStyle(palette.textSecondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("답변 생성 중")
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -379,7 +429,7 @@ private struct ChatTimelineEntryRow: View {
                 .font(ClientTheme.Typography.mono)
                 .foregroundStyle(palette.warning)
 
-        case .done(let ok, let summary):
+        case .done(_, let ok, let summary):
             Label(summary, systemImage: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                 .font(ClientTheme.Typography.summary)
                 .foregroundStyle(ok ? palette.textPrimary : palette.failure)

@@ -188,10 +188,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showWindow() {
         let window = window ?? {
-            // 720x480 was cramped for a sidebar + transcript + editor pane
-            // (byeolki: "기본으로 보여지는 창의 크기를 좀 키워줘"), and at
-            // origin (0,0) it opened in the bottom-left corner.
-            let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 1100, height: 740))
+            // 1100x740 was still cramped once the editor pane opens (sidebar +
+            // file tree + Monaco + narrowed chat all fighting for width) --
+            // byeolki asked again for the default size to grow. At origin
+            // (0,0) it opened in the bottom-left corner, so this keeps the
+            // explicit contentRect instead of relying on center() alone.
+            let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 1440, height: 900))
             let hosting = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
             // NSHostingController defaults to sizingOptions
             // .preferredContentSize, i.e. it keeps pushing the SwiftUI
@@ -200,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 700x471) no matter what contentRect or setContentSize said.
             hosting.sizingOptions = []
             newWindow.contentViewController = hosting
-            newWindow.setContentSize(CGSize(width: 1100, height: 740))
+            newWindow.setContentSize(CGSize(width: 1440, height: 900))
             // Same numbers ClientWindowView declares as its own SwiftUI
             // minWidth/minHeight (ClientTheme.Metrics.windowMinWidth/
             // windowMinHeight) -- this is the constraint that's actually

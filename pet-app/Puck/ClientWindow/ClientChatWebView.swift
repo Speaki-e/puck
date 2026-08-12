@@ -7,8 +7,8 @@
 //  via loadFileURL -- unlike EditorWebView.swift, this is never served over
 //  a network. workspace must not own any chat/agent surface (docs/
 //  decisions.md, 2026-08-13), so the chat UI is a bundle PuckClient owns
-//  and drives directly through a WKScriptMessageHandler bridge
-//  (ClientChatBridge.swift), not something workspace serves.
+//  and drives directly through ClientChatBridge (a WKScriptMessageHandler),
+//  not something workspace serves.
 //
 //  chat-web builds as a classic deferred script, not an ES module
 //  (vite.config.ts): WKWebView silently refuses to execute
@@ -29,29 +29,38 @@ final class ClientChatWebViewPool {
     static let shared = ClientChatWebViewPool()
     private var webView: WKWebView?
 
-    func webView(configuration: (WKWebView) -> Void) -> WKWebView {
+    /// `bridge` is registered as the "puckChat" message handler and attached
+    /// to the created web view before the first load, so it can never miss
+    /// the page's first `action:ready` message.
+    func webView(bridge: ClientChatBridge) -> WKWebView {
         if let existing = webView { return existing }
-        let created = WKWebView()
+
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(bridge, name: "puckChat")
+        let created = WKWebView(frame: .zero, configuration: configuration)
+        bridge.attach(webView: created)
+
+        guard let indexURL = Bundle.main.url(forResource: "ChatWeb/index", withExtension: "html") else {
+            assertionFailure("ChatWeb/index.html missing from bundle -- run scripts/sync-chat-web.sh before building")
+            webView = created
+            return created
+        }
+        // allowingReadAccessTo must be an ancestor of every file the page
+        // references (assets/, fonts) -- the ChatWeb folder itself, not
+        // just index.html, since relative ./assets/... URLs resolve
+        // beneath it.
+        created.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
+
         webView = created
-        configuration(created)
         return created
     }
 }
 
 struct ClientChatWebView: NSViewRepresentable {
+    let bridge: ClientChatBridge
+
     func makeNSView(context: Context) -> WKWebView {
-        let webView = ClientChatWebViewPool.shared.webView { webView in
-            guard let indexURL = Bundle.main.url(forResource: "ChatWeb/index", withExtension: "html") else {
-                assertionFailure("ChatWeb/index.html missing from bundle -- run scripts/sync-chat-web.sh before building")
-                return
-            }
-            // allowingReadAccessTo must be an ancestor of every file the page
-            // references (assets/, fonts) -- the ChatWeb folder itself, not
-            // just index.html, since relative ./assets/... URLs resolve
-            // beneath it.
-            webView.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
-        }
-        return webView
+        ClientChatWebViewPool.shared.webView(bridge: bridge)
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {}

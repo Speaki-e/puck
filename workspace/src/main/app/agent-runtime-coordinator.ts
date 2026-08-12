@@ -7,7 +7,7 @@ import type { EditorGateway } from "../editor-gateway.js";
 import type { JsonlLogger } from "../logger.js";
 import type { PetBridge } from "../pet-bridge.js";
 import { SessionRegistry } from "../session-registry.js";
-import { createEditorLocalExecutor, createPetAppProxyExecutor } from "../tool-executors.js";
+import { createEditorLocalExecutor } from "../tool-executors.js";
 import type { WorkspaceController } from "../workspace-controller.js";
 import type { WorkspaceRegistry } from "../workspace-registry.js";
 
@@ -18,8 +18,6 @@ interface AgentRuntimeCoordinatorDeps {
   petBridge: PetBridge;
   registry: WorkspaceRegistry;
   logger: JsonlLogger;
-  getClaudeApiKey?(): Promise<string | undefined>;
-  getModel?(): string;
   /** --openai-code-editor: code_editor를 ACP 대신 OpenAI 툴 루프로 실행 (openai-code-editor.ts). */
   openAiCodeEditor?: { apiKey: string; model: string };
 }
@@ -40,7 +38,7 @@ interface CodeEditorUpdatePayload {
 
 interface ToolExecuteRequestPayload {
   requestId: string;
-  executorKind: "pet-app" | "workspace" | "workspace-direct";
+  executorKind: "workspace-direct";
   tool: string;
   args: JSONValue;
   workspaceId: string;
@@ -48,16 +46,17 @@ interface ToolExecuteRequestPayload {
 }
 
 /**
- * Main 쪽 AI 실행 경계. ai-module/SessionRouter/RunRegistry는 이제 Agent Host에 있다
- * (docs/architecture.md "다음 구조 단계") -- 이 파일은 그 실행을 RPC로 위임하고,
- * Agent Host가 emit하는 agent_* 이벤트를 petBridge로 옮겨 싣는 얇은 어댑터다. petAppProxy/
- * editorLocal/openAiCodeEditor 자체는 그대로 여기 남는다 -- petBridge/FileService/
- * EditorGateway가 전부 Main 전용이라 옮길 수 없기 때문이다(tool_execute_request로 왕복).
+ * Main 쪽 AI 실행 경계. workspace는 이제 "일반 에디터"다(byeolki, 2026-08-12: "workspace는 일반
+ * 에디터고, 모든 AI 처리는 puckclient가 함") -- 무엇을 할지 판단하는 ai-module/SessionRouter/
+ * RunRegistry는 걷어냈고(agent-runner.ts), 남은 건 pet-app의 CodeEditorDelegate가 이미 코딩
+ * 작업이라고 판단해 보낸 user_input을 code_editor 한 번으로 실행하는 것뿐이다. 이 파일은 그
+ * 실행을 Agent Host에 RPC로 위임하고, Agent Host가 emit하는 agent_* 이벤트를 petBridge로
+ * 옮겨 싣는 얇은 어댑터다. editorLocal/openAiCodeEditor 자체는 그대로 여기 남는다 --
+ * FileService/EditorGateway가 전부 Main 전용이라 옮길 수 없기 때문이다(tool_execute_request로 왕복).
  */
 export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps): AgentRuntimeCoordinator {
   const { agentHost, controller, editorGateway, petBridge, registry, logger } = deps;
   const sessionRegistry = new SessionRegistry();
-  const petAppProxy = createPetAppProxyExecutor(petBridge);
   const codeEditorRequests = new Map<string, { workspaceId: string; sessionId: string }>();
   const toolExecuteAborts = new Map<string, AbortController>();
   /** Agent Host가 비정상 종료됐을 때 agent_done을 못 받은 세션에 실패를 알리기 위한 최소 추적(W3/W7과 동등). */
@@ -81,8 +80,8 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
   };
 
   /**
-   * code_editor를 실제로 수행하는 실행기(DirectCodeEditorRuntime 전용, "workspace-direct" tool_execute_request가
-   * 이걸 탄다). 기본은 editorLocal(ACP 경유)이고, --openai-code-editor면 OpenAI 툴 루프로 바꿔 낀다.
+   * code_editor를 실제로 수행하는 실행기("workspace-direct" tool_execute_request가 이걸 탄다).
+   * 기본은 editorLocal(ACP 경유)이고, --openai-code-editor면 OpenAI 툴 루프로 바꿔 낀다.
    */
   const codeEditorExecutorFor = (workspaceId: string, sessionId: string): ToolExecutor => {
     const openAi = deps.openAiCodeEditor;
@@ -124,11 +123,7 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
     toolExecuteAborts.set(payload.requestId, controller_);
     let result: ToolExecutionResult;
     try {
-      const executor = payload.executorKind === "pet-app"
-        ? petAppProxy
-        : payload.executorKind === "workspace-direct"
-          ? codeEditorExecutorFor(payload.workspaceId, payload.sessionId)
-          : editorLocalFor(payload.workspaceId, payload.sessionId);
+      const executor = codeEditorExecutorFor(payload.workspaceId, payload.sessionId);
       result = await executor.execute(payload.tool, payload.args, controller_.signal);
     } catch (error) {
       result = { ok: false, error: "execution_failed", detail: error instanceof Error ? error.message : String(error) };
@@ -137,14 +132,6 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
     }
     await agentHost.request("toolExecuteResponse", { requestId: payload.requestId, result: result as unknown as JSONValue }, 5_000).catch((error) => {
       void logger.write("warn", "tool_execute_response_failed", { message: error instanceof Error ? error.message : String(error) });
-    });
-  }
-
-  async function handleRuntimeConfigRequest(payload: { requestId: string }): Promise<void> {
-    const apiKey = await (deps.getClaudeApiKey?.() ?? Promise.resolve(process.env.ANTHROPIC_API_KEY));
-    const model = deps.getModel?.() ?? "claude-sonnet-4-5";
-    await agentHost.request("runtimeConfigResponse", { requestId: payload.requestId, apiKey, model }, 5_000).catch((error) => {
-      void logger.write("warn", "runtime_config_response_failed", { message: error instanceof Error ? error.message : String(error) });
     });
   }
 
@@ -172,9 +159,6 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
         toolExecuteAborts.get(requestId)?.abort();
         break;
       }
-      case "runtime_config_request":
-        void handleRuntimeConfigRequest(event.payload as { requestId: string });
-        break;
       case "agent_thinking": {
         const { workspaceId, sessionId } = event.payload as { workspaceId: string; sessionId: string };
         petBridge.sendEvent({ type: "event", workspace_id: workspaceId, session_id: sessionId, event: "agent_thinking" });

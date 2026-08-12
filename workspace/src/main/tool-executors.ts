@@ -5,16 +5,8 @@ import { DEFAULT_EDITABLE_SIZE_LIMIT, type FileService } from "./file-service.js
 import { FileServiceError } from "../shared/file-contract.js";
 import type { AgentHostController } from "./agent-host-controller.js";
 import type { EditorGateway } from "./editor-gateway.js";
-import type { PetBridge } from "./pet-bridge.js";
 
 const CODE_EDITOR_TIMEOUT_MS = (TOOL_REGISTRY.find((entry) => entry.name === "code_editor")?.timeoutSec ?? 600) * 1_000;
-
-/** petAppProxy: pet-app 실행 도구를 소켓으로 위임하는 얇은 어댑터(plan/03_workspace.md 4.1). */
-export function createPetAppProxyExecutor(petBridge: Pick<PetBridge, "dispatch">): ToolExecutor {
-  return {
-    execute: (tool, args, signal) => petBridge.dispatch(tool, args, signal),
-  };
-}
 
 export interface EditorLocalDeps {
   workspaceId: string;

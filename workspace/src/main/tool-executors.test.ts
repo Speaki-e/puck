@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { createEditorLocalExecutor, createPetAppProxyExecutor } from "./tool-executors.js";
+import { createEditorLocalExecutor } from "./tool-executors.js";
 import { FileService } from "./file-service.js";
 
 async function fixture() {
@@ -11,17 +11,6 @@ async function fixture() {
   const service = await FileService.create(root);
   return { root, service };
 }
-
-describe("createPetAppProxyExecutor", () => {
-  it("petBridge.dispatch로 그대로 위임한다", async () => {
-    const dispatch = vi.fn().mockResolvedValue({ ok: true, data: { pid: 1 } });
-    const executor = createPetAppProxyExecutor({ dispatch });
-    const signal = new AbortController().signal;
-    const result = await executor.execute("launch_app", { app_name: "Safari" }, signal);
-    expect(dispatch).toHaveBeenCalledWith("launch_app", { app_name: "Safari" }, signal);
-    expect(result).toEqual({ ok: true, data: { pid: 1 } });
-  });
-});
 
 describe("createEditorLocalExecutor: code_editor", () => {
   it("모델이 보낸 project_path를 무시하고 세션 workspace의 실제 경로를 강제한다", async () => {

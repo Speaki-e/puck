@@ -90,17 +90,11 @@ for (const file of files) {
     const to = layer(dependency);
     const forbidden = (
       (from === "shared" && to !== "shared")
-      || (from === "renderer" && ["main", "agent-host", "mocks"].includes(to))
+      || (from === "renderer" && ["main", "agent-host"].includes(to))
       || (from === "agent-host" && ["main", "renderer"].includes(to))
-      || (from === "mocks" && ["main", "renderer", "agent-host"].includes(to))
       || (from === "main" && to === "renderer")
-      || (from === "main" && to === "mocks")
     );
     if (forbidden) violations.push(`${relative(file)} must not import ${relative(dependency)}`);
-
-    if (from === "agent-host" && to === "mocks" && relative(file) !== "src/agent-host/agent-runner.ts") {
-      violations.push(`${relative(file)} imports mocks outside the temporary ai-module boundary`);
-    }
   }
 }
 

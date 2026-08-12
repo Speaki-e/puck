@@ -1,22 +1,19 @@
-import type { AgentCallbacks, Attachment, JSONValue, ToolExecutionResult, ToolExecutor } from "@speaki-e/protocol";
-import { MockAgentRuntime } from "../mocks/mock-agent-runtime.js";
-import type { AgentRuntime } from "../shared/ports.js";
+import type { Attachment, JSONValue, ToolExecutionResult, ToolExecutor } from "@speaki-e/protocol";
 import { createAcpPermissionResolver } from "./acp-permission-bridge.js";
 import type { PermissionResolver } from "./acp-adapter.js";
-import { AiModuleRuntime } from "./ai-module-runtime.js";
 import { DirectCodeEditorRuntime } from "./direct-code-editor-runtime.js";
 import { PendingApprovalStore } from "./pending-approval-store.js";
 import { cancelActiveRun, failAllActiveRuns } from "./run-cancellation.js";
 import { RunRegistry } from "./run-registry.js";
 import { SessionRouter } from "./session-router.js";
 
-export type ExecutorKind = "pet-app" | "workspace" | "workspace-direct";
+export type ExecutorKind = "workspace-direct";
 
 export interface AgentRunnerDeps {
   emit(event: string, payload: JSONValue): void;
   /**
-   * petAppProxy/editorLocal이 실제로 무언가를 하려면 Main에 있는 petBridge/FileService/
-   * EditorGateway가 필요하다 -- Agent Host는 이 콜백으로 실행을 Main에 위임한다
+   * editorDirectFor가 실제로 code_editor를 돌리려면 Main에 있는 agentHost(runCodeEditor RPC)나
+   * FileService(OpenAI 대체 경로)가 필요하다 -- Agent Host는 이 콜백으로 실행을 Main에 위임한다
    * (tool_execute_request/toolExecuteResponse의 왕복은 index.ts가 감춘다).
    */
   executeToolOnMain(
@@ -27,11 +24,6 @@ export interface AgentRunnerDeps {
     sessionId: string,
     signal?: AbortSignal,
   ): Promise<ToolExecutionResult>;
-  /** Claude API 키/모델은 Main의 SecretStore/SettingsStore가 소유하므로 run마다 다시 물어본다. */
-  getRuntimeConfig(): Promise<{ apiKey?: string; model: string }>;
-  useMockAiModule: boolean;
-  /** --direct-code-editor: ai-module을 건너뛰고 code_editor로 직결 (DirectCodeEditorRuntime). */
-  directCodeEditor: boolean;
 }
 
 function createToolExecuteProxy(
@@ -56,16 +48,21 @@ export interface AgentRunner {
   cancelSession(sessionId: string): boolean;
   respondToApproval(approvalId: string, approved: boolean): boolean;
   rejectPendingApprovals(): void;
-  /** acp-adapter.ts의 resolvePermission으로 쓸 리졸버 -- ACP 승인도 ai-module 승인과 같은 저장소를 탄다. */
+  /** acp-adapter.ts의 resolvePermission으로 쓸 리졸버. */
   permissionResolverFor(payload: { workspaceId: string; sessionId: string }): PermissionResolver;
   /** Agent Host 종료 직전(shutdown RPC): 대기 중이던 실행을 전부 실패 처리하고 agent_done을 보낸다. */
   shutdown(): void;
 }
 
 /**
- * ai-module 실행을 소유한다(docs/architecture.md "다음 구조 단계": ai-module과
- * SessionRouter/RunRegistry를 Agent Host로). Main은 이제 사용자 입력 하나를 runAgent 요청
- * 한 번으로 위임하고, 진행 상황은 agent_* 이벤트로 받는다.
+ * 2026-08-12, byeolki: "workspace는 일반 에디터고, 모든 AI 처리는 puckclient가 함." ai-module
+ * 실행 루프(SessionRouter/RunRegistry를 Agent Host로 옮긴 직전 판)는 걷어냈다 -- workspace는 이제
+ * "무엇을 할지" 판단하지 않고, pet-app의 CodeEditorDelegate(Puck/Agent/CodeEditorDelegate.swift)가
+ * 이미 코딩 작업이라고 판단해서 보낸 user_input 하나를 code_editor 한 번으로 곧장 실행하기만 한다
+ * (예전의 --direct-code-editor 모드가 유일한 경로가 됨). SessionRouter(세션당 직렬화)와
+ * RunRegistry(취소/ActiveRun 추적)는 이 단일 실행에도 여전히 의미가 있어 남겨뒀다. petAppProxy와
+ * ai-module 전용 승인 경로는 삭제 -- pet-app 도구 호출은 전부 pet-app 자신의 AgentRunner.swift가
+ * 처리하고 workspace를 거치지 않는다.
  */
 export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
   const sessionRouter = new SessionRouter();
@@ -78,34 +75,8 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     runRegistry,
   });
 
-  const petAppProxy = createToolExecuteProxy(deps, "pet-app", "", "");
-  const aiRuntimes = new Map<string, AiModuleRuntime>();
-
-  const editorLocalFor = (workspaceId: string, sessionId: string): ToolExecutor =>
-    createToolExecuteProxy(deps, "workspace", workspaceId, sessionId);
-
   const editorDirectFor = (workspaceId: string, sessionId: string): ToolExecutor =>
     createToolExecuteProxy(deps, "workspace-direct", workspaceId, sessionId);
-
-  const aiRuntimeFor = (workspaceId: string): AiModuleRuntime => {
-    const existing = aiRuntimes.get(workspaceId);
-    if (existing) return existing;
-    // AiModuleRuntime.getClient()는 getApiKey()를 먼저 await한 뒤 getModel()을 동기로 읽는다
-    // (04_ai-module.md 3.4) -- 그 순서를 이용해 한 번의 getRuntimeConfig() 왕복으로 둘 다 받아온다.
-    let cachedModel = "claude-sonnet-4-5";
-    const created = new AiModuleRuntime({
-      getApiKey: async () => {
-        const config = await deps.getRuntimeConfig();
-        cachedModel = config.model;
-        return config.apiKey;
-      },
-      getModel: () => cachedModel,
-      petAppProxy,
-      editorLocalFor: (sessionId) => editorLocalFor(workspaceId, sessionId),
-    });
-    aiRuntimes.set(workspaceId, created);
-    return created;
-  };
 
   const sendAgentDone = (input: { workspaceId: string; sessionId: string; ok: boolean; summary: string }): void => {
     deps.emit("agent_done", input as unknown as JSONValue);
@@ -125,39 +96,32 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       const { runId, signal } = runRegistry.begin(workspaceId, sessionId);
       deps.emit("agent_thinking", { workspaceId, sessionId } as unknown as JSONValue);
 
-      const callbacks: AgentCallbacks = {
-        onTextChunk: (chunk) => {
-          deps.emit("agent_text_chunk", { workspaceId, sessionId, text: chunk } as unknown as JSONValue);
-        },
-        onToolCallStart: (id, tool, toolArgs) => {
-          if (tool === "code_editor") return;
-          deps.emit("agent_tool_call", { workspaceId, sessionId, id, tool, args: toolArgs } as unknown as JSONValue);
-        },
-        onToolResult: (id, ok, data, error, detail) => {
-          const wireError = error === "denied_by_user" ? undefined : error;
-          deps.emit("agent_tool_result", { workspaceId, sessionId, id, ok, data, error: wireError, detail } as unknown as JSONValue);
-        },
-        onApprovalRequired: (summary, resolve) => {
-          void pendingApprovals
-            .requestApproval({ runId, workspaceId, sessionId, source: "ai-module", summary })
-            .then(resolve);
-        },
-        onSessionCreated: (newSessionId, title) => {
-          deps.emit("agent_session_created", { workspaceId, sessionId: newSessionId, title } as unknown as JSONValue);
-        },
-        onDone: (ok, summary) => {
-          if (runRegistry.markDoneSent(runId)) sendAgentDone({ workspaceId, sessionId, ok, summary });
-        },
-      };
-
       try {
-        const agentRuntime: AgentRuntime = deps.useMockAiModule
-          ? new MockAgentRuntime({ petAppProxy, editorLocal: editorLocalFor(workspaceId, sessionId) })
-          : deps.directCodeEditor
-            ? new DirectCodeEditorRuntime((id) => editorDirectFor(workspaceId, id))
-            : aiRuntimeFor(workspaceId);
-
-        await agentRuntime.run(text, sessionId, { projectPath }, callbacks, attachments, signal);
+        const runtime = new DirectCodeEditorRuntime((id) => editorDirectFor(workspaceId, id));
+        await runtime.run(
+          text,
+          sessionId,
+          { projectPath },
+          {
+            onTextChunk: (chunk) => {
+              deps.emit("agent_text_chunk", { workspaceId, sessionId, text: chunk } as unknown as JSONValue);
+            },
+            onToolCallStart: (id, tool, toolArgs) => {
+              if (tool === "code_editor") return;
+              deps.emit("agent_tool_call", { workspaceId, sessionId, id, tool, args: toolArgs } as unknown as JSONValue);
+            },
+            onToolResult: (id, ok, data, error, detail) => {
+              deps.emit("agent_tool_result", { workspaceId, sessionId, id, ok, data, error, detail } as unknown as JSONValue);
+            },
+            onApprovalRequired: (_summary, resolve) => resolve(false),
+            onSessionCreated: () => {},
+            onDone: (ok, summary) => {
+              if (runRegistry.markDoneSent(runId)) sendAgentDone({ workspaceId, sessionId, ok, summary });
+            },
+          },
+          attachments,
+          signal,
+        );
       } catch (error) {
         if (runRegistry.markDoneSent(runId)) {
           sendAgentDone({

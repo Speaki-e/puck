@@ -4,6 +4,25 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-13: workspace trimmed to editor-only UI
+
+workspace is embedded in PuckClient purely as the `code_editor` view (WKWebView),
+so surfaces that duplicated PuckClient's own chat/settings were dead weight --
+one, `CommandDock`'s agent input, was actively broken there:
+`gateway-workspace-api.ts`'s `runCommand` just threw
+("Editor View에서는 에이전트 명령을 직접 실행하지 않습니다").
+
+- Removed: `CommandDock` (replaced by a minimal read-only status strip),
+  `WorkspaceTitlebar`'s "Workspace ALPHA" brand chrome (redundant inside
+  another app's window), `SettingsPanel`'s "모델" field (nothing has consumed
+  `WorkspaceSettings.model` since ai-module was retired).
+- Kept: the API key field (still the one non-env-var way to hand ACP a Claude
+  key), file-size-limit/log-level/recent-projects (still workspace's own
+  domain) -- these weren't in scope, just the agent-brain duplication was.
+- Backing IPC (`agent:run`/`agent:cancel`, `WorkspaceController.setAgentCommands`)
+  removed to match; `agent:status`/`agent:working-paths` kept (still real ACP
+  readiness feedback).
+
 ## 2026-08-13: one point color across workspace and pet-app -- pumpkin orange
 
 workspace's accent had drifted to blue (`#3291ff`) while pet-app's ClientPalette

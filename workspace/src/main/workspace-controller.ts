@@ -8,8 +8,6 @@ import { basenameForLog, JsonlLogger } from "./logger.js";
 
 export class WorkspaceController extends EventEmitter {
   private readonly services = new Map<string, FileService>();
-  private runAgent: (command: string, workspace: WorkspaceRecord) => Promise<{ requestId: string }> = async (command) => ({ requestId: `mock-${command}` });
-  private cancelAgent: () => Promise<boolean> = async () => false;
 
   constructor(
     readonly registry: WorkspaceRegistry,
@@ -25,27 +23,6 @@ export class WorkspaceController extends EventEmitter {
     if (projectPath) await this.bindDefault(projectPath);
     const current = this.registry.get("default");
     if (current?.realProjectPath) await this.ensureService(current);
-  }
-
-  setAgentCommands(commands: {
-    run(command: string, workspace: WorkspaceRecord): Promise<{ requestId: string }>;
-    cancel(): Promise<boolean>;
-  }): void {
-    this.runAgent = commands.run;
-    this.cancelAgent = commands.cancel;
-  }
-
-  async runCommand(command: string, workspaceId: string): Promise<{ requestId: string }> {
-    const workspace = this.registry.get(workspaceId);
-    if (!workspace?.realProjectPath) throw new Error("프로젝트가 연결되지 않았습니다");
-    const result = await this.runAgent(command, workspace);
-    await this.logger.write("info", "agent_run_requested", { requestId: result.requestId, workspaceId });
-    return result;
-  }
-
-  async cancelCommand(): Promise<boolean> {
-    this.broadcast("agent:status", "취소 요청 중");
-    return this.cancelAgent();
   }
 
   /** EditorGateway(김민영 W2)가 같은 워크스페이스의 FileService 인스턴스를 재사용하기 위한 접점. */
@@ -72,17 +49,6 @@ export class WorkspaceController extends EventEmitter {
       await this.logger.write("info", "file_saved", { workspaceId, path: result.path, size: result.size });
       return result;
     });
-    ipcMain.handle("agent:run", async (_event, command: string, workspaceId: string) => {
-      const workspace = this.registry.get(workspaceId);
-      if (!workspace?.realProjectPath) throw new Error("프로젝트가 연결되지 않았습니다");
-      const result = await this.runAgent(command, workspace);
-      await this.logger.write("info", "agent_run_requested", { requestId: result.requestId, workspaceId });
-      return result;
-    });
-    ipcMain.handle("agent:cancel", async () => {
-      this.broadcast("agent:status", "취소 요청됨");
-      return this.cancelAgent();
-    });
     ipcMain.handle("window:control", (event, action: "minimize" | "maximize" | "close") => {
       const window = BrowserWindow.fromWebContents(event.sender);
       if (!window) return false;
@@ -104,8 +70,6 @@ export class WorkspaceController extends EventEmitter {
       "files:read",
       "files:preview-image",
       "files:save",
-      "agent:run",
-      "agent:cancel",
       "window:control",
     ]) ipcMain.removeHandler(channel);
   }

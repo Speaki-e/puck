@@ -23,8 +23,6 @@ export interface WorkspaceApi {
   readFile(workspaceId: string, path: string): Promise<FileContent>;
   previewImage(workspaceId: string, path: string): Promise<FileContent>;
   saveFile(workspaceId: string, request: SaveFileRequest): Promise<SaveFileResult>;
-  runCommand(command: string, workspaceId: string): Promise<{ requestId: string }>;
-  cancelCommand(): Promise<boolean>;
   windowControl(action: "minimize" | "maximize" | "close"): Promise<boolean>;
   onFileChange(listener: (event: FileChangeEvent) => void): () => void;
   onAgentStatus(listener: (status: string) => void): () => void;

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { Attachment, JSONValue, ToolErrorCode, ToolExecutionResult, ToolExecutor } from "@speaki-e/protocol";
 import { createOpenAiCodeEditorExecutor } from "../openai-code-editor.js";
 import { workingPathsFromUpdate, type AcpUpdatePayload } from "../../shared/acp-update.js";
@@ -264,18 +263,6 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
       });
     }
   }
-
-  controller.setAgentCommands({
-    run: (command, workspace) => {
-      const requestId = randomUUID();
-      void handleUserInput(workspace.id, "default", command).catch((error) => logger.write("warn", "agent_run_failed", {
-        workspaceId: workspace.id,
-        message: error instanceof Error ? error.message : String(error),
-      }));
-      return Promise.resolve({ requestId });
-    },
-    cancel: () => agentHost.request("cancelAgentSession", { sessionId: "default" }, 5_000).then((r) => r.cancelled).catch(() => false),
-  });
 
   return {
     handleUserInput,

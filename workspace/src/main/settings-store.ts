@@ -6,7 +6,6 @@ import type { LogLevel, WorkspaceSettings } from "../shared/settings-contract.js
 export type { WorkspaceSettings } from "../shared/settings-contract.js";
 
 const DEFAULT_SETTINGS: WorkspaceSettings = {
-  model: "claude-sonnet-4-5",
   fileSizeLimitBytes: 2 * 1024 * 1024,
   logLevel: "info",
 };
@@ -16,7 +15,6 @@ const LOG_LEVELS = new Set<LogLevel>(["debug", "info", "warn", "error"]);
 
 function sanitize(patch: Partial<WorkspaceSettings>): Partial<WorkspaceSettings> {
   const result: Partial<WorkspaceSettings> = {};
-  if (typeof patch.model === "string" && patch.model.trim()) result.model = patch.model.trim();
   if (typeof patch.fileSizeLimitBytes === "number" && Number.isFinite(patch.fileSizeLimitBytes) && patch.fileSizeLimitBytes >= MIN_FILE_SIZE_LIMIT) {
     result.fileSizeLimitBytes = Math.floor(patch.fileSizeLimitBytes);
   }

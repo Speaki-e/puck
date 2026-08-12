@@ -69,15 +69,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .eyebrow { color: var(--mute); font-family: "Geist Mono", ui-monospace, monospace; font-size: 10px; font-weight: 500; line-height: 14px; letter-spacing: .06em; }
 
 .workspace-shell { display: grid; grid-template-rows: 56px minmax(0, 1fr) 72px; width: 100%; height: 100%; background: var(--canvas); }
-.titlebar { display: grid; grid-template-columns: 300px minmax(240px, 1fr) 300px; align-items: center; padding: 0 14px 0 18px; border-bottom: 1px solid var(--hairline); background: rgba(9, 9, 9, .96); -webkit-app-region: drag; }
+.titlebar { display: grid; grid-template-columns: minmax(240px, 1fr) 300px; align-items: center; padding: 0 14px 0 18px; border-bottom: 1px solid var(--hairline); background: rgba(9, 9, 9, .96); -webkit-app-region: drag; }
 .titlebar button { -webkit-app-region: no-drag; }
-.brand-lockup { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.brand-mark { position: relative; display: grid; width: 26px; height: 26px; place-items: center; overflow: hidden; border: 1px solid #353535; border-radius: 7px; background: linear-gradient(145deg, #1c1c1c, #101010); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
-.brand-mark::after { position: absolute; inset: 3px; border-radius: 5px; background: radial-gradient(circle at 28% 18%, rgba(0,223,216,.17), transparent 46%), radial-gradient(circle at 80% 80%, rgba(168,85,247,.2), transparent 48%); content: ""; }
-.brand-mark svg { position: relative; z-index: 1; width: 18px; height: 18px; stroke: #e9e9e9; stroke-width: 1.45; stroke-linecap: round; stroke-linejoin: round; }
-.brand-name { font-size: 15px; font-weight: 600; letter-spacing: -.35px; }
-.alpha-badge { padding: 3px 5px; border: 1px solid var(--hairline); border-radius: 4px; color: var(--mute); background: var(--surface); font-family: "Geist Mono", monospace; font-size: 8px; letter-spacing: .08em; }
-.project-identity { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 8px; color: var(--body); font-size: 12px; }
+.project-identity { display: flex; min-width: 0; align-items: center; gap: 8px; color: var(--body); font-size: 12px; }
 .project-identity strong { max-width: 180px; overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .project-path { max-width: 280px; overflow: hidden; color: var(--mute); text-overflow: ellipsis; white-space: nowrap; }
 .project-dot { width: 7px; height: 7px; border: 1px solid #4b4b4b; border-radius: 50%; background: #202020; }
@@ -190,22 +184,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-bottom-width: 2px; border-radius: 5px; background: #171717; font-family: "Geist Mono", monospace; font-size: 8px; }
 .empty-actions b { font-weight: 400; }
 
-.command-dock { display: grid; grid-template-columns: 260px minmax(300px, 760px) 90px; align-items: center; justify-content: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--hairline); background: var(--canvas); }
-.status-block { display: flex; min-width: 0; align-items: center; gap: 9px; }
+.status-bar { display: flex; align-items: center; gap: 9px; padding: 10px 16px; border-top: 1px solid var(--hairline); background: var(--canvas); }
 .status-pulse { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px rgba(237, 140, 51, .08); }
-.status-block > div { display: flex; min-width: 0; flex-direction: column; }
 .status-text { overflow: hidden; color: var(--body); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.command-composer { display: flex; height: 46px; min-width: 0; align-items: center; gap: 9px; padding: 0 6px 0 13px; border: 1px solid #303030; border-radius: 12px; background: #141414; box-shadow: 0 1px 1px rgba(0,0,0,.3), 0 8px 24px -14px rgba(0,0,0,.9); transition: border-color .15s, box-shadow .15s; }
-.command-composer:focus-within { border-color: #915f31; box-shadow: 0 0 0 3px rgba(237, 140, 51, .1), 0 8px 24px -14px rgba(0,0,0,.9); }
-.composer-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 6px; color: #c084fc; background: #24162f; }
-.composer-icon .icon { width: 13px; height: 13px; }
-.command-composer input { min-width: 0; flex: 1; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 12px; }
-.command-composer input::placeholder { color: var(--faint); }.command-composer input:disabled { cursor: not-allowed; }
-.enter-hint { color: #b2b2b2; font-family: "Geist Mono", monospace; font-size: 8px; }
-.run-button { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: 8px; background: #ededed; color: #111; cursor: pointer; }
-.run-button:hover:not(:disabled) { background: #fff; }.run-button:disabled { background: #252525; color: #555; cursor: default; }.run-button .icon { width: 14px; height: 14px; }
-.stop-button { display: inline-flex; height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 6px; background: #111; color: var(--body); font-size: 11px; cursor: pointer; }
-.stop-button:hover { border-color: #713838; color: #ff7770; background: #201313; }.stop-button .icon { width: 13px; height: 13px; }
 
 .settings-panel { display: flex; width: min(440px, 92vw); max-height: 82vh; flex-direction: column; gap: 16px; overflow-y: auto; padding: 20px; border: 1px solid var(--hairline); border-radius: 12px; background: #101010; box-shadow: 0 24px 60px -20px rgba(0,0,0,.8); }
 .settings-panel header { display: flex; align-items: center; justify-content: space-between; }
@@ -225,9 +206,8 @@ kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-botto
 @keyframes pulse { 50% { opacity: .35; transform: scale(.75); } }
 
 @media (max-width: 980px) {
-  .titlebar { grid-template-columns: 210px 1fr 160px; }.project-path { display: none; }
+  .titlebar { grid-template-columns: 1fr 160px; }.project-path { display: none; }
   .editor-layout { grid-template-columns: 228px minmax(0, 1fr); }
-  .command-dock { grid-template-columns: 160px minmax(300px, 1fr) 76px; }.enter-hint { display: none; }
 }
 
 @theme inline {

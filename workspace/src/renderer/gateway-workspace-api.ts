@@ -52,14 +52,6 @@ export function createGatewayWorkspaceApi(transport: EditorTransport, workspaceI
       return requestAs<SaveFileResult>(transport, { workspaceId: id, type: "file:save", payload: request as unknown as JSONValue });
     },
 
-    async runCommand(): Promise<{ requestId: string }> {
-      throw new Error("Editor View에서는 에이전트 명령을 직접 실행하지 않습니다 -- pet-app 채팅을 사용하세요");
-    },
-
-    async cancelCommand() {
-      return false;
-    },
-
     async windowControl() {
       return false;
     },

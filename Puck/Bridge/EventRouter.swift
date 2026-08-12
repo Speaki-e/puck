@@ -111,9 +111,46 @@ enum EventRouter {
             // Only agent_done(ok=true) is specified; a failed run is already
             // signaled via toolResult(ok=false).
             return ok
-                ? EventReaction(sfxKey: "task_success", jump: true, bubbleText: summary, emotion: "happy")
+                ? EventReaction(sfxKey: "task_success", jump: true, bubbleText: bubbleSummary(from: summary), emotion: "happy")
                 : EventReaction()
         }
+    }
+
+    /// The speech bubble gets the headline, not the whole answer.
+    ///
+    /// byeolki, 2026-08-12: "pet이 ai 답변을 전부 출력하지 말고 핵심부분만
+    /// 간결하게". agent_done's summary is whatever the agent that produced it
+    /// felt like putting there -- for the F15 local agent it is literally the
+    /// full reply text, and an ACP/editor run can hand back several
+    /// paragraphs. The full text is already in the chat transcript
+    /// (text_chunk); the bubble floating next to a 100px character is the one
+    /// surface that cannot carry it.
+    ///
+    /// Trimmed here rather than at each agent: this is the only place a
+    /// bubble is built, so every producer -- local, workspace, whatever comes
+    /// next -- is covered by the one rule.
+    static func bubbleSummary(from summary: String, limit: Int = 60) -> String? {
+        let firstLine = summary
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .first?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+        guard !firstLine.isEmpty else { return nil }
+
+        // First sentence, keeping its terminator -- "고쳤어요." reads finished,
+        // "고쳤어요" reads cut off. A terminator only ends a sentence when what
+        // follows is whitespace or nothing: otherwise "hello.ts에 주석을
+        // 추가했어요." becomes "hello." (which the test caught), and the same
+        // goes for version numbers and 0.5.
+        let sentence = firstLine.indices
+            .first { index in
+                guard ".!?。".contains(firstLine[index]) else { return false }
+                let next = firstLine.index(after: index)
+                return next == firstLine.endIndex || firstLine[next].isWhitespace
+            }
+            .map { String(firstLine[...$0]) } ?? firstLine
+
+        guard sentence.count > limit else { return sentence }
+        return sentence.prefix(limit).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     /// Extracts `detail.path` from a code_editor tool_call (protocol 3.2:

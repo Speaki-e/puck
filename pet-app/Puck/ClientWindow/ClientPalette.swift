@@ -30,14 +30,13 @@ struct ClientPalette {
     /// real `glassEffect` here and a flat bordered fill everywhere else.
     var usesGlassSurfaces: Bool
 
-    // 2026-08-02: neutral tokens (background/border/text) pulled to match
-    // the "Gray" scale of byeolki's 5 Figma references pixel-for-pixel
-    // ("ㅇㄴㅇㄴ 그냥 똑같이 해달라고" -- after an earlier pass that only
-    // touched two components, byeolki wants the visual style matched, not
-    // just cherry-picked). `accent` stays the established pumpkin orange,
-    // not Figma's neutral/black send button -- that's this app's own brand
-    // color (byeolki, 2026-07-30: "호박을 로고로 쓰고 싶어"), deliberately
-    // out of scope for a "match Figma's colors" pass.
+    // 2026-08-12: byeolki asked for the reverse of the 08-02 pass -- workspace
+    // (the Electron/web client window) is the design source of truth now, and
+    // ClientPalette adopts *its* tokens (src/renderer/styles.css's --canvas/
+    // --surface/--hairline/--ink/--mute/--blue) instead of the other way
+    // around. `.dark` below matches workspace's actual palette pixel-for-
+    // pixel; `.light`/`.glass` are untouched since workspace has no light
+    // mode to port from.
     static let light = ClientPalette(
         background: .white, // Gray/White Alpha 0 #FFFFFF
         surface: .white,
@@ -53,12 +52,12 @@ struct ClientPalette {
     )
 
     static let dark = ClientPalette(
-        background: Color(red: 0.086, green: 0.086, blue: 0.086), // #161616
-        surface: Color(red: 0.122, green: 0.122, blue: 0.122), // #1F1F1F
-        surfaceBorder: Color(red: 0.165, green: 0.165, blue: 0.165), // #2A2A2A
-        textPrimary: Color(red: 0.949, green: 0.949, blue: 0.941),
-        textSecondary: Color(red: 0.549, green: 0.549, blue: 0.549),
-        accent: Color(red: 0.93, green: 0.55, blue: 0.20),
+        background: Color(red: 0.035, green: 0.035, blue: 0.035), // workspace --canvas #090909
+        surface: Color(red: 0.067, green: 0.067, blue: 0.067), // workspace --surface #111111
+        surfaceBorder: Color(red: 0.161, green: 0.161, blue: 0.161), // workspace --hairline #292929
+        textPrimary: Color(red: 0.929, green: 0.929, blue: 0.929), // workspace --ink #ededed
+        textSecondary: Color(red: 0.467, green: 0.467, blue: 0.467), // workspace --mute #777777
+        accent: Color(red: 0.196, green: 0.569, blue: 1.0), // workspace --blue #3291ff
         onAccent: .white,
         success: .green,
         failure: .red,

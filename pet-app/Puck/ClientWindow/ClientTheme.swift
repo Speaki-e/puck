@@ -13,23 +13,29 @@
 import SwiftUI
 
 enum ClientTheme {
+    // 2026-08-12: workspace (the source of truth now, see ClientPalette) sets
+    // its type in Geist -- a neutral/grotesque sans, not SF Rounded's soft
+    // "friendly chat app" feel. pet-app doesn't bundle the Geist font file
+    // (that's a separate asset-embedding task), so this drops `design:
+    // .rounded` in favor of the system default design as the closer-available
+    // approximation rather than pulling in a new font dependency here.
     enum Typography {
-        static let sectionHeader = Font.system(.caption, design: .rounded).weight(.semibold)
-        static let workspaceName = Font.system(.body, design: .rounded).weight(.medium)
-        static let sessionTitle = Font.system(.callout, design: .rounded)
+        static let sectionHeader = Font.system(.caption).weight(.semibold)
+        static let workspaceName = Font.system(.body).weight(.medium)
+        static let sessionTitle = Font.system(.callout)
         static let messageBody = Font.system(.body)
-        static let toolLabel = Font.system(.callout, design: .rounded).weight(.medium)
+        static let toolLabel = Font.system(.callout).weight(.medium)
         static let mono = Font.system(.caption, design: .monospaced)
-        static let summary = Font.system(.callout, design: .rounded).weight(.semibold)
+        static let summary = Font.system(.callout).weight(.semibold)
         /// The empty-state greeting.
-        static let greeting = Font.system(.largeTitle, design: .rounded).weight(.bold)
+        static let greeting = Font.system(.largeTitle).weight(.bold)
         /// The line under the greeting.
-        static let greetingSubtitle = Font.system(.body, design: .rounded)
+        static let greetingSubtitle = Font.system(.body)
         /// The example-prompt chips under the greeting, and the disclaimer
         /// caption under the input bar.
-        static let caption = Font.system(.caption, design: .rounded)
+        static let caption = Font.system(.caption)
         /// Sender labels above a message bubble ("나" / the app's name).
-        static let senderLabel = Font.system(.caption2, design: .rounded).weight(.semibold)
+        static let senderLabel = Font.system(.caption2).weight(.semibold)
     }
 
     enum Metrics {
@@ -51,13 +57,13 @@ enum ClientTheme {
         static let spacingSmall: CGFloat = 6
         static let spacingMedium: CGFloat = 10
         static let spacingLarge: CGFloat = 16
-        /// 2026-08-02: 24 matches the slothGPT chatbot-kit reference's own
-        /// card/bubble rounding exactly (byeolki: "이거에 좀 더 맞춰봐", a
-        /// closer analogue than the legal-case-app reference used earlier
-        /// the same day -- their nav-row rounding is 12, unchanged below).
-        static let bubbleCornerRadius: CGFloat = 24
-        static let cardCornerRadius: CGFloat = 24
-        static let rowCornerRadius: CGFloat = 12
+        /// 2026-08-12: pulled down from the Figma-matched 24/24/12 to
+        /// workspace's own sharper radii (src/renderer/styles.css: 12px
+        /// panels, 6px buttons/rows) now that workspace is the design source
+        /// of truth (see ClientPalette).
+        static let bubbleCornerRadius: CGFloat = 10
+        static let cardCornerRadius: CGFloat = 12
+        static let rowCornerRadius: CGFloat = 6
         /// The small sender avatar drawn above each message bubble.
         static let avatarSize: CGFloat = 22
         /// The client window's own floor -- sidebar expanded (220) + the main
@@ -68,8 +74,8 @@ enum ClientTheme {
         /// vs. the enforced 760/520), which meant the SwiftUI-declared
         /// minimum was never actually reachable and the two numbers could
         /// silently drift apart again the next time either one changed.
-        static let windowMinWidth: CGFloat = 760
-        static let windowMinHeight: CGFloat = 520
+        static let windowMinWidth: CGFloat = 960
+        static let windowMinHeight: CGFloat = 640
     }
 
     /// The shapes surfaces are cut to. Spelled once here rather than
@@ -80,6 +86,6 @@ enum ClientTheme {
         static let bubble = RoundedRectangle(cornerRadius: Metrics.bubbleCornerRadius, style: .continuous)
         static let card = RoundedRectangle(cornerRadius: Metrics.cardCornerRadius, style: .continuous)
         static let row = RoundedRectangle(cornerRadius: Metrics.rowCornerRadius, style: .continuous)
-        static let panel = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        static let panel = RoundedRectangle(cornerRadius: 12, style: .continuous)
     }
 }

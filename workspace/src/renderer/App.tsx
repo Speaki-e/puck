@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { FileTreeEntry } from "../shared/file-contract";
-import { CommandDock } from "./components/CommandDock";
 import { EditorSurface } from "./components/EditorSurface";
 import { EditorTabs } from "./components/EditorTabs";
 import { FileTree } from "./components/FileTree";
@@ -26,7 +25,6 @@ export function App() {
   const [workspace, setWorkspace] = useState<RendererWorkspaceRecord>();
   const [tree, setTree] = useState<FileTreeEntry[]>([]);
   const [state, dispatch] = useReducer(editorReducer, initialState);
-  const [command, setCommand] = useState("");
   const [status, setStatus] = useState("준비됨");
   const [workingPaths, setWorkingPaths] = useState(() => new Set<string>());
   const [diffAgainstDisk, setDiffAgainstDisk] = useState<string>();
@@ -264,13 +262,6 @@ export function App() {
     }
   };
 
-  const runCommand = async () => {
-    if (!api || !workspace || !command.trim()) return;
-    setStatus("Agent가 작업을 시작하는 중…");
-    await api.runCommand(command.trim(), workspace.id);
-    setCommand("");
-  };
-
   const title = useMemo(() => workspace?.projectPath?.split(/[\\/]/).at(-1) ?? "Workspace", [workspace]);
   const dirtyCount = state.tabs.filter(isDirty).length;
 
@@ -331,14 +322,11 @@ export function App() {
         </section>
       </section>
 
-      <CommandDock
-        status={status}
-        command={command}
-        enabled={Boolean(workspace)}
-        onCommandChange={setCommand}
-        onRun={() => void runCommand()}
-        onCancel={() => void api?.cancelCommand()}
-      />
+      <footer className="status-bar">
+        <span className="status-pulse" />
+        <span className="eyebrow">STATUS</span>
+        <span className="status-text" aria-label="현재 상태">{status}</span>
+      </footer>
       {settingsOpen && api && (
         <SettingsPanel api={api} onClose={() => setSettingsOpen(false)} onProjectSelected={(path) => void switchToRecentProject(path)} />
       )}

@@ -94,18 +94,6 @@ export function SettingsPanel({ api, onClose, onProjectSelected }: Props) {
         </section>
 
         <section>
-          <h3>모델</h3>
-          <Label htmlFor="settings-model" className="sr-only">모델</Label>
-          <Input
-            id="settings-model"
-            value={snapshot.model}
-            onChange={(event) => setSnapshot({ ...snapshot, model: event.target.value })}
-            onBlur={() => void update({ model: snapshot.model })}
-            aria-label="모델"
-          />
-        </section>
-
-        <section>
           <h3>파일 크기 제한</h3>
           <div className="settings-row">
             <Slider

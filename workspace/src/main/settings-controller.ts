@@ -33,7 +33,6 @@ export class SettingsController {
       const updated = await this.settings.update(patch);
       this.onSettingsChanged?.(updated);
       await this.logger.write("info", "settings_updated", {
-        model: updated.model,
         logLevel: updated.logLevel,
         fileSizeLimitBytes: updated.fileSizeLimitBytes,
       });

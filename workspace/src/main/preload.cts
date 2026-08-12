@@ -9,8 +9,6 @@ contextBridge.exposeInMainWorld("workspace", {
   readFile: (workspaceId: string, filePath: string) => ipcRenderer.invoke("files:read", workspaceId, filePath),
   previewImage: (workspaceId: string, filePath: string) => ipcRenderer.invoke("files:preview-image", workspaceId, filePath),
   saveFile: (workspaceId: string, request: unknown) => ipcRenderer.invoke("files:save", workspaceId, request),
-  runCommand: (command: string, workspaceId: string) => ipcRenderer.invoke("agent:run", command, workspaceId),
-  cancelCommand: () => ipcRenderer.invoke("agent:cancel"),
   windowControl: (action: "minimize" | "maximize" | "close") => ipcRenderer.invoke("window:control", action),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   updateSettings: (patch: unknown) => ipcRenderer.invoke("settings:update", patch),

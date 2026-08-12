@@ -52,8 +52,10 @@ Renderer는 파일 상태와 비동기 작업을 `App.tsx`에서 조정하고, �
 
 - `EditorSurface`: Monaco, 이미지 미리보기, 충돌 배너와 diff
 - `WorkspaceTitlebar`: 프로젝트/설정/창 제어
-- `CommandDock`: Agent 명령과 상태
 - `FileTree`, `EditorTabs`, `SettingsPanel`: 독립 화면 영역
+
+workspace는 "무엇을 할지" 판단하지 않으므로(위 "AI 실행 경계" 참고) 에이전트 명령을 직접 받는 UI가
+없습니다 -- 하단은 저장/재연결/에러 같은 짧은 상태 텍스트만 보여주는 얇은 status bar 하나뿐입니다.
 - `monaco-config.ts`: 공통 테마와 폰트 설정
 
 Electron 폴백 창은 preload IPC를 사용하고, WKWebView는 `gateway-transport.ts`를 사용하지만 둘 다 같은 `WorkspaceApi` 인터페이스와 Editor View 번들을 소비합니다.

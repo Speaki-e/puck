@@ -2,7 +2,6 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface WorkspaceSettings {
-  model: string;
   /** read_file/에디터 편집 가능 크기 상한(바이트). */
   fileSizeLimitBytes: number;
   logLevel: LogLevel;

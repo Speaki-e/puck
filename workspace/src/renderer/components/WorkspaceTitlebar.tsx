@@ -1,6 +1,5 @@
 import type { WorkspaceApi } from "../workspace-api";
 import { Icon } from "./Icon";
-import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
@@ -23,18 +22,6 @@ export function WorkspaceTitlebar({
 }: WorkspaceTitlebarProps) {
   return (
     <header className="titlebar">
-      <div className="brand-lockup">
-        <span className="brand-mark" aria-hidden>
-          <svg viewBox="0 0 24 24" fill="none">
-            <circle cx="6" cy="7" r="2.25" />
-            <circle cx="18" cy="7" r="2.25" />
-            <circle cx="12" cy="17" r="2.25" />
-            <path d="M8 8.2 10.8 15M16 8.2 13.2 15M8.2 7h7.6" />
-          </svg>
-        </span>
-        <span className="brand-name">Workspace</span>
-        <Badge variant="outline" className="alpha-badge">ALPHA</Badge>
-      </div>
       <div className="project-identity" title={projectPath}>
         <span className={`project-dot ${connected ? "connected" : ""}`} />
         <strong>{title}</strong>

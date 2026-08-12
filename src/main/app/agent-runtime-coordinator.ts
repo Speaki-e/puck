@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type * as acp from "@agentclientprotocol/sdk";
-import type { AgentCallbacks, Attachment, JSONValue } from "@speaki-e/protocol";
+import type { AgentCallbacks, Attachment, JSONValue, ToolExecutor } from "@speaki-e/protocol";
 import { MockAgentRuntime } from "../../mocks/mock-agent-runtime.js";
 import { AiModuleRuntime } from "../ai-module-runtime.js";
+import { DirectCodeEditorRuntime } from "./direct-code-editor-runtime.js";
 import { workingPathsFromUpdate, type AcpUpdatePayload } from "../../shared/acp-update.js";
 import { createAcpPermissionResolver } from "../acp-permission-bridge.js";
 import type { AgentHostController } from "../agent-host-controller.js";
@@ -14,6 +15,7 @@ import { cancelActiveRun, failAllActiveRuns } from "../run-cancellation.js";
 import { RunRegistry } from "../run-registry.js";
 import { SessionRegistry } from "../session-registry.js";
 import { SessionRouter } from "../session-router.js";
+import { createOpenAiCodeEditorExecutor } from "../openai-code-editor.js";
 import { createEditorLocalExecutor, createPetAppProxyExecutor } from "../tool-executors.js";
 import type { WorkspaceController } from "../workspace-controller.js";
 import type { WorkspaceRegistry } from "../workspace-registry.js";
@@ -28,6 +30,10 @@ interface AgentRuntimeCoordinatorDeps {
   getClaudeApiKey?(): Promise<string | undefined>;
   getModel?(): string;
   useMockAiModule?: boolean;
+  /** --direct-code-editor: ai-module을 건너뛰고 code_editor로 직결 (DirectCodeEditorRuntime). */
+  directCodeEditor?: boolean;
+  /** --openai-code-editor: code_editor를 ACP 대신 OpenAI 툴 루프로 실행 (openai-code-editor.ts). */
+  openAiCodeEditor?: { apiKey: string; model: string };
 }
 
 export interface AgentRuntimeCoordinator {
@@ -95,6 +101,22 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
         codeEditorRequests.set(requestId, { workspaceId, sessionId });
         return () => codeEditorRequests.delete(requestId);
       },
+    });
+  };
+
+  /**
+   * code_editor를 실제로 수행하는 실행기. 기본은 editorLocal(ACP 경유)이고,
+   * --openai-code-editor면 OpenAI 툴 루프로 바꿔 낀다 -- 부르는 쪽은 어느 쪽인지
+   * 알 필요가 없다(같은 ToolExecutor).
+   */
+  const codeEditorExecutorFor = (workspaceId: string, sessionId: string): ToolExecutor => {
+    const openAi = deps.openAiCodeEditor;
+    if (!openAi) return editorLocalFor(workspaceId, sessionId);
+    return createOpenAiCodeEditorExecutor({
+      projectPath: registry.get(workspaceId)?.realProjectPath ?? "",
+      fileServiceFor: () => controller.getFileService(workspaceId),
+      apiKey: openAi.apiKey,
+      model: openAi.model,
     });
   };
 
@@ -273,7 +295,9 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
         const useMock = deps.useMockAiModule ?? process.env.NODE_ENV === "test";
         const agentRuntime = useMock
           ? new MockAgentRuntime({ petAppProxy, editorLocal: editorLocalFor(workspaceId, sessionId) })
-          : aiRuntimeFor(workspaceId);
+          : deps.directCodeEditor
+            ? new DirectCodeEditorRuntime((id) => codeEditorExecutorFor(workspaceId, id))
+            : aiRuntimeFor(workspaceId);
 
         await agentRuntime.run(
           text,

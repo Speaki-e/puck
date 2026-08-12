@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# 빌드 산출물 / 의존성
+node_modules/
+dist/
+
+# Local secrets / logs
+*.log
+.env
+
+# Local AI agent working brief (generated from ../plans/, not shared)
+CLAUDE.md

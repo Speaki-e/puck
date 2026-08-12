@@ -42,7 +42,7 @@
 - [x] **김민영** `SessionRouter`와 `RunRegistry` 구현
 - [ ] **김민영** 실제 태그 버전 `ai-module`을 Agent Host에 연결 -- `부분 완료`: ai-module 저장소가 아직 `.gitignore` 커밋 하나뿐이라(태그 없음) 설치 불가. `AgentRuntime`/`ApprovalPort` 포트와 `petAppProxy`/`editorLocal` 실행기는 실제 계약대로 배선 완료했고, 현재는 `src/main/app/agent-runtime-coordinator.ts`가 `MockAgentRuntime`을 임시 연결한다. 기획서 4장의 최종 소유 경계는 Agent Host이며, 실제 패키지가 준비되면 coordinator를 Agent Host RPC 어댑터로 치환한다.
 - [x] **김민영** 승인·취소 브리지를 ai-module/ACP/PetBridge와 연결
-- [ ] **공통** PetAgentClient → Workspace → ai-module → ACP → Editor View 전체 왕복 테스트
+- [ ] **공통** PuckClient → Workspace → ai-module → ACP → Editor View 전체 왕복 테스트
 - [ ] **이주한** 실제 Claude 인증 환경에서 자연어 파일 수정·취소·ACP 크래시 검증
 
 ---
@@ -141,10 +141,10 @@
 
 ### 공통
 
-- [x] `editor_view_ready` URL을 PetAgentClient에 전달하는 계약 시험 (2026-08-03, 3라운드) `tests/e2e/editor-view-status-contract.spec.ts` -- 실제 PetBridge 소켓으로 `editor_view_ready`/`editor_view_unavailable`을 받아 workspace_id·url이 맞는지, 그 url이 실제로 200을 반환하는지까지 왕복 검증. project_path 있는/없는 워크스페이스 둘 다, 그리고 두 번째 워크스페이스 생성까지 포함
+- [x] `editor_view_ready` URL을 PuckClient에 전달하는 계약 시험 (2026-08-03, 3라운드) `tests/e2e/editor-view-status-contract.spec.ts` -- 실제 PetBridge 소켓으로 `editor_view_ready`/`editor_view_unavailable`을 받아 workspace_id·url이 맞는지, 그 url이 실제로 200을 반환하는지까지 왕복 검증. project_path 있는/없는 워크스페이스 둘 다, 그리고 두 번째 워크스페이스 생성까지 포함
 - [x] 서로 다른 두 워크스페이스 URL과 WebSocket 격리 시험 (2026-08-03, 3라운드) `src/main/editor-gateway-isolation.test.ts` -- file:changed/acp:update/acp:working-paths 브로드캐스트, state:update/restore, open_in_editor 대기 탭, FileService 자체가 워크스페이스별로 격리되는지 확인. 이 테스트를 작성하다 `mocks/mock-editor-gateway-client.ts`의 실제 버그를 하나 발견해 같이 고쳤다 -- `next(timeoutMs)`가 타임아웃으로 reject된 뒤에도 그 waiter를 큐에서 제거하지 않아서, 그다음에 도착하는(관련 없는) 메시지가 죽은 Promise로 조용히 삼켜지고 후속 `next()` 호출이 자기 타임아웃까지 기다리게 되는 문제였다(다른 저장소도 이 mock 클라이언트를 재사용하므로 영향 범위가 있었음)
 
-**완료 기준:** PetAgentClient WKWebView와 Electron 폴백 창에서 동일 Editor View 사용
+**완료 기준:** PuckClient WKWebView와 Electron 폴백 창에서 동일 Editor View 사용
 
 ---
 
@@ -197,7 +197,7 @@
 - [x] 지수 backoff 자동 재연결
 - [x] 잘못된 protocol 메시지와 알 수 없는 result 로깅
 - [x] 수신 `user_input`·`run_cancel`을 Agent Host/WorkspaceController로 실제 라우팅
-- [x] `agent_thinking`·`text_chunk`·`agent_done` 이벤트를 PetAgentClient로 실제 브로드캐스트
+- [x] `agent_thinking`·`text_chunk`·`agent_done` 이벤트를 PuckClient로 실제 브로드캐스트
 - [ ] pet-app 실제 `bridge.sock`과 장시간 재연결 시험
 
 ### 김민영
@@ -213,10 +213,10 @@
 
 - [ ] protocol에 `state_snapshot_request`와 `state_snapshot` 추가
 - [ ] Workspace·Session·Editor URL snapshot 생성
-- [ ] PetAgentClient 최초 연결·재연결 시 snapshot 동기화
+- [ ] PuckClient 최초 연결·재연결 시 snapshot 동기화
 - [ ] protocol 확장 플래그 제거 및 정식 타입 사용
 
-**완료 기준:** PetAgentClient 재실행 후에도 전체 워크스페이스·세션·작업 상태 복원
+**완료 기준:** PuckClient 재실행 후에도 전체 워크스페이스·세션·작업 상태 복원
 
 ---
 
@@ -276,7 +276,7 @@
 - [x] `read_file` 구현
 - [x] 프로젝트 내부 읽기 전용 접근
 - [x] 대용량·바이너리·인코딩 오류 표준화
-- [x] ai-module callback을 PetAgentClient 이벤트로 전달 (`AgentCallbacks` → `petBridge.sendEvent`, `src/main/app/agent-runtime-coordinator.ts`)
+- [x] ai-module callback을 PuckClient 이벤트로 전달 (`AgentCallbacks` → `petBridge.sendEvent`, `src/main/app/agent-runtime-coordinator.ts`)
 
 ### 이주한
 
@@ -368,7 +368,7 @@
 
 ### 공통
 
-- [ ] PetAgentClient 종료·재실행 후 snapshot 복구 시험
+- [ ] PuckClient 종료·재실행 후 snapshot 복구 시험
 - [ ] 실제 pet-app과 잘못된 protocol 메시지 상호 운용 시험
 - [x] 두 워크스페이스에서 ACP 병렬 작업 시험 (2026-08-04, 4라운드) `code-editor-queue-acp-integration.test.ts` -- `code-editor-queue.test.ts`는 mock execute 함수로 큐 자체의 정책만 확인했었는데(W5), 실제 `CodeEditorQueue` + `AcpAdapter` + Mock ACP 자식 프로세스(`tests/fixtures/mock-acp-agent.mjs`) 조합으로 서로 다른 두 워크스페이스에 진짜 ACP 작업을 동시에 붙여 검증했다. 한 워크스페이스를 `WAIT`로 붙잡아 둔 채 다른 워크스페이스 작업이 기다리지 않고 끝나는지, 결과 파일이 각자 프로젝트 폴더에만 남는지(워크스페이스 격리) 둘 다 확인. 같은 워크스페이스 안에서는 여전히 순차 실행되는 것도 함께 검증
 - [x] 장시간 실행·반복 재연결·메모리 누수 시험 (2026-08-04, 5라운드) `src/main/editor-gateway-connection-churn.test.ts` -- EditorGateway WebSocket을 300회 연결·해제 반복하며 매 반복마다 서버 쪽 연결 목록(`state.connections`)이 정확히 0으로 돌아오는지 확인(관측을 위해 `EditorGateway.connectionCount()` 최소 접근자 추가, `CodeEditorQueue.position()`과 같은 기존 관측용 공개 메서드 패턴). heap은 50회마다 샘플링해 반복 횟수에 비례해 계속 자라지 않는지 널널한 임계값으로 스모크 체크(정밀 프로파일링 도구는 새로 안 씀). `pending-approval-store`/`run-registry`/`session-registry`는 EditorGateway의 WS 연결·해제와 코드상 연동돼 있지 않아(`editor-gateway.ts`의 `handleConnection`/`forget`이 건드리는 건 워크스페이스별 connections Set뿐) 이번 시험 범위에서 제외함(사용자 확인받음) -- 세 registry는 PetBridge/AgentHost/승인 흐름에 연결돼 있고 그 경로들은 이미 `petbridge-approval-integration.test.ts`(W7) 등 다른 시험으로 커버돼 있음
@@ -392,14 +392,14 @@
 
 ### 전체 통합
 
-- [ ] PetAgentClient 사용자 입력
+- [ ] PuckClient 사용자 입력
 - [ ] pet-app `bridge.sock` 전달
 - [ ] Workspace SessionRouter/RunRegistry 등록
 - [ ] ai-module tool-use 실행
 - [ ] `code_editor` → CodeEditorQueue → ACP
 - [ ] 파일 변경과 Editor View 갱신
-- [ ] 결과를 PetAgentClient와 pet-app에 전달
-- [ ] PetAgentClient 재연결 후 state snapshot 복구
+- [ ] 결과를 PuckClient와 pet-app에 전달
+- [ ] PuckClient 재연결 후 state snapshot 복구
 
 ---
 
@@ -425,7 +425,7 @@
 ### 공통
 
 - protocol 확장 PR과 타입 리뷰
-- PetAgentClient/pet-app 전체 통합
+- PuckClient/pet-app 전체 통합
 - 첨부 파일 보안 정책 (3라운드에서 검증 로직 4건 완료, 구현된 F14 임시 캡처 파일의 삭제 책임만 미확정)
 - 필수 장애 시험과 최종 인수 테스트
 - (2026-08-04, 4라운드) 외부 의존성 없이 바로 끝낼 수 있던 항목 7개 완료: pet-bridge/editor-gateway 잘못된 메시지 계약 테스트, 로그의 절대경로 유출 3건 수정(`basenameForLog`), 두 워크스페이스 ACP 병렬 통합 테스트, 파일 트리 제외 패턴 확장 및 성능 실측, Agent Host 재시작 후 GUI 상태 복구(`ready` 시 "준비됨" 재emit), CI 워크플로(`ci.yml`) 신규 작성, protocol 버전 호환 매트릭스 문서. 테스트를 짜다가 실사용에서만 드러나는 버그 2건도 발견·수정함: pet-bridge 테스트용 mock 소켓이 `data` 리스너 없이 paused 상태로 남아 `server.close()`가 안 끝나던 문제, `agent-host-controller.ts`가 재시작 완료 후에도 GUI 상태를 "다시 시작하는 중"에 방치하던 문제. 여전히 막힌 것: E2E(`pnpm test:e2e`)는 이 Windows 개발 환경의 Electron/Playwright 버전 조합 문제로 로컬 실행 확인을 못 했다(새로 만든 CI에서 처음 돌 때 검증 필요) -- 기존 e2e 테스트도 동일 환경 문제로 로컬에서 안 됨을 확인했으므로 이번에 손댄 코드 때문에 생긴 문제는 아니다

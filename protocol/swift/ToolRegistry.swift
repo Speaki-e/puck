@@ -9,7 +9,7 @@
 //  Why a Swift mirror now: the registry was TS-only because the only Swift
 //  consumer (pet-app's executor) is told which tool to run by the wire and
 //  never has to enumerate them. An agent does -- it has to hand the model the
-//  full tool list -- and the agent now runs in Swift, inside PetAgentClient.
+//  full tool list -- and the agent now runs in Swift, inside PuckClient.
 //  Hardcoding that list in the agent is exactly what the repo root README
 //  forbids, so it lands here instead.
 //

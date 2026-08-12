@@ -1,7 +1,7 @@
 {
   "name": "@speaki-e/workspace",
   "version": "0.1.0",
-  "description": "PetAgent Workspace backend and embedded Monaco editor",
+  "description": "Puck Workspace backend and embedded Monaco editor",
   "author": "Speaki-e",
   "private": true,
   "type": "module",

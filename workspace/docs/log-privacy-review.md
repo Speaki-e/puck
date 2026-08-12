@@ -18,7 +18,7 @@ TODO.md W7/공통 "개인정보·API 키·프로젝트 경로 로그 정책 리�
 |---|---|---|---|
 | `workspace-controller.ts`의 `bindDefault` | `workspace_project_bound` | `record.realProjectPath`를 절대경로 그대로 기록 -- Windows에서 `C:\Users\<user>\...`, macOS에서 `/Users/<user>/...` 형태로 OS 사용자명이 로그에 남는다 | `basenameForLog()`로 마지막 세그먼트만 기록 |
 | `attachment-validator.ts`의 `filterValidAttachments` catch 블록 | `attachment_rejected` | 거부된 첨부의 절대경로(`attachment.path`)를 그대로 기록 -- OS 임시 디렉터리 하위 경로라 여기도 사용자 홈 디렉터리가 포함된다 | 동일하게 `basenameForLog()` 적용 |
-| `pet-bridge.ts`의 `openSocket` 연결 성공 핸들러 | `pet_bridge_connected` | `defaultBridgeSocketPath()`가 macOS에서 `os.homedir()` 하위 경로(`~/Library/Application Support/PetAgent/bridge.sock`)를 반환 -- 연결될 때마다 로그에 홈 디렉터리가 남는다(Windows named pipe 경로는 홈 디렉터리를 포함하지 않아 원래도 안전했지만 일관성을 위해 동일 처리) | 동일하게 `basenameForLog()` 적용 |
+| `pet-bridge.ts`의 `openSocket` 연결 성공 핸들러 | `pet_bridge_connected` | `defaultBridgeSocketPath()`가 macOS에서 `os.homedir()` 하위 경로(`~/Library/Application Support/Puck/bridge.sock`)를 반환 -- 연결될 때마다 로그에 홈 디렉터리가 남는다(Windows named pipe 경로는 홈 디렉터리를 포함하지 않아 원래도 안전했지만 일관성을 위해 동일 처리) | 동일하게 `basenameForLog()` 적용 |
 
 세 곳 모두 `logger.ts`에 새로 추가한 `basenameForLog(absolutePath)` 헬퍼(내부적으로
 `path.basename`)를 재사용한다. `REDACTED_KEYS`에 항목을 추가하는 대신 헬퍼를 택한 이유: 이 필드들은

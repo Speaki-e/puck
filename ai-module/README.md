@@ -1,6 +1,6 @@
 # Speaki-e ai-module
 
-PetAgent의 에이전트 코어입니다. Anthropic Messages API 스트리밍과 tool-use 루프를 처리하고, 실행 자체는 호출자가 주입한 executor에 맡깁니다. UI·소켓·파일시스템을 직접 다루지 않습니다.
+Puck의 에이전트 코어입니다. Anthropic Messages API 스트리밍과 tool-use 루프를 처리하고, 실행 자체는 호출자가 주입한 executor에 맡깁니다. UI·소켓·파일시스템을 직접 다루지 않습니다.
 
 ## 역할
 

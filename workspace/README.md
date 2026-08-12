@@ -1,11 +1,11 @@
 # Speaki-e Workspace
 
-PetAgent의 로컬 워크스페이스 앱입니다. Monaco 에디터, 프로젝트 파일 관리, PetBridge, Claude Agent ACP와 `ai-module` 실행을 한 Electron 앱 안에서 연결합니다.
+Puck의 로컬 워크스페이스 앱입니다. Monaco 에디터, 프로젝트 파일 관리, PetBridge, Claude Agent ACP와 `ai-module` 실행을 한 Electron 앱 안에서 연결합니다.
 
 ## 구성
 
 ```text
-PetAgentClient ── PetBridge ── Workspace ── ai-module ── Claude API
+PuckClient ── PetBridge ── Workspace ── ai-module ── Claude API
                                   │
                                   └── Claude Agent ACP ── 프로젝트 파일
 ```
@@ -36,7 +36,7 @@ UI 없이 브리지와 백엔드만 실행하려면 다음을 사용합니다.
 corepack pnpm start:headless -- --project C:\path\to\project
 ```
 
-기본 PetBridge 주소는 Windows `\\.\pipe\PetAgent-bridge`, macOS `~/Library/Application Support/PetAgent/bridge.sock`입니다. 다른 주소가 필요하면 `--bridge-socket <path>`를 추가하세요.
+기본 PetBridge 주소는 Windows `\\.\pipe\Puck-bridge`, macOS `~/Library/Application Support/Puck/bridge.sock`입니다. 다른 주소가 필요하면 `--bridge-socket <path>`를 추가하세요.
 
 ## 검증
 

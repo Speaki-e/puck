@@ -3,7 +3,7 @@
 ## 프로세스 경계
 
 ```text
-PetAgentClient / Fallback Electron
+PuckClient / Fallback Electron
               │ HTTP + WebSocket / IPC
               ▼
 Workspace Main

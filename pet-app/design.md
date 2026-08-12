@@ -223,6 +223,6 @@ HStack(spacing: 0)
 
 ## 10. 이 문서에 없는 것
 
-- 펫 오버레이(F1)·노치(`Puck/Notch/`)·텍스트 입력 버블(F6)은 `ClientTheme` 토큰을 쓰지 않는 별개 표면이다. 노치는 실측 지오메트리(`NotchGeometry`, 폴백 170×24)로 그린다.
+- 펫 오버레이(F1)·텍스트 입력 버블(F6)은 `ClientTheme` 토큰을 쓰지 않는 별개 표면이다.
 - 에디터 뷰(`EditorWebView`)는 아직 어디에도 호스팅되지 않는다("에디터는 따로 할거라 토글 빼").
 - 다크/글래스 팔레트의 `success`/`failure`/`warning`은 아직 시스템 색(`.green`/`.red`/`.orange`) 그대로다. 라이트 테마도 동일.

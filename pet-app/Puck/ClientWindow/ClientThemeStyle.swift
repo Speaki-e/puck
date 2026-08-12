@@ -6,7 +6,7 @@
 //  Which of the three ClientWindow themes is active -- byeolki: "테마 종류를
 //  다크, 화이트, 글래스로". A distinct setting from Puck's system-wide
 //  AppAppearance (Settings' light/dark/system toggle, used by the pet
-//  overlay/Notch/Settings), but not a separate ClientWindow-local one either
+//  overlay/Settings), but not a separate ClientWindow-local one either
 //  -- byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
 //  셰이디 설정으로 변경할 수 있어야하거든". Persisted in Puck's own
 //  UserDefaults domain (SettingsStore) and broadcast to PuckClient over

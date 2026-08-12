@@ -25,7 +25,6 @@ final class SettingsStore {
         static let characterSummon = "Puck.hotkey.characterSummon"
         static let toySummon1 = "Puck.hotkey.toySummon1"
         static let toySummon2 = "Puck.hotkey.toySummon2"
-        static let isNotchEnabled = "Puck.isNotchEnabled"
         static let isMuteComplaintEnabled = "Puck.isMuteComplaintEnabled"
         static let selectedAvatarName = "Puck.selectedAvatarName"
         static let hasRequestedAccessibility = "Puck.hasRequestedAccessibility"
@@ -52,10 +51,6 @@ final class SettingsStore {
     /// same shape as onAppearanceChanged's own broadcast) so the client
     /// window picks it up immediately.
     var onClientThemeStyleChanged: ((ClientThemeStyle) -> Void)?
-    /// The notch (2026-08-01) is a persistent NSWindow AppDelegate owns, not
-    /// something SettingsView can start/stop directly -- this is how turning
-    /// it off in Settings actually tears the window down immediately.
-    var onNotchEnabledChanged: ((Bool) -> Void)?
     /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
     /// 해주고" -- picking a different installed avatar in Settings has to
     /// swap the *running* pet immediately, not just take effect next launch.
@@ -103,23 +98,11 @@ final class SettingsStore {
         set { defaults.set(newValue, forKey: Keys.avoidClimbingFocusedWindow) }
     }
 
-    /// On by default -- the notch is meant to always be there, like the
-    /// real menu bar. byeolki, 2026-08-01: "다이내믹 아일랜드 끄고 킬 수
-    /// 있는 버튼 추가해줘".
-    var isNotchEnabled: Bool {
-        get { defaults.object(forKey: Keys.isNotchEnabled) as? Bool ?? true }
-        set {
-            defaults.set(newValue, forKey: Keys.isNotchEnabled)
-            onNotchEnabledChanged?(newValue)
-        }
-    }
-
     /// Whether muting gets a sulk (angry face + "제 목소리가 시끄러우신거에
     /// 요?") -- byeolki, 2026-08-01, after asking for the sulk to stop
     /// moving the pet to center screen: "이런거 설정 가능하도록 해줘". No
-    /// live-callback needed (unlike isNotchEnabled): this is only consulted
-    /// at the moment mute is toggled, not applied to something already on
-    /// screen.
+    /// live-callback needed: this is only consulted at the moment mute is
+    /// toggled, not applied to something already on screen.
     var isMuteComplaintEnabled: Bool {
         get { defaults.object(forKey: Keys.isMuteComplaintEnabled) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.isMuteComplaintEnabled) }

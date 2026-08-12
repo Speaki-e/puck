@@ -36,9 +36,6 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case avoidClimbingLabel, speedLabel, toySizeLabel, toyPumpkin, toyWand
 
-    /// The top-of-screen notch/Dynamic Island (2026-08-01).
-    case notchEnabledLabel
-
     case avatarsHeader, importAvatarButton, importPanelPrompt
     /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
     /// 해주고" -- picking a different installed avatar as a preset.
@@ -108,8 +105,6 @@ enum Strings {
         .toySizeLabel: "장난감 크기",
         .toyPumpkin: "호박",
         .toyWand: "지팡이",
-
-        .notchEnabledLabel: "다이내믹 아일랜드",
 
         .avatarsHeader: "아바타",
         .importAvatarButton: "아바타 패키지 가져오기…",

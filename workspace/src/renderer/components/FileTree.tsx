@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
 import type { FileTreeEntry } from "../../shared/file-contract";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface Props {
   entries: FileTreeEntry[];
@@ -77,10 +80,10 @@ export function FileTree(props: Props) {
     <div className="tree-container">
       <label className="tree-search">
         <svg viewBox="0 0 20 20" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8.5" cy="8.5" r="5" /><path d="m12.2 12.2 4 4" /></svg>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일 검색" aria-label="파일 검색" />
-        {query && <button type="button" onClick={() => setQuery("")} aria-label="검색 지우기">×</button>}
+        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일 검색" aria-label="파일 검색" />
+        {query && <Button type="button" variant="ghost" size="icon-sm" onClick={() => setQuery("")} aria-label="검색 지우기">×</Button>}
       </label>
-      <div className="tree-scroll">
+      <ScrollArea className="tree-scroll">
         {entries.length === 0 ? (
           <div className="empty-tree">
             <span>{props.entries.length ? "검색 결과가 없습니다" : "프로젝트를 열어주세요"}</span>
@@ -91,7 +94,7 @@ export function FileTree(props: Props) {
             {entries.map((entry) => <TreeItem key={entry.path} entry={entry} {...props} depth={0} searching={Boolean(normalized)} />)}
           </ul>
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

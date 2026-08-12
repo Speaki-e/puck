@@ -20,7 +20,9 @@ test("설정 화면에서 로그 수준·모델을 바꾸고 API 키를 안전�
     const panel = window.locator(".settings-panel");
     await expect(panel).toBeVisible({ timeout: 10_000 });
 
-    await window.getByLabel("로그 수준").selectOption("debug");
+    // 로그 수준은 shadcn/Radix Select(네이티브 <select> 아님) -- 트리거를 열고 옵션을 클릭한다.
+    await window.getByLabel("로그 수준").click();
+    await window.getByRole("option", { name: "debug" }).click();
     await window.getByLabel("모델").fill("claude-opus-5");
     await window.getByLabel("모델").blur();
 
@@ -37,7 +39,7 @@ test("설정 화면에서 로그 수준·모델을 바꾸고 API 키를 안전�
     await window.getByLabel("설정 닫기").click();
     await expect(panel).toHaveCount(0);
     await window.getByRole("button", { name: "설정" }).click();
-    await expect(window.getByLabel("로그 수준")).toHaveValue("debug", { timeout: 10_000 });
+    await expect(window.getByLabel("로그 수준")).toHaveText("debug", { timeout: 10_000 });
     await expect(window.getByLabel("모델")).toHaveValue("claude-opus-5");
   } finally {
     await application.close();

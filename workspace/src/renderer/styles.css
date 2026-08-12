@@ -1,5 +1,10 @@
+@import "tailwindcss";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
   color: #ededed;
@@ -18,6 +23,40 @@
   --blue-soft: #132f4c;
   --violet: #a855f7;
   --warning: #f5a623;
+  /* shadcn 테마 변수 -- 이 앱은 라이트 모드가 없으므로(:root가 곧 유일한 테마) 위 --canvas/--ink류
+     팔레트 값을 그대로 물려서 shadcn 컴포넌트가 기존 UI와 같은 색을 쓰게 한다. */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: #ededed;
+  --primary-foreground: #111111;
+  --secondary: var(--hairline-soft);
+  --secondary-foreground: var(--ink);
+  --muted: var(--hairline-soft);
+  --muted-foreground: var(--mute);
+  --accent: var(--hairline-soft);
+  --accent-foreground: var(--ink);
+  --destructive: #ff7770;
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--blue);
+  --chart-1: var(--blue);
+  --chart-2: var(--violet);
+  --chart-3: var(--warning);
+  --chart-4: var(--body);
+  --chart-5: var(--mute);
+  --radius: 0.5rem;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--blue);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--hairline-soft);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--blue);
 }
 
 * { box-sizing: border-box; }
@@ -168,7 +207,6 @@ kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-botto
 .stop-button { display: inline-flex; height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 6px; background: #111; color: var(--body); font-size: 11px; cursor: pointer; }
 .stop-button:hover { border-color: #713838; color: #ff7770; background: #201313; }.stop-button .icon { width: 13px; height: 13px; }
 
-.settings-overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(5, 5, 5, .6); backdrop-filter: blur(2px); }
 .settings-panel { display: flex; width: min(440px, 92vw); max-height: 82vh; flex-direction: column; gap: 16px; overflow-y: auto; padding: 20px; border: 1px solid var(--hairline); border-radius: 12px; background: #101010; box-shadow: 0 24px 60px -20px rgba(0,0,0,.8); }
 .settings-panel header { display: flex; align-items: center; justify-content: space-between; }
 .settings-panel h2 { margin: 0; font-size: 15px; font-weight: 600; }
@@ -190,4 +228,62 @@ kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-botto
   .titlebar { grid-template-columns: 210px 1fr 160px; }.project-path { display: none; }
   .editor-layout { grid-template-columns: 228px minmax(0, 1fr); }
   .command-dock { grid-template-columns: 160px minmax(300px, 1fr) 76px; }.enter-hint { display: none; }
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* 이 앱은 라이트/다크 토글이 없다 -- :root 자체가 항상 다크라, 별도 .dark 오버라이드 블록은
+   두지 않는다(나중에 라이트 모드가 생기면 여기 :root를 .light로 내리고 이 자리에 다크를 채우면 됨). */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

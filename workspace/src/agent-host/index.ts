@@ -56,12 +56,9 @@ function callMain<T>(
 }
 
 const toolExecutePending = new Map<string, PendingMainCall<ToolExecutionResult>>();
-const runtimeConfigPending = new Map<string, PendingMainCall<{ apiKey?: string; model: string }>>();
 
 const agentRunner = createAgentRunner({
   emit,
-  useMockAiModule: process.env.NODE_ENV === "test" || process.env.WORKSPACE_MOCK_AI === "1",
-  directCodeEditor: process.env.WORKSPACE_DIRECT_CODE_EDITOR === "1",
   executeToolOnMain: (executorKind: ExecutorKind, tool, args, workspaceId, sessionId, signal) => {
     let requestIdForAbort: string | undefined;
     const result = callMain<ToolExecutionResult>(
@@ -77,12 +74,6 @@ const agentRunner = createAgentRunner({
     signal?.addEventListener("abort", onAbort, { once: true });
     return result.finally(() => signal?.removeEventListener("abort", onAbort));
   },
-  getRuntimeConfig: () => callMain<{ apiKey?: string; model: string }>(
-    "runtime_config_request",
-    (requestId) => ({ requestId } as unknown as JSONValue),
-    runtimeConfigPending,
-    10_000,
-  ),
 });
 
 /**
@@ -98,9 +89,6 @@ function createAdapterFor(payload: { requestId: string; workspaceId: string; ses
       workspaceId: payload.workspaceId,
       update: JSON.parse(JSON.stringify(update)),
     } as JSONValue),
-    // ACP 승인도 ai-module의 onApprovalRequired와 같은 PendingApprovalStore를 탄다(agent-runner.ts) --
-    // 예전에는 이 리졸버가 Main에 있어서 별도 permission_request/permissionResponse 왕복이 필요했지만,
-    // 이제 승인 저장소 자체가 Agent Host에 있으므로 여기서 직접 부른다.
     resolvePermission: agentRunner.permissionResolverFor({ workspaceId: payload.workspaceId, sessionId: payload.sessionId }),
   });
 }
@@ -173,16 +161,6 @@ parentPort.on("message", async ({ data: message }) => {
           toolExecutePending.delete(message.payload.requestId);
           clearTimeout(pending.timer);
           pending.resolve(message.payload.result as unknown as ToolExecutionResult);
-        }
-        respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
-        break;
-      }
-      case "runtimeConfigResponse": {
-        const pending = runtimeConfigPending.get(message.payload.requestId);
-        if (pending) {
-          runtimeConfigPending.delete(message.payload.requestId);
-          clearTimeout(pending.timer);
-          pending.resolve({ apiKey: message.payload.apiKey, model: message.payload.model });
         }
         respond({ kind: "response", id: message.id, ok: true, payload: { accepted: true } });
         break;

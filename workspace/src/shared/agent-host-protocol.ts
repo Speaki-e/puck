@@ -14,7 +14,7 @@ export interface AgentHostRequestMap {
   busyForTest: { durationMs: number };
   shutdown: Record<string, never>;
   /**
-   * Main -> Agent Host: 사용자 입력 하나를 ai-module(또는 mock/direct 대체 런타임)로 실행한다.
+   * Main -> Agent Host: 사용자 입력 하나를 DirectCodeEditorRuntime(code_editor 위임)로 실행한다.
    * SessionRouter/RunRegistry가 이제 Agent Host에 있으므로(docs/architecture.md "다음 구조
    * 단계"), 이 요청 하나가 예전 AgentRuntimeCoordinator.handleUserInput 전체를 대신한다.
    * 진행 상황(텍스트/도구 호출/승인 등)은 agent_* 이벤트로 스트리밍되고, 이 요청은 실행이
@@ -36,17 +36,11 @@ export interface AgentHostRequestMap {
   /** Main -> Agent Host: pet-app 연결 종료 시 대기 중인 모든 승인을 거부한다. */
   rejectPendingApprovals: Record<string, never>;
   /**
-   * Main -> Agent Host: "tool_execute_request" 이벤트(petAppProxy/editorLocal 실행 요청)에 대한
+   * Main -> Agent Host: "tool_execute_request" 이벤트(editorLocal 실행 요청)에 대한
    * 결과를 돌려준다. Agent Host 혼자서는 petBridge나 FileService에 닿을 수 없으므로 Main이
    * 실제로 실행하고 결과만 돌려준다.
    */
   toolExecuteResponse: { requestId: string; result: JSONValue };
-  /**
-   * Main -> Agent Host: "runtime_config_request" 이벤트에 대한 답 -- Claude API 키/모델은
-   * SecretStore/SettingsStore(둘 다 Main 전용)에서 오고, 실행 중에도 바뀔 수 있어(설정 화면)
-   * Agent Host 시작 시 한 번만 넘기지 않고 run마다 새로 물어본다.
-   */
-  runtimeConfigResponse: { requestId: string; apiKey?: string; model: string };
 }
 
 export interface AgentHostResponseMap {
@@ -61,7 +55,6 @@ export interface AgentHostResponseMap {
   respondToApproval: { handled: boolean };
   rejectPendingApprovals: { accepted: true };
   toolExecuteResponse: { accepted: true };
-  runtimeConfigResponse: { accepted: true };
 }
 
 export type AgentHostRequest<K extends keyof AgentHostRequestMap = keyof AgentHostRequestMap> =
@@ -82,17 +75,13 @@ export type AgentHostEvent = {
   /**
    * agent_thinking/agent_text_chunk/agent_tool_call/agent_tool_result/agent_approval_request/
    * agent_session_created/agent_done: 예전에는 AgentCallbacks를 Main이 직접 구현해 받던
-   * 것들이다. 이제 그 콜백을 부르는 실행(AiModuleRuntime 등)이 Agent Host에 있으므로, 같은
+   * 것들이다. 이제 그 콜백을 부르는 실행(DirectCodeEditorRuntime)이 Agent Host에 있으므로, 같은
    * 정보를 이벤트로 내보내고 Main은 petBridge로 그대로 옮겨 싣기만 한다.
    *
-   * tool_execute_request/tool_execute_cancel: petAppProxy(pet-app 도구) 또는
-   * editorLocal(code_editor/open_in_editor/read_file)이 실제로 무언가를 하려면 Main에 있는
-   * petBridge/FileService/EditorGateway가 필요하다. Agent Host는 이 이벤트로 실행을 위임하고,
-   * Main은 toolExecuteResponse로 결과를 돌려준다. 실행 중 취소(signal abort)는
-   * tool_execute_cancel로 알린다(응답을 기다리지 않는 fire-and-forget).
-   *
-   * runtime_config_request: ai-module 클라이언트를 만들기/재사용하기 전에 최신 API 키/모델을
-   * Main에 물어본다.
+   * tool_execute_request/tool_execute_cancel: editorLocal(code_editor/open_in_editor/read_file)이
+   * 실제로 무언가를 하려면 Main에 있는 petBridge/FileService/EditorGateway가 필요하다. Agent
+   * Host는 이 이벤트로 실행을 위임하고, Main은 toolExecuteResponse로 결과를 돌려준다. 실행 중
+   * 취소(signal abort)는 tool_execute_cancel로 알린다(응답을 기다리지 않는 fire-and-forget).
    */
   event:
     | "ready"
@@ -106,8 +95,7 @@ export type AgentHostEvent = {
     | "agent_session_created"
     | "agent_done"
     | "tool_execute_request"
-    | "tool_execute_cancel"
-    | "runtime_config_request";
+    | "tool_execute_cancel";
   payload: JSONValue;
 };
 

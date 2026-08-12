@@ -75,7 +75,6 @@ export async function startWorkspaceApplication(): Promise<void> {
     logger,
     app.getAppPath(),
     claudeApiKey,
-    options.directCodeEditor,
   );
   agentHost.on("status", (status: string) => controller.sendAgentStatus(status));
   await agentHost.start();
@@ -98,8 +97,6 @@ export async function startWorkspaceApplication(): Promise<void> {
     petBridge,
     registry,
     logger,
-    getClaudeApiKey: async () => await secrets.get("claudeApiKey") ?? process.env.ANTHROPIC_API_KEY,
-    getModel: () => settingsStore.current.model,
     // 키가 없으면 플래그만으로는 켜지 않는다 -- 켜진 척하고 매 편집마다 401을
     // 받느니, 기본 경로(ACP)로 남아 있는 편이 낫다.
     openAiCodeEditor: options.openAiCodeEditor && process.env.OPENAI_API_KEY

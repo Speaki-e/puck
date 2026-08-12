@@ -15,10 +15,10 @@ Workspace Main
 ├─ SecretStore / SettingsStore
 └─ AgentHostController
               │ MessagePort RPC (양방향: runAgent/cancelAgentSession/respondToApproval ↓,
-              │                          agent_*/tool_execute_request/runtime_config_request ↑)
+              │                          agent_*/tool_execute_request ↑)
               ▼
 Agent Host Utility Process
-├─ agent-runner (SessionRouter, RunRegistry, PendingApprovalStore, AiModuleRuntime)
+├─ agent-runner (SessionRouter, RunRegistry, PendingApprovalStore, DirectCodeEditorRuntime)
 ├─ CodeEditorQueue
 └─ AcpAdapter
               │ ACP JSON-RPC
@@ -26,21 +26,19 @@ Agent Host Utility Process
 Claude Agent ACP child process
 ```
 
-Main은 Electron 생명주기, 파일시스템, 로컬 HTTP/WebSocket, PetBridge, 암호화 저장소를 소유합니다. Agent Host는 ai-module 실행과 ACP 실행을 별도 Utility Process에 격리합니다. Agent Host가 비정상 종료되면 재시작하고, Main은 진행 중이던 `runAgent` 호출이 없으면 조용히, 있으면(내부 in-flight 추적) 해당 세션에 `agent_done(ok=false)`를 보내 정리합니다. FileService와 Editor View는 Main에 남아 있으므로 영향받지 않습니다.
+Main은 Electron 생명주기, 파일시스템, 로컬 HTTP/WebSocket, PetBridge, 암호화 저장소를 소유합니다. Agent Host는 ACP 실행을 별도 Utility Process에 격리합니다. Agent Host가 비정상 종료되면 재시작하고, Main은 진행 중이던 `runAgent` 호출이 없으면 조용히, 있으면(내부 in-flight 추적) 해당 세션에 `agent_done(ok=false)`를 보내 정리합니다. FileService와 Editor View는 Main에 남아 있으므로 영향받지 않습니다.
 
 `src/main/index.ts`는 애플리케이션 시작과 치명적 오류 처리만 담당합니다. 실제 조립은 `src/main/app` 아래에 모아 도메인 모듈과 Electron 진입점을 분리했습니다.
 
 ## AI 실행 경계
 
-ai-module, SessionRouter, RunRegistry, PendingApprovalStore는 Agent Host의 `agent-runner.ts`에 있습니다(docs/architecture.md 이전 판이 "다음 구조 단계"로 예고했던 이동이 완료됨).
+byeolki, 2026-08-12: "workspace는 일반 에디터고, 모든 AI 처리는 puckclient가 함." Workspace는 더 이상 "이게 무슨 작업인지" 판단하지 않습니다. pet-app의 에이전트(F15)가 이미 코딩 작업이라고 분류해 지시문을 작성한 뒤 `user_input`으로 보내면, Workspace는 그 텍스트 전체를 `code_editor` 도구 호출 하나로 곧장 실행합니다 -- 이 판단·위임을 `DirectCodeEditorRuntime`(`src/agent-host/direct-code-editor-runtime.ts`)이 맡고, `AiModuleRuntime`/`MockAgentRuntime`과 그 전제였던 pet-app 도구 프록시(petAppProxy)는 제거되었습니다.
 
-- 세션 직렬화(SessionRouter)와 ActiveRun 관리(RunRegistry)가 Agent Host 프로세스 안에서 이루어집니다.
-- ai-module의 `onApprovalRequired`와 ACP의 `request_permission`이 같은 `PendingApprovalStore`를 거쳐 같은 `agent_approval_request`/`respondToApproval` 왕복으로 나갑니다 -- 예전처럼 ACP 전용 `permission_request`/`permissionResponse` 짝이 따로 있지 않습니다.
-- petAppProxy(pet-app 도구 위임)와 editorLocal(code_editor/open_in_editor/read_file)은 Main에만 있는 petBridge/FileService/EditorGateway가 필요하므로, Agent Host는 `tool_execute_request` 이벤트로 실행을 위임하고 Main은 `toolExecuteResponse`로 결과를 돌려줍니다. `code_editor` 자체는 Agent Host 안에서 바로 처리되던 `runCodeEditor` RPC를 그대로 한 번 더 타므로(Main을 거쳐 되돌아옴) 약간의 왕복 비용이 있지만, 이 도구는 원래도 수 초~수 분 걸리는 작업이라 무시할 만합니다.
-- Claude API 키/모델은 Main의 SecretStore/SettingsStore가 소유하므로(설정 화면에서 실행 중에도 바뀔 수 있음), Agent Host는 run마다 `runtime_config_request`로 최신 값을 물어봅니다.
-- Workspace별 `AiModuleRuntime`/Claude client 재사용으로 세션 히스토리를 유지합니다.
+- 세션 직렬화(SessionRouter)와 ActiveRun 관리(RunRegistry)는 여전히 Agent Host 프로세스 안에 있습니다 -- 실행기가 하나로 줄었어도 동시 실행 취소/정리 책임은 그대로 필요합니다.
+- ACP의 `request_permission`은 `PendingApprovalStore`를 거쳐 `agent_approval_request`/`respondToApproval` 왕복으로 나갑니다. `DirectCodeEditorRuntime`은 `onApprovalRequired`를 항상 거부로 응답하므로(코딩 작업 자체는 pet-app이 이미 승인한 것으로 간주) 이 경로로는 더 이상 승인 요청이 발생하지 않습니다.
+- editorLocal(code_editor/open_in_editor/read_file)은 Main에만 있는 petBridge/FileService/EditorGateway가 필요하므로, Agent Host는 `tool_execute_request` 이벤트로 실행을 위임하고 Main은 `toolExecuteResponse`로 결과를 돌려줍니다. `code_editor` 자체는 Agent Host 안에서 바로 처리되던 `runCodeEditor` RPC를 그대로 한 번 더 타므로(Main을 거쳐 되돌아옴) 약간의 왕복 비용이 있지만, 이 도구는 원래도 수 초~수 분 걸리는 작업이라 무시할 만합니다.
+- Claude API 키는 ACP(Claude Code CLI)의 인증에만 쓰이며, 없으면 ACP가 자기 로그인 인증으로 대체합니다. 모델 선택이나 실행 중 API 키 교체를 위한 `runtime_config_request` 왕복은(ai-module 전용이었으므로) 제거되었습니다.
 - AsyncLocalStorage 기반 세션별 `editorLocal` 실행기 격리는 그대로입니다.
-- 테스트(`NODE_ENV=test`/`WORKSPACE_MOCK_AI=1`)에서는 Agent Host 안에서 `MockAgentRuntime`을 사용합니다.
 
 ## 파일 흐름
 
@@ -80,5 +78,4 @@ EditorGateway는 프로세스당 하나만 실행되며 workspace ID, token, Ori
 
 - 내부 import cycle 부재
 - shared/renderer/agent-host 계층 역참조 금지
-- Agent Host에서 Mock 구현(MockAgentRuntime)을 사용하는 임시 경계가 agent-runner 밖으로 확산되지 않음
 - `main/index.ts`와 `renderer/App.tsx`가 다시 거대 진입 파일이 되지 않음

@@ -22,9 +22,9 @@ export function Sidebar() {
       className="flex h-full shrink-0 flex-col border-r border-hairline bg-surface transition-[width] duration-[180ms] ease-in-out"
       style={{ width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH }}
     >
-      <div className="h-7 shrink-0" /> {/* clears the native titlebar traffic lights */}
+      <div className="h-7 shrink-0" /> {/* clears the native titlebar traffic lights -- see TopBar.tsx's comment */}
 
-      <div className={cn("flex items-center gap-1 px-2 pb-2", !expanded && "flex-col")}>
+      <div className={cn("flex items-center gap-1 border-b border-hairline px-2 pb-2", !expanded && "flex-col")}>
         <WorkspaceSwitcher
           workspaces={state.workspaces}
           activeWorkspaceId={state.activeWorkspaceId}

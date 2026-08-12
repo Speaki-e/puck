@@ -25,7 +25,7 @@ enum ChatTimelineEntry: Equatable {
     case toolCall(id: String, tool: String, args: JSONValue?)
     case toolResult(id: String, ok: Bool, data: JSONValue?, error: String?, detail: String?)
     case approvalRequested(id: UUID, approvalId: String, summary: String)
-    case done(ok: Bool, summary: String)
+    case done(id: UUID, ok: Bool, summary: String)
 }
 
 extension ChatTimelineEntry: Identifiable {
@@ -39,9 +39,14 @@ extension ChatTimelineEntry: Identifiable {
         case .toolCall(let id, _, _): return "call:\(id)"
         case .toolResult(let id, _, _, _, _): return "result:\(id)"
         case .approvalRequested(let id, _, _): return id
-        // done is emitted at most once per session (agent_done ends the run),
-        // so a fixed identity is fine -- there's never a second one to collide with.
-        case .done: return "done"
+        // Was a fixed "done" on the assumption that agent_done happens once
+        // per session. It doesn't: a session takes as many prompts as the
+        // user types, and every run ends with one. Two rows sharing an id in
+        // the transcript's ForEach is undefined behaviour -- what it did in
+        // practice was throw the scroll position to the top of the list the
+        // moment a second run finished (byeolki, 2026-08-12: "프롬프트 하나
+        // 끝나면 계속 맨위로 스크롤되는거").
+        case .done(let id, _, _): return id
         }
     }
 }
@@ -69,6 +74,19 @@ final class ChatSession: ObservableObject, Identifiable {
     /// from a BridgeEvent (protocol never sends the user's own text back).
     func appendUserMessage(_ text: String) {
         timeline.append(.userMessage(id: UUID(), text: text))
+    }
+
+    /// The send landed, so the agent owes an answer -- shown as the "생각 중"
+    /// row until the first text_chunk replaces it (byeolki, 2026-08-12: "ai가
+    /// 답변 생성하는 동안 로딩 보여줘").
+    ///
+    /// Set here rather than waiting for agent_thinking: that event is produced
+    /// by the agent, put on the socket, and relayed back to this app, so the
+    /// window would sit with no feedback for the whole round trip -- and if
+    /// the agent's very first act is a slow model call, that is the exact
+    /// stretch the user is staring at.
+    func markWaitingForAgent() {
+        isRunning = true
     }
 
     /// Folds one BridgeEvent into the timeline. Caller (ClientWindowStore) is
@@ -103,7 +121,7 @@ final class ChatSession: ObservableObject, Identifiable {
         case .agentDone(let ok, let summary):
             isRunning = false
             pendingApproval = nil
-            timeline.append(.done(ok: ok, summary: summary))
+            timeline.append(.done(id: UUID(), ok: ok, summary: summary))
         }
     }
 }

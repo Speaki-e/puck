@@ -139,7 +139,45 @@ final class ChatSessionTests: XCTestCase {
 
         XCTAssertFalse(session.isRunning)
         XCTAssertNil(session.pendingApproval)
-        XCTAssertEqual(session.timeline.last, .done(ok: true, summary: "3 tests passed"))
+        guard case .done(_, let ok, let summary)? = session.timeline.last else {
+            return XCTFail("expected a done entry, got \(String(describing: session.timeline.last))")
+        }
+        XCTAssertTrue(ok)
+        XCTAssertEqual(summary, "3 tests passed")
+    }
+
+    /// The loading row is driven by isRunning, and it has to come up on the
+    /// send rather than on the relayed agent_thinking -- otherwise the window
+    /// shows nothing for the whole round trip (2026-08-12).
+    func test_markWaitingForAgent_startsRunningBeforeAnyEventArrives() {
+        let session = makeSession()
+        XCTAssertFalse(session.isRunning)
+
+        session.markWaitingForAgent()
+        XCTAssertTrue(session.isRunning)
+
+        // And the run ending still puts it away -- a spinner with no off
+        // switch is the failure mode worth guarding.
+        session.apply(.agentDone(ok: true, summary: "끝"))
+        XCTAssertFalse(session.isRunning)
+    }
+
+    /// A session takes as many prompts as the user types, so agent_done lands
+    /// once per run, not once per session. While `.done` had a fixed id, the
+    /// second one collided with the first in the transcript's ForEach and the
+    /// scroll jumped to the top of the list every time a run finished
+    /// (byeolki, 2026-08-12).
+    func test_severalRunsInOneSession_produceDistinctDoneIds() {
+        let session = makeSession()
+        session.apply(.agentDone(ok: true, summary: "첫 번째"))
+        session.apply(.agentDone(ok: true, summary: "두 번째"))
+
+        let doneIds = session.timeline.compactMap { entry -> AnyHashable? in
+            guard case .done = entry else { return nil }
+            return entry.id
+        }
+        XCTAssertEqual(doneIds.count, 2)
+        XCTAssertEqual(Set(doneIds).count, 2, "two finished runs must not share a row identity")
     }
 
     /// Every timeline entry needs a stable identity for SwiftUI's List --

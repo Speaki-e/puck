@@ -19,8 +19,8 @@
   --hairline-soft: #1a1a1a;
   --canvas: #090909;
   --surface: #111111;
-  --blue: #3291ff;
-  --blue-soft: #132f4c;
+  --brand: #ed8c33;
+  --brand-soft: #3d2612;
   --violet: #a855f7;
   --warning: #f5a623;
   /* shadcn 테마 변수 -- 이 앱은 라이트 모드가 없으므로(:root가 곧 유일한 테마) 위 --canvas/--ink류
@@ -42,8 +42,8 @@
   --destructive: #ff7770;
   --border: var(--hairline);
   --input: var(--hairline);
-  --ring: var(--blue);
-  --chart-1: var(--blue);
+  --ring: var(--brand);
+  --chart-1: var(--brand);
   --chart-2: var(--violet);
   --chart-3: var(--warning);
   --chart-4: var(--body);
@@ -51,12 +51,12 @@
   --radius: 0.5rem;
   --sidebar: var(--surface);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--blue);
+  --sidebar-primary: var(--brand);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--hairline-soft);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--hairline);
-  --sidebar-ring: var(--blue);
+  --sidebar-ring: var(--brand);
 }
 
 * { box-sizing: border-box; }
@@ -64,7 +64,7 @@ html, body, #root { width: 100%; height: 100%; }
 body { margin: 0; min-width: 760px; min-height: 560px; overflow: hidden; }
 button, input { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .icon { width: 16px; height: 16px; flex: 0 0 auto; }
 .eyebrow { color: var(--mute); font-family: "Geist Mono", ui-monospace, monospace; font-size: 10px; font-weight: 500; line-height: 14px; letter-spacing: .06em; }
 
@@ -108,7 +108,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .file-count { display: grid; min-width: 22px; height: 22px; place-items: center; border: 1px solid var(--hairline); border-radius: 6px; color: var(--mute); background: var(--canvas); font-family: "Geist Mono", monospace; font-size: 10px; }
 .tree-container { display: grid; grid-template-rows: 49px minmax(0, 1fr); min-height: 0; }
 .tree-search { display: flex; height: 30px; align-items: center; gap: 7px; margin: 10px 10px 9px; padding: 0 8px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--canvas); color: var(--mute); }
-.tree-search:focus-within { border-color: #315f91; background: #151515; box-shadow: 0 0 0 2px rgba(50, 145, 255, .1); }
+.tree-search:focus-within { border-color: #915f31; background: #151515; box-shadow: 0 0 0 2px rgba(237, 140, 51, .1); }
 .tree-search svg { width: 14px; height: 14px; flex: 0 0 auto; }
 .tree-search input { min-width: 0; flex: 1; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 11px; }
 .tree-search input::placeholder { color: var(--faint); }
@@ -150,7 +150,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .tab-main { display: flex; min-width: 0; flex: 1; align-items: center; gap: 7px; padding: 0 5px 0 11px; border: 0; background: transparent; color: inherit; cursor: pointer; }
 .tab-file-icon { font-family: "Geist Mono", monospace; font-size: 8px; color: var(--faint); }
 .tab-name { min-width: 0; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.dirty-dot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: var(--blue); }
+.dirty-dot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: var(--brand); }
 .tab-close { width: 25px; padding: 0; border: 0; background: transparent; color: #666; font-size: 16px; cursor: pointer; opacity: 0; }
 .editor-tab:hover .tab-close, .editor-tab.active .tab-close { opacity: 1; }
 .tab-close:hover { color: var(--ink); }
@@ -192,11 +192,11 @@ kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-botto
 
 .command-dock { display: grid; grid-template-columns: 260px minmax(300px, 760px) 90px; align-items: center; justify-content: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--hairline); background: var(--canvas); }
 .status-block { display: flex; min-width: 0; align-items: center; gap: 9px; }
-.status-pulse { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 4px rgba(0, 112, 243, .08); }
+.status-pulse { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px rgba(237, 140, 51, .08); }
 .status-block > div { display: flex; min-width: 0; flex-direction: column; }
 .status-text { overflow: hidden; color: var(--body); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .command-composer { display: flex; height: 46px; min-width: 0; align-items: center; gap: 9px; padding: 0 6px 0 13px; border: 1px solid #303030; border-radius: 12px; background: #141414; box-shadow: 0 1px 1px rgba(0,0,0,.3), 0 8px 24px -14px rgba(0,0,0,.9); transition: border-color .15s, box-shadow .15s; }
-.command-composer:focus-within { border-color: #315f91; box-shadow: 0 0 0 3px rgba(50, 145, 255, .1), 0 8px 24px -14px rgba(0,0,0,.9); }
+.command-composer:focus-within { border-color: #915f31; box-shadow: 0 0 0 3px rgba(237, 140, 51, .1), 0 8px 24px -14px rgba(0,0,0,.9); }
 .composer-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 6px; color: #c084fc; background: #24162f; }
 .composer-icon .icon { width: 13px; height: 13px; }
 .command-composer input { min-width: 0; flex: 1; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 12px; }

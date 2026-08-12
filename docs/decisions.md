@@ -4,6 +4,21 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-13: one point color across workspace and pet-app -- pumpkin orange
+
+workspace's accent had drifted to blue (`#3291ff`) while pet-app's ClientPalette
+used orange (`#ed8c33`), so the two apps' UIs no longer matched even though
+PuckClient embeds workspace's editor directly. Unified on pet-app's existing
+orange rather than workspace's blue, since orange was already the app's brand
+color (see the removed "Figma color matching" scope note in `pet-app/design.md`).
+
+- workspace: `src/renderer/styles.css`'s `--blue`/`--blue-soft` renamed to
+  `--brand`/`--brand-soft` and repointed to `#ed8c33`; the handful of
+  hardcoded blue rgba/hex tints (focus rings, status-pulse glow) converted to
+  the same orange.
+- pet-app: `ClientPalette.light/.dark/.glass` all now use the identical
+  `#ed8c33` accent (previously `.dark` alone had drifted to workspace's blue).
+
 ## 2026-08-12: workspace becomes a plain editor; pet-app's F15 brain is permanent
 
 pet-app's temporary F15 agent core (`Puck/Agent/AgentRunner.swift`, Swift +

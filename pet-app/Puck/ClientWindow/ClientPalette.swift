@@ -32,15 +32,16 @@ struct ClientPalette {
 
     // workspace (the Electron/web client window) is the design source of
     // truth: `.dark` below matches its tokens (src/renderer/styles.css's
-    // --canvas/--surface/--hairline/--ink/--mute/--blue) pixel-for-pixel.
-    // `.light`/`.glass` are untouched since workspace has no light mode.
+    // --canvas/--surface/--hairline/--ink/--mute) pixel-for-pixel. accent is
+    // the app's pumpkin orange (#ed8c33) in every palette and in workspace's
+    // --brand -- one point color regardless of which app or theme is showing.
     static let light = ClientPalette(
         background: .white, // Gray/White Alpha 0 #FFFFFF
         surface: .white,
         surfaceBorder: Color(red: 0.933, green: 0.914, blue: 0.941), // Gray/+5 #EEE9F0
         textPrimary: Color(red: 0.200, green: 0.169, blue: 0.212), // Gray/-3 #332B36
         textSecondary: Color(red: 0.412, green: 0.369, blue: 0.431), // Gray/0 #695E6E
-        accent: Color(red: 0.80, green: 0.42, blue: 0.12),
+        accent: Color(red: 0.929, green: 0.549, blue: 0.200), // #ed8c33, same as .dark/.glass/workspace --brand
         onAccent: .white,
         success: .green,
         failure: .red,
@@ -54,7 +55,7 @@ struct ClientPalette {
         surfaceBorder: Color(red: 0.161, green: 0.161, blue: 0.161), // workspace --hairline #292929
         textPrimary: Color(red: 0.929, green: 0.929, blue: 0.929), // workspace --ink #ededed
         textSecondary: Color(red: 0.467, green: 0.467, blue: 0.467), // workspace --mute #777777
-        accent: Color(red: 0.196, green: 0.569, blue: 1.0), // workspace --blue #3291ff
+        accent: Color(red: 0.929, green: 0.549, blue: 0.200), // workspace --brand #ed8c33
         onAccent: .white,
         success: .green,
         failure: .red,
@@ -73,7 +74,7 @@ struct ClientPalette {
         surfaceBorder: Color.white.opacity(0.12),
         textPrimary: .white,
         textSecondary: Color.white.opacity(0.6),
-        accent: Color(red: 0.93, green: 0.55, blue: 0.20),
+        accent: Color(red: 0.929, green: 0.549, blue: 0.200), // #ed8c33, same as .dark/.light/workspace --brand
         onAccent: .white,
         success: .green,
         failure: .red,

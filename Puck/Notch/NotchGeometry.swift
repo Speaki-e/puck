@@ -7,9 +7,7 @@
 //  ported from boring.notch's getClosedNotchSize (sizing/matters.swift).
 //  On a real notched Mac this makes the collapsed pill exactly the
 //  physical notch's own width/height, so it reads as an extension of the
-//  hardware cutout instead of a floating badge guessed at a fixed size --
-//  byeolki, 2026-08-01, after cloning boring.notch's source to fix "다이내믹
-//  아일랜드 쪽 파트가 이상한데".
+//  hardware cutout instead of a floating badge guessed at a fixed size.
 //
 
 import CoreGraphics

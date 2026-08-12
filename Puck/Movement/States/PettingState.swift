@@ -5,13 +5,12 @@
 //  F3 · owner: 박해영 (Haeyoung Park)
 //  Petting state's StateHandler implementation.
 //
-//  A double-tap "petting" reaction, distinct from a single ReactClick tap --
-//  byeolki's request for more diverse motions/interactions (2026-07-29).
+//  A double-tap "petting" reaction, distinct from a single ReactClick tap.
 //  Reuses ReactClickState's exact shape (short reaction, then back to
 //  whatever the pet was doing), just with its own clip/bounce/emotion so it
 //  reads as a different, happier reaction than a plain click.
 //
-//  2026-07-29: also the reaction to having its head stroked with the cursor
+//  Also the reaction to having its head stroked with the cursor
 //  (HeadPetDetector). That version has no duration of its own -- it lasts as
 //  long as the user keeps going -- so the timer is suspended while stroking
 //  and the pet twirls (Spin) once the hand leaves, instead of dropping

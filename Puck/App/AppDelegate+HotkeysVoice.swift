@@ -1,0 +1,288 @@
+//
+//  AppDelegate+HotkeysVoice.swift
+//  Puck
+//
+//  F6/F7 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  Global hotkeys, voice input, and the quick-capture text bubble.
+//
+
+import AppKit
+import CoreGraphics
+
+extension AppDelegate {
+    // MARK: - Global hotkeys + voice (F6/F7)
+
+    func setUpGlobalHotkeys() {
+        let manager = GlobalHotkeyManager(bindings: settingsStore.hotkeyBindings)
+        let speechService = SpeechRecognitionService(locale: Locale(identifier: settingsStore.speechRecognitionLocaleIdentifier))
+        let voiceController = VoiceInputController(speechService: speechService)
+
+        voiceController.onListenStart = { [weak self] in
+            guard let self, let characterController = self.characterController else { return }
+            self.stateBeforeListen = characterController.currentState
+            characterController.transition(to: self.listenState)
+            // F7: listen_start is an event-name sound key (plan/01_protocol.md
+            // section 6), separate from the state's own "listen" clip key that
+            // the shared enter() path triggers.
+            self.sfxPlayer?.trigger("listen_start", loop: false)
+        }
+        voiceController.onListenEnd = { [weak self] in
+            guard let self, let characterController = self.characterController else { return }
+            characterController.transition(to: self.stateBeforeListen ?? self.idleState)
+            self.stateBeforeListen = nil
+        }
+        voiceController.onFinalText = { [weak self] text in
+            self?.sendUserInput(text: text, source: .voice)
+        }
+        voiceController.onError = { error in
+            AppLogger.shared.log(.error, "Speech recognition error: \(error)")
+        }
+        voiceInputController = voiceController
+
+        manager.onPushToTalkDown = { [weak voiceController] in voiceController?.pushToTalkDown() }
+        manager.onPushToTalkUp = { [weak voiceController] in voiceController?.pushToTalkUp() }
+        manager.onTextInputRequested = { [weak self] in self?.showTextInputBubble() }
+        manager.onCharacterSummonRequested = { [weak self] in self?.summonCharacter() }
+        manager.onToySummon1Requested = { [weak self] in self?.summonToy(at: 0) }
+        manager.onToySummon2Requested = { [weak self] in self?.summonToy(at: 1) }
+
+        if !manager.start() {
+            AppLogger.shared.log(.warning, "GlobalHotkeyManager failed to start (Accessibility permission likely not granted)")
+        }
+        hotkeyManager = manager
+    }
+
+    /// Hands a command to whatever can act on it.
+    ///
+    /// F15 (2026-07-31): that now includes PuckClient, because the agent
+    /// moved there. Mirroring to the gui used to be the text bubble's private
+    /// business -- one line in submitFromInputBubble, purely so the client
+    /// window could *display* what was typed. Every input goes there now, and
+    /// for the same reason a voice command previously reached nothing: the
+    /// only listener it had was a workspace process that does not exist.
+    private func sendUserInput(text: String, source: UserInput.Source, attachments: [Attachment] = []) {
+        let message = BridgeMessage.userInput(
+            UserInput(text: text, source: source, attachments: attachments.isEmpty ? nil : attachments)
+        )
+        let reachedClient = bridgeServer?.send(message, to: .gui) == true
+        // Still offered to a workspace as well: if one ever attaches, the
+        // protocol 3.3 channel is still its way in, and delivering to both is
+        // harmless while only the client acts.
+        let reachedWorkspace = userInputSender.send(text: text, source: source, attachments: attachments.isEmpty ? nil : attachments) == .sent
+
+        guard !reachedClient else { return }
+        // Held rather than dropped -- PuckClient is launched alongside the
+        // pet (CompanionAppLauncher) and is most likely still connecting.
+        pendingClientMirror = message
+        if !reachedWorkspace {
+            // F6: tell the user why nothing happened. Re-opening the input
+            // bubble here (what this used to do) just looped — typing again
+            // reopened it again, and the input was never delivered.
+            showWorkspaceOfflineBubble()
+        }
+    }
+
+    /// byeolki (2026-07-30): "입력창에 내용을 작성하면 창이 새로 열리면서
+    /// ... 입력한 내용이 보여지게". The bubble stays the lightweight capture
+    /// it is; what it submits goes to workspace as usual *and* is mirrored to
+    /// PuckClient, which brings its window up showing the text. Closing
+    /// or quitting that window changes nothing here -- it's a separate
+    /// process, and the pet doesn't observe its presence.
+    private func submitFromInputBubble(_ text: String, attachments: [Attachment] = []) {
+        // Brought up first so the window is on its way while the text is
+        // delivered; sendUserInput queues it if the connection isn't up yet.
+        openClientApp()
+        sendUserInput(text: text, source: .text, attachments: attachments)
+    }
+
+    /// F6 (2026-07-30 재정정): F13 클라이언트 창이 PuckClient라는 별도
+    /// 앱으로 분리되면서, 이 핫키는 다시 원래의 가벼운 퀵 캡처 말풍선만
+    /// 담당한다 -- 무거운 전체 창을 열 이유가 없어졌음.
+    private func showTextInputBubble() {
+        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
+
+        pinCharacter()
+        // Fresh session, fresh state -- bubbleView itself is a brand-new
+        // instance per makeBubble() call, but this property lives on the
+        // delegate and would otherwise carry a stale attachment into a
+        // session whose (also fresh) view shows no thumbnail at all.
+        pendingBubbleAttachment = nil
+
+        bubbleView.onSubmit = { [weak self] text in
+            // Focus goes to PuckClient below, not back to the app the
+            // user invoked the bubble from -- restoring it first would flash
+            // that app forward for a frame.
+            bubbleWindow.closeAndYieldFocus()
+            self?.unpinCharacter()
+            let attachment = self?.pendingBubbleAttachment
+            self?.pendingBubbleAttachment = nil
+            self?.submitFromInputBubble(text, attachments: attachment.map { [$0] } ?? [])
+        }
+        let dismiss = { [weak self] in
+            bubbleWindow.closeAndRestoreFocus()
+            self?.unpinCharacter()
+            self?.pendingBubbleAttachment = nil
+        }
+        bubbleView.onCancel = dismiss
+        // Clicking away is the other way out of a Spotlight panel.
+        bubbleWindow.onDismiss = dismiss
+        bubbleView.onAttachRequested = { [weak self, weak bubbleView] in
+            self?.startAttachmentCapture(bubbleView: bubbleView)
+        }
+        bubbleView.onRemoveAttachment = { [weak self, weak bubbleView] in
+            self?.pendingBubbleAttachment = nil
+            bubbleView?.setAttachmentThumbnail(nil)
+        }
+        bubbleWindow.showAndActivate()
+        // After showAndActivate, not before: makeFirstResponder on a window
+        // that isn't key yet doesn't put the caret in the field, so the panel
+        // came up needing a click before it would take a keystroke.
+        bubbleView.showInput()
+    }
+
+    /// F14 (byeolki, 2026-08-01: "마우스 드래그를 통해서 캡쳐 후
+    /// attachments를 삽입할 수 있도록 해줘"). Shells out to screencapture -i
+    /// rather than the bubble hiding itself first: the system's own capture
+    /// overlay draws on top of everything regardless, and hiding/reshowing
+    /// the panel around an async, human-paced drag risked exactly the
+    /// resignKey/refocus races closeAndRestoreFocus exists to avoid
+    /// elsewhere in this file.
+    private func startAttachmentCapture(bubbleView: TextInputBubbleView?) {
+        ScreenRegionCapture.capture { [weak self, weak bubbleView] url in
+            // The interactive capture takes focus system-wide; hand it back
+            // regardless of whether anything was actually captured.
+            NSApp.activate(ignoringOtherApps: true)
+            self?.textInputBubbleWindow?.makeKeyAndOrderFront(nil)
+
+            guard let url else { return } // Escape, or capture failed
+            self?.pendingBubbleAttachment = Attachment(path: url.path)
+            bubbleView?.setAttachmentThumbnail(NSImage(contentsOf: url))
+        }
+    }
+
+    /// F13 (2026-07-30): the client window is now PuckClient.app, a
+    /// separate Dock-resident process -- opening/focusing it is just
+    /// activating that app, the same as clicking its Dock icon.
+    func openClientApp() {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: AppIdentity.puckClientBundleID) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
+    }
+
+    /// No-op if already pinned (repeated Option+Shift+Space while the bubble
+    /// is open) -- otherwise a second call would capture .pinned itself as
+    /// the state to restore to.
+    func pinCharacter() {
+        guard let characterController, stateBeforePin == nil else { return }
+        stateBeforePin = characterController.currentState
+        characterController.transition(to: pinnedState)
+    }
+
+    private func unpinCharacter() {
+        guard let characterController else { return }
+        characterController.transition(to: stateBeforePin ?? idleState)
+        stateBeforePin = nil
+    }
+
+    /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선".
+    private func showWorkspaceOfflineBubble() {
+        showNoticeBubble("워크스페이스가 꺼져 있어요", for: 2.5)
+    }
+
+    /// Puts the bubble over the pet's head, so what it says comes from it
+    /// rather than from the middle of the screen (byeolki, 2026-07-31:
+    /// "말풍선이 펫한테서 나오게").
+    ///
+    /// Only speech does this. The Option+Shift+Space input panel stays put at
+    /// its own fixed spot (bottom-center, see makeBubble) -- it's a capture
+    /// field the user aims at, not something that should chase the pet
+    /// around the screen.
+    ///
+    /// `wasMovedByUser` is deliberately ignored: a bubble the user once
+    /// dragged is still the pet's speech, and leaving it parked where the pet
+    /// no longer is defeats the whole point.
+    func anchorBubbleToPet(_ bubbleWindow: TextInputBubbleWindow, size: CGSize) {
+        bubbleWindow.setContentSize(size)
+
+        guard
+            let window = primaryWindow,
+            let screen = window.screen ?? NSScreen.main,
+            let body = characterBody
+        else {
+            return
+        }
+
+        let petPoint = globalAppKitPoint(fromWindowLocal: body.position, window: window)
+        // body.position is the pet's ground point, so its head is a hitbox up
+        // from there -- in AppKit's bottom-left space, up is +y.
+        let headY = petPoint.y + avatarHitboxSize.height
+        var origin = CGPoint(x: petPoint.x - size.width / 2, y: headY + Self.speechBubbleGap)
+
+        // Clamped, because a pet in a corner would otherwise put half its
+        // speech off the screen. Vertically it flips below the pet instead of
+        // being shoved down over its head.
+        let frame = screen.visibleFrame
+        origin.x = min(max(origin.x, frame.minX + 8), frame.maxX - size.width - 8)
+        if origin.y + size.height > frame.maxY - 8 {
+            origin.y = petPoint.y - size.height - Self.speechBubbleGap
+        }
+        origin.y = max(origin.y, frame.minY + 8)
+
+        bubbleWindow.setFrameOrigin(NSPoint(x: origin.x, y: origin.y))
+    }
+
+    /// Close enough to read as attached, far enough not to cover the pet.
+    private static let speechBubbleGap: CGFloat = 8
+    /// Gap between the quick-capture panel and the bottom of the visible
+    /// (Dock-excluded) screen area.
+    private static let bottomModalMargin: CGFloat = 60
+
+    func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
+        guard let screen = primaryWindow?.screen ?? NSScreen.main else { return nil }
+
+        let size = TextInputBubbleView.panelSize
+        let bubbleWindow = textInputBubbleWindow ?? {
+            let newWindow = TextInputBubbleWindow(contentRect: CGRect(origin: .zero, size: size))
+            textInputBubbleWindow = newWindow
+            return newWindow
+        }()
+
+        let bubbleView = TextInputBubbleView(frame: CGRect(origin: .zero, size: size))
+        bubbleWindow.setContentSize(size)
+        bubbleWindow.contentView = bubbleView
+
+        // Bottom-center (byeolki, 2026-08-01: "모달 뜨는걸 중앙 하단으로
+        // 변경") -- centred across, hovering just above the Dock.
+        // visibleFrame already excludes the Dock/menu bar, so this margin is
+        // just breathing room, not Dock clearance.
+        let frame = screen.visibleFrame
+        if !bubbleWindow.wasMovedByUser {
+            bubbleWindow.setFrameOrigin(NSPoint(
+                x: frame.midX - size.width / 2,
+                y: frame.minY + Self.bottomModalMargin
+            ))
+        }
+        return (bubbleWindow, bubbleView)
+    }
+
+    private func summonCharacter() {
+        // TODO(F3): a real "summon" (walk to the cursor/frontmost window,
+        // now that MoveToState exists and is used by point_at/launch_app)
+        // isn't wired up here yet. For now this just re-centers the pet on
+        // the primary display, standing on the ground.
+        guard let window = primaryWindow else { return }
+        moveCharacter(to: GroundedSpawnPosition.position(in: groundAwareSize(of: window)))
+    }
+
+    /// Teleports the pet -- through characterBody (see handleWindowsRebuilt's
+    /// comment) so the frame loop's hitbox tracking and any in-flight
+    /// movement state stay consistent with where the pet actually renders.
+    private func moveCharacter(to windowLocalPoint: CGPoint) {
+        guard let window = primaryWindow else { return }
+        characterBody?.position = windowLocalPoint
+        clickThroughController?.updateCharacter(
+            screenPosition: globalAppKitPoint(fromWindowLocal: windowLocalPoint, window: window),
+            hitboxSize: avatarHitboxSize
+        )
+    }
+
+}

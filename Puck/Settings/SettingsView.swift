@@ -4,28 +4,16 @@
 //
 //  Shared · owner: Sangwoo Kang / Haeyoung Park
 //  The menu bar panel: everything the app can be told to do, in one column.
+//  Laid out as pokoPet's menu bar popover is -- one narrow scrolling column
+//  on a single translucent panel, plain sections, a tinted item grid, action
+//  rows at the foot -- dropping straight from the status item rather than
+//  opening a separate window.
 //
-//  2026-07-29 redesign (byeolki: "세팅 ui ux 좀 다시 설계해줘. 한국어
-//  언어모드도 만들어주고"): was a single long Form mixing sound, movement,
-//  and permission controls with no grouping beyond section headers, and
-//  Avatar management lived in an entirely separate window reachable only
-//  from a second menu-bar item.
-//
-//  2026-07-31 (byeolki: "pokopet 설정창과 비슷하게", then "이 설정 이거 위에
-//  아이콘 누르면 바로 나오게 그 창을"): the tabbed GlassCard window that
-//  replaced it is gone in turn. The reference is pokoPet's menu bar popover
-//  -- one narrow scrolling column on a single translucent panel, plain
-//  sections, a tinted item grid, action rows at the foot -- and it drops
-//  straight from the status item, so this is no longer a window at all.
-//  Tabs went with it: the reference has none, and four tabs over twelve
-//  controls was chrome the content never needed.
-//
-//  2026-08-02 (byeolki: "기존 셰이디앱에 있던 에이전트 관련 설정은 전부
-//  셰이디에이전트 설정으로 옮기고"): the F15 API-key section moved to
-//  PuckClient's own Settings window (`AgentSettingsView`, Cmd+,) -- the
-//  agent that actually reads the key runs there, not here (see
-//  AgentConfiguration's own doc comment for why a shared .env rather than
-//  the Keychain in the first place).
+//  The F15 API-key section lives in PuckClient's own Settings window
+//  (AgentSettingsView, Cmd+,) instead of here -- the agent that actually
+//  reads the key runs there, not here (see AgentConfiguration's own doc
+//  comment for why a shared .env rather than the Keychain in the first
+//  place).
 //
 
 import SwiftUI

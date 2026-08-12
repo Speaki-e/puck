@@ -3,21 +3,16 @@
 //  Puck
 //
 //  F13 · owner: 박해영 (Haeyoung Park)
-//  2026-08-01 design-system rebuild (byeolki: "기존 프론트엔드에서 고치기
-//  보다는 프론트엔드를 처음부터 만드는 마음으로"). Replaces ClientRailView's
-//  icon-only rail: the session list is real and visible here, not hidden
-//  behind a popover -- reference screenshot #2 (a dark, Claude-Desktop-
-//  shaped app) shows its sidebar this way, and it's a genuine usability
+//  Replaces ClientRailView's icon-only rail: the session list is real and
+//  visible here, not hidden behind a popover -- a genuine usability
 //  improvement over "click an icon, open a popover" for something used on
 //  every message. Only the workspace switcher keeps ClientRailView's popover
 //  pattern into the collapsed state, since a 56pt icon rail has no room for
 //  a real list -- session switching still needs the sidebar expanded.
 //
-//  2026-08-02: the footer's theme popover is gone -- byeolki: "테마는 셰이디
-//  앱과 동기화 되어서 메뉴막대를 통한 셰이디 설정으로 변경할 수 있어야하거든".
-//  ClientThemeStyle is now a Puck Settings item (SettingsView's "채팅
-//  테마" row), synced here cross-process by PuckClient's AppDelegate --
-//  this view only reads store.themeStyle via clientPalette, never sets it.
+//  ClientThemeStyle is a Puck Settings item (SettingsView's "채팅 테마"
+//  row), synced here cross-process by PuckClient's AppDelegate -- this view
+//  only reads store.themeStyle via clientPalette, never sets it.
 //
 
 import SwiftUI

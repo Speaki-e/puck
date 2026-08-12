@@ -3,11 +3,10 @@
 //  Puck
 //
 //  F2 · owner: Sangwoo Kang
-//  Avatar import/switch UI, wired to AvatarImportValidator. 2026-07-29: also
-//  hosts the size slider and per-emotion image mapping (both edit the active
-//  avatar's manifest.json via AvatarManifestEditor). Embedded as the
-//  Settings window's "Avatar" tab (byeolki's UI/UX redesign request,
-//  2026-07-29) rather than a separate window.
+//  Avatar import/switch UI, wired to AvatarImportValidator. Also hosts the
+//  size slider and per-emotion image mapping (both edit the active avatar's
+//  manifest.json via AvatarManifestEditor). Embedded as the Settings
+//  window's "Avatar" tab rather than a separate window.
 //
 
 import AppKit

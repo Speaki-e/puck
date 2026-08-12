@@ -4,17 +4,10 @@
 //
 //  Notch · owner: 박해영 (Haeyoung Park)
 //  A boring.notch clone's headline widgets (Now Playing + battery) with the
-//  toy-summon row added on top -- byeolki, 2026-08-01, after the first pass
-//  shipped only a generic pill: "다이내믹 아일랜드 걍 Boring Notch
-//  클론코딩을 기반으로 하고, 거기에 toy 꺼내는 것만 얹으라는 소리였는데".
-//  2026-08-01 (later same day): actually cloned boring.notch's source
-//  (github.com/TheBoredTeam/boring.notch) after byeolki flagged the result
-//  as still "이상한데" -- the plain RoundedRectangle read as a floating
-//  pill rather than an extension of the screen's own top edge. Now uses
-//  NotchShape (the real concave/convex notch flare, ported from
-//  boringNotch/components/Notch/NotchShape.swift) and a short hover
-//  debounce (ported from ContentView.handleHover) instead of toggling
-//  instantly.
+//  toy-summon row added on top. Uses NotchShape (the real concave/convex
+//  notch flare, ported from boringNotch/components/Notch/NotchShape.swift)
+//  and a short hover debounce (ported from ContentView.handleHover) instead
+//  of toggling instantly.
 //
 //  Owns its own hover-driven `isExpanded` state (for the pill's own shape
 //  animation) and separately reports it via onExpandedChanged, so

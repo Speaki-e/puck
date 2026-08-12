@@ -1,5 +1,5 @@
 {
-  "name": "ai-module",
+  "name": "@speaki-e/ai-module",
   "version": "0.1.0",
   "description": "Claude API streaming client (A0)",
   "type": "module",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "@speaki-e/protocol": "file:../protocol"
+    "@speaki-e/protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

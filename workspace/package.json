@@ -38,7 +38,7 @@
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@monaco-editor/react": "4.7.0",
     "@speaki-e/ai-module": "workspace:*",
-    "@speaki-e/protocol": "github:Speaki-e/protocol#4244922fa4605645e577905ed37b33b94a5b16e5",
+    "@speaki-e/protocol": "workspace:*",
     "chokidar": "5.0.0",
     "monaco-editor": "0.56.0",
     "react": "19.2.8",

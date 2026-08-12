@@ -23,6 +23,13 @@ private final class StubTransport: UserInputTransport {
 }
 
 final class ClientWindowStoreTests: XCTestCase {
+    /// `.done` carries a per-entry UUID now (two runs in one session used to
+    /// collide on a fixed id), so its rows are matched on content.
+    private func doneSummary(_ session: ChatSession?) -> String? {
+        guard case .done(_, _, let summary)? = session?.timeline.last else { return nil }
+        return summary
+    }
+
     private func makeStore() -> (ClientWindowStore, StubTransport) {
         let transport = StubTransport()
         let store = ClientWindowStore(sender: UserInputSender { transport })
@@ -63,8 +70,8 @@ final class ClientWindowStoreTests: XCTestCase {
         store.handleChatEvent(.agentDone(ok: true, summary: "default workspace done"), workspaceId: "default", sessionId: "default")
         store.handleChatEvent(.agentDone(ok: true, summary: "w2 done"), workspaceId: "w2", sessionId: "default")
 
-        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.timeline, [.done(ok: true, summary: "default workspace done")])
-        XCTAssertEqual(store.session(workspaceId: "w2", sessionId: "default")?.timeline, [.done(ok: true, summary: "w2 done")])
+        XCTAssertEqual(doneSummary(store.session(workspaceId: "default", sessionId: "default")), "default workspace done")
+        XCTAssertEqual(doneSummary(store.session(workspaceId: "w2", sessionId: "default")), "w2 done")
     }
 
     func test_sessionCreate_userOrigin_appendsWithoutSwitchingActive() {
@@ -104,6 +111,87 @@ final class ClientWindowStoreTests: XCTestCase {
         store.handleClientUpdate(.editorViewUnavailable(workspaceId: "default", reason: .noProjectPath))
 
         XCTAssertEqual(store.workspaces.first { $0.id == "default" }?.editorUnavailableReason, .noProjectPath)
+    }
+
+    /// byeolki, 2026-08-12: "프롬프트 쓴 세션은 닫고 새로 넘어가야지" -- a move,
+    /// not a branch, so the chat the prompt was written in must not be left
+    /// behind holding it.
+    func test_moveTurnToTaskSession_closesTheChatItCameFromAndBringsTheMessage() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s-new", title: "새 채팅", origin: .user))
+
+        store.moveTurnToTaskSession(
+            workspaceId: "default",
+            from: "s-new",
+            to: "s-task",
+            title: "hello.ts 주석 추가",
+            userMessage: "hello.ts에 주석 달아줘"
+        )
+
+        let sessions = store.sessions(in: "default")
+        XCTAssertEqual(sessions.map(\.id), ["default", "s-task"], "the source chat must be gone, not sitting empty")
+        XCTAssertEqual(store.activeSessionId, "s-task")
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "s-task")?.timeline.count, 1,
+                       "the user's own message moves across -- otherwise the task session opens empty")
+    }
+
+    /// The casual session is the one exception: 02_pet-app.md F13 keeps
+    /// `session_id: "default"` always present, and it holds conversation that
+    /// has nothing to do with the task.
+    func test_moveTurnToTaskSession_keepsTheCasualSession() {
+        let (store, _) = makeStore()
+
+        store.moveTurnToTaskSession(
+            workspaceId: "default",
+            from: "default",
+            to: "s-task",
+            title: "작업",
+            userMessage: "고쳐줘"
+        )
+
+        XCTAssertEqual(store.sessions(in: "default").map(\.id), ["default", "s-task"])
+        XCTAssertEqual(store.activeSessionId, "s-task")
+    }
+
+    /// The same session_create is announced on the socket and relayed straight
+    /// back to this app, so it arrives after the local move already built the
+    /// session. Re-creating it would wipe the message just moved in.
+    func test_relayedSessionCreate_doesNotWipeTheSessionTheMoveAlreadyBuilt() {
+        let (store, _) = makeStore()
+        store.moveTurnToTaskSession(
+            workspaceId: "default",
+            from: "default",
+            to: "s-task",
+            title: "작업",
+            userMessage: "고쳐줘"
+        )
+
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s-task", title: "작업", origin: .agent))
+
+        XCTAssertEqual(store.sessions(in: "default").filter { $0.id == "s-task" }.count, 1)
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "s-task")?.timeline.count, 1)
+    }
+
+    /// What the topBar's editor toggle is enabled by, and what
+    /// ClientWindowView's workspace-switch fallback reads to decide whether
+    /// to close the editor (F13 "화면 3분할", 2026-08-12).
+    func test_canOpenEditor_onlyOnceAnEditorURLHasArrived() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: "/tmp/cat-house"))
+        func workspace(_ id: String) -> ClientWorkspace? { store.workspaces.first { $0.id == id } }
+
+        // A project_path alone is not enough -- workspace hasn't said it is
+        // serving anything yet.
+        XCTAssertEqual(workspace("w2")?.canOpenEditor, false)
+
+        store.handleClientUpdate(.editorViewReady(workspaceId: "w2", url: "http://127.0.0.1:1/editor"))
+        XCTAssertEqual(workspace("w2")?.canOpenEditor, true)
+        // The pure-chat default workspace stays off.
+        XCTAssertEqual(workspace("default")?.canOpenEditor, false)
+
+        // And it goes back off if workspace withdraws it (project unbound).
+        store.handleClientUpdate(.editorViewUnavailable(workspaceId: "w2", reason: .noProjectPath))
+        XCTAssertEqual(workspace("w2")?.canOpenEditor, false)
     }
 
     func test_requestNewWorkspace_delegatesToSender() {

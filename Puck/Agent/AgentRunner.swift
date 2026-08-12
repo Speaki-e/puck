@@ -39,11 +39,32 @@ typealias AgentEventSink = (BridgeEvent) -> Void
 /// Asks the user to approve a dangerous tool. Returns whether to proceed.
 typealias AgentApprovalGate = (_ summary: String, _ approvalId: String) async -> Bool
 
+/// Hands a coding task to workspace's agent and returns what it reported.
+/// See CodeEditorDelegate for why this is a closure and not another entry in
+/// PetToolDispatcher.
+typealias AgentCodeEditorDelegation = (_ task: String) async -> DispatchedToolResult
+
+/// Branches the casual conversation into its own task session; everything the
+/// run emits after this is addressed to the new one.
+typealias AgentTaskSessionOpener = (_ title: String, _ brief: String) -> Void
+
 final class AgentRunner {
     private let client: GPTClient
     private let dispatcher: PetToolDispatcher
     private let approve: AgentApprovalGate
     private let emit: AgentEventSink
+    /// nil in the standalone case (no workspace to delegate to), and then
+    /// code_editor is not offered to the model at all -- the same rule the
+    /// pet-app-only tool list was already built on.
+    private let delegateCodeEditor: AgentCodeEditorDelegation?
+    /// Offered only alongside code_editor: with nowhere to delegate to, there
+    /// is no long-running work to move out of the casual session, and a task
+    /// session that only ever holds chat is just a confusing empty room.
+    private let openTaskSession: AgentTaskSessionOpener?
+    /// protocol section 7's `src: "agent"` lines. Without them a failed call
+    /// is an opaque uuid in pet-app's log with no tool name and no reason.
+    private let logger: ToolExecutionLogging?
+    private let toolSpecs: [GPTToolSpec]
 
     /// Conversation memory for the session. Per plan/04_ai-module.md 3.4 this
     /// is in-memory only -- persistence is explicitly後순위.
@@ -58,12 +79,21 @@ final class AgentRunner {
         client: GPTClient,
         dispatcher: PetToolDispatcher,
         approve: @escaping AgentApprovalGate,
-        emit: @escaping AgentEventSink
+        emit: @escaping AgentEventSink,
+        delegateCodeEditor: AgentCodeEditorDelegation? = nil,
+        openTaskSession: AgentTaskSessionOpener? = nil,
+        logger: ToolExecutionLogging? = nil
     ) {
+        self.logger = logger
         self.client = client
         self.dispatcher = dispatcher
         self.approve = approve
         self.emit = emit
+        self.delegateCodeEditor = delegateCodeEditor
+        self.openTaskSession = delegateCodeEditor == nil ? nil : openTaskSession
+        toolSpecs = Self.petToolSpecs
+            + (delegateCodeEditor == nil ? [] : [Self.codeEditorSpec])
+            + (self.openTaskSession == nil ? [] : [Self.openTaskSessionSpec])
         messages = [.system(Self.systemPrompt)]
     }
 
@@ -80,7 +110,7 @@ final class AgentRunner {
         for _ in 0..<Self.maxTurns {
             let turn: GPTTurn
             do {
-                turn = try await client.send(messages: messages, tools: Self.toolSpecs)
+                turn = try await client.send(messages: messages, tools: toolSpecs)
             } catch {
                 let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 emit(.textChunk(text: reason))
@@ -113,7 +143,29 @@ final class AgentRunner {
 
     private func perform(_ call: GPTToolCall) async {
         let arguments = JSONValue.decodeObject(from: call.argumentsJSON)
+
+        // The one tool that never crosses the socket and never shows up as a
+        // tool call in the transcript: it only moves where the rest of this
+        // run is addressed (01_protocol.md section 4, 04_ai-module.md 3.7 --
+        // "결과는 onSessionCreated 콜백 → session_create 이벤트로만 통지").
+        // Emitting tool_call/tool_result for it would put plumbing in the
+        // chat and make the pet react to a session switch as if it were work.
+        if call.name == Self.openTaskSessionToolName, let openTaskSession {
+            guard
+                case .object(let args) = arguments,
+                case .string(let title)? = args["title"], !title.isEmpty
+            else {
+                messages.append(.tool(callId: call.id, content: "error: execution_failed -- title이 비어 있어요."))
+                return
+            }
+            let brief = if case .string(let value)? = args["brief"] { value } else { "" }
+            openTaskSession(title, brief)
+            messages.append(.tool(callId: call.id, content: "ok -- 새 작업 세션 \"\(title)\"으로 옮겼습니다."))
+            return
+        }
+
         emit(.toolCall(id: call.id, tool: call.name, args: arguments, detail: nil))
+        logger?.log(.agentToolCall(id: call.id, tool: call.name, args: arguments))
 
         if ToolRegistry.tool(named: call.name)?.requiresApproval == true {
             let summary = Self.approvalSummary(tool: call.name, arguments: call.argumentsJSON)
@@ -127,7 +179,22 @@ final class AgentRunner {
             }
         }
 
-        let result = await dispatcher.execute(tool: call.name, arguments: arguments)
+        let result: DispatchedToolResult
+        if call.name == Self.codeEditorToolName, let delegateCodeEditor {
+            // workspace's tool, so it never goes to PetToolDispatcher (which
+            // would put a tool_dispatch pet-app can't execute on the socket).
+            // project_path is deliberately dropped: workspace resolves the
+            // path from the session's own workspace record and ignores what
+            // the model sends, so passing it on would only invite the model
+            // to think it decides.
+            guard case .object(let args) = arguments, case .string(let task)? = args["task"], !task.isEmpty else {
+                report(callId: call.id, ok: false, error: "execution_failed", detail: "task가 비어 있어요.", data: nil)
+                return
+            }
+            result = await delegateCodeEditor(task)
+        } else {
+            result = await dispatcher.execute(tool: call.name, arguments: arguments)
+        }
         report(callId: call.id, ok: result.ok, error: result.error, detail: result.detail, data: result.data)
     }
 
@@ -135,6 +202,11 @@ final class AgentRunner {
     /// result can never reach one of the three and not the others.
     private func report(callId: String, ok: Bool, error: String?, detail: String?, data: JSONValue?) {
         emit(.toolResult(id: callId, ok: ok, data: data, error: error, detail: detail))
+        // detail rides along in the error field when there is one: the code
+        // alone ("execution_failed") is never enough to act on, and this line
+        // is the only place the reason survives after the chat scrolls away.
+        let reason = [error, detail].compactMap { $0 }.joined(separator: " -- ")
+        logger?.log(.agentToolResult(id: callId, ok: ok, error: reason.isEmpty ? nil : reason))
         messages.append(.tool(callId: callId, content: Self.toolResultText(ok: ok, data: data, error: error, detail: detail)))
     }
 
@@ -161,13 +233,36 @@ final class AgentRunner {
 
     // MARK: - Prompt and tool descriptions
 
-    /// Only pet-app's tools are offered. The three workspace ones are in the
-    /// registry but nothing implements them (docs/tools.md marks their
-    /// responses TBD), and a tool the model can call but nobody can run is
-    /// worse than a missing one.
-    private static let toolSpecs: [GPTToolSpec] = ToolRegistry.tools(for: .petApp).map { tool in
+    /// pet-app's own tools -- the ones PetToolDispatcher can actually put on
+    /// the socket. open_in_editor and read_file stay off the list for the
+    /// original reason: they are in the registry but nothing on either side
+    /// implements them yet, and a tool the model can call but nobody can run
+    /// is worse than a missing one.
+    private static let petToolSpecs: [GPTToolSpec] = ToolRegistry.tools(for: .petApp).map { tool in
         GPTToolSpec(name: tool.name, description: description(for: tool.name), parameters: tool.parameters)
     }
+
+    static let codeEditorToolName = "code_editor"
+    static let openTaskSessionToolName = "open_task_session"
+
+    private static let openTaskSessionSpec: GPTToolSpec = GPTToolSpec(
+        name: openTaskSessionToolName,
+        description: description(for: openTaskSessionToolName),
+        parameters: ToolRegistry.tool(named: openTaskSessionToolName)?.parameters ?? []
+    )
+
+    /// The one workspace-owned tool that does have someone to run it, once a
+    /// workspace is connected -- delegated rather than dispatched (see
+    /// CodeEditorDelegate). Parameters come from the registry like every
+    /// other tool, so the shape stays the contract's.
+    private static let codeEditorSpec: GPTToolSpec = {
+        let tool = ToolRegistry.tool(named: codeEditorToolName)
+        return GPTToolSpec(
+            name: codeEditorToolName,
+            description: description(for: codeEditorToolName),
+            parameters: tool?.parameters ?? []
+        )
+    }()
 
     private static func description(for tool: String) -> String {
         switch tool {
@@ -206,6 +301,28 @@ final class AgentRunner {
             return "Run a shell command via /bin/zsh and return stdout, stderr and the exit code. Requires the user's approval."
         case "run_applescript":
             return "Run an AppleScript and return its result as a string. Requires the user's approval. Use this for app automation that has no dedicated tool."
+        case openTaskSessionToolName:
+            return """
+            Move this conversation into a new task session before starting real work. Whenever the \
+            user asks for code to be written or changed, call this first and wait for its result; \
+            call code_editor on the next turn. `title` is a short label for the sidebar in the user's language \
+            (e.g. "hello.ts 주석 추가"); `brief` is one line on what the task is. Everything you say \
+            after this lands in the new session, so the casual chat stays readable and the user can \
+            stop the coding work without stopping the conversation. Do not call it for questions, \
+            explanations, or anything you answer without editing files.
+            """
+        case codeEditorToolName:
+            return """
+            Hand a coding task to the workspace editor's own coding agent, which reads and edits the \
+            files of the project the user has open and reports back what it changed. Pass `task` as \
+            one self-contained instruction in the user's own words -- the editor agent cannot see \
+            this conversation, so include everything it needs (which file or feature, what to change, \
+            any constraint the user gave). Do NOT pass project_path; the workspace decides that. \
+            This is the only way to change files: never use run_shell to edit code. It can take \
+            minutes, and the user watches the edit happen in the editor while it runs. Returns the \
+            editor agent's summary, or fails with pet_app_disconnected when no workspace is connected \
+            -- in which case tell the user to open the workspace app.
+            """
         default:
             return tool
         }
@@ -225,6 +342,15 @@ final class AgentRunner {
       interruption -- reach for them only when no gentler tool does the job.
     - click_element never works on system permission dialogs. When one is involved, point_at it and \
       tell the user to click it themselves.
+    - Call tools through the tool interface, one at a time. NEVER write a tool call as text or as \
+      a code snippet -- code in your reply is something the user reads, not something that runs. If \
+      no tool can do what was asked, say so plainly instead of writing what the call would look like.
+    - When the user asks for code to be written or changed, use code_editor if you have it. You \
+      never edit files yourself, and the shell is not a substitute for it. If you also have \
+      open_task_session, call it first so the editing runs in its own session.
+    - You have no tool that reads a file. To SHOW the user a file's contents, use run_shell (cat), \
+      which costs them an approval -- the ban on the shell is about editing, not reading. \
+      code_editor is for changing files; never send it a request that only asks to display one.
     - When a tool fails with permission_denied, tell the user which permission to grant in System \
       Settings. When it fails with pet_app_disconnected, tell them the pet app isn't running.
     - Never claim you did something a tool did not actually report success for.

@@ -16,6 +16,7 @@ export class AgentHostController extends EventEmitter {
     private readonly logger: JsonlLogger,
     private readonly appPath = process.cwd(),
     private readonly claudeApiKey?: string,
+    private readonly directCodeEditor = false,
   ) {
     super();
   }
@@ -30,6 +31,10 @@ export class AgentHostController extends EventEmitter {
         NODE_ENV: process.env.NODE_ENV ?? "production",
         WORKSPACE_APP_PATH: this.appPath,
         ...(this.claudeApiKey ? { ANTHROPIC_API_KEY: this.claudeApiKey } : {}),
+        // agent-runner.ts가 mock/direct 런타임을 고를지 결정한다(예전엔 Main의
+        // agent-runtime-coordinator가 이 판단을 했다).
+        ...(process.env.WORKSPACE_MOCK_AI ? { WORKSPACE_MOCK_AI: process.env.WORKSPACE_MOCK_AI } : {}),
+        ...(this.directCodeEditor ? { WORKSPACE_DIRECT_CODE_EDITOR: "1" } : {}),
       },
     });
     this.child = child;

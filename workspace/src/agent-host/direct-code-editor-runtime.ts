@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AgentCallbacks, Attachment, Context, ToolExecutor } from "@speaki-e/protocol";
 
-import type { AgentRuntime } from "../../shared/ports.js";
+import type { AgentRuntime } from "../shared/ports.js";
 
 /**
  * user_input 하나를 code_editor 한 번으로 곧장 실행하는 AgentRuntime.

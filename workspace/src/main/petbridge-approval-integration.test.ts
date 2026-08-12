@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { PetBridge } from "./pet-bridge.js";
 import { JsonlLogger } from "./logger.js";
-import { PendingApprovalStore } from "./pending-approval-store.js";
+import { PendingApprovalStore } from "../agent-host/pending-approval-store.js";
 
 const servers: net.Server[] = [];
 const bridges: PetBridge[] = [];
@@ -58,7 +58,8 @@ describe("PendingApprovalStore <-> 실제 PetBridge 연결 종료 통합", () =>
         approval_id: input.approvalId,
       }),
     });
-    // app/pet-bridge-router.ts가 연결 종료 시 사용하는 것과 동일한 승인 거부 배선(W7 완료 기준).
+    // 실제로는 Main(app/pet-bridge-router.ts)이 disconnect를 감지하면 rejectPendingApprovals RPC로
+    // Agent Host에 있는 이 저장소를 부른다(agent-runner.ts) -- 여기서는 그 마지막 한 걸음만 직접 재현한다.
     bridge.on("state", (state: string) => {
       if (state === "disconnected" || state === "closed") approvals.rejectAll();
     });

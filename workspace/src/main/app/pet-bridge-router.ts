@@ -83,10 +83,10 @@ export function installPetBridgeRouter(deps: PetBridgeRouterDeps): void {
         break;
       }
       case "run_cancel":
-        coordinator.cancelSession(stringField(message, "session_id", "default"));
+        await coordinator.cancelSession(stringField(message, "session_id", "default"));
         break;
       case "approval_response":
-        coordinator.respondToApproval(
+        await coordinator.respondToApproval(
           stringField(message, "approval_id", ""),
           Boolean(message.approved),
         );

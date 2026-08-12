@@ -12,6 +12,9 @@ DerivedData/
 Puck/Resources/Info.plist
 PuckClient/Resources/Info.plist
 
+# Synced from ../chat-web/dist by scripts/sync-chat-web.sh, not committed
+PuckClient/Resources/ChatWeb/
+
 # macOS
 .DS_Store
 

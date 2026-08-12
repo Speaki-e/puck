@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Local secrets / logs
+*.log
+.env
+
+# Dependencies and generated output
+node_modules/
+dist/

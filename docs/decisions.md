@@ -4,6 +4,49 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-13: PuckClient's chat UI is moving to web (React/Tailwind/shadcn)
+
+Native SwiftUI iteration on PuckClient's chat window couldn't hit a specific
+visual target (Orca/Zed-inspired, minimalist, shadcn) at any reasonable
+speed -- no devtools, no hot reload, no exact-value extraction, just
+rebuild/relaunch/eyeball-compare. `workspace`'s own renderer (already
+Tailwind+shadcn) took a rich shadcn migration far more easily for the same
+reason. Full plan: `puck/pet-app` chat/sidebar/settings gets rebuilt as a new
+standalone package, `puck/chat-web/` (React+Tailwind+shadcn, its own
+`package.json`, not part of `workspace`'s pnpm workspace or build pipeline --
+routing it through `workspace` would partially reverse the entry right below
+this one, and concretely break chat for the default project-less workspace
+since `EditorGateway` never starts without a bound project). Built to a
+static bundle, copied into `PuckClient.app`'s resources
+(`PuckClient/Resources/ChatWeb`, synced by `pet-app/scripts/sync-chat-web.sh`),
+loaded via `WKWebView.loadFileURL` (`ClientChatWebView.swift`) and driven by a
+native JS↔Swift bridge -- `ClientWindowStore`/`ChatSession` stay the real-time
+source of truth exactly as they are today, they just gain a second UI
+consumer. Full design in `.claude/plans/optimized-mapping-curry.md` (local to
+byeolki's machine, not committed) -- ported here as work lands.
+
+**`file://` + WKWebView gotchas found empirically (Phase 0 spike), matter for
+any future static bundle loaded this way**:
+- WKWebView silently refuses to execute `<script type="module">` under
+  `file://` -- navigation succeeds, no error surfaces anywhere (not
+  `WKNavigationDelegate`, not `window.onerror`), the script just never runs.
+  Fix: build as a classic (non-module) bundle. Vite's `rollupOptions.output`
+  `{format: "iife", inlineDynamicImports: true}` does this, but Vite's HTML
+  plugin still hardcodes `type="module" crossorigin` on the injected
+  `<script>` tag regardless of the actual output format -- a postbuild step
+  has to rewrite it (`chat-web/scripts/strip-module-script-tag.mjs`).
+- That rewritten tag must keep `defer` (not become a bare classic script):
+  `type="module"` scripts execute after the document parses, and dropping
+  that guarantee makes `document.getElementById("root")` run before `<body>`
+  exists, which is React error #299 ("target container is not a DOM
+  element"), not any kind of loading failure.
+- When a script has no `crossorigin`/CORS attributes (which this one now
+  doesn't, by necessity), WKWebView reports any runtime error inside it as a
+  bare `"Script error."` with no file/line/message -- by design, not a bug.
+  Debugging needs errors caught and logged explicitly from inside the bundle
+  (`try/catch` around the entry point, `console.error` the real
+  `error.message`/`error.stack`) rather than relying on `window.onerror`.
+
 ## 2026-08-13: workspace trimmed to editor-only UI
 
 workspace is embedded in PuckClient purely as the `code_editor` view (WKWebView),

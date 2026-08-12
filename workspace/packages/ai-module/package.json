@@ -1,0 +1,16 @@
+{
+  "name": "@speaki-e/ai-module",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "@speaki-e/protocol": "github:Speaki-e/protocol#4244922fa4605645e577905ed37b33b94a5b16e5"
+  }
+}

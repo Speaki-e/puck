@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Local secrets / logs
+*.log
+.env
+.env.*
+!.env.example
+
+# Local AI agent working brief (generated from ../plans/, not shared)
+CLAUDE.md
+
+# Dependencies and generated output
+node_modules/
+dist/
+dist-main/
+dist-test/
+release/
+coverage/
+playwright-report/
+test-results/
+
+# Editor and OS files
+.idea/
+.vscode/
+Thumbs.db

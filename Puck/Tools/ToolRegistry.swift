@@ -79,7 +79,7 @@ enum ToolRegistry {
         /// Whether a consumer should prompt before running, collapsing
         /// `.acpInternal`/`.notRequired` to false and `.required`/
         /// `.requiredWithWhitelist` to true -- the coarse view most call
-        /// sites (e.g. PetToolDispatcher's gating) actually need.
+        /// sites (e.g. AgentRunner's gating) actually need.
         var requiresApproval: Bool {
             switch approval {
             case .notRequired, .acpInternal: return false

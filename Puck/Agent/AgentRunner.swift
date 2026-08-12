@@ -5,10 +5,9 @@
 //  F15 · owner: 박해영 (Haeyoung Park)
 //  The tool-use loop -- plan/04_ai-module.md section 3.2, in Swift.
 //
-//  byeolki (2026-07-31): "client에 gpt api를 연결해서 이제 펫이 막 화면을
-//  컨트롤 하고 날씨 앱 막 켜주고". "날씨 앱 켜줘" reaches here as `run`, the
-//  model answers with launch_app, PetToolDispatcher puts that on bridge.sock,
-//  pet-app launches it and walks the pet over.
+//  "날씨 앱 켜줘" reaches here as `run`, the model answers with launch_app,
+//  PetToolDispatcher puts that on bridge.sock, pet-app launches it and walks
+//  the pet over.
 //
 //  ## Where this deviates from the plan, and why
 //

@@ -53,8 +53,8 @@ extension NSWindow {
     /// "신호등만 색이 다르게 보임"). Made it worse, not better -- a real
     /// screenshot showed a visibly translucent patch appear right where the
     /// traffic lights sit. Reverted. The likely reason: unlike
-    /// `OverlayWindow`/`NotchWindow`/`TextInputBubbleWindow` (all
-    /// `.borderless`, no titlebar at all), this window is `.titled` with
+    /// `OverlayWindow`/`TextInputBubbleWindow` (both `.borderless`, no
+    /// titlebar at all), this window is `.titled` with
     /// `fullSizeContentView` -- it still has a real native titlebar
     /// container view hosting the traffic lights, layered above the content.
     /// Making the *window* non-opaque exposes that native layer's own

@@ -131,10 +131,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     var menuBarController: MenuBarController?
     var textInputBubbleWindow: TextInputBubbleWindow?
-    var notchWindowController: NotchWindowController?
-    var notchStatusStore: NotchStatusStore?
-    var nowPlayingMonitor: NowPlayingMonitor?
-    var batteryMonitor: BatteryMonitor?
 
     // The following three properties are declared here rather than in the
     // extension file that uses them, because Swift extensions cannot add
@@ -177,7 +173,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
         setUpMenuBar()
         setUpOverlayAndAvatar()
-        setUpNotch()
         setUpWindowSensing()
         setUpToolExecutor()
         setUpBridgeServer()
@@ -195,9 +190,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // recycles that PID onto any live process, start() refuses forever with
         // .alreadyRunning and nothing tells the user which file to delete.
         frameClock.stop()
-        notchWindowController?.stop()
-        nowPlayingMonitor?.stop()
-        batteryMonitor?.stop()
         hotkeyManager?.stop()
         voiceInputController?.pushToTalkUp()
         bridgeServer?.stop()

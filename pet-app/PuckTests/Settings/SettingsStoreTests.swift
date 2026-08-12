@@ -60,20 +60,6 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(SettingsStore(defaults: defaults).isMuteComplaintEnabled)
     }
 
-    func test_isNotchEnabled_defaultsToTrue() {
-        XCTAssertTrue(SettingsStore(defaults: defaults).isNotchEnabled)
-    }
-
-    func test_settingIsNotchEnabled_firesOnNotchEnabledChanged() {
-        let store = SettingsStore(defaults: defaults)
-        var received: Bool?
-        store.onNotchEnabledChanged = { received = $0 }
-
-        store.isNotchEnabled = false
-
-        XCTAssertEqual(received, false)
-    }
-
     // byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고"
     func test_selectedAvatarName_defaultsToDummy() {
         XCTAssertEqual(SettingsStore(defaults: defaults).selectedAvatarName, "dummy")

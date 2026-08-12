@@ -46,13 +46,12 @@ interface ToolExecuteRequestPayload {
 }
 
 /**
- * Main 쪽 AI 실행 경계. workspace는 이제 "일반 에디터"다(byeolki, 2026-08-12: "workspace는 일반
- * 에디터고, 모든 AI 처리는 puckclient가 함") -- 무엇을 할지 판단하는 ai-module/SessionRouter/
- * RunRegistry는 걷어냈고(agent-runner.ts), 남은 건 pet-app의 CodeEditorDelegate가 이미 코딩
- * 작업이라고 판단해 보낸 user_input을 code_editor 한 번으로 실행하는 것뿐이다. 이 파일은 그
- * 실행을 Agent Host에 RPC로 위임하고, Agent Host가 emit하는 agent_* 이벤트를 petBridge로
- * 옮겨 싣는 얇은 어댑터다. editorLocal/openAiCodeEditor 자체는 그대로 여기 남는다 --
- * FileService/EditorGateway가 전부 Main 전용이라 옮길 수 없기 때문이다(tool_execute_request로 왕복).
+ * Main 쪽 AI 실행 경계. workspace는 "무엇을 할지" 판단하지 않는 일반 에디터다(docs/architecture.md
+ * "AI 실행 경계" 참고) -- pet-app의 CodeEditorDelegate가 이미 코딩 작업이라고 판단해 보낸
+ * user_input을 code_editor 한 번으로 실행하는 것뿐이다. 이 파일은 그 실행을 Agent Host에 RPC로
+ * 위임하고, Agent Host가 emit하는 agent_* 이벤트를 petBridge로 옮겨 싣는 얇은 어댑터다.
+ * editorLocal/openAiCodeEditor 자체는 그대로 여기 남는다 -- FileService/EditorGateway가 전부
+ * Main 전용이라 옮길 수 없기 때문이다(tool_execute_request로 왕복).
  */
 export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps): AgentRuntimeCoordinator {
   const { agentHost, controller, editorGateway, petBridge, registry, logger } = deps;

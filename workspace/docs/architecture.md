@@ -32,7 +32,7 @@ Main은 Electron 생명주기, 파일시스템, 로컬 HTTP/WebSocket, PetBridge
 
 ## AI 실행 경계
 
-byeolki, 2026-08-12: "workspace는 일반 에디터고, 모든 AI 처리는 puckclient가 함." Workspace는 더 이상 "이게 무슨 작업인지" 판단하지 않습니다. pet-app의 에이전트(F15)가 이미 코딩 작업이라고 분류해 지시문을 작성한 뒤 `user_input`으로 보내면, Workspace는 그 텍스트 전체를 `code_editor` 도구 호출 하나로 곧장 실행합니다 -- 이 판단·위임을 `DirectCodeEditorRuntime`(`src/agent-host/direct-code-editor-runtime.ts`)이 맡고, `AiModuleRuntime`/`MockAgentRuntime`과 그 전제였던 pet-app 도구 프록시(petAppProxy)는 제거되었습니다.
+Workspace는 더 이상 "이게 무슨 작업인지" 판단하지 않습니다 -- pet-app이 판단을 전담합니다(전체 배경은 `docs/decisions.md` "workspace becomes a plain editor" 참고). pet-app의 에이전트(F15)가 이미 코딩 작업이라고 분류해 지시문을 작성한 뒤 `user_input`으로 보내면, Workspace는 그 텍스트 전체를 `code_editor` 도구 호출 하나로 곧장 실행합니다 -- 이 판단·위임을 `DirectCodeEditorRuntime`(`src/agent-host/direct-code-editor-runtime.ts`)이 맡고, `AiModuleRuntime`/`MockAgentRuntime`과 그 전제였던 pet-app 도구 프록시(petAppProxy)는 제거되었습니다.
 
 - 세션 직렬화(SessionRouter)와 ActiveRun 관리(RunRegistry)는 여전히 Agent Host 프로세스 안에 있습니다 -- 실행기가 하나로 줄었어도 동시 실행 취소/정리 책임은 그대로 필요합니다.
 - ACP의 `request_permission`은 `PendingApprovalStore`를 거쳐 `agent_approval_request`/`respondToApproval` 왕복으로 나갑니다. `DirectCodeEditorRuntime`은 `onApprovalRequired`를 항상 거부로 응답하므로(코딩 작업 자체는 pet-app이 이미 승인한 것으로 간주) 이 경로로는 더 이상 승인 요청이 발생하지 않습니다.

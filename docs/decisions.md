@@ -1,0 +1,43 @@
+# Decisions log
+
+Cross-cutting product/architecture decisions that don't belong inline in code
+comments. Newest first. Each entry: what changed, why, and where the actual
+implementation lives.
+
+## 2026-08-12: workspace becomes a plain editor; pet-app's F15 brain is permanent
+
+pet-app's temporary F15 agent core (`Puck/Agent/AgentRunner.swift`, Swift +
+OpenAI) is now the single, permanent decision-maker for all user commands.
+ai-module was never started, so instead of building it and retiring F15, we
+retired the ai-module design and kept F15. workspace no longer judges "what
+kind of request is this" — it only executes `code_editor` once, for whatever
+text pet-app's CodeEditorDelegate already decided is a coding task.
+
+- Implementation: `workspace/src/agent-host/direct-code-editor-runtime.ts`
+  (`DirectCodeEditorRuntime`), wired in `workspace/src/agent-host/agent-runner.ts`.
+- Removed: `AiModuleRuntime`, `MockAgentRuntime`, `petAppProxy`, the
+  `--direct-code-editor`/`--mock-ai` flags, the `runtime_config_request` RPC.
+- Delegation path: pet-app's `CodeEditorDelegate.execute` sends the existing
+  `user_input`/`agent_done` socket messages (no protocol change needed) rather
+  than a new `tool_dispatch` direction.
+- Details: `workspace/docs/architecture.md` "AI 실행 경계"; plan repo
+  `02_pet-app.md` F15, `프로젝트_개요.md` §2.
+
+## 2026-08-12: PuckClient adopts workspace's design, not the other way around
+
+Earlier the client window's `ClientPalette`/`ClientTheme` were pushed toward a
+Figma reference and workspace's renderer theme was pulled to match *that*.
+This reversed: workspace's actual shadcn theme (blue `#3291ff` accent,
+`#090909`/`#111111` surfaces, 12px/6px corner radii) is now the source of
+truth, and pet-app's `ClientPalette.dark`/`ClientTheme` were ported to match
+it pixel-for-pixel. The client window's default size also grew to 1440x900
+(from 1100x740) since the sidebar + file tree + Monaco + chat compete for
+width once the embedded editor pane is open.
+
+## 2026-08-12: repo consolidation
+
+`protocol`, `pet-app`, `workspace`, `ai-module` merged into one monorepo,
+[Speaki-e/puck](https://github.com/Speaki-e/puck) (git subtree, history
+preserved). The four standalone repos are archived on GitHub (read-only).
+`landing` and `plan` (spec repo) stay separate on purpose. See plan repo
+`프로젝트_개요.md` for the up-to-date system/team tables.

@@ -188,11 +188,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showWindow() {
         let window = window ?? {
-            // 1100x740 was still cramped once the editor pane opens (sidebar +
-            // file tree + Monaco + narrowed chat all fighting for width) --
-            // byeolki asked again for the default size to grow. At origin
-            // (0,0) it opened in the bottom-left corner, so this keeps the
-            // explicit contentRect instead of relying on center() alone.
+            // Sidebar + file tree + Monaco + chat all fighting for width once
+            // the editor pane opens. At origin (0,0) it opens in the
+            // bottom-left corner, so this keeps the explicit contentRect
+            // instead of relying on center() alone.
             let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 1440, height: 900))
             let hosting = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
             // NSHostingController defaults to sizingOptions

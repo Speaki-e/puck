@@ -30,13 +30,10 @@ struct ClientPalette {
     /// real `glassEffect` here and a flat bordered fill everywhere else.
     var usesGlassSurfaces: Bool
 
-    // 2026-08-12: byeolki asked for the reverse of the 08-02 pass -- workspace
-    // (the Electron/web client window) is the design source of truth now, and
-    // ClientPalette adopts *its* tokens (src/renderer/styles.css's --canvas/
-    // --surface/--hairline/--ink/--mute/--blue) instead of the other way
-    // around. `.dark` below matches workspace's actual palette pixel-for-
-    // pixel; `.light`/`.glass` are untouched since workspace has no light
-    // mode to port from.
+    // workspace (the Electron/web client window) is the design source of
+    // truth: `.dark` below matches its tokens (src/renderer/styles.css's
+    // --canvas/--surface/--hairline/--ink/--mute/--blue) pixel-for-pixel.
+    // `.light`/`.glass` are untouched since workspace has no light mode.
     static let light = ClientPalette(
         background: .white, // Gray/White Alpha 0 #FFFFFF
         surface: .white,

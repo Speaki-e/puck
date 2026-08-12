@@ -92,8 +92,16 @@ final class ClientWindowStore: ObservableObject {
 
         case .sessionCreate(let workspaceId, let sessionId, let title, let origin):
             let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)
-            sessionsByKey[key] = ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: origin)
-            sessionOrder.append(key)
+            // Idempotent: F15's own agent announces its task session on the
+            // socket *and* moves the turn into it locally (moveTurnToTaskSession),
+            // and pet-app relays the announcement back to this very app -- so
+            // the same session_create legitimately arrives twice. Re-creating
+            // would wipe the messages already moved in and duplicate the
+            // sidebar row.
+            if sessionsByKey[key] == nil {
+                sessionsByKey[key] = ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: origin)
+                sessionOrder.append(key)
+            }
             if origin == .agent {
                 // byeolki: the agent branching a casual chat into a task
                 // session should bring the user along automatically, not
@@ -117,6 +125,49 @@ final class ClientWindowStore: ObservableObject {
         default:
             break
         }
+    }
+
+    /// The agent decided this turn is real work and opened a task session for
+    /// it (F15 open_task_session, 2026-08-12). This is a **move**, not a
+    /// branch: byeolki -- "프롬프트 쓴 세션은 닫고 새로 넘어가야지".
+    ///
+    /// - the user's own message goes with it, because ChatView echoed it into
+    ///   the source session locally and it would otherwise vanish with that
+    ///   session, leaving the task session open with nothing in it
+    /// - the source chat is closed, *unless* it is the workspace's casual
+    ///   session: 02_pet-app.md F13 has `session_id: "default"` always
+    ///   present, and closing it would also throw away conversation that has
+    ///   nothing to do with this task
+    ///
+    /// Called locally rather than driven off the socket because there is no
+    /// "session closed" message in protocol 3.4 -- only create. Nothing else
+    /// owns a session list, so nothing else needs telling.
+    func moveTurnToTaskSession(
+        workspaceId: String,
+        from sourceSessionId: String,
+        to sessionId: String,
+        title: String,
+        userMessage: String
+    ) {
+        let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)
+        if sessionsByKey[key] == nil {
+            sessionsByKey[key] = ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: .agent)
+            sessionOrder.append(key)
+        }
+        if !userMessage.isEmpty {
+            sessionsByKey[key]?.appendUserMessage(userMessage)
+        }
+
+        activeWorkspaceId = workspaceId
+        activeSessionId = sessionId
+
+        guard sourceSessionId != Self.defaultSessionId, sourceSessionId != sessionId else { return }
+        // sessionOrder/sessionsByKey aren't @Published (the sidebar reads them
+        // through sessions(in:)), so the removal has to announce itself.
+        objectWillChange.send()
+        let sourceKey = SessionKey(workspaceId: workspaceId, sessionId: sourceSessionId)
+        sessionsByKey.removeValue(forKey: sourceKey)
+        sessionOrder.removeAll { $0 == sourceKey }
     }
 
     private func updateWorkspace(_ workspaceId: String, _ mutate: (inout ClientWorkspace) -> Void) {

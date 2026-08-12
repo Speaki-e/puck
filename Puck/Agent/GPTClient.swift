@@ -98,6 +98,13 @@ final class GPTClient {
             "model": configuration.model,
             "messages": messages.map(Self.encode),
             "tools": tools.map(Self.encode),
+            // One call per turn. AgentRunner performs a turn's calls
+            // sequentially anyway, and asking for a *sequence* (2026-08-12:
+            // open_task_session then code_editor) is what made the model
+            // write the whole plan out as a python snippet instead of calling
+            // anything -- with batching off it makes the first call, sees its
+            // result, and then makes the next.
+            "parallel_tool_calls": false,
         ])
 
         let (data, response) = try await session.data(for: request)

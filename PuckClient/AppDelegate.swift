@@ -48,6 +48,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clientWindowStore.onRunCancelled = { [weak self] in
             self?.agentHost.cancelPendingApprovals()
         }
+        agentHost.onTaskSessionOpened = { [weak self] workspaceId, sourceSessionId, sessionId, title, userMessage in
+            self?.clientWindowStore.moveTurnToTaskSession(
+                workspaceId: workspaceId,
+                from: sourceSessionId,
+                to: sessionId,
+                title: title,
+                userMessage: userMessage
+            )
+        }
 
         showWindow()
     }
@@ -116,6 +125,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch message {
         case .event(let event, let workspaceId, let sessionId):
             clientWindowStore.handleChatEvent(event, workspaceId: workspaceId, sessionId: sessionId)
+            // workspace's agent_done is also how a delegated code_editor call
+            // finds out it finished (CodeEditorDelegate).
+            agentHost.handle(event, sessionId: sessionId)
         case .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
             clientWindowStore.handleClientUpdate(message)
         case .toolResult(let result):

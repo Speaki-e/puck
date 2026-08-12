@@ -93,6 +93,31 @@ final class EventRouterTests: XCTestCase {
         )
     }
 
+    /// The bubble is one line beside a 100px character, and agent_done's
+    /// summary is whatever the producing agent put there -- for the F15 local
+    /// agent, the entire reply (byeolki, 2026-08-12: "전부 출력하지 말고 핵심
+    /// 부분만 간결하게"). The full text is in the transcript either way.
+    func test_agentDone_bubbleKeepsOnlyTheHeadline() {
+        let wall = """
+        hello.ts에 주석을 추가했어요. 파일 맨 위에 한 줄 주석을 넣었고, \
+        나머지 코드는 손대지 않았습니다.
+        추가로 확인이 필요하면 말씀해 주세요.
+        """
+        let reaction = EventRouter.reaction(for: .agentDone(ok: true, summary: wall))
+
+        XCTAssertEqual(reaction.bubbleText, "hello.ts에 주석을 추가했어요.")
+    }
+
+    func test_bubbleSummary_edges() {
+        // No sentence terminator: capped with an ellipsis rather than cut mid-air.
+        let long = String(repeating: "가", count: 80)
+        XCTAssertEqual(EventRouter.bubbleSummary(from: long), String(repeating: "가", count: 60) + "…")
+        // Nothing to say means no bubble at all, not an empty one.
+        XCTAssertNil(EventRouter.bubbleSummary(from: "   \n  "))
+        // Already short: untouched, terminator kept.
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "Safari 켰어요!"), "Safari 켰어요!")
+    }
+
     func test_agentDone_failure_isNoOp() {
         // Not specified in the reaction table — only agent_done(ok=true) is; toolResult(ok=false)
         // already covers the failure-signaling case.

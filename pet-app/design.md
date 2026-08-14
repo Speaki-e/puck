@@ -1,38 +1,49 @@
 # Puck 디자인 시스템 (현재 구현 기준)
 
-> **범위 축소 — 2026-08-13.** F13 클라이언트 창(사이드바·탑바·채팅창)은 `chat-web/`(React/
-> Tailwind/shadcn)로 옮겨갔고 `ChatView.swift`/`ClientSidebarView.swift`는 삭제됐다 — 아래 문서가
-> 설명하는 구조(사이드바/탑바/메시지 버블 레이아웃)는 더 이상 실제 코드가 아니다(`docs/decisions.md`
-> 참고). `ClientPalette`/`ClientTheme`/`GlassSurface` 자체는 여전히 살아있지만, 이제 소비자는
-> **Puck.app의 Settings 화면**(`Puck/Settings/*.swift`)뿐이다 — 색 토큰(§2)은 여전히 유효하지만
-> 그 외(사이드바 폭, 말풍선 레이아웃 등)는 chat-web의 CSS(`chat-web/src/styles.css`)가 새 기준이다.
+> **디자인 시스템 v2 — 2026-08-14.** 아래 문서는 이전 팔레트/테마 체계(호박 주황 accent +
+> 다크/화이트/글래스 3무드)를 전면 교체한 결과를 기록한다. 근거/레퍼런스(Orca)는
+> `docs/superpowers/specs/2026-08-14-design-system-v2-design.md` 참고 — 교체 사유는 기술적
+> 결함이 아니라 아트디렉션 전면 재조정이었다. `.glass` 테마는 폐기됐다(macOS 26+ 전용 기능
+> 유지보수 비용 대비 실익이 낮다는 판단, `docs/decisions.md`).
+>
+> 별도 사실 하나 더: F13 클라이언트 창의 사이드바/탑바/메시지 목록은 이 v2 작업보다 하루 앞선
+> 2026-08-13에 이미 `chat-web/`(React/Tailwind/shadcn)로 옮겨갔고 `ChatView.swift`/
+> `ClientSidebarView.swift`는 삭제됐다(`docs/decisions.md` "PuckClient's chat UI moved to
+> web"). `ClientWindowView.swift`가 실제로 그리는 건 `ClientChatWebView`(그 chat-web을 호스팅하는
+> WKWebView) + 조건부 네이티브 `EditorPaneView`(§9.5) + 상시 `ClientStatusBarView`(§4.5) 셋뿐이다.
+> 이번 v2는 그 레이아웃 재설계를 하지 않았다(스코프 밖, 위 스펙 §6) — 아래 §6 이하가 여전히
+> 사이드바/말풍선 레이아웃을 서술하는 건 그 이전 상태의 기록이고, 지금 pet-app Swift 코드가
+> 아니라 chat-web 쪽 이야기다. `ClientPalette`/`ClientTheme`의 실제 현재 소비처는 Settings
+> 화면(`Puck/Settings/*.swift`)과 네이티브 에디터 뷰(`Puck/ClientWindow/Editor/*.swift`,
+> `StatusDotView`/`ClientStatusBarView`) — chat-web/workspace의 CSS도 같은 원시값을 공유한다
+> (§2 참고, 확인함).
 
 F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제로 존재하는 값 그대로** 기록한 문서다.
 새 디자인 제안이 아니라 현황 스냅샷이며, 값이 바뀌면 이 문서가 아니라 아래 소스가 먼저 바뀐다.
 
 | 역할 | 파일 |
 |---|---|
-| 색 토큰 (3세트) | `Puck/ClientWindow/ClientPalette.swift` |
+| 색 토큰 (2세트: light/dark) | `Puck/ClientWindow/ClientPalette.swift` |
 | 타입·간격·모양 토큰 | `Puck/ClientWindow/ClientTheme.swift` |
 | 테마 선택/동기화 | `Puck/ClientWindow/ClientThemeStyle.swift` |
-| 표면(글래스/플랫) 분기 | `Puck/ClientWindow/GlassSurface.swift` |
 | 팔레트 주입 | `Puck/ClientWindow/ClientPaletteEnvironment.swift` |
+| 상태 점 컴포넌트 | `Puck/ClientWindow/StatusDotView.swift` |
+| 상태 바 | `Puck/ClientWindow/ClientStatusBarView.swift` |
 
 원칙 하나: **뷰는 시스템 색/폰트를 직접 쓰지 않는다.** 전부 `ClientPalette`(색)와 `ClientTheme`(그 외)에서 나온다.
 
 ---
 
-## 1. 테마 — light / dark / glass
+## 1. 테마 — light / dark
 
-`ClientThemeStyle`은 라이트/다크 축이 아니라 **독립적으로 아트디렉션된 3개의 무드**다("다크, 화이트, 글래스").
+`ClientThemeStyle`은 이제 정말 라이트/다크 축이다(v1은 독립적으로 아트디렉션된 3개 무드 — 다크,
+화이트, 글래스 — 였다). `.glass`는 v2에서 완전히 삭제됐다.
 
-| 값 | 표시명 | colorScheme | 표면 |
-|---|---|---|---|
-| `.light` | 화이트 | light | 플랫 + 1px 보더 |
-| `.dark` | 다크 | dark | 플랫 + 1px 보더 |
-| `.glass` | 글래스 | dark (고정) | 실제 `glassEffect` |
+| 값 | 표시명 | colorScheme |
+|---|---|---|
+| `.light` | 화이트 | light |
+| `.dark` | 다크 | dark |
 
-- 글래스에 라이트 변형은 없다. 반투명은 어두운 바탕 위에서만 제대로 읽힌다.
 - 기본값(파싱 실패 시 폴백)은 `.dark` — 이 앱이 원래 갖고 있던 룩.
 - 저장 위치는 Puck 쪽 `SettingsStore`(`Puck.clientThemeStyle`). 채팅 창 안이 아니라 **메뉴막대 → Puck 설정 → "채팅 테마"** 에서 바꾼다.
 - PuckClient는 별도 프로세스라 UserDefaults를 못 읽는다. `ClientThemeStyle.crossProcessChangeNotification`으로 브로드캐스트하되 **값을 notification userInfo에 실어 보낸다** — `UserDefaults.set()` 직후 다른 프로세스에서 읽으면 아직 옛 값일 수 있는 실제 레이스가 있었다.
@@ -40,110 +51,163 @@ F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제�
 
 ## 2. 색 토큰
 
-11개 필드로 고정. 팔레트마다 전부 채운다.
+`ClientPalette`는 12개 프로퍼티 — 10개 저장 필드 + 2개 계산 프로퍼티. 계산 프로퍼티는 다른 필드를
+재사용해서 절대 따로 어긋나지 않는다: `statusIdle { textSecondary }`, `statusActive { accent }`.
 
-`background` `surface` `surfaceBorder` `textPrimary` `textSecondary` `accent` `onAccent` `success` `failure` `warning` `usesGlassSurfaces`
+`background` `surface` `surfaceBorder` `textPrimary` `textSecondary` `accent` `onAccent`
+`statusSuccess` `statusError` `statusWarning` (저장) · `statusIdle` `statusActive` (계산)
 
-### light — Figma "Gray" 스케일 픽셀 매칭
+### light
 
 | 토큰 | 값 |
 |---|---|
-| background / surface | `#FFFFFF` |
-| surfaceBorder | `#EEE9F0` (Gray/+5) |
-| textPrimary | `#332B36` (Gray/-3) |
-| textSecondary | `#695E6E` (Gray/0) |
+| background | `#fafafa` |
+| surface | `#ffffff` |
+| surfaceBorder | `#e5e5e5` |
+| textPrimary | `#1a1a1a` |
+| textSecondary | `#6b6b6b` |
 | accent | `#ed8c33` |
+| onAccent | `#ffffff` |
 
-### dark — workspace(Electron 클라이언트 창)의 실제 팔레트와 픽셀 단위로 일치
-
-workspace가 디자인 기준이 됐다(`docs/decisions.md` 2026-08-12). 아래 값은 workspace의
-`src/renderer/styles.css` `--canvas`/`--surface`/`--hairline`/`--ink`/`--mute`를 그대로 옮긴 것이다.
-accent만 예외 — workspace의 point color 자체가 (`--brand`로) 이 앱의 호박 주황에 맞춰졌다.
+### dark
 
 | 토큰 | 값 |
 |---|---|
-| background | `#090909` (workspace `--canvas`) |
-| surface | `#111111` (workspace `--surface`) |
-| surfaceBorder | `#292929` (workspace `--hairline`) |
-| textPrimary | `#ededed` (workspace `--ink`) |
-| textSecondary | `#777777` (workspace `--mute`) |
-| accent | `#ed8c33` (workspace `--brand`) |
+| background | `#0a0a0a` |
+| surface | `#131313` |
+| surfaceBorder | `#242424` |
+| textPrimary | `#ededed` |
+| textSecondary | `#7a7a7a` |
+| accent | `#ed8c33` |
+| onAccent | `#161616` (거의 검정 — 이 팔레트에서는 흰색보다 accent 위 대비/무드가 낫다) |
 
-### glass
+v2 값은 Orca 레퍼런스 기반으로 새로 잡은 값이다(`docs/superpowers/specs/2026-08-14-design-system-v2-design.md`
+§1) — v1처럼 workspace CSS를 그대로 옮겨온 게 아니라, **세 소비처(`ClientPalette.swift`,
+`chat-web/src/styles.css`, `workspace/src/renderer/styles.css`)를 같은 값으로 동시에 갈아끼웠다.**
+실제로 확인한 결과 `chat-web/src/styles.css`의 `--ink`/`--mute`/`--hairline`/`--canvas`/`--surface`/
+`--brand`와 `workspace/src/renderer/styles.css`의 동일 변수들이 위 표와 정확히 같은 hex를 쓴다(light
+변형도 동일 — workspace/chat-web은 이전엔 다크 전용이었는데 v2에서 라이트 세트가 새로 추가됐다).
 
-background `#161616`, `surface`/`surfaceBorder`는 `white.opacity(0.06 / 0.12)`, 텍스트는 `white` /
-`white.opacity(0.6)`, `usesGlassSurfaces = true`. background는 `.dark`(`#090909`)와 다르다 — 워크스페이스
-전환(2026-08-12) 때 `.glass`는 건드리지 않았기 때문. accent는 `.dark`/`.light`와 같은 `#ed8c33`.
-`surface`/`surfaceBorder`는 **macOS 26 미만 폴백(`.regularMaterial`)의 틴트일 뿐**이고, macOS 26+에서는 무시되고 진짜 `glassEffect`가 그려진다.
+### 상태 색 (v2 신규)
+
+| 토큰 | 값 | 비고 |
+|---|---|---|
+| `statusSuccess` | `#3fb950` | light/dark 공통(테마 무관 고정) |
+| `statusError` | `#f85149` | light/dark 공통 |
+| `statusWarning` | `#e3b341` | light/dark 공통 |
+| `statusIdle` | `textSecondary` 재사용 | 계산 프로퍼티 |
+| `statusActive` | `accent` 재사용 | 계산 프로퍼티 |
+
+`statusSuccess`/`statusError`/`statusWarning`은 accent와 마찬가지로 라이트/다크 두 팔레트에서 값이
+동일하다(테마가 바뀌어도 안 바뀐다). 오늘 기준 실제 소비처는 둘뿐이다: `statusWarning`은
+`ConflictBannerView`(디스크 변경 경고 아이콘)에서 직접 쓰고, 나머지 네 값은 `StatusDotView`/
+`DotStatus`를 거쳐 `ClientStatusBarView`(§4.5)에서 쓰인다.
 
 ### accent 사용 규칙
 
-accent는 **의도적으로 유일하게 튀는 색**이다. 쓰는 곳은 다음뿐:
-
-- 전송 버튼 (보낼 내용이 있을 때만 채워짐)
-- 워크스페이스 아바타 원
-- 활성 사이드바 행 / 팝오버 행 (`accent.opacity(0.14)`)
-- 메시지 말풍선 배경 (`accent.opacity(0.06)`)
-- 사용자 아바타 배경 (`accent.opacity(0.16)`)
-
-세 팔레트(`.light`/`.dark`/`.glass`) 전부, 그리고 workspace(`--brand`)까지 같은 `#ed8c33` 호박 주황
-하나로 통일돼 있다(2026-08-13, "포인트 컬러는 워크스페이스, client 상관없이 주황색으로 통합") —
-앱이나 테마와 무관하게 accent를 손댈 땐 이 한 값만 바꾸면 된다.
+accent는 **여전히 유일하게 튀는 색**이고 값도 안 바뀌었다(`#ed8c33`, light/dark 공통, chat-web
+`--brand`/workspace `--brand`와도 동일 — 확인함). 다만 구체적으로 어디에 칠해지는지(전송 버튼,
+활성 행, 말풍선 배경 등)는 이제 chat-web 쪽 React 컴포넌트의 영역이고, 이번 v2 재작성은 화면
+레이아웃을 다시 건드리지 않았다(스코프 밖, 위 스펙 §6). v1 문서가 나열했던
+`accent.opacity(0.14)`류 구체 수치는 이미 정확하지 않았다 — 실제로 확인해보니 chat-web은 opacity
+대신 `--brand-soft`(`#3d2612`) 같은 별도 고정 토큰을 쓰는 쪽으로 이미 바뀌어 있었다. 그래서 여기선
+그 수치를 다시 단정하지 않는다.
 
 ## 3. 타이포그래피
 
-전부 `Font.system`, 기본 디자인. workspace가 Geist(그로테스크 산세리프)를 쓰지만 pet-app이 그 폰트
-파일을 번들하지 않아서(2026-08-12), `design: .rounded`를 걷어내고 시스템 기본을 그 대체로 쓴다 —
-SF Rounded의 "친근한 챗앱" 톤은 더 이상 없다. `mono`만 monospaced로 예외.
+전부 `Font.system`, 기본 디자인. `mono`만 monospaced로 예외. v1의 11개 토큰 중 6개만 남았다(Task 3,
+쓰는 곳이 없어진 토큰은 이름만 남겨두지 않고 그대로 삭제).
 
 | 토큰 | 정의 | 용도 |
 |---|---|---|
-| `greeting` | largeTitle · bold | 빈 상태 인사말 |
-| `greetingSubtitle` | body | 인사말 아래 한 줄 |
-| `workspaceName` | body · medium | 워크스페이스명, 세션 선택 pill, 새 채팅 |
-| `sessionTitle` | callout | 세션 행, 설정 행 라벨 |
-| `toolLabel` | callout · medium | 툴 호출 라벨 |
-| `summary` | callout · semibold | 완료 요약 |
-| `messageBody` | body | 메시지 본문, 입력 필드 |
-| `sectionHeader` | caption · semibold | 섹션 헤더, 배너 |
-| `caption` | caption | 디스클레이머, 인라인 액션 |
-| `senderLabel` | caption2 · semibold | "나" / 앱 이름 |
-| `mono` | caption · monospaced | 툴 인자·결과, 승인 요약 |
+| `sectionHeader` | caption · semibold | 설정창 섹션 제목(`SettingsSection`) |
+| `workspaceName` | callout · medium | 설정창 헤더의 앱 이름 |
+| `sessionTitle` | footnote | 범용 라벨 — 설정 행 라벨, 에디터 빈 상태/로딩 메시지 |
+| `toolLabel` | footnote · medium | 충돌 배너(`ConflictBannerView`) 제목 |
+| `mono` | caption · monospaced | 상태 바의 워크스페이스명, 설정 슬라이더 라이브 값, 이미지 미리보기 캡션 |
+| `caption` | caption2 | 탭 스트립 파일명, 파일트리 행, 충돌 배너 부제 |
 
-전부 시스템 텍스트 스타일 기반이라 **동적 타입(사용자 글자 크기)을 따라간다.** 고정 pt 폰트는 아바타 글리프 두 곳(11pt, `Image(systemName:)`)뿐.
+전부 시스템 텍스트 스타일 기반이라 **동적 타입(사용자 글자 크기)을 따라간다.**
 
 ## 4. 간격·크기·모양
 
 ```
-spacingSmall   6      bubbleCornerRadius  10
-spacingMedium  10     cardCornerRadius    12
-spacingLarge   16     rowCornerRadius      6
-                      panel corner        12
-sidebarWidthExpanded   220      contentMaxWidth   720
-sidebarWidthCollapsed   68      bubbleMaxWidth    420
-railButtonSize          36      avatarSize         22
-windowMinWidth         960      windowMinHeight   640
+spacingSmall    4      cardCornerRadius   6
+spacingMedium   8      rowCornerRadius    4
+spacingLarge   12
+windowMinWidth 960     windowMinHeight  640
 ```
 
-- 사이드바 220/68은 Figma 레퍼런스 실측값(이 부분은 workspace 전환과 무관하게 유지).
-- 코너 라운딩은 2026-08-12부로 workspace의 실제 radii(`src/renderer/styles.css`: 패널 12px, 버튼/행 6px)를 따른다 — 예전엔 Figma 레퍼런스의 24/24/12를 썼다.
-- 모양은 전부 `style: .continuous`이고 `ClientTheme.Shapes`(`bubble`/`card`/`row`/`panel`)에 한 번만 선언한다 — 코너 스타일이 표면마다 어긋나면 창이 한 시스템으로 안 보인다.
-- `bubbleMaxWidth`(420)가 `contentMaxWidth`(720)보다 훨씬 좁은 건 의도다. 창이 넓어도 한 줄이 길면 읽기 나빠진다.
-- `windowMinWidth/Height`는 SwiftUI `.frame(minWidth:)`와 AppKit `NSWindow.minSize`가 **같은 상수 하나**를 읽는다. 기본 창 크기(`PuckClient/AppDelegate.swift`)도 1440x900으로 커졌다 — 에디터 패널이 열리면 사이드바+파일트리+Monaco+채팅이 폭을 다투기 때문.
+v1의 11개 메트릭 중 7개만 남았다 — 사이드바 폭/말풍선 최대폭/아바타 크기는 그 값을 쓰던 뷰(구
+ChatView 계열)와 함께 삭제됐다.
 
-## 5. 표면 — 글래스 대 플랫
+- 코너 라운딩은 v2에서 한 단계 더 줄었다(`cardCornerRadius` 12→6, `rowCornerRadius` 6→4) — chat-web/workspace의 `--radius` 계열도 같은 방향으로 같이 줄었다(`ClientTheme.swift`의 코드 주석 기준, Task 6).
+- 모양은 `ClientTheme.Shapes`에 `card`/`row` 두 개만 선언돼 있다(둘 다 `style: .continuous`) — v1에 있던 `bubble`/`panel` 모양은 그걸 쓰던 뷰와 함께 없어졌다.
+- `spacingSmall`/`spacingMedium`/`spacingLarge`는 `ClientWindow/Editor/*`뿐 아니라 `Puck/Settings/*`, `PuckClient/AgentSettingsView.swift`에서도 쓰인다 — ClientWindow 폴더 전용 토큰이 아니라 Puck 쪽 UI 전반의 공용 간격 스케일이다.
+- `windowMinWidth`/`windowMinHeight`는 SwiftUI `.frame(minWidth:)`(`ClientWindowView.swift`)와 AppKit `NSWindow.minSize`(`PuckClient/AppDelegate.swift`)가 **같은 상수 하나**를 읽는다.
 
-호출부는 항상 `themedSurface(palette, in: shape)` 하나만 쓴다. 분기는 이 함수 안에서 끝난다.
+## 4.5 상태 표현 (신규) — `StatusDotView` / `ClientStatusBarView`
+
+이 절은 v2에서 새로 생긴 것(Task 4-5) — v1 문서에는 없었다.
+
+**`DotStatus`**(`Puck/ClientWindow/StatusDotView.swift`)는 4개 case다: `idle`/`active`/`success`/`error`,
+각각 `palette.statusIdle`/`statusActive`/`statusSuccess`/`statusError`로 매핑된다. `StatusDotView`는
+지름 6pt(호출부에서 override 가능) 원 하나를 그리고, **`.active`일 때만 펄스**한다(불투명도
+1↔0.4, `.easeInOut(duration: 0.9).repeatForever(autoreverses: true)`) — idle/success/error는 정지된
+상태를 나타내므로 모션이 없다.
+
+**`ClientStatusBarView`**는 `ClientWindowView`의 콘텐츠 아래(항상 표시되는 얇은 바, height 22,
+`palette.surface` 배경 + 위쪽 1px `palette.surfaceBorder` 헤어라인)에 워크스페이스 이름(mono)과
+상태 점 하나를 보여준다. `dotStatus(for:)`가 `EditorAvailability`를 `DotStatus`로 매핑한다:
+`.noProject → .idle`, `.ready → .success`, `.unavailable → .error`. **`.active`는 이 매핑에서 절대
+나오지 않는다** — 상태 바 자체는 idle/success/error 세 값만 보여준다.
+
+이름에 대한 코드 주석을 그대로 옮기면: "Reports the active workspace's editor/project status --
+deliberately not called 'connection', since that term means the pet-app↔workspace bridge socket
+elsewhere in this codebase and this bar doesn't observe that." 즉 이 바가 보여주는 건 브릿지 소켓
+연결 여부가 **아니라** 에디터/프로젝트 상태다 — 이름을 헷갈리지 않게 의도적으로 고른 것.
+
+**두 번째 소비처, 그리고 아직 해소되지 않은 긴장**: `EditorTabStripView`(Task 7)가 더러워진(unsaved)
+파일 탭 옆에 `StatusDotView(status: .active, ..., diameter: 5)`를 붙인다. 디자인 리뷰에서 지적된
+지점: 원래 스펙(위 design spec §4)에서 `.active`는 "실행 중" 같은 **짧게 지속되는 진행 상태**를
+위해 설계됐는데, dirty 플래그는 사용자가 저장하기 전까지 무기한 지속될 수 있고 그동안 계속
+펄스한다 — 세션 내내 켜져 있는 게 가능한 유일한 `.active` 사용처다. 이게 명백히 잘못됐다는
+뜻은 아니다("저장 안 한 파일이 있다"는 신호 자체는 유용하다) — 다만 `.active`의 원래 의미에서
+꽤 벌어져 있고, 이 문서를 쓰는 시점까지 그대로 남아 있는 **열린 질문**이다. 계속 펄스하게 둘지,
+dirty 표시는 펄스 없는 다른 표현으로 바꿀지는 별도 결정이 필요하다.
+
+## 5. 표면
+
+`GlassSurface.swift`는 Task 1-2 수정 라운드에서 **완전히 삭제됐다**(단순화된 게 아니라 파일 자체가
+없어짐). 대체할 공용 `themedSurface`류 함수도 새로 만들어지지 않았다 — 팔레트가 라이트/다크
+둘뿐이고 둘 다 항상 플랫이라 분기할 게 없기 때문이다. 호출부마다 필요한 만큼만 직접 조합한다:
 
 ```
-themedSurface ─ usesGlassSurfaces ─ true  → glassSurface  ─ macOS 26+ → glassEffect(.regular)
-                                                          └ 그 미만  → .regularMaterial
-               └                    false → borderedSurface (surface 채움 + surfaceBorder 1px)
+배경만                    .background(palette.surface)
+                          (EditorTabStripView, FileTreeView)
+
+배경 + 테두리 카드         .background(palette.surface)
+                          .clipShape(ClientTheme.Shapes.card)
+                          .overlay(ClientTheme.Shapes.card.stroke(palette.surfaceBorder))
+                          (ConflictBannerView — 이 패턴의 유일한 사용처)
+
+배경 + 위쪽 헤어라인만     .background(palette.surface)
+                          .overlay(alignment: .top) {
+                              Rectangle().fill(palette.surfaceBorder).frame(height: 1)
+                          }
+                          (ClientStatusBarView)
 ```
 
-배포 타깃이 macOS 14인데 `glassEffect`는 26+라, `#available`을 호출부마다 흩뿌리지 않고 여기 한 곳에서만 게이트한다. 사이드바 배경만 예외로 `VisualEffectBackground(material: .sidebar)`(글래스) / `background.brightness(-0.02)`(플랫)를 직접 쓴다.
+`VisualEffectBackground`(`Puck/ClientWindow/VisualEffectBackground.swift`, `NSVisualEffectView`
+래퍼)는 파일 자체는 아직 남아 있지만, 실제로 확인해보니 **현재 아무 뷰도 이걸 쓰지 않는다** —
+원래 (이미 삭제된) 사이드바 배경용으로 만들어졌던 것으로 보이는 죽은 코드다. 왜 같이 정리되지
+않았는지는 이번 v2 스코프 밖이라 확인하지 않았다.
 
 ## 6. 레이아웃
+
+> 아래 이 절부터 §9까지는 위 배너에서 이미 밝혔듯 **2026-08-13 chat-web 이전 상태의 기록**이다.
+> 사이드바/탑바/말풍선은 지금 pet-app Swift 코드에 없고 `chat-web/`(React/Tailwind/shadcn)로
+> 옮겨갔다 — 이번 v2 작업은 그 레이아웃을 다시 서술하거나 검증하지 않았다(스코프 밖).
 
 ### 창 크롬
 
@@ -190,11 +254,11 @@ HStack(spacing: 0)
 |---|---|
 | 사용자/어시스턴트 메시지 | MessageBubble |
 | 툴 호출 | `DisclosureGroup` + 렌치 아이콘, 인자는 mono, `card` 표면 |
-| 툴 결과 | 성공/실패 원형 아이콘(`success`/`failure`) + mono 텍스트, `card` 표면 |
-| 승인 요청 | `warning` 색 라벨 |
+| 툴 결과 | 성공/실패 원형 아이콘(`statusSuccess`/`statusError`) + mono 텍스트, `card` 표면 |
+| 승인 요청 | `statusWarning` 색 라벨 |
 | 완료 | seal / 경고 아이콘 + `summary` 폰트 |
 
-승인 배너의 기본 액션은 **색이 아니라 굵기**로 표시한다(허용 = semibold, 거부 = `failure` 색).
+승인 배너의 기본 액션은 **색이 아니라 굵기**로 표시한다(허용 = semibold, 거부 = `statusError` 색).
 
 ### 빈 상태
 
@@ -232,12 +296,18 @@ HStack(spacing: 0)
 
 `Puck/ClientWindow/Editor/`(파일트리·탭·`CodeEditSourceEditor` 호스팅)는 chrome(파일트리 행, 탭, 빈 상태, 충돌 배너)에 §2의 `ClientPalette`를 그대로 쓴다 — 새 표면이라고 별도 색 체계를 만들지 않았다.
 
-구문 강조만 예외다. `CodeEditorHostView.theme(for:)`가 `ClientPalette`에서 4개 값(`background`/`lineHighlight`=`surface`/`textPrimary`/`textSecondary`/`accent`)을 그대로 물려받고, 그 위에 코드 전용으로 고정된 3색(키워드 보라·타입 청록·리터럴 녹색, 팔레트 무관 고정 hex)을 얹는다 — 문자열 리터럴은 accent(`#ed8c33`)를 재사용. 코드 색 팔레트는 UI 색 토큰 11개보다 훨씬 많은 구분이 필요해서 나온 의도적 예외이지, 누락이 아니다.
+구문 강조만 예외다. `CodeEditorHostView.theme(for:)`가 `ClientPalette`에서 **5개 필드**
+(`background`/`surface`(lineHighlight로)/`textPrimary`/`textSecondary`/`accent`)를 물려받는다 —
+그중 `accent`는 insertionPoint·selection(25% 알파)·strings·characters 네 자리에 재사용되고,
+`textSecondary`는 invisibles와 comments(이탤릭)에 재사용된다. 그 위에 코드 전용으로 고정된 3색
+(키워드 보라·타입 청록·리터럴 녹색, 팔레트 무관 고정 hex)을 얹는다. 코드 색 팔레트는 UI 색 토큰
+10개보다 훨씬 많은 구분이 필요해서 나온 의도적 예외이지, 누락이 아니다.
 
-**미검증 항목**: 이 3색(보라/청록/녹색)은 `.dark`/`.glass`(어두운 배경) 기준으로 고른 값이라 `.light` 팔레트(흰 배경)에서도 대비가 충분한지 실제로 확인된 적이 없다 — 렌더링해서 눈으로 봐야 판단 가능한 사안이라 이번 정리에서는 건드리지 않았다.
+**미검증 항목**: 이 3색(보라/청록/녹색)은 `.dark`(어두운 배경) 기준으로 고른 값이라 `.light` 팔레트(흰 배경)에서도 대비가 충분한지 실제로 확인된 적이 없다 — 렌더링해서 눈으로 봐야 판단 가능한 사안이라 이번 정리에서는 건드리지 않았다.
 
 ## 10. 이 문서에 없는 것
 
 - 펫 오버레이(F1)·텍스트 입력 버블(F6)은 `ClientTheme` 토큰을 쓰지 않는 별개 표면이다.
 - ~~에디터 뷰(`EditorWebView`)는 아직 어디에도 호스팅되지 않는다~~ — **2026-08-14 해소**. `EditorWebView`(workspace가 서빙하는 웹 뷰) 자체는 삭제되고 네이티브 `Puck/ClientWindow/Editor/`로 대체됐다(위 9.5절, `docs/decisions.md` 참고). "에디터는 따로 할거라 토글 빼"는 그 사이 임시 상태를 설명하던 문장이라 더 이상 유효하지 않다.
-- 다크/글래스 팔레트의 `success`/`failure`/`warning`은 아직 시스템 색(`.green`/`.red`/`.orange`) 그대로다. 라이트 테마도 동일.
+- `onAccent`(§2)는 `ClientPalette`에 정의돼 있지만, 실제로 확인해보니 pet-app Swift 뷰 중 이 필드를 읽는 곳이 **아직 없다** — accent 위에 텍스트/아이콘을 얹는 자리가 지금 pet-app 네이티브 코드엔 없다(chat-web 쪽엔 있을 수 있으나 확인 안 함). v1에서 `success`/`failure`/`warning`이 시스템 색 그대로였던 것과 비슷한 모양의, 정의는 됐지만 아직 안 쓰이는 필드.
+- chat-web의 세션 전환(세션 스위처) UI는 이번 계획에서 한 번도 들여다보지 않았다(Task 7 노트) — `EditorTabStripView`(§4.5, §5)에 적용한 탭 스트립 패턴과 시각적으로 맞는지는 검증되지 않은 별도 후속 과제다.

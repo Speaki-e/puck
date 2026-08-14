@@ -2,19 +2,19 @@
 //  ToolTimeouts.swift
 //  protocol
 //
-//  Per-tool timeout mirror (docs/tools.md, plan/01_protocol.md section 4).
-//  Reference implementation -- pet-app copies this file. Mirrors the
-//  `timeoutSec` field of every entry in src/types/tools.ts.
+//  Per-tool timeout mirror (plan/01_protocol.md section 4; protocol's own
+//  docs/tools.md was removed). Reference implementation -- pet-app copies
+//  this file. Mirrors the `timeoutSec` field of every entry in src/types/tools.ts.
 //
 //  Only the timeouts are mirrored, not the whole registry: `timeout_sec` is
 //  the one registry field a tool_dispatch *receiver* needs but the wire does
-//  not carry (docs/socket.md -- the sender owns the real timeout, the
-//  receiver only needs a bound that is not tighter than the registry's).
+//  not carry (the sender owns the real timeout, the receiver only needs a
+//  bound that is not tighter than the registry's).
 //  Executor/approval/params stay TS-only because no Swift-side consumer
 //  reads them.
 //
-//  Update this file together with src/types/tools.ts and docs/tools.md on any
-//  timeout change (see repo root README, change management rules).
+//  Update this file together with src/types/tools.ts on any timeout change
+//  (see repo root README, change management rules).
 //
 
 import Foundation

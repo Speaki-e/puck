@@ -2,10 +2,11 @@
 //  BridgeMessages.swift
 //  protocol
 //
-//  Socket message Codable types (docs/socket.md, plan/01_protocol.md section 3).
-//  Reference implementation -- pet-app copies this file. Mirrors src/types/events.ts.
-//  Schema source: plan/01_protocol.md section 3. Update this file together with
-//  src/types/events.ts and docs/socket.md on any schema change (see repo root README,
+//  Socket message Codable types (plan/01_protocol.md section 3; protocol's
+//  own docs/socket.md was removed). Reference implementation -- pet-app
+//  copies this file. Mirrors src/types/events.ts.
+//  Schema source: plan/01_protocol.md section 3. Update this file together
+//  with src/types/events.ts on any schema change (see repo root README,
 //  change management rules).
 //
 

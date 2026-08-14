@@ -1,6 +1,6 @@
 /**
- * Distributed debugging log format (protocol docs/logging.md, plan/01_protocol.md
- * section 7). JSON Lines, one file per day under
+ * Distributed debugging log format (plan/01_protocol.md section 7; protocol's
+ * own docs/logging.md was removed). JSON Lines, one file per day under
  * ~/Library/Application Support/Puck/logs/. Joining on `id` across the
  * three sources reconstructs a tool call's full path.
  */

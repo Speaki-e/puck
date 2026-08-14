@@ -6,7 +6,7 @@
  * 추가/삭제/수정하지 않는다 — 도구가 늘거나 스펙이 바뀌면 protocol만 고친다.
  */
 import type Anthropic from "@anthropic-ai/sdk";
-import { TOOL_REGISTRY, type ToolDefinition, type ToolParam } from "@speaki-e/protocol/src/index.js";
+import { TOOL_REGISTRY, type ToolDefinition, type ToolParam } from "@speaki-e/protocol/dist/index.js";
 
 /** 이름 → 정의 조회용 인덱스. 레지스트리는 상수이므로 모듈 로드 시 한 번만 만든다. */
 const BY_NAME: ReadonlyMap<string, ToolDefinition> = new Map(

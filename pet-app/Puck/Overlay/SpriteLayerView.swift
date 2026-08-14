@@ -15,7 +15,8 @@
 //  Y down -- the same convention GlobalScreenSpace/StateContext already use
 //  for every movement calculation, so SpriteAvatar can set screen positions
 //  directly with zero conversion (unlike ScreenSpaceMapper's world<->screen
-//  mapping, which USDZAvatar still needs for RealityKit's Y-up world space).
+//  mapping, which the removed USDZAvatar needed for RealityKit's Y-up world
+//  space).
 //
 
 import AppKit

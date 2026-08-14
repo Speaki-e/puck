@@ -4,7 +4,7 @@ import path from "node:path";
 import { Readable, Writable } from "node:stream";
 import chokidar, { type FSWatcher } from "chokidar";
 import * as acp from "@agentclientprotocol/sdk";
-import { resolveClaudeAgentCommand } from "../shared/acp-command.js";
+import { resolveAgentCommand, type CodingAgentKind } from "../shared/acp-command.js";
 
 export interface CodeEditorResult {
   ok: boolean;
@@ -32,14 +32,15 @@ export interface AcpAdapterOptions {
   command?: string;
   args?: string[];
   env?: NodeJS.ProcessEnv;
+  agentKind?: CodingAgentKind;
   onUpdate?: AcpUpdateHandler;
   resolvePermission?: PermissionResolver;
   spawnProcess?: (command: string, args: string[], options: Parameters<typeof spawn>[2]) => ChildProcessWithoutNullStreams;
 }
 
-function claudeAgentCommand(): { command: string; args: string[] } {
+function agentCommand(kind: CodingAgentKind): { command: string; args: string[] } {
   const appPath = process.env.WORKSPACE_APP_PATH ?? process.cwd();
-  return resolveClaudeAgentCommand(appPath);
+  return resolveAgentCommand(kind, appPath);
 }
 
 function permissionDenied(): acp.RequestPermissionResponse {
@@ -108,10 +109,21 @@ export class AcpAdapter {
       });
       await new Promise<void>((resolve, reject) => watcher!.once("ready", resolve).once("error", reject));
 
-      const defaults = claudeAgentCommand();
+      const agentKind = this.options.agentKind ?? "claude";
+      const defaults = agentCommand(agentKind);
       const command = this.options.command ?? defaults.command;
       const args = this.options.args ?? defaults.args;
       const spawnProcess = this.options.spawnProcess ?? ((cmd, childArgs, options) => spawn(cmd, childArgs, options) as ChildProcessWithoutNullStreams);
+      // Deliberately minimal env: only forward what the spawned agent process
+      // needs (PATH/NODE_ENV/ELECTRON_RUN_AS_NODE plus the API key the
+      // selected agent reads), never the full parent env.
+      const agentEnv: NodeJS.ProcessEnv = {};
+      if (agentKind === "codex") {
+        if (process.env.CODEX_API_KEY) agentEnv.CODEX_API_KEY = process.env.CODEX_API_KEY;
+        if (process.env.OPENAI_API_KEY) agentEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+      } else {
+        if (process.env.ANTHROPIC_API_KEY) agentEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+      }
       child = spawnProcess(command, args, {
         cwd: input.projectPath,
         stdio: ["pipe", "pipe", "pipe"],
@@ -120,7 +132,7 @@ export class AcpAdapter {
           PATH: process.env.PATH,
           NODE_ENV: process.env.NODE_ENV ?? "production",
           ELECTRON_RUN_AS_NODE: "1",
-          ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}),
+          ...agentEnv,
           ...this.options.env,
         },
       });

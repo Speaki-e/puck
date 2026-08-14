@@ -83,24 +83,50 @@ protocol AgentLLMClient {
     func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn
 }
 
-/// Picks the `AgentLLMClient` implementation matching `configuration()`'s
-/// `provider` -- the one place `AgentHost` (both apps only ever construct one
-/// of these, at `AgentHost.init`) decides which host it is talking to. A
-/// third provider only ever means adding one more case here.
-///
-/// The provider is read once, at construction, to choose the class -- the
-/// returned client still re-reads `configuration()` on every `send` for the
-/// key and model, same as before. Switching providers in Settings while a
-/// run is already wired up therefore takes effect on the next launch, not
-/// mid-run -- the same restart AgentHost's own doc comment already implies
-/// for anything that changes which client class is in play.
-func makeAgentLLMClient(_ configuration: @escaping () -> AgentConfiguration) -> any AgentLLMClient {
-    switch configuration().provider {
-    case .openai:
-        return GPTClient(configuration: configuration)
-    case .anthropic:
-        return ClaudeClient(configuration: configuration)
+/// Routes each `send` to the underlying client matching `configuration()`'s
+/// `provider` *at the time of that call* -- not at construction. Both
+/// `GPTClient` and `ClaudeClient` already re-read `configuration()` per
+/// request so a key typed into Settings works without a relaunch; picking
+/// the provider itself only once (at `AgentHost.init`, which both apps call
+/// exactly once) contradicted that and left a provider switch in Settings
+/// stuck until the app restarted. Constructing both underlying clients is
+/// cheap -- they hold only a closure and a `URLSession` -- so there is no
+/// real cost to keeping both around and asking on every turn which one to
+/// use. A third provider only ever means adding one more case here.
+final class RoutingAgentLLMClient: AgentLLMClient {
+    private let configuration: () -> AgentConfiguration
+    private let openAIClient: any AgentLLMClient
+    private let anthropicClient: any AgentLLMClient
+
+    init(
+        configuration: @escaping () -> AgentConfiguration,
+        openAIClient: any AgentLLMClient,
+        anthropicClient: any AgentLLMClient
+    ) {
+        self.configuration = configuration
+        self.openAIClient = openAIClient
+        self.anthropicClient = anthropicClient
     }
+
+    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        switch configuration().provider {
+        case .openai:
+            return try await openAIClient.send(messages: messages, tools: tools)
+        case .anthropic:
+            return try await anthropicClient.send(messages: messages, tools: tools)
+        }
+    }
+}
+
+/// `AgentHost` (both apps only ever construct one of these, at
+/// `AgentHost.init`) gets a client that re-decides the provider on every
+/// `send` -- see `RoutingAgentLLMClient`.
+func makeAgentLLMClient(_ configuration: @escaping () -> AgentConfiguration) -> any AgentLLMClient {
+    RoutingAgentLLMClient(
+        configuration: configuration,
+        openAIClient: GPTClient(configuration: configuration),
+        anthropicClient: ClaudeClient(configuration: configuration)
+    )
 }
 
 final class GPTClient: AgentLLMClient {

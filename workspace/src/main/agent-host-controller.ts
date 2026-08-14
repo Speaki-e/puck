@@ -17,6 +17,9 @@ export class AgentHostController extends EventEmitter {
     private readonly appPath = process.cwd(),
     /** ACP(Claude Code CLI)가 인증에 쓴다 -- ai-module은 더 이상 이 프로세스에서 안 돈다. */
     private readonly claudeApiKey?: string,
+    /** ACP(codex-acp)가 인증에 쓴다 -- AcpAdapter가 agentKind === "codex"일 때 자식 프로세스의 env에서 읽는다. */
+    private readonly codexApiKey?: string,
+    private readonly openAiApiKey?: string,
   ) {
     super();
   }
@@ -31,6 +34,8 @@ export class AgentHostController extends EventEmitter {
         NODE_ENV: process.env.NODE_ENV ?? "production",
         WORKSPACE_APP_PATH: this.appPath,
         ...(this.claudeApiKey ? { ANTHROPIC_API_KEY: this.claudeApiKey } : {}),
+        ...(this.codexApiKey ? { CODEX_API_KEY: this.codexApiKey } : {}),
+        ...(this.openAiApiKey ? { OPENAI_API_KEY: this.openAiApiKey } : {}),
       },
     });
     this.child = child;

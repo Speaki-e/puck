@@ -15,4 +15,14 @@ final class StatusDotViewTests: XCTestCase {
         XCTAssertEqual(DotStatus.success.color(in: palette), palette.statusSuccess)
         XCTAssertEqual(DotStatus.error.color(in: palette), palette.statusError)
     }
+
+    func test_pulsesDefaultsToTrue() {
+        let dot = StatusDotView(status: .active, palette: .dark)
+        XCTAssertTrue(dot.pulses)
+    }
+
+    func test_pulsesCanBeDisabledForPersistentStates() {
+        let dot = StatusDotView(status: .active, palette: .dark, pulses: false)
+        XCTAssertFalse(dot.pulses)
+    }
 }

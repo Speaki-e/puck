@@ -28,6 +28,11 @@ struct StatusDotView: View {
     let status: DotStatus
     let palette: ClientPalette
     var diameter: CGFloat = 6
+    /// Whether `.active` animates. False for states that persist indefinitely --
+    /// an unsaved file stays unsaved until the user acts, and a dot pulsing for
+    /// minutes reads as ongoing activity that isn't happening. See the v3 layout
+    /// spec's session-row section for the distinction.
+    var pulses: Bool = true
 
     @State private var isPulsing = false
 
@@ -35,7 +40,7 @@ struct StatusDotView: View {
         Circle()
             .fill(status.color(in: palette))
             .frame(width: diameter, height: diameter)
-            .opacity(status == .active && isPulsing ? 0.4 : 1)
+            .opacity(status == .active && pulses && isPulsing ? 0.4 : 1)
             .animation(
                 status == .active
                     ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
@@ -43,7 +48,7 @@ struct StatusDotView: View {
                 value: isPulsing
             )
             .task(id: status) {
-                isPulsing = status == .active
+                isPulsing = pulses && status == .active
             }
     }
 }

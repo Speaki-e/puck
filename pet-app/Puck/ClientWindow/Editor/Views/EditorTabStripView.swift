@@ -43,7 +43,7 @@ struct EditorTabStripView: View {
                 .font(ClientTheme.Typography.caption)
                 .lineLimit(1)
             if tab.isDirty {
-                StatusDotView(status: .active, palette: palette, diameter: 5)
+                StatusDotView(status: .active, palette: palette, diameter: 5, pulses: false)
             }
             Button(action: { onClose(tab.path) }) {
                 Image(systemName: "xmark")

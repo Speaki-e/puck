@@ -3,6 +3,7 @@ import { TOOL_REGISTRY, type JSONValue, type ToolExecutionResult, type ToolExecu
 import type { CodeEditorResult } from "../agent-host/acp-adapter.js";
 import { DEFAULT_EDITABLE_SIZE_LIMIT, type FileService } from "./file-service.js";
 import { FileServiceError } from "../shared/file-contract.js";
+import type { CodingAgentKind } from "../shared/acp-command.js";
 import type { AgentHostController } from "./agent-host-controller.js";
 import type { EditorGateway } from "./editor-gateway.js";
 
@@ -15,6 +16,8 @@ export interface EditorLocalDeps {
   projectPath: string;
   agentHost: Pick<AgentHostController, "request">;
   editorGateway: Pick<EditorGateway, "requestOpenTab">;
+  /** 설정(W7)의 codingAgent 스냅샷 -- 비어 있으면 AcpAdapter가 "claude"로 기본 처리한다. */
+  codingAgent?: CodingAgentKind;
   fileServiceFor(workspaceId: string): Promise<FileService>;
   /**
    * code_editor 요청을 Agent Host에 보내기 직전에 그 requestId를 알려준다. Agent Host의
@@ -60,6 +63,7 @@ async function codeEditorTool(deps: EditorLocalDeps, args: JSONValue, signal?: A
     task,
     // 보안 핵심(W6 완료 기준): args.project_path는 절대 신뢰하지 않고 세션 workspace의 실제 경로로 강제한다.
     projectPath: deps.projectPath,
+    agentKind: deps.codingAgent,
   }, CODE_EDITOR_TIMEOUT_MS);
   const onAbort = () => {
     void deps.agentHost.request("cancelCodeEditor", { requestId }, 5_000).catch(() => undefined);

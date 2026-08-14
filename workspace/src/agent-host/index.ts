@@ -8,6 +8,7 @@ import type { Attachment, JSONValue, ToolExecutionResult } from "@speaki-e/proto
 import { AcpAdapter } from "./acp-adapter.js";
 import { CodeEditorQueue, QueueCancelledError } from "./code-editor-queue.js";
 import { createAgentRunner, type ExecutorKind } from "./agent-runner.js";
+import type { CodingAgentKind } from "../shared/acp-command.js";
 
 interface UtilityParentPort {
   postMessage(message: unknown): void;
@@ -82,8 +83,9 @@ const agentRunner = createAgentRunner({
  * onUpdate/resolvePermission이 "지금 이 이벤트가 어느 requestId/workspaceId 것인지" 구분할 수 없었다.
  * 요청마다 만들면 onUpdate/resolvePermission 클로저가 자기 requestId를 들고 있어 안전하게 구분된다.
  */
-function createAdapterFor(payload: { requestId: string; workspaceId: string; sessionId: string }): AcpAdapter {
+function createAdapterFor(payload: { requestId: string; workspaceId: string; sessionId: string; agentKind?: CodingAgentKind }): AcpAdapter {
   return new AcpAdapter({
+    agentKind: payload.agentKind,
     onUpdate: (update) => emit("code_editor_update", {
       requestId: payload.requestId,
       workspaceId: payload.workspaceId,

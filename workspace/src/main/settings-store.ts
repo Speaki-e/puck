@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import type { CodingAgentKind } from "../shared/acp-command.js";
 import type { LogLevel, WorkspaceSettings } from "../shared/settings-contract.js";
 
 export type { WorkspaceSettings } from "../shared/settings-contract.js";
@@ -8,10 +9,12 @@ export type { WorkspaceSettings } from "../shared/settings-contract.js";
 const DEFAULT_SETTINGS: WorkspaceSettings = {
   fileSizeLimitBytes: 2 * 1024 * 1024,
   logLevel: "info",
+  codingAgent: "claude",
 };
 
 const MIN_FILE_SIZE_LIMIT = 64 * 1024;
 const LOG_LEVELS = new Set<LogLevel>(["debug", "info", "warn", "error"]);
+const CODING_AGENTS = new Set<CodingAgentKind>(["claude", "codex"]);
 
 function sanitize(patch: Partial<WorkspaceSettings>): Partial<WorkspaceSettings> {
   const result: Partial<WorkspaceSettings> = {};
@@ -19,6 +22,9 @@ function sanitize(patch: Partial<WorkspaceSettings>): Partial<WorkspaceSettings>
     result.fileSizeLimitBytes = Math.floor(patch.fileSizeLimitBytes);
   }
   if (typeof patch.logLevel === "string" && LOG_LEVELS.has(patch.logLevel)) result.logLevel = patch.logLevel;
+  if (typeof patch.codingAgent === "string" && CODING_AGENTS.has(patch.codingAgent as CodingAgentKind)) {
+    result.codingAgent = patch.codingAgent;
+  }
   return result;
 }
 

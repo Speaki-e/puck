@@ -32,6 +32,43 @@ describe("createEditorLocalExecutor: code_editor", () => {
     expect(result).toEqual({ ok: true, data: { ok: true, summary: "완료", changedFiles: ["a.ts"] } });
   });
 
+  it("설정된 codingAgent를 runCodeEditor 요청의 agentKind로 전달한다", async () => {
+    const request = vi.fn().mockResolvedValue({ ok: true, summary: "완료", changedFiles: [] });
+    const executor = createEditorLocalExecutor({
+      workspaceId: "w1",
+      sessionId: "s1",
+      projectPath: "/real/project/path",
+      codingAgent: "codex",
+      agentHost: { request },
+      editorGateway: { requestOpenTab: vi.fn() },
+      fileServiceFor: async () => { throw new Error("not used"); },
+    });
+    await executor.execute("code_editor", { task: "버그 수정" });
+    expect(request).toHaveBeenCalledWith(
+      "runCodeEditor",
+      expect.objectContaining({ agentKind: "codex" }),
+      expect.any(Number),
+    );
+  });
+
+  it("codingAgent를 지정하지 않으면 agentKind를 보내지 않는다(AcpAdapter가 claude로 기본 처리)", async () => {
+    const request = vi.fn().mockResolvedValue({ ok: true, summary: "완료", changedFiles: [] });
+    const executor = createEditorLocalExecutor({
+      workspaceId: "w1",
+      sessionId: "s1",
+      projectPath: "/real/project/path",
+      agentHost: { request },
+      editorGateway: { requestOpenTab: vi.fn() },
+      fileServiceFor: async () => { throw new Error("not used"); },
+    });
+    await executor.execute("code_editor", { task: "버그 수정" });
+    expect(request).toHaveBeenCalledWith(
+      "runCodeEditor",
+      expect.objectContaining({ agentKind: undefined }),
+      expect.any(Number),
+    );
+  });
+
   it("실패 결과의 acp_error를 execution_failed로 정규화한다", async () => {
     const request = vi.fn().mockResolvedValue({ ok: false, summary: "실패", changedFiles: [], error: "acp_error", detail: "boom" });
     const executor = createEditorLocalExecutor({

@@ -1,6 +1,7 @@
 import type { Attachment, JSONValue, ToolErrorCode, ToolExecutionResult, ToolExecutor } from "@speaki-e/protocol";
 import { createOpenAiCodeEditorExecutor } from "../openai-code-editor.js";
 import { workingPathsFromUpdate, type AcpUpdatePayload } from "../../shared/acp-update.js";
+import type { CodingAgentKind } from "../../shared/acp-command.js";
 import type { AgentHostController } from "../agent-host-controller.js";
 import type { EditorGateway } from "../editor-gateway.js";
 import type { JsonlLogger } from "../logger.js";
@@ -19,6 +20,8 @@ interface AgentRuntimeCoordinatorDeps {
   logger: JsonlLogger;
   /** --openai-code-editor: code_editor를 ACP 대신 OpenAI 툴 루프로 실행 (openai-code-editor.ts). */
   openAiCodeEditor?: { apiKey: string; model: string };
+  /** 설정 화면(W7)의 codingAgent를 새 실행마다 반영하기 위한 훅(getEditableSizeLimit과 동일한 패턴). */
+  getCodingAgent?: () => CodingAgentKind;
 }
 
 export interface AgentRuntimeCoordinator {
@@ -69,6 +72,7 @@ export function createAgentRuntimeCoordinator(deps: AgentRuntimeCoordinatorDeps)
       projectPath: workspace?.realProjectPath ?? "",
       agentHost,
       editorGateway,
+      codingAgent: deps.getCodingAgent?.(),
       fileServiceFor: (id) => controller.getFileService(id),
       trackCodeEditorRequest: (requestId) => {
         codeEditorRequests.set(requestId, { workspaceId, sessionId });

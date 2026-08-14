@@ -21,19 +21,46 @@ func dotStatus(for availability: EditorAvailability) -> DotStatus {
     }
 }
 
+/// `/Users/x/dev/p` -> `~/dev/p`. Only at a path boundary, so `/Users/xyz`
+/// isn't mangled by a home of `/Users/x`.
+func abbreviatedPath(_ path: String, home: String) -> String {
+    if path == home { return "~" }
+    guard path.hasPrefix(home + "/") else { return path }
+    return "~" + path.dropFirst(home.count)
+}
+
 struct ClientStatusBarView: View {
     let workspace: ClientWorkspace?
     let availability: EditorAvailability
     let palette: ClientPalette
 
+    /// Loaded fresh rather than threaded in from a store: this is the same
+    /// config AgentSettingsView reads directly (AgentConfiguration.load()),
+    /// and the model name changing means either a rebuild or an .env edit --
+    /// neither of which this view needs to observe live.
+    private var model: String {
+        AgentConfiguration.load().model
+    }
+
+    // "일상 대화" matches ClientWindowStore.casualSessionTitle -- the
+    // default workspace's own name, not an English placeholder (every
+    // sibling string here is Korean, e.g. ConflictBannerView's "디스크에서
+    // 파일이 변경됐습니다").
+    private var projectLabel: String {
+        guard let projectPath = workspace?.projectPath else { return workspace?.name ?? "일상 대화" }
+        return abbreviatedPath(projectPath, home: NSHomeDirectory())
+    }
+
     var body: some View {
         HStack(spacing: ClientTheme.Metrics.spacingSmall) {
             StatusDotView(status: dotStatus(for: availability), palette: palette)
-            // "일상 대화" matches ClientWindowStore.casualSessionTitle -- the
-            // default workspace's own name, not an English placeholder
-            // (every sibling string here is Korean, e.g. ConflictBannerView's
-            // "디스크에서 파일이 변경됐습니다").
-            Text(workspace?.name ?? "일상 대화")
+            Text(projectLabel)
+                .font(ClientTheme.Typography.mono)
+                .foregroundStyle(palette.textSecondary)
+            Rectangle()
+                .fill(palette.surfaceBorder)
+                .frame(width: 1, height: 10)
+            Text(model)
                 .font(ClientTheme.Typography.mono)
                 .foregroundStyle(palette.textSecondary)
             Spacer()

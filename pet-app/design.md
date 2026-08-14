@@ -1,10 +1,10 @@
 # Puck 디자인 시스템 (현재 구현 기준)
 
 > **디자인 시스템 v2 — 2026-08-14.** 아래 문서는 이전 팔레트/테마 체계(호박 주황 accent +
-> 다크/화이트/글래스 3무드)를 전면 교체한 결과를 기록한다. 근거/레퍼런스(Orca)는
-> `docs/superpowers/specs/2026-08-14-design-system-v2-design.md` 참고 — 교체 사유는 기술적
-> 결함이 아니라 아트디렉션 전면 재조정이었다. `.glass` 테마는 폐기됐다(macOS 26+ 전용 기능
-> 유지보수 비용 대비 실익이 낮다는 판단, `docs/decisions.md`).
+> 다크/화이트/글래스 3무드)를 전면 교체한 결과를 기록한다. 근거/배경은 `docs/decisions.md`의
+> 2026-08-14 항목 참고 — 교체 사유는 기술적 결함이 아니라 아트디렉션 전면 재조정이었다.
+> `.glass` 테마는 폐기됐다(macOS 26+ 전용 기능 유지보수 비용 대비 실익이 낮다는 판단,
+> `docs/decisions.md`).
 >
 > 별도 사실 하나 더: F13 클라이언트 창의 사이드바/탑바/메시지 목록은 이 v2 작업보다 하루 앞선
 > 2026-08-13에 이미 `chat-web/`(React/Tailwind/shadcn)로 옮겨갔고 `ChatView.swift`/
@@ -81,8 +81,8 @@ F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제�
 | accent | `#ed8c33` |
 | onAccent | `#161616` (거의 검정 — 이 팔레트에서는 흰색보다 accent 위 대비/무드가 낫다) |
 
-v2 값은 Orca 레퍼런스 기반으로 새로 잡은 값이다(`docs/superpowers/specs/2026-08-14-design-system-v2-design.md`
-§1) — v1처럼 workspace CSS를 그대로 옮겨온 게 아니라, **세 소비처(`ClientPalette.swift`,
+v2 값은 Orca 레퍼런스 기반으로 새로 잡은 값이다(`docs/decisions.md`의 2026-08-14 항목 참고)
+— v1처럼 workspace CSS를 그대로 옮겨온 게 아니라, **세 소비처(`ClientPalette.swift`,
 `chat-web/src/styles.css`, `workspace/src/renderer/styles.css`)를 같은 값으로 동시에 갈아끼웠다.**
 실제로 확인한 결과 `chat-web/src/styles.css`의 `--ink`/`--mute`/`--hairline`/`--canvas`/`--surface`/
 `--brand`와 `workspace/src/renderer/styles.css`의 동일 변수들이 위 표와 정확히 같은 hex를 쓴다(light
@@ -198,10 +198,9 @@ dirty 표시는 펄스 없는 다른 표현으로 바꿀지는 별도 결정이 
                           (ClientStatusBarView)
 ```
 
-`VisualEffectBackground`(`Puck/ClientWindow/VisualEffectBackground.swift`, `NSVisualEffectView`
-래퍼)는 파일 자체는 아직 남아 있지만, 실제로 확인해보니 **현재 아무 뷰도 이걸 쓰지 않는다** —
-원래 (이미 삭제된) 사이드바 배경용으로 만들어졌던 것으로 보이는 죽은 코드다. 왜 같이 정리되지
-않았는지는 이번 v2 스코프 밖이라 확인하지 않았다.
+`VisualEffectBackground`(`NSVisualEffectView` 래퍼)도 이번 라운드에서 **완전히 삭제됐다** — 확인
+결과 아무 뷰도 쓰지 않는 죽은 코드였고, 원래 (이미 삭제된) 사이드바 배경용으로 만들어졌던 것으로
+보인다. `GlassSurface.swift`(SwiftUI 쪽 절반, 이미 삭제됨)와 같은 이유로 같이 삭제됐다.
 
 ## 6. 레이아웃
 

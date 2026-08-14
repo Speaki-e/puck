@@ -13,9 +13,9 @@
  * shared tooling (docs/decisions.md, 2026-08-13) -- if it drifts, that's the
  * comment to update.
  *
- * v2 (2026-08-14, docs/superpowers/specs/2026-08-14-design-system-v2-design.md):
- * darker/denser base palette, new light-theme variant, new --status-*
- * vocabulary. --brand is unchanged -- it never moves.
+ * v2 (2026-08-14, docs/decisions.md): darker/denser base palette, new
+ * light-theme variant, new --status-* vocabulary. --brand is unchanged --
+ * it never moves.
  */
 :root {
   color: #ededed;
@@ -32,14 +32,15 @@
   --surface: #131313;
   --brand: #ed8c33;
   --brand-soft: #3d2612;
+  --on-brand: #161616;
   --violet: #a855f7;
-  --warning: #e3b341;
+  --warning: var(--status-warning);
   --status-success: #3fb950;
   --status-error: #f85149;
   --status-warning: #e3b341;
   --status-idle: var(--mute);
-  /* shadcn 테마 변수 -- 이 앱은 라이트 모드가 없으므로(:root가 곧 유일한 테마) 위 --canvas/--ink류
-     팔레트 값을 그대로 물려서 shadcn 컴포넌트가 기존 UI와 같은 색을 쓰게 한다. */
+  /* shadcn 테마 변수 -- 위 --canvas/--ink류 팔레트 값을 그대로 물려서 shadcn 컴포넌트가 기존
+     UI와 같은 색을 쓰게 한다. v2: 아래 .light 블록에서 라이트 변형도 정의한다. */
   --background: var(--canvas);
   --foreground: var(--ink);
   --card: var(--surface);
@@ -67,7 +68,7 @@
   --sidebar: var(--surface);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--brand);
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary-foreground: var(--on-brand);
   --sidebar-accent: var(--hairline-soft);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--hairline);
@@ -77,9 +78,11 @@
 /*
  * v2 (2026-08-14): light-theme variant, new to this app -- apply by adding
  * class="light" to <html>/<body>. Mirrors pet-app's ClientPalette.light.
- * No consumer wires up a toggle yet (out of scope for this plan -- token
- * definition only, matching how this plan's Swift side ships light/dark
- * as data without redesigning who calls the toggle).
+ * Variables are complete and this file has zero hardcoded color literals
+ * below the token block, so class="light" actually renders correctly today
+ * -- it's just that no consumer wires up a toggle yet (out of scope for
+ * this plan -- token definition only, matching how this plan's Swift side
+ * ships light/dark as data without redesigning who calls the toggle).
  */
 .light {
   color: #1a1a1a;
@@ -110,6 +113,7 @@ button, input, textarea { font: inherit; }
      hand-written CSS classes) lean on Tailwind utilities directly. */
   --color-brand: var(--brand);
   --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
   --color-ink: var(--ink);
   --color-body: var(--body);
   --color-mute: var(--mute);
@@ -160,7 +164,8 @@ button, input, textarea { font: inherit; }
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* This app has no light/dark toggle -- :root itself is always dark. */
+/* No consumer wires up a toggle yet, so :root (dark) is what actually
+   renders -- see the .light block above for its own note on readiness. */
 
 @layer base {
   * {

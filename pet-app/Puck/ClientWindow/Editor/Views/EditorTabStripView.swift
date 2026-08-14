@@ -2,10 +2,12 @@
 //  EditorTabStripView.swift
 //  Puck
 //
-//  Design system v2 (2026-08-14): switched from hardcoded spacing/size
-//  literals to ClientTheme.Metrics -- see
-//  docs/superpowers/specs/2026-08-14-design-system-v2-design.md §4 (tab
-//  strip pattern).
+//  Design system v2 (2026-08-14): switched internal spacing/padding to
+//  ClientTheme.Metrics -- see docs/decisions.md (tab strip pattern).
+//  stripHeight/tabHeight stay plain literals rather than derived from a
+//  spacing token -- they're this view's own dimensions, not a spacing
+//  concern, and coupling them to a generic token would let retuning that
+//  token silently resize the tab strip.
 //
 
 import SwiftUI
@@ -18,9 +20,9 @@ struct EditorTabStripView: View {
 
     @Environment(\.clientPalette) private var palette
 
-    static let stripHeight: CGFloat = ClientTheme.Metrics.spacingLarge * 2 + 4
+    private static let stripHeight: CGFloat = 28
 
-    private static let tabHeight: CGFloat = stripHeight - 4
+    private static let tabHeight: CGFloat = 24
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {

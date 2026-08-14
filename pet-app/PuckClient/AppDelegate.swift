@@ -124,8 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyClientThemeStyle(_ style: ClientThemeStyle) {
         clientWindowStore.themeStyle = style
-        // NSVisualEffectView materials (the `.glass` theme's sidebar) and
-        // native chrome (NSOpenPanel, popovers) follow NSApp.appearance, not
+        // Native chrome (NSOpenPanel, popovers) follows NSApp.appearance, not
         // SwiftUI's .preferredColorScheme, which never touches them -- same
         // reason Puck's own AppDelegate sets NSApp.appearance alongside
         // its SwiftUI modifier.

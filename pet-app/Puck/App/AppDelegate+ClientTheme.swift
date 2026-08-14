@@ -14,7 +14,7 @@ extension AppDelegate {
 
     /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
     /// 셰이디 설정으로 변경할 수 있어야하거든" -- ClientThemeStyle (the
-    /// client window's own light/dark/glass theme, separate from the
+    /// client window's own light/dark theme, separate from the
     /// system-wide appearance above) is a Settings item here, but only
     /// PuckClient's client window actually renders with it -- this process
     /// never applies it locally, just persists it (via SettingsStore) and

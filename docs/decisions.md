@@ -4,6 +4,63 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-14: design system v2 -- new mood, light/dark only, new status vocabulary
+
+Full art-direction replacement of `ClientPalette`/`ClientTheme` and the two
+web surfaces that mirror them, not a technical fix -- the previous look
+(pumpkin-orange accent, dark/white/glass three-mood system) just wasn't
+working. New reference mood is an Orca/Zed-style IDE tool: near-black/white
+base, denser spacing, harder (smaller) corner radii. `#ed8c33` accent is
+kept -- still the one deliberately loud color.
+
+- Themes: 3 → 2. `.glass` is deleted entirely from `ClientThemeStyle` --
+  no longer light/dark/glass, just light/dark. `GlassSurface.swift` and the
+  `themedSurface` view modifier are deleted as dead code (nothing else drew
+  the glass material). `VisualEffectBackground.swift` (the AppKit half of
+  the same glass sidebar) is deleted too, in the same cleanup pass.
+- `ClientPalette` values replaced for both `.light`/`.dark`: `background`/
+  `surface`/`surfaceBorder`/`textPrimary`/`textSecondary`/`onAccent` all
+  repointed to the new v2 hexes (`pet-app/design.md` §2 has the full table).
+  `accent` (`#ed8c33`) is unchanged. `onAccent` on `.dark` is now `#161616`
+  (near-black) rather than white -- reads better on the orange fill per the
+  new reference mood; `.light`'s `onAccent` stays white.
+- New status-color vocabulary on `ClientPalette`: `statusSuccess`
+  (`#3fb950`), `statusError` (`#f85149`), `statusWarning` (`#e3b341`) are
+  new stored fields (theme-invariant), plus `statusIdle`/`statusActive`
+  as *computed* properties (`textSecondary`/`accent` respectively) so they
+  can never drift from those fields. Replaces the old system-color
+  (`.green`/`.red`/`.orange`) usage design.md previously documented as ad
+  hoc.
+- New components consuming that vocabulary: `StatusDotView` (small filled
+  circle, `.active` pulses) and `ClientStatusBarView` (persistent thin
+  status bar along the bottom of the client window, new UI surface --
+  reports the active workspace's editor/project status, not the
+  pet-app<->workspace bridge socket).
+- Density retune in `ClientTheme.Metrics`: `spacingSmall`/`spacingMedium`/
+  `spacingLarge` go from 6/10/16 to 4/8/12; `cardCornerRadius`/
+  `rowCornerRadius` go from 12/6 to 6/4. Every panel/tab/badge gets a step
+  smaller and more tightly packed -- "soft chat app" density to "dense
+  tool" density.
+- `chat-web/src/styles.css` and `workspace/src/renderer/styles.css`: token
+  values updated to match (`--canvas`/`--surface`/`--hairline`/`--ink`/
+  `--mute`/`--brand` names unchanged, values replaced), new `--status-*`
+  variables added. Both files also gain a `.light` block for the first time
+  -- neither had a light theme before. Note: chat-web's light variables are
+  complete and the stylesheet below the token block has zero hardcoded
+  color literals, so `class="light"` works today; workspace's `.light`
+  block is defined but ~59 hardcoded dark literals remain further down that
+  file, so `class="light"` there currently yields a broken half-light UI --
+  not fixed in this pass (tracked as follow-up, not urgent since nothing
+  wires up a light toggle yet on either surface).
+- `pet-app/design.md` was rewritten in full to the v2 values and is the
+  detailed reference for all of the above (exact hex tables, typography,
+  component patterns) -- this entry is the summary, not a duplicate.
+- Supersedes the 2026-08-12 "PuckClient adopts workspace's design" entry
+  below (the `#090909`/`#111111` surfaces and 12px/6px radii it describes
+  as "source of truth" are the now-replaced v1 values) and the 2026-08-13
+  "one point color" entry's claim that `ClientPalette.light/.dark/.glass`
+  all share `#ed8c33` (`.glass` no longer exists).
+
 ## 2026-08-14: PuckClient's editor pane goes native, drops workspace at runtime
 
 Replaced `EditorWebView.swift` (a `WKWebView` loading a URL `workspace`
@@ -170,6 +227,8 @@ color (see the removed "Figma color matching" scope note in `pet-app/design.md`)
   the same orange.
 - pet-app: `ClientPalette.light/.dark/.glass` all now use the identical
   `#ed8c33` accent (previously `.dark` alone had drifted to workspace's blue).
+  **Superseded 2026-08-14**: `.glass` no longer exists (design system v2
+  above deleted it); the accent value itself is still `#ed8c33`.
 
 ## 2026-08-12: workspace becomes a plain editor; pet-app's F15 brain is permanent
 
@@ -191,6 +250,11 @@ text pet-app's CodeEditorDelegate already decided is a coding task.
   `02_pet-app.md` F15, `프로젝트_개요.md` §2.
 
 ## 2026-08-12: PuckClient adopts workspace's design, not the other way around
+
+**Superseded 2026-08-14**: the `#090909`/`#111111` surfaces and 12px/6px
+corner radii below were replaced wholesale by design system v2 (see the
+2026-08-14 entry above) -- they are no longer the source of truth for
+anything. Kept here for history.
 
 Earlier the client window's `ClientPalette`/`ClientTheme` were pushed toward a
 Figma reference and workspace's renderer theme was pulled to match *that*.

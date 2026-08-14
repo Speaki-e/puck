@@ -25,7 +25,7 @@ export function WorkspaceSwitcher({ workspaces, activeWorkspaceId, expanded, onS
         <PopoverTrigger asChild>
           <Button type="button" variant="ghost" className={cn("h-auto justify-start gap-2 px-1.5 py-1.5", !expanded && "w-full justify-center px-0")}>
             <Avatar className="size-6 shrink-0">
-              <AvatarFallback className="bg-brand text-[11px] font-medium text-white">
+              <AvatarFallback className="bg-brand text-[11px] font-medium text-on-brand">
                 {(activeWorkspace?.name ?? "?").slice(0, 1).toUpperCase()}
               </AvatarFallback>
             </Avatar>

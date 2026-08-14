@@ -3,8 +3,8 @@
 //  Puck
 //
 //  Design system v2 (2026-08-14) -- the status-color vocabulary
-//  (docs/superpowers/specs/2026-08-14-design-system-v2-design.md §1/§4)
-//  needs one shared visual it's rendered as: a small filled circle. `.active`
+//  (docs/decisions.md) needs one shared visual it's rendered as: a small
+//  filled circle. `.active`
 //  pulses (an ongoing, not-yet-resolved state deserves motion the other
 //  three don't -- idle/success/error are all settled states).
 //

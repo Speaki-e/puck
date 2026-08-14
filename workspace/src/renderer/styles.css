@@ -21,14 +21,15 @@
   --surface: #131313;
   --brand: #ed8c33;
   --brand-soft: #3d2612;
+  --on-brand: #161616;
   --violet: #a855f7;
-  --warning: #e3b341;
+  --warning: var(--status-warning);
   --status-success: #3fb950;
   --status-error: #f85149;
   --status-warning: #e3b341;
   --status-idle: var(--mute);
-  /* shadcn 테마 변수 -- 이 앱은 라이트 모드가 없으므로(:root가 곧 유일한 테마) 위 --canvas/--ink류
-     팔레트 값을 그대로 물려서 shadcn 컴포넌트가 기존 UI와 같은 색을 쓰게 한다. */
+  /* shadcn 테마 변수 -- 위 --canvas/--ink류 팔레트 값을 그대로 물려서 shadcn 컴포넌트가 기존
+     UI와 같은 색을 쓰게 한다. v2: 아래 .light 블록에서 라이트 변형도 정의한다. */
   --background: var(--canvas);
   --foreground: var(--ink);
   --card: var(--surface);
@@ -56,7 +57,7 @@
   --sidebar: var(--surface);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--brand);
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary-foreground: var(--on-brand);
   --sidebar-accent: var(--hairline-soft);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--hairline);
@@ -66,9 +67,12 @@
 /*
  * v2 (2026-08-14): light-theme variant, new to this app -- apply by adding
  * class="light" to <html>/<body>. Mirrors pet-app's ClientPalette.light.
- * No consumer wires up a toggle yet (out of scope for this plan -- token
- * definition only, matching how this plan's Swift side ships light/dark
- * as data without redesigning who calls the toggle).
+ * Unlike chat-web's copy of this block, this file still has ~59 hardcoded
+ * dark color literals below the token block (surface/hairline shades,
+ * status-pulse glow, syntax-chip colors, etc.) that don't read any of these
+ * variables -- class="light" is NOT usable here yet, it would produce a
+ * broken half-light UI. Token definition only (out of scope for this plan
+ * to convert those literals); no consumer wires up a toggle either way.
  */
 .light {
   color: #1a1a1a;
@@ -96,7 +100,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .eyebrow { color: var(--mute); font-family: "Geist Mono", ui-monospace, monospace; font-size: 10px; font-weight: 500; line-height: 14px; letter-spacing: .06em; }
 
 .workspace-shell { display: grid; grid-template-rows: 56px minmax(0, 1fr) 72px; width: 100%; height: 100%; background: var(--canvas); }
-.titlebar { display: grid; grid-template-columns: minmax(240px, 1fr) 300px; align-items: center; padding: 0 14px 0 18px; border-bottom: 1px solid var(--hairline); background: rgba(9, 9, 9, .96); -webkit-app-region: drag; }
+.titlebar { display: grid; grid-template-columns: minmax(240px, 1fr) 300px; align-items: center; padding: 0 14px 0 18px; border-bottom: 1px solid var(--hairline); background: rgba(10, 10, 10, .96); -webkit-app-region: drag; }
 .titlebar button { -webkit-app-region: no-drag; }
 .project-identity { display: flex; min-width: 0; align-items: center; gap: 8px; color: var(--body); font-size: 12px; }
 .project-identity strong { max-width: 180px; overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
@@ -107,9 +111,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .button-ghost:hover:not(:disabled) { border-color: #444; background: var(--hairline-soft); }
 .button-ghost:disabled { color: #4d4d4d; cursor: default; }
 /* Primary action, matching client's own primary CTA (ChatInputBar's send
-   button: bg-brand text-white) rather than shadcn's generic --primary --
+   button: bg-brand text-on-brand) rather than shadcn's generic --primary --
    the two apps' most prominent buttons should read as the same brand. */
-.button-primary-small, .button-primary { border-color: var(--brand); background: var(--brand); color: #fff; }
+.button-primary-small, .button-primary { border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
 .button-primary-small:hover, .button-primary:hover { background: color-mix(in oklch, var(--brand), white 12%); transform: translateY(-1px); }
 /* Same radius token as every other button (var(--radius-md)) -- a full
    100px pill only ever existed here; nothing in client's actual shadcn
@@ -303,8 +307,9 @@ kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-botto
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* 이 앱은 라이트/다크 토글이 없다 -- :root 자체가 항상 다크라, 별도 .dark 오버라이드 블록은
-   두지 않는다(나중에 라이트 모드가 생기면 여기 :root를 .light로 내리고 이 자리에 다크를 채우면 됨). */
+/* 토글이 아직 없어서 :root(다크)가 실제로 항상 렌더된다. .light 블록(위)에 변수는 이미
+   있지만, 이 아래 스타일시트의 ~59개 하드코딩 다크 리터럴이 그 변수를 안 쓰므로 .light는
+   아직 실사용 불가 -- 위 .light 블록 주석 참고. */
 
 @layer base {
   * {

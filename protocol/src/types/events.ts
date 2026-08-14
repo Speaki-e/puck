@@ -1,5 +1,5 @@
 /**
- * Socket message types (protocol docs/socket.md, plan/01_protocol.md section 3).
+ * Socket message types (plan/01_protocol.md section 3; protocol's own docs/socket.md was removed).
  * Wire format: JSON Lines over the pet-app <-> workspace Unix Domain Socket.
  * Mirrors pet-app/Puck/Bridge/{BridgeMessages,JSONValue}.swift.
  */
@@ -52,7 +52,7 @@ export interface ToolResult {
   type: "tool_result";
   id: string;
   ok: boolean;
-  /** Present when ok is true. Shape is tool-specific -- see docs/tools.md. */
+  /** Present when ok is true. Shape is tool-specific -- see each entry's responseNote in tools.ts. */
   data?: JSONValue;
   /** Present when ok is false. Standard code only -- see ToolErrorCode. */
   error?: ToolErrorCode;

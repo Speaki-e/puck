@@ -1,6 +1,6 @@
 /**
- * Avatar manifest.json schema (protocol docs/avatar-manifest.md, plan/01_protocol.md
- * section 6). Mirrors pet-app/Puck/Avatar/AvatarManifest.swift.
+ * Avatar manifest.json schema (plan/01_protocol.md section 6; protocol's own
+ * docs/avatar-manifest.md was removed). Mirrors pet-app/Puck/Avatar/AvatarManifest.swift.
  *
  * Primary avatar type is 2D sprites (PNG) rather than 3D usdz.
  * `bounce_intensity` and `emotions` are additive, optional fields --
@@ -21,8 +21,9 @@ export interface Hitbox {
  * manifest.json (e.g. "walk" -> Avatars/{name}/walk.png). For `type: usdz`,
  * the same stem convention pointed at a usdz instead -- one usdz file per
  * clip, not one usdz with many named animations, since RealityKit only ever
- * plays a usdz's first animation regardless of how many it contains. See
- * pet-app/docs/avatar-spec.md for the full external-creator requirements.
+ * plays a usdz's first animation regardless of how many it contains. There is
+ * no dedicated external-creator spec doc yet; this comment is the current
+ * source of truth for that requirement.
  *
  * For `type: video`, the value is instead a { in, out } timecode range (seconds).
  */

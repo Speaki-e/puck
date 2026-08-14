@@ -1,5 +1,5 @@
 /**
- * ai-module interface (protocol docs/agent-interface.md, plan/01_protocol.md section 5).
+ * ai-module interface (plan/01_protocol.md section 5; protocol's own docs/agent-interface.md was removed).
  */
 
 import type { Attachment, JSONValue, ToolErrorCode } from "./events.js";

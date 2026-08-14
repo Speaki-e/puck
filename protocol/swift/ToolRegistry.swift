@@ -2,9 +2,10 @@
 //  ToolRegistry.swift
 //  protocol
 //
-//  Tool registry mirror (docs/tools.md, plan/01_protocol.md section 4).
-//  Reference implementation -- consumers copy this file, the way pet-app
-//  already copies BridgeMessages.swift and ToolTimeouts.swift.
+//  Tool registry mirror (plan/01_protocol.md section 4; protocol's own
+//  docs/tools.md was removed). Reference implementation -- consumers copy
+//  this file, the way pet-app already copies BridgeMessages.swift and
+//  ToolTimeouts.swift.
 //
 //  Why a Swift mirror now: the registry was TS-only because the only Swift
 //  consumer (pet-app's executor) is told which tool to run by the wire and
@@ -14,13 +15,12 @@
 //  forbids, so it lands here instead.
 //
 //  What is deliberately NOT here: each tool's `description` text. That is
-//  owned by ai-module (docs/tools.md notes), because it is prompt-tuning
-//  material rather than contract -- it changes without the wire changing.
-//  The Swift agent keeps its descriptions next to its prompt for the same
-//  reason.
+//  prompt-tuning material rather than contract -- it changes without the
+//  wire changing. The Swift agent keeps its descriptions next to its prompt
+//  for the same reason.
 //
-//  Update this file together with src/types/tools.ts and docs/tools.md on any
-//  registry change (see repo root README, change management rules).
+//  Update this file together with src/types/tools.ts on any registry change
+//  (see repo root README, change management rules).
 //
 
 import Foundation

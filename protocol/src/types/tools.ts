@@ -1,5 +1,5 @@
 /**
- * Tool registry (protocol docs/tools.md, plan/01_protocol.md section 4).
+ * Tool registry (plan/01_protocol.md section 4; protocol's own docs/tools.md was removed).
  * This is a real .ts module (not .d.ts): executor/approval/timeout are
  * runtime values ai-module imports and uses to build its tool-use request
  * and dispatch routing -- a declaration file cannot hold them.
@@ -126,7 +126,8 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     params: [
       { name: "frame", type: "object", required: true, description: "Frame whose center point receives a synthesized CGEvent click." },
     ],
-    description: "Synthesize a click at frame's center. System dialogs are not supported -- see not_supported_target.",
+    description: "Synthesize a click at frame's center. Per spec, system dialogs should be rejected with " +
+      "not_supported_target, but that classification is not implemented yet -- see responseNote.",
     responseNote:
       "null. Spec: returns error not_supported_target for system dialog targets, falling back to point_at plus user " +
       "guidance in that case. NOT YET IMPLEMENTED in pet-app as of this writing -- classifying \"is this a system " +
@@ -169,14 +170,20 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
   },
   {
     name: "open_in_editor",
+    // Still "workspace" (not "pet-app"): like code_editor, this is delegated
+    // in-process by PuckClient's own AgentRunner rather than dispatched over
+    // bridge.sock -- it never reaches Puck.app's ToolExecutor. Since the
+    // native editor pane (Puck/ClientWindow/Editor) reads files itself via
+    // WorkspaceFileService, it no longer touches the workspace app's own
+    // process at all either. See docs/decisions.md's native-editor-pane entry.
     executor: "workspace",
     approval: not_required,
     timeoutSec: 10,
     params: [
-      { name: "path", type: "string", required: true, description: "File path to open as a Monaco tab." },
+      { name: "path", type: "string", required: true, description: "File path to open as an editor tab." },
     ],
-    description: "Open a file as a Monaco editor tab.",
-    responseNote: "TBD -- workspace has not been implemented yet.",
+    description: "Open a file as an editor tab in the client window's editor pane.",
+    responseNote: "Returns null on success; the tab opens in whichever workspace the agent is running in.",
   },
   {
     name: "read_file",
@@ -187,7 +194,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
       { name: "path", type: "string", required: true, description: "File path to read." },
     ],
     description: "Return a file's contents (read-only, does not open a tab).",
-    responseNote: "TBD -- workspace has not been implemented yet. Expected to carry file contents as a string; update this note once workspace ships read_file.",
+    responseNote: "Carries the file's contents as a string, plus language/size/readOnly metadata.",
   },
   {
     name: "open_task_session",

@@ -12,18 +12,31 @@ import Foundation
 struct ClientWorkspace: Identifiable, Equatable {
     let id: String
     var name: String
-    /// nil for a pure-chat workspace -- code_editor and the editor view are
-    /// unavailable for it (see editorUnavailableReason).
+    /// nil for a pure-chat workspace -- code_editor and the editor pane are
+    /// unavailable for it.
     var projectPath: String?
-    /// Set once workspace confirms the embedded editor view bundle is being
-    /// served (protocol 3.5); nil until then or if unavailable.
-    var editorViewURL: URL?
-    var editorUnavailableReason: EditorViewUnavailableReason?
+    /// Cached rather than recomputed on every read: resolving this touches
+    /// the filesystem (EditorAvailability.resolve), and ClientWorkspace
+    /// values get read from SwiftUI body evaluations often enough that a
+    /// syscall there would be a real hot path. Refreshed via
+    /// refreshEditorAvailability() -- see ClientWindowStore for the call
+    /// sites (workspace creation, editor toggle opened, watcher-detected
+    /// root loss).
+    private(set) var editorAvailability: EditorAvailability
 
-    /// The editor toggle's enabled state. A URL only ever arrives via
-    /// protocol 3.5's editor_view_ready, which workspace only sends for a
-    /// workspace it actually bound a project_path to -- so this covers both
-    /// "pure-chat workspace" and "workspace isn't connected yet" without
-    /// pet-app second-guessing either.
-    var canOpenEditor: Bool { editorViewURL != nil }
+    init(id: String, name: String, projectPath: String?) {
+        self.id = id
+        self.name = name
+        self.projectPath = projectPath
+        editorAvailability = EditorAvailability.resolve(projectPath: projectPath)
+    }
+
+    var canOpenEditor: Bool {
+        if case .ready = editorAvailability { return true }
+        return false
+    }
+
+    mutating func refreshEditorAvailability() {
+        editorAvailability = EditorAvailability.resolve(projectPath: projectPath)
+    }
 }

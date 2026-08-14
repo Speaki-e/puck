@@ -114,9 +114,14 @@ enum ToolRegistry {
         Tool(name: "run_applescript", executor: .petApp, approval: .required, parameters: [
             Parameter(name: "script", type: .string, isRequired: true),
         ]),
-        // workspace executor -- listed because the registry is the registry,
-        // but the workspace repo has shipped none of them, so an agent with no
-        // editor executor injected must not offer these to the model.
+        // workspace executor -- none of these are dispatched over bridge.sock
+        // like a .petApp tool; each is offered to the model only when
+        // AgentRunner is constructed with the matching delegate closure (see
+        // delegateCodeEditor/delegateReadFile/delegateOpenInEditor), same as
+        // code_editor already was. code_editor still reaches into workspace's
+        // ACP subprocess through that delegation; open_in_editor/read_file no
+        // longer touch the workspace app's process at all -- PuckClient's own
+        // editor pane (Puck/ClientWindow/Editor) reads files itself.
         Tool(name: "code_editor", executor: .workspace, approval: .acpInternal, parameters: [
             Parameter(name: "task", type: .string, isRequired: true),
             Parameter(name: "project_path", type: .string, isRequired: true),

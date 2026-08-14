@@ -110,18 +110,6 @@ final class ClientWindowStore: ObservableObject {
                 activeSessionId = sessionId
             }
 
-        case .editorViewReady(let workspaceId, let url):
-            updateWorkspace(workspaceId) {
-                $0.editorViewURL = URL(string: url)
-                $0.editorUnavailableReason = nil
-            }
-
-        case .editorViewUnavailable(let workspaceId, let reason):
-            updateWorkspace(workspaceId) {
-                $0.editorViewURL = nil
-                $0.editorUnavailableReason = reason
-            }
-
         default:
             break
         }
@@ -173,6 +161,18 @@ final class ClientWindowStore: ObservableObject {
     private func updateWorkspace(_ workspaceId: String, _ mutate: (inout ClientWorkspace) -> Void) {
         guard let index = workspaces.firstIndex(where: { $0.id == workspaceId }) else { return }
         mutate(&workspaces[index])
+    }
+
+    /// Re-resolves a workspace's EditorAvailability against the filesystem
+    /// right now -- ClientWorkspace.init already does this once at
+    /// creation, so this is only needed for the two cases where the
+    /// on-disk state can change out from under an already-created
+    /// workspace: right before the editor toggle opens (a stale answer from
+    /// creation time would otherwise persist for the workspace's whole
+    /// lifetime) and when EditorPaneView's live watcher reports the open
+    /// project's root itself was moved/deleted.
+    func refreshEditorAvailability(forWorkspace workspaceId: String) {
+        updateWorkspace(workspaceId) { $0.refreshEditorAvailability() }
     }
 
     /// Feed for BridgeMessageRouter.onChatEvent. A session that doesn't exist

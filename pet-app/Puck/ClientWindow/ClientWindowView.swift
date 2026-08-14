@@ -7,10 +7,14 @@
 //
 //  Chat rebuild (2026-08-13, docs/decisions.md): sidebar, top bar, and
 //  transcript all moved into ClientChatWebView (React/Tailwind/shadcn) --
-//  this view is now just that web view, plus the native EditorWebView pane
-//  when the (web-driven) editor toggle is on. ClientPalette/ClientTheme
-//  still theme the settings window and window chrome, but no longer this
-//  view's own content.
+//  this view is now just that web view, plus the native EditorPaneView pane
+//  when the (web-driven) editor toggle is on.
+//
+//  Native editor pane (F13 continued): EditorPaneView reads files itself via
+//  WorkspaceFileService instead of loading a URL workspace serves, so this
+//  view now also injects clientPalette into the environment -- ClientPalette/
+//  ClientTheme otherwise only themed the settings window, and EditorPaneView's
+//  views need the active theme the same way that window does.
 //
 
 import SwiftUI
@@ -26,18 +30,23 @@ struct ClientWindowView: View {
 
     var body: some View {
         Group {
-            if isEditorOpen, let editorURL = activeWorkspace?.editorViewURL {
+            if isEditorOpen, let availability = activeWorkspace?.editorAvailability {
                 HSplitView {
                     ClientChatWebView(bridge: chatBridge)
                         .frame(minWidth: 320, idealWidth: 420)
-                    EditorWebView(workspaceId: store.activeWorkspaceId, url: editorURL)
-                        .frame(minWidth: 360)
+                    EditorPaneView(
+                        workspaceId: store.activeWorkspaceId,
+                        availability: availability,
+                        onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
+                    )
+                    .frame(minWidth: 360)
                 }
             } else {
                 ClientChatWebView(bridge: chatBridge)
             }
         }
         .frame(minWidth: ClientTheme.Metrics.windowMinWidth, minHeight: ClientTheme.Metrics.windowMinHeight)
+        .environment(\.clientPalette, store.themeStyle.palette)
         .onAppear {
             chatBridge.setEditorOpenChangeHandler { isOpen in isEditorOpen = isOpen }
         }

@@ -1,0 +1,49 @@
+//
+//  EditorContentHostView.swift
+//  Puck
+//
+
+import SwiftUI
+
+struct EditorContentHostView: View {
+    @ObservedObject var store: EditorPaneStore
+
+    @Environment(\.clientPalette) private var palette
+
+    var body: some View {
+        if let tab = store.activeTab {
+            VStack(spacing: 0) {
+                if tab.diskChanged {
+                    ConflictBannerView(
+                        onKeepMine: { store.keepMine(path: tab.path) },
+                        onUseDisk: { store.useDisk(path: tab.path) }
+                    )
+                }
+                if tab.isImage {
+                    ImagePreviewView(tab: tab)
+                } else {
+                    CodeEditorHostView(
+                        content: Binding(
+                            get: { tab.content },
+                            set: { store.updateDraft(path: tab.path, content: $0) }
+                        ),
+                        isEditable: !tab.readOnly,
+                        path: tab.path
+                    )
+                    .id(tab.path)
+                }
+            }
+        } else {
+            VStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+                Text("왼쪽 탐색기에서 파일을 선택하세요")
+                    .font(ClientTheme.Typography.sessionTitle)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(palette.background)
+        }
+    }
+}

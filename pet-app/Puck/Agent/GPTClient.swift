@@ -61,14 +61,20 @@ enum GPTError: LocalizedError {
     case http(status: Int, body: String)
     case malformedResponse(String)
 
+    /// Both clients throw these, so the text can't name a provider -- an
+    /// Anthropic user with a bad key was being told "OpenAI API 401", which
+    /// is exactly the confusion AgentHost's provider-aware "no key" message
+    /// was added to prevent. Whoever is showing this already knows which
+    /// provider is selected (`AgentConfiguration.provider`); the error only
+    /// needs to say what went wrong.
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "OpenAI API 키가 설정되지 않았습니다."
+            return "API 키가 설정되지 않았습니다."
         case .http(let status, let body):
-            return "OpenAI API \(status): \(body)"
+            return "API 오류 \(status): \(body)"
         case .malformedResponse(let what):
-            return "OpenAI 응답을 해석할 수 없습니다: \(what)"
+            return "응답을 해석할 수 없습니다: \(what)"
         }
     }
 }

@@ -109,6 +109,53 @@ final class ClaudeClientTests: XCTestCase {
         XCTAssertEqual(blocks.first?["content"] as? String, "72°F and sunny")
     }
 
+    /// Parallel tool calls produce one `.tool` per call, and this API wants
+    /// every tool_result answering one assistant turn in a SINGLE user
+    /// message. Splitting them doesn't 400 -- it quietly makes the model stop
+    /// fanning out on later turns, which no error would ever reveal.
+    func test_consecutiveToolResults_mergeIntoOneUserMessage() throws {
+        let encoded = ClaudeClient.encodeMessages([
+            .tool(callId: "toolu_a", content: "first"),
+            .tool(callId: "toolu_b", content: "second"),
+            .tool(callId: "toolu_c", content: "third"),
+        ])
+
+        XCTAssertEqual(encoded.count, 1, "three parallel results must not become three messages")
+        let blocks = try XCTUnwrap(encoded.first?["content"] as? [[String: Any]])
+        XCTAssertEqual(blocks.map { $0["tool_use_id"] as? String }, ["toolu_a", "toolu_b", "toolu_c"])
+    }
+
+    func test_toolResultsSeparatedByOtherMessages_staySeparate() throws {
+        let encoded = ClaudeClient.encodeMessages([
+            .tool(callId: "toolu_a", content: "first"),
+            .assistant(text: "이어서 확인할게요", toolCalls: []),
+            .tool(callId: "toolu_b", content: "second"),
+        ])
+
+        XCTAssertEqual(encoded.map { $0["role"] as? String }, ["user", "assistant", "user"])
+    }
+
+    // MARK: - stop_reason
+
+    /// Both of these come back as HTTP 200 with empty/partial content, so
+    /// without the check they decode to an empty turn and AgentRunner ends
+    /// the run ok=true having shown the user nothing.
+    func test_decodeTurn_onRefusal_throwsRatherThanReturningAnEmptyTurn() {
+        let json = Data(#"{"stop_reason":"refusal","content":[]}"#.utf8)
+        XCTAssertThrowsError(try ClaudeClient.decodeTurn(from: json))
+    }
+
+    func test_decodeTurn_onMaxTokensTruncation_throws() {
+        let json = Data(#"{"stop_reason":"max_tokens","content":[{"type":"text","text":"부분 응"}]}"#.utf8)
+        XCTAssertThrowsError(try ClaudeClient.decodeTurn(from: json))
+    }
+
+    func test_decodeTurn_onNormalStopReason_decodesNormally() throws {
+        let json = Data(#"{"stop_reason":"end_turn","content":[{"type":"text","text":"완료"}]}"#.utf8)
+        let turn = try ClaudeClient.decodeTurn(from: json)
+        XCTAssertEqual(turn.text, "완료")
+    }
+
     // MARK: - assistant encoding: text + tool_use blocks
 
     func test_assistantTurn_withTextAndToolCall_encodesBothBlockTypes() throws {

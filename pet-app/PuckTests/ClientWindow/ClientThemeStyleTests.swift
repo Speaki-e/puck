@@ -2,33 +2,21 @@
 //  ClientThemeStyleTests.swift
 //  Puck
 //
-//  F13 test · owner: 박해영 (Haeyoung Park)
-//
 
 import XCTest
 @testable import Puck
 
 final class ClientThemeStyleTests: XCTestCase {
-    func test_hasExactlyThreeCases() {
-        XCTAssertEqual(ClientThemeStyle.allCases, [.light, .dark, .glass])
+    func test_hasExactlyTwoCases() {
+        XCTAssertEqual(ClientThemeStyle.allCases, [.light, .dark])
     }
 
     func test_light_isLightColorScheme() {
         XCTAssertEqual(ClientThemeStyle.light.colorScheme, .light)
     }
 
-    // .glass always renders dark -- translucency over a light backdrop
-    // doesn't hold together, and a separate glass-on-light variant doubles
-    // the design surface for no real gain (see the design spec).
-    func test_dark_and_glass_areBothDarkColorScheme() {
+    func test_dark_isDarkColorScheme() {
         XCTAssertEqual(ClientThemeStyle.dark.colorScheme, .dark)
-        XCTAssertEqual(ClientThemeStyle.glass.colorScheme, .dark)
-    }
-
-    func test_light_and_dark_useFlatSurfaces_glassUsesGlassSurfaces() {
-        XCTAssertFalse(ClientThemeStyle.light.palette.usesGlassSurfaces)
-        XCTAssertFalse(ClientThemeStyle.dark.palette.usesGlassSurfaces)
-        XCTAssertTrue(ClientThemeStyle.glass.palette.usesGlassSurfaces)
     }
 
     func test_displayName_isDistinctForEveryCase() {
@@ -37,18 +25,14 @@ final class ClientThemeStyleTests: XCTestCase {
     }
 
     func test_resolved_withKnownRawValue_returnsMatchingCase() {
-        XCTAssertEqual(ClientThemeStyle.resolved(fromDefaultsValue: "glass"), .glass)
+        XCTAssertEqual(ClientThemeStyle.resolved(fromDefaultsValue: "light"), .light)
     }
 
     func test_resolved_withNilOrUnknownRawValue_defaultsToDark() {
         XCTAssertEqual(ClientThemeStyle.resolved(fromDefaultsValue: nil), .dark)
-        XCTAssertEqual(ClientThemeStyle.resolved(fromDefaultsValue: "sepia"), .dark)
+        XCTAssertEqual(ClientThemeStyle.resolved(fromDefaultsValue: "glass"), .dark)
     }
 
-    // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
-    // 셰이디 설정으로 변경할 수 있어야하거든" -- the setting now lives in
-    // Puck's own Settings and is broadcast to PuckClient cross-process,
-    // the same DistributedNotificationCenter shape AppAppearance used to use.
     func test_crossProcessUserInfo_roundTripsThroughResolved() {
         for style in ClientThemeStyle.allCases {
             XCTAssertEqual(ClientThemeStyle.resolved(fromCrossProcessUserInfo: style.crossProcessUserInfo), style)

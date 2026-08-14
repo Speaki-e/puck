@@ -33,12 +33,16 @@ struct SessionSummaryJSON: Encodable {
     let workspaceId: String
     let title: String
     let isRunning: Bool
+    let lastActivityAt: Double?
+    let lastRunOk: Bool?
 
     init(_ session: ChatSession) {
         id = session.id
         workspaceId = session.workspaceId
         title = session.title
         isRunning = session.isRunning
+        lastActivityAt = session.lastActivityAt.map { $0.timeIntervalSince1970 * 1000 }
+        lastRunOk = session.lastRunOk
     }
 }
 

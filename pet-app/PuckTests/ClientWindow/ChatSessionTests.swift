@@ -194,4 +194,36 @@ final class ChatSessionTests: XCTestCase {
         let ids = session.timeline.map(\.id)
         XCTAssertEqual(Set(ids).count, ids.count)
     }
+
+    // MARK: - lastActivityAt / lastRunOk (v3 sidebar relative time + outcome)
+
+    func test_lastActivityAt_isNilBeforeAnyEvent() {
+        let session = makeSession()
+        XCTAssertNil(session.lastActivityAt)
+    }
+
+    func test_lastActivityAt_advancesOnEveryAppliedEvent() {
+        let session = makeSession()
+        session.apply(.agentThinking)
+        let first = session.lastActivityAt
+        XCTAssertNotNil(first)
+        session.apply(.textChunk(text: "hi"))
+        XCTAssertNotNil(session.lastActivityAt)
+        XCTAssertGreaterThanOrEqual(session.lastActivityAt!, first!)
+    }
+
+    func test_lastRunOk_isNilUntilARunCompletes() {
+        let session = makeSession()
+        XCTAssertNil(session.lastRunOk)
+        session.apply(.agentThinking)
+        XCTAssertNil(session.lastRunOk, "a run in progress has no outcome yet")
+    }
+
+    func test_lastRunOk_reflectsTheMostRecentDoneEntry() {
+        let session = makeSession()
+        session.apply(.agentDone(ok: false, summary: "실패"))
+        XCTAssertEqual(session.lastRunOk, false)
+        session.apply(.agentDone(ok: true, summary: "완료"))
+        XCTAssertEqual(session.lastRunOk, true, "the newest done entry wins")
+    }
 }

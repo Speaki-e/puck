@@ -29,6 +29,8 @@ export interface SessionSummaryJSON {
   workspaceId: string;
   title: string;
   isRunning: boolean;
+  lastActivityAt: number | null;
+  lastRunOk: boolean | null;
 }
 
 // 1:1 with ChatTimelineEntry (ChatSession.swift).

@@ -73,7 +73,17 @@ enum GPTError: LocalizedError {
     }
 }
 
-final class GPTClient {
+/// What `AgentRunner` needs from an LLM: one tool-use turn in, one turn out.
+///
+/// The `GPT*` payload types keep their names even though they now cross
+/// provider lines -- renaming them would touch every call site for no
+/// behavioral gain, and the shapes really are the same three request fields
+/// and two response fields regardless of who serves them.
+protocol AgentLLMClient {
+    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn
+}
+
+final class GPTClient: AgentLLMClient {
     /// Read per request, not captured once: a key typed into Settings has to
     /// take effect without quitting the app, and this is a file read.
     private let configuration: () -> AgentConfiguration

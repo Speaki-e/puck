@@ -3,40 +3,38 @@
 //  Puck
 //
 //  F13 · owner: 박해영 (Haeyoung Park)
-//  Which of the three ClientWindow themes is active -- byeolki: "테마 종류를
-//  다크, 화이트, 글래스로". A distinct setting from Puck's system-wide
-//  AppAppearance (Settings' light/dark/system toggle, used by the pet
-//  overlay/Settings), but not a separate ClientWindow-local one either
-//  -- byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
-//  셰이디 설정으로 변경할 수 있어야하거든". Persisted in Puck's own
-//  UserDefaults domain (SettingsStore) and broadcast to PuckClient over
-//  DistributedNotificationCenter, the same shape AppAppearance's old
-//  cross-process wiring used -- PuckClient's AppDelegate is the only
-//  consumer, seeding ClientWindowStore.themeStyle from it.
+//  Which of the ClientWindow themes is active. Design system v2
+//  (2026-08-14) dropped the `.glass` theme -- see docs/decisions.md for
+//  the rationale. A distinct setting from Puck's system-wide AppAppearance
+//  (Settings' light/dark/system toggle, used by the pet overlay/Settings),
+//  but not a separate ClientWindow-local one either -- byeolki, 2026-08-02:
+//  "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한 셰이디 설정으로 변경할 수
+//  있어야하거든". Persisted in Puck's own UserDefaults domain (SettingsStore)
+//  and broadcast to PuckClient over DistributedNotificationCenter, the same
+//  shape AppAppearance's old cross-process wiring used -- PuckClient's
+//  AppDelegate is the only consumer, seeding ClientWindowStore.themeStyle
+//  from it.
 //
 
 import SwiftUI
 
 enum ClientThemeStyle: String, CaseIterable, Identifiable {
-    case light, dark, glass
+    case light, dark
 
     var id: String { rawValue }
 
-    /// Shown in the sidebar's theme popover.
+    /// Shown in Settings' theme picker.
     var displayName: String {
         switch self {
         case .light: return "화이트"
         case .dark: return "다크"
-        case .glass: return "글래스"
         }
     }
 
-    /// `.glass` always renders dark -- see ClientPalette.glass's own doc
-    /// comment for why a light-glass variant doesn't exist.
     var colorScheme: ColorScheme {
         switch self {
         case .light: return .light
-        case .dark, .glass: return .dark
+        case .dark: return .dark
         }
     }
 
@@ -44,7 +42,6 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
         switch self {
         case .light: return .light
         case .dark: return .dark
-        case .glass: return .glass
         }
     }
 

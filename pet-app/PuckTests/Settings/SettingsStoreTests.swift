@@ -163,8 +163,8 @@ final class SettingsStoreTests: XCTestCase {
 
     func test_clientThemeStyle_roundTrips() {
         let store = SettingsStore(defaults: defaults)
-        store.clientThemeStyle = .glass
-        XCTAssertEqual(store.clientThemeStyle, .glass)
+        store.clientThemeStyle = .light
+        XCTAssertEqual(store.clientThemeStyle, .light)
     }
 
     func test_settingClientThemeStyle_firesOnClientThemeStyleChanged() {

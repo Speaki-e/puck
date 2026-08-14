@@ -57,7 +57,7 @@ typealias AgentFileDelegation = (_ path: String) async -> DispatchedToolResult
 typealias AgentTaskSessionOpener = (_ title: String, _ brief: String) -> Void
 
 final class AgentRunner {
-    private let client: GPTClient
+    private let client: any AgentLLMClient
     private let dispatcher: PetToolDispatcher
     private let approve: AgentApprovalGate
     private let emit: AgentEventSink
@@ -89,7 +89,7 @@ final class AgentRunner {
     private static let maxTurns = 10
 
     init(
-        client: GPTClient,
+        client: any AgentLLMClient,
         dispatcher: PetToolDispatcher,
         approve: @escaping AgentApprovalGate,
         emit: @escaping AgentEventSink,

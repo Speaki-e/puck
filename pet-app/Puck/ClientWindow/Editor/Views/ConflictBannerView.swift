@@ -19,7 +19,7 @@ struct ConflictBannerView: View {
     var body: some View {
         HStack(spacing: ClientTheme.Metrics.spacingMedium) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(palette.warning)
+                .foregroundStyle(palette.statusWarning)
             VStack(alignment: .leading, spacing: 2) {
                 Text("디스크에서 파일이 변경됐습니다")
                     .font(ClientTheme.Typography.toolLabel)

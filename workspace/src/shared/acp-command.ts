@@ -9,8 +9,22 @@ export function preferUnpackedPath(filePath: string): string {
   return existsSync(unpacked) ? unpacked : filePath;
 }
 
-export function resolveClaudeAgentCommand(appPath: string): { command: string; args: string[] } {
+export type CodingAgentKind = "claude" | "codex";
+
+const AGENT_PACKAGE_NAMES: Record<CodingAgentKind, string> = {
+  claude: "@agentclientprotocol/claude-agent-acp",
+  codex: "@agentclientprotocol/codex-acp",
+};
+
+export function resolveAgentCommand(
+  kind: CodingAgentKind,
+  appPath: string,
+): { command: string; args: string[] } {
   const requireFromApp = createRequire(path.join(appPath, "package.json"));
-  const agentPath = preferUnpackedPath(requireFromApp.resolve("@agentclientprotocol/claude-agent-acp/dist/index.js"));
+  const agentPath = preferUnpackedPath(requireFromApp.resolve(`${AGENT_PACKAGE_NAMES[kind]}/dist/index.js`));
   return { command: process.execPath, args: [agentPath] };
+}
+
+export function resolveClaudeAgentCommand(appPath: string): { command: string; args: string[] } {
+  return resolveAgentCommand("claude", appPath);
 }

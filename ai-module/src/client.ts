@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { JSONValue, ToolDefinition } from "@speaki-e/protocol/src/index.js";
+import type { JSONValue, ToolDefinition } from "@speaki-e/protocol/dist/index.js";
 
 import { describeApproval, loadWhitelist, needsApproval, type Whitelist } from "./approval.js";
 import { buildSystemPrompt, loadBasePrompt } from "./context.js";

@@ -10,7 +10,7 @@ import type {
   ToolExecutor,
   ToolExecutorKind,
   ToolResultErrorCode,
-} from "@speaki-e/protocol/src/index.js";
+} from "@speaki-e/protocol/dist/index.js";
 
 // ToolExecutor는 protocol이 이미 정의하고 있다(agent-interface.ts). 자체 정의하지 않고
 // 그대로 재수출한다 — 호출부가 protocol 경로를 몰라도 되게 하기 위한 편의 재수출일 뿐,
@@ -20,7 +20,7 @@ export type {
   Context,
   ToolExecutor,
   ToolExecutionResult,
-} from "@speaki-e/protocol/src/index.js";
+} from "@speaki-e/protocol/dist/index.js";
 
 /**
  * 실제로 디스패치되는 실행기 종류. "ai-module"은 open_task_session 하나를 위한

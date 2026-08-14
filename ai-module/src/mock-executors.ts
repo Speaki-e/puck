@@ -8,7 +8,7 @@
  * 실제 구현은 pet-app 소켓 프록시(petAppProxy)와 workspace 인프로세스
  * 실행기(editorLocal)가 각각 맡는다.
  */
-import type { JSONValue } from "@speaki-e/protocol/src/index.js";
+import type { JSONValue } from "@speaki-e/protocol/dist/index.js";
 
 import type { ToolExecutionResult, ToolExecutor } from "./types.js";
 

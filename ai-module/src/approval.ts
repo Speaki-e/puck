@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import type { ToolDefinition } from "@speaki-e/protocol/src/index.js";
+import type { ToolDefinition } from "@speaki-e/protocol/dist/index.js";
 
 /** 번들 환경에서는 파일 자산이 없을 수 있으므로 안전한 내장 기본값을 둔다. */
 const DEFAULT_WHITELIST: Whitelist = {

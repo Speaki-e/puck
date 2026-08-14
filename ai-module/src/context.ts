@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import type { Context, WindowInfo } from "@speaki-e/protocol/src/index.js";
+import type { Context, WindowInfo } from "@speaki-e/protocol/dist/index.js";
 
 export type { Context, WindowInfo };
 

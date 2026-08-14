@@ -32,7 +32,9 @@ export interface SessionSummaryJSON {
   /** Absent (not null) when the session has never seen an event -- Swift's
    *  encoder omits the key for a nil Date rather than writing null. */
   lastActivityAt?: number | null;
-  lastRunOk: boolean | null;
+  /** Absent (not null) until a run completes -- same omitted-key shape as
+   *  `lastActivityAt` above, since Swift encodes both from optionals. */
+  lastRunOk?: boolean | null;
 }
 
 // 1:1 with ChatTimelineEntry (ChatSession.swift).

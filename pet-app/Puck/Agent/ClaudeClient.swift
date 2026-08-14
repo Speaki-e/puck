@@ -43,7 +43,11 @@ final class ClaudeClient: AgentLLMClient {
     /// exchanges, not long-form generation, so a fixed mid-size cap is
     /// simpler than plumbing a per-call value through `AgentLLMClient` for a
     /// need that hasn't come up yet.
-    private static let maxTokens = 4096
+    ///
+    /// This has to be read together with `thinking` below: `max_tokens` caps
+    /// thinking *plus* visible output, so a budget sized only for the answer
+    /// gets spent on reasoning and the turn comes back truncated.
+    private static let maxTokens = 8192
 
     init(configuration: @escaping () -> AgentConfiguration, session: URLSession = .shared) {
         self.configuration = configuration
@@ -64,6 +68,16 @@ final class ClaudeClient: AgentLLMClient {
         var body: [String: Any] = [
             "model": configuration.model,
             "max_tokens": Self.maxTokens,
+            // Asked for explicitly rather than left to the model's default.
+            // On current Sonnet models an omitted `thinking` means adaptive
+            // thinking runs, and its tokens come out of `max_tokens` -- so
+            // omitting this silently changes both cost and how much budget is
+            // left for the actual answer. It also means thinking blocks come
+            // back in `content`, which this client would have to echo into the
+            // next assistant turn for a multi-turn tool loop to stay valid.
+            // AgentRunner is a short tool-dispatch loop, not a reasoning
+            // workload, so turn it off and keep the whole budget for output.
+            "thinking": ["type": "disabled"],
             "messages": Self.encodeMessages(messages),
             "tools": tools.map(Self.encode),
         ]
@@ -102,31 +116,47 @@ final class ClaudeClient: AgentLLMClient {
 
     /// Everything except `.system` cases (hoisted separately into the
     /// top-level `system` field) becomes a `messages` entry.
+    ///
+    /// Consecutive `.tool` results are merged into ONE user message rather
+    /// than one message each. When the model makes parallel tool calls,
+    /// `AgentRunner` appends a `.tool` per call, and this API expects every
+    /// `tool_result` answering a single assistant turn to come back in the
+    /// same user message. Splitting them is accepted (consecutive same-role
+    /// messages don't 400) but degrades the model's willingness to fan out
+    /// on later turns -- a silent behavioral regression no test would catch.
     static func encodeMessages(_ messages: [GPTMessage]) -> [[String: Any]] {
-        messages.compactMap { message -> [String: Any]? in
+        var encoded: [[String: Any]] = []
+        var pendingToolResults: [[String: Any]] = []
+
+        func flushToolResults() {
+            guard !pendingToolResults.isEmpty else { return }
+            encoded.append(["role": "user", "content": pendingToolResults])
+            pendingToolResults = []
+        }
+
+        for message in messages {
             switch message {
             case .system:
-                return nil
-            case .user(let text):
-                return ["role": "user", "content": text]
-            case .assistant(let text, let toolCalls):
-                return ["role": "assistant", "content": encodeAssistantContent(text: text, toolCalls: toolCalls)]
+                continue
             case .tool(let callId, let content):
                 // No `role: "tool"` on this API -- a tool result goes back
                 // inside a *user* message as a tool_result block keyed by
                 // the tool_use id it answers.
-                return [
-                    "role": "user",
-                    "content": [
-                        [
-                            "type": "tool_result",
-                            "tool_use_id": callId,
-                            "content": content,
-                        ],
-                    ],
-                ]
+                pendingToolResults.append([
+                    "type": "tool_result",
+                    "tool_use_id": callId,
+                    "content": content,
+                ])
+            case .user(let text):
+                flushToolResults()
+                encoded.append(["role": "user", "content": text])
+            case .assistant(let text, let toolCalls):
+                flushToolResults()
+                encoded.append(["role": "assistant", "content": encodeAssistantContent(text: text, toolCalls: toolCalls)])
             }
         }
+        flushToolResults()
+        return encoded
     }
 
     /// An assistant turn's `content` is an array mixing a text block (if the
@@ -186,6 +216,24 @@ final class ClaudeClient: AgentLLMClient {
             let content = root["content"] as? [[String: Any]]
         else {
             throw GPTError.malformedResponse("no content array")
+        }
+
+        // Both of these arrive as HTTP 200 with an empty or partial content
+        // array, so without this check they decode to a turn with no text and
+        // no calls -- which AgentRunner reads as "the model said nothing" and
+        // finishes the run ok=true, showing the user nothing at all. Surface
+        // them as errors instead so the failure is visible.
+        if let stopReason = root["stop_reason"] as? String {
+            switch stopReason {
+            case "refusal":
+                throw GPTError.malformedResponse("모델이 응답을 거부했습니다 (stop_reason: refusal)")
+            case "max_tokens":
+                throw GPTError.malformedResponse(
+                    "응답이 max_tokens(\(Self.maxTokens))에서 잘렸습니다 -- 도구 호출이 중간에 끊겼을 수 있습니다"
+                )
+            default:
+                break
+            }
         }
 
         var texts: [String] = []

@@ -201,24 +201,34 @@ final class AgentConfigurationTests: XCTestCase {
     }
 }
 
-/// F15 (task 4): `makeAgentLLMClient` is the single place `AgentHost`'s
-/// construction site (PuckClient/AgentHost.swift) picks a client class --
-/// getting this switch wrong means every request goes to the wrong host
-/// regardless of which key Settings has stored.
+/// F15 (task 4, revised task 8): `makeAgentLLMClient` is the single place
+/// `AgentHost`'s construction site (PuckClient/AgentHost.swift) builds the
+/// client `AgentRunner` gets -- getting this wrong means every request goes
+/// to the wrong host regardless of which key Settings has stored.
+///
+/// It now always returns a `RoutingAgentLLMClient` (task 8's gap-2 fix)
+/// rather than a `GPTClient`/`ClaudeClient` chosen once at construction, so
+/// a provider switch in Settings takes effect on the next `send` instead of
+/// the next relaunch. `RoutingAgentLLMClientTests` covers that per-request
+/// routing behavior directly (with spy clients); these two cases just
+/// confirm the factory always hands back a router, for every provider and
+/// for the no-`AGENT_PROVIDER` default alike.
 final class MakeAgentLLMClientTests: XCTestCase {
-    func test_factoryReturnsTheClientMatchingTheSelectedProvider() {
+    func test_factoryReturnsARouter_forEitherExplicitProvider() {
         let openAI = makeAgentLLMClient({ AgentConfiguration.load(environment: ["AGENT_PROVIDER": "openai"], searchPaths: []) })
-        XCTAssertTrue(openAI is GPTClient)
+        XCTAssertTrue(openAI is RoutingAgentLLMClient)
 
         let anthropic = makeAgentLLMClient({ AgentConfiguration.load(environment: ["AGENT_PROVIDER": "anthropic"], searchPaths: []) })
-        XCTAssertTrue(anthropic is ClaudeClient)
+        XCTAssertTrue(anthropic is RoutingAgentLLMClient)
     }
 
     /// No `AGENT_PROVIDER` at all resolves to `.openai` (AgentConfiguration's
     /// own default) -- the factory has to follow that fallback rather than
-    /// crash or pick arbitrarily.
-    func test_factoryDefaultsToGPTClientWhenNoProviderIsSet() {
+    /// crash or pick arbitrarily. `RoutingAgentLLMClient` re-reads this on
+    /// every `send`, so the default only has to be right in `configuration`,
+    /// not baked into which class got picked.
+    func test_factoryReturnsARouter_whenNoProviderIsSet() {
         let client = makeAgentLLMClient({ AgentConfiguration.load(environment: [:], searchPaths: []) })
-        XCTAssertTrue(client is GPTClient)
+        XCTAssertTrue(client is RoutingAgentLLMClient)
     }
 }

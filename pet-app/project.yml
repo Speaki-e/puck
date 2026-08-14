@@ -5,6 +5,19 @@ options:
     macOS: "14.0"
   createIntermediateGroups: true
 
+# Native editor pane (Puck/ClientWindow/Editor). Pinned to exact tags, not
+# from:/branch: main -- both packages are pre-1.0 and actively developed.
+# CodeEditLanguages must match CodeEditSourceEditor's own exact pin (its
+# Package.swift pins CodeEditLanguages 0.1.20) or SwiftPM's dependency
+# resolution fails on two conflicting `exact` requirements for the same package.
+packages:
+  CodeEditSourceEditor:
+    url: https://github.com/CodeEditApp/CodeEditSourceEditor
+    exactVersion: "0.15.2"
+  CodeEditLanguages:
+    url: https://github.com/CodeEditApp/CodeEditLanguages
+    exactVersion: "0.1.20"
+
 settings:
   base:
     SWIFT_VERSION: "5"
@@ -53,6 +66,14 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.Puck
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Puck/Resources/Puck.entitlements
+    # Puck/ClientWindow/Editor is sourced by this target too (the whole
+    # `Puck` folder is), so it needs the same editor-pane package dependency
+    # as PuckClient even though the pet itself never shows an editor UI --
+    # same structural situation as it already linking WebKit for the same
+    # reason (EditorWebView.swift was compiled here pre-native-editor too).
+    dependencies:
+      - package: CodeEditSourceEditor
+      - package: CodeEditLanguages
     scheme:
       testTargets:
         - PuckTests
@@ -123,6 +144,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckClient
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIconClient
         CODE_SIGN_ENTITLEMENTS: PuckClient/Resources/PuckClient.entitlements
+    dependencies:
+      - package: CodeEditSourceEditor
+      - package: CodeEditLanguages
 
   PuckTests:
     type: bundle.unit-test

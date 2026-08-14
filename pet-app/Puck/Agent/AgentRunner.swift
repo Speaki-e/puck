@@ -43,6 +43,15 @@ typealias AgentApprovalGate = (_ summary: String, _ approvalId: String) async ->
 /// PetToolDispatcher.
 typealias AgentCodeEditorDelegation = (_ task: String) async -> DispatchedToolResult
 
+/// Reads or opens a file in the client window's native editor pane. Not
+/// dispatched via PetToolDispatcher either, for the same reason as
+/// code_editor: both need the current run's workspaceId to resolve a
+/// relative path against a specific project root, which a tool_dispatch's
+/// bare `{path}` argument has no room for, and which pet-app's
+/// process-wide ToolExecutor (Puck.app, not this app) has no way to reach
+/// PuckClient's own editor-pane state to answer anyway.
+typealias AgentFileDelegation = (_ path: String) async -> DispatchedToolResult
+
 /// Branches the casual conversation into its own task session; everything the
 /// run emits after this is addressed to the new one.
 typealias AgentTaskSessionOpener = (_ title: String, _ brief: String) -> Void
@@ -60,6 +69,11 @@ final class AgentRunner {
     /// is no long-running work to move out of the casual session, and a task
     /// session that only ever holds chat is just a confusing empty room.
     private let openTaskSession: AgentTaskSessionOpener?
+    /// nil only in the standalone case (same rule as delegateCodeEditor) --
+    /// unlike code_editor, these two don't depend on a workspace/ACP process
+    /// being connected, only on the active workspace having a project bound.
+    private let delegateReadFile: AgentFileDelegation?
+    private let delegateOpenInEditor: AgentFileDelegation?
     /// protocol section 7's `src: "agent"` lines. Without them a failed call
     /// is an opaque uuid in pet-app's log with no tool name and no reason.
     private let logger: ToolExecutionLogging?
@@ -81,6 +95,8 @@ final class AgentRunner {
         emit: @escaping AgentEventSink,
         delegateCodeEditor: AgentCodeEditorDelegation? = nil,
         openTaskSession: AgentTaskSessionOpener? = nil,
+        delegateReadFile: AgentFileDelegation? = nil,
+        delegateOpenInEditor: AgentFileDelegation? = nil,
         logger: ToolExecutionLogging? = nil
     ) {
         self.logger = logger
@@ -90,9 +106,13 @@ final class AgentRunner {
         self.emit = emit
         self.delegateCodeEditor = delegateCodeEditor
         self.openTaskSession = delegateCodeEditor == nil ? nil : openTaskSession
+        self.delegateReadFile = delegateReadFile
+        self.delegateOpenInEditor = delegateOpenInEditor
         toolSpecs = Self.petToolSpecs
             + (delegateCodeEditor == nil ? [] : [Self.codeEditorSpec])
             + (self.openTaskSession == nil ? [] : [Self.openTaskSessionSpec])
+            + (delegateReadFile == nil ? [] : [Self.readFileSpec])
+            + (delegateOpenInEditor == nil ? [] : [Self.openInEditorSpec])
         messages = [.system(Self.systemPrompt)]
     }
 
@@ -191,6 +211,18 @@ final class AgentRunner {
                 return
             }
             result = await delegateCodeEditor(task)
+        } else if call.name == Self.readFileToolName, let delegateReadFile {
+            guard let path = Self.pathArgument(from: arguments) else {
+                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil)
+                return
+            }
+            result = await delegateReadFile(path)
+        } else if call.name == Self.openInEditorToolName, let delegateOpenInEditor {
+            guard let path = Self.pathArgument(from: arguments) else {
+                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil)
+                return
+            }
+            result = await delegateOpenInEditor(path)
         } else {
             result = await dispatcher.execute(tool: call.name, arguments: arguments)
         }
@@ -234,19 +266,27 @@ final class AgentRunner {
         }
     }
 
+    /// Shared by read_file/open_in_editor -- both take just {path: string}.
+    /// Internal, not private: directly unit-tested (see AgentRunnerTests).
+    static func pathArgument(from arguments: JSONValue) -> String? {
+        guard case .object(let args) = arguments, case .string(let path)? = args["path"], !path.isEmpty else {
+            return nil
+        }
+        return path
+    }
+
     // MARK: - Prompt and tool descriptions
 
     /// pet-app's own tools -- the ones PetToolDispatcher can actually put on
-    /// the socket. open_in_editor and read_file stay off the list for the
-    /// original reason: they are in the registry but nothing on either side
-    /// implements them yet, and a tool the model can call but nobody can run
-    /// is worse than a missing one.
+    /// the socket.
     private static let petToolSpecs: [GPTToolSpec] = ToolRegistry.tools(for: .petApp).map { tool in
         GPTToolSpec(name: tool.name, description: description(for: tool.name), parameters: tool.parameters)
     }
 
     static let codeEditorToolName = "code_editor"
     static let openTaskSessionToolName = "open_task_session"
+    static let readFileToolName = "read_file"
+    static let openInEditorToolName = "open_in_editor"
 
     private static let openTaskSessionSpec: GPTToolSpec = GPTToolSpec(
         name: openTaskSessionToolName,
@@ -266,6 +306,18 @@ final class AgentRunner {
             parameters: tool?.parameters ?? []
         )
     }()
+
+    private static let readFileSpec: GPTToolSpec = GPTToolSpec(
+        name: readFileToolName,
+        description: description(for: readFileToolName),
+        parameters: ToolRegistry.tool(named: readFileToolName)?.parameters ?? []
+    )
+
+    private static let openInEditorSpec: GPTToolSpec = GPTToolSpec(
+        name: openInEditorToolName,
+        description: description(for: openInEditorToolName),
+        parameters: ToolRegistry.tool(named: openInEditorToolName)?.parameters ?? []
+    )
 
     private static func description(for tool: String) -> String {
         switch tool {
@@ -326,6 +378,21 @@ final class AgentRunner {
             editor agent's summary, or fails with pet_app_disconnected when no workspace is connected \
             -- in which case tell the user to open the workspace app.
             """
+        case readFileToolName:
+            return """
+            Return a file's contents from the project the current workspace has open, read-only. \
+            `path` is relative to the project root (or absolute, as long as it's inside the project). \
+            Use this to answer questions about code or show the user what a file contains -- it does \
+            not open a tab in the editor pane; use open_in_editor for that. Fails with execution_failed \
+            if the workspace has no project open, the path doesn't exist, or the file is binary/too large.
+            """
+        case openInEditorToolName:
+            return """
+            Open a file as a tab in the client window's editor pane, so the user can see (and, if they \
+            choose, edit) it themselves. `path` is relative to the project root. This does not return \
+            the file's contents to you -- call read_file first if you need to know what's in it. Use \
+            this when the user asks to see or work on a specific file, not as a way to read it yourself.
+            """
         default:
             return tool
         }
@@ -351,9 +418,10 @@ final class AgentRunner {
     - When the user asks for code to be written or changed, use code_editor if you have it. You \
       never edit files yourself, and the shell is not a substitute for it. If you also have \
       open_task_session, call it first so the editing runs in its own session.
-    - You have no tool that reads a file. To SHOW the user a file's contents, use run_shell (cat), \
-      which costs them an approval -- the ban on the shell is about editing, not reading. \
-      code_editor is for changing files; never send it a request that only asks to display one.
+    - If you have read_file, use it (not run_shell/cat) to read or show a file's contents -- it's \
+      read-only and costs no approval. Use open_in_editor, if you have it, when the user should see \
+      or edit the file themselves instead of just being told what's in it. Neither edits a file; \
+      code_editor is the only tool that changes one.
     - When a tool fails with permission_denied, tell the user which permission to grant in System \
       Settings. When it fails with pet_app_disconnected, tell them the pet app isn't running.
     - Never claim you did something a tool did not actually report success for.

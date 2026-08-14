@@ -95,22 +95,39 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.activeSessionId, "s9")
     }
 
-    func test_editorViewReady_setsTheURLOnlyForItsOwnWorkspace() {
+    func test_workspaceCreate_withARealProjectPath_canOpenEditorImmediately() throws {
         let (store, _) = makeStore()
-        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: "/tmp/cat-house"))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
 
-        store.handleClientUpdate(.editorViewReady(workspaceId: "w2", url: "http://127.0.0.1:1/editor"))
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: root.path))
 
-        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.editorViewURL, URL(string: "http://127.0.0.1:1/editor"))
-        XCTAssertNil(store.workspaces.first { $0.id == "default" }?.editorViewURL)
+        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.editorAvailability, .ready(rootURL: URL(fileURLWithPath: root.path, isDirectory: true)))
+        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.canOpenEditor, true)
     }
 
-    func test_editorViewUnavailable_setsTheReason() {
+    func test_workspaceCreate_withAPathThatDoesNotExist_cannotOpenEditor() {
         let (store, _) = makeStore()
 
-        store.handleClientUpdate(.editorViewUnavailable(workspaceId: "default", reason: .noProjectPath))
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "ghost house", projectPath: "/nonexistent/\(UUID().uuidString)"))
 
-        XCTAssertEqual(store.workspaces.first { $0.id == "default" }?.editorUnavailableReason, .noProjectPath)
+        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.editorAvailability, .unavailable(.pathMissing))
+        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.canOpenEditor, false)
+    }
+
+    func test_refreshEditorAvailability_picksUpAProjectFolderDeletedAfterCreation() throws {
+        let (store, _) = makeStore()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: root.path))
+        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.canOpenEditor, true)
+
+        try FileManager.default.removeItem(at: root)
+        store.refreshEditorAvailability(forWorkspace: "w2")
+
+        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.editorAvailability, .unavailable(.pathMissing))
+        XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.canOpenEditor, false)
     }
 
     /// byeolki, 2026-08-12: "프롬프트 쓴 세션은 닫고 새로 넘어가야지" -- a move,
@@ -175,23 +192,11 @@ final class ClientWindowStoreTests: XCTestCase {
     /// What the topBar's editor toggle is enabled by, and what
     /// ClientWindowView's workspace-switch fallback reads to decide whether
     /// to close the editor (F13 "화면 3분할", 2026-08-12).
-    func test_canOpenEditor_onlyOnceAnEditorURLHasArrived() {
+    func test_canOpenEditor_falseForThePureChatDefaultWorkspace() {
         let (store, _) = makeStore()
-        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: "/tmp/cat-house"))
         func workspace(_ id: String) -> ClientWorkspace? { store.workspaces.first { $0.id == id } }
 
-        // A project_path alone is not enough -- workspace hasn't said it is
-        // serving anything yet.
-        XCTAssertEqual(workspace("w2")?.canOpenEditor, false)
-
-        store.handleClientUpdate(.editorViewReady(workspaceId: "w2", url: "http://127.0.0.1:1/editor"))
-        XCTAssertEqual(workspace("w2")?.canOpenEditor, true)
-        // The pure-chat default workspace stays off.
         XCTAssertEqual(workspace("default")?.canOpenEditor, false)
-
-        // And it goes back off if workspace withdraws it (project unbound).
-        store.handleClientUpdate(.editorViewUnavailable(workspaceId: "w2", reason: .noProjectPath))
-        XCTAssertEqual(workspace("w2")?.canOpenEditor, false)
     }
 
     func test_requestNewWorkspace_delegatesToSender() {

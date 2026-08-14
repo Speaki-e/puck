@@ -25,6 +25,8 @@ final class AgentHost {
     /// code_editor's executor lives in workspace, so it is delegated over
     /// user_input rather than dispatched -- see CodeEditorDelegate.
     private let codeEditorDelegate: CodeEditorDelegate
+    /// read_file/open_in_editor's implementation -- see EditorFileDelegate.
+    private let editorFileDelegate: EditorFileDelegate
     private var runner: AgentRunner!
 
     /// approvalId -> the run waiting on the user's answer.
@@ -57,7 +59,7 @@ final class AgentHost {
         _ userMessage: String
     ) -> Void)?
 
-    init(broadcast: @escaping (BridgeMessage) -> Bool) {
+    init(broadcast: @escaping (BridgeMessage) -> Bool, resolveProjectPath: @escaping (String) -> String?) {
         self.broadcast = broadcast
         self.dispatcher = PetToolDispatcher(send: broadcast)
         self.codeEditorDelegate = CodeEditorDelegate(send: { task, workspaceId, sessionId in
@@ -69,6 +71,7 @@ final class AgentHost {
                 attachments: nil
             )))
         })
+        self.editorFileDelegate = EditorFileDelegate(resolveProjectPath: resolveProjectPath)
         self.runner = AgentRunner(
             client: GPTClient(configuration: { .load() }),
             dispatcher: dispatcher,
@@ -91,6 +94,18 @@ final class AgentHost {
             },
             openTaskSession: { [weak self] title, brief in
                 self?.openTaskSession(title: title, brief: brief)
+            },
+            delegateReadFile: { [weak self] path in
+                guard let self else {
+                    return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
+                }
+                return await self.editorFileDelegate.readFile(path: path, workspaceId: self.activeWorkspaceId)
+            },
+            delegateOpenInEditor: { [weak self] path in
+                guard let self else {
+                    return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
+                }
+                return await self.editorFileDelegate.openInEditor(path: path, workspaceId: self.activeWorkspaceId)
             },
             // Same directory Puck's executor writes to, so `id` joins the
             // agent's tool_call/tool_result with pet-app's exec lines in one
@@ -210,4 +225,5 @@ final class AgentHost {
             lock.unlock()
         }
     }
+
 }

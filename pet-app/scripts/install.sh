@@ -41,6 +41,7 @@ for scheme in Puck PuckClient; do
         -configuration Release \
         -destination 'platform=macOS' \
         -derivedDataPath "$DERIVED" \
+        -skipPackagePluginValidation \
         DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
         > /dev/null
 done

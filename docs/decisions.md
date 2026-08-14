@@ -4,6 +4,70 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-14: PuckClient's editor pane goes native, drops workspace at runtime
+
+Replaced `EditorWebView.swift` (a `WKWebView` loading a URL `workspace`
+served over its own loopback `EditorGateway`, the entire compiled React/
+Monaco bundle plus a WS file API) with a fully native SwiftUI file tree +
+tabs + syntax-highlighted editor, backed directly by a new
+`WorkspaceFileService` that reads/writes the project itself. Same motivation
+as the chat window's earlier move, opposite direction: this time native
+Swift is what let the app stop depending on `workspace` being launched at
+all for manual file browsing/editing, not what was blocking it. Lightweight
+by design -- no diff view, minimap, autocomplete/LSP, or multi-cursor,
+matching Monaco's *un*used feature surface rather than its full one.
+
+- New: `pet-app/Puck/ClientWindow/Editor/` -- `WorkspaceFileService.swift`
+  (1:1 port of `workspace/src/main/file-service.ts`: tree listing with the
+  same hardcoded ignore list, binary/UTF-8 sniffing, SHA-256-revision
+  optimistic-concurrency save, image preview), `PathContainment.swift`/
+  `ImageMime.swift` (ports of the matching `shared/*.ts`), `WorkspaceFileWatcher.swift`
+  (FSEvents, not `DispatchSource` -- the latter doesn't recurse or notice new
+  paths), `EditorPaneStore`/`EditorPaneStorePool` (tab/tree state, one
+  `EditorPaneStore` per workspace, kept alive for the process's life same as
+  the old `EditorWebViewPool`), `EditorAvailability.swift` (replaces
+  `ClientWorkspace.editorViewURL`/`editorUnavailableReason` with a
+  synchronous, locally-resolved enum -- no round trip needed now that
+  PuckClient already has the real path before touching anything).
+- Syntax highlighting: `CodeEditSourceEditor`/`CodeEditLanguages`
+  (MIT, tree-sitter-based, the actual editor component behind CodeEdit.app),
+  the first external SwiftPM dependency in this repo (`project.yml`'s new
+  `packages:` section). `STTextView` was ruled out (GPLv3/paid-commercial
+  license); `Runestone` was ruled out (its own README says AppKit/Catalyst
+  support isn't finished). Its bundled `SwiftLint` build-tool plugin has no
+  local binary to run in this environment, so builds/tests pass
+  `-skipPackagePluginValidation` now (`scripts/install.sh` updated to match)
+  -- harmless, since that plugin only lints `CodeEditSourceEditor`'s own
+  source, not this repo's.
+- `read_file`/`open_in_editor` re-pointed to native too, in the same pass:
+  new `Puck/Agent/EditorFileDelegate.swift`, delegated from `AgentRunner`
+  exactly like `code_editor` already was (`AgentFileDelegation` closures,
+  offered to the model only when wired) -- **not** `.petApp`-executor
+  `ToolExecutor`/`ToolHandler` dispatch, since that machinery runs in
+  Puck.app's separate process/on Puck.app's own state, which has no access
+  to PuckClient's editor-pane state at all. Both tools were actually inert
+  before this (excluded from `AgentRunner.petToolSpecs` and never delegated),
+  so this is the first time either is reachable by the model, closing a real
+  inconsistency: previously a human could edit files with `workspace` fully
+  unlaunched but the agent couldn't read one at all.
+- `pet-app/project.yml`'s `packages:`/target `dependencies:` had to go on
+  **both** `Puck` and `PuckClient` targets, not just `PuckClient` -- the new
+  `Editor/` sources live under the already-shared `Puck/ClientWindow` path,
+  so `Puck.app` (the pet, no editor UI of its own) links
+  `CodeEditSourceEditor` transitively too, same structural situation as it
+  already linking WebKit for the same reason.
+- Explicitly not touched: `workspace`'s TypeScript side (`EditorGateway`,
+  `editor_view_ready`/`editor_view_unavailable` sending) -- PuckClient just
+  stops consuming those messages; `EditorGateway` becomes a dead-consumer
+  server that still starts on every `workspace` launch, a natural TS-side
+  cleanup follow-up, not bundled here. `code_editor`'s ACP-subprocess
+  mechanism (still genuinely needs `workspace` running) is untouched.
+- Verified: 1016/1016 `PuckTests` (was 957 pre-Electron-revert baseline +
+  59 new, covering `WorkspaceFileService`/`PathContainment`/`EditorLanguage`/
+  `WorkspaceFileWatcher`/`EditorPaneStore`/`EditorFileDelegate`/
+  `AgentRunner.pathArgument`), both `Puck`/`PuckClient` targets build clean,
+  `scripts/install.sh` builds+signs+installs both apps.
+
 ## 2026-08-13: PuckClient's chat UI moved to web (React/Tailwind/shadcn) -- done
 
 Landed in full: `chat-web/` (sidebar, top bar, transcript, streaming, tool

@@ -120,6 +120,11 @@ final class ClientChatBridge: NSObject, WKScriptMessageHandler {
     }
 
     private func setEditorOpen(_ isOpen: Bool) {
+        // Re-resolve against the filesystem right before showing the pane --
+        // ClientWorkspace's cached availability is otherwise only as fresh
+        // as whenever this workspace was created, which could be long before
+        // the toggle is actually opened.
+        if isOpen { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
         isEditorOpen = isOpen
         editorOpenChangeHandler?(isOpen)
         pushEditorOpen()

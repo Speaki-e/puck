@@ -24,9 +24,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// pushed to imperatively rather than Combine-observed.
     private lazy var chatBridge = ClientChatBridge(store: clientWindowStore)
     /// F15 (2026-07-31): the agent runs in this process now -- see AgentHost.
-    private lazy var agentHost = AgentHost(broadcast: { [weak self] message in
-        self?.bridgeClient.broadcast(message) ?? false
-    })
+    private lazy var agentHost = AgentHost(
+        broadcast: { [weak self] message in
+            self?.bridgeClient.broadcast(message) ?? false
+        },
+        resolveProjectPath: { [weak self] workspaceId in
+            self?.clientWindowStore.workspaces.first { $0.id == workspaceId }?.projectPath
+        }
+    )
     private var window: ClientWindow?
     private var settingsWindow: NSWindow?
     private var clientThemeStyleObserver: NSObjectProtocol?

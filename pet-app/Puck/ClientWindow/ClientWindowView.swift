@@ -29,21 +29,28 @@ struct ClientWindowView: View {
     }
 
     var body: some View {
-        Group {
-            if isEditorOpen, let availability = activeWorkspace?.editorAvailability {
-                HSplitView {
+        VStack(spacing: 0) {
+            Group {
+                if isEditorOpen, let availability = activeWorkspace?.editorAvailability {
+                    HSplitView {
+                        ClientChatWebView(bridge: chatBridge)
+                            .frame(minWidth: 320, idealWidth: 420)
+                        EditorPaneView(
+                            workspaceId: store.activeWorkspaceId,
+                            availability: availability,
+                            onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
+                        )
+                        .frame(minWidth: 360)
+                    }
+                } else {
                     ClientChatWebView(bridge: chatBridge)
-                        .frame(minWidth: 320, idealWidth: 420)
-                    EditorPaneView(
-                        workspaceId: store.activeWorkspaceId,
-                        availability: availability,
-                        onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
-                    )
-                    .frame(minWidth: 360)
                 }
-            } else {
-                ClientChatWebView(bridge: chatBridge)
             }
+            ClientStatusBarView(
+                workspace: activeWorkspace,
+                availability: activeWorkspace?.editorAvailability ?? .noProject,
+                palette: store.themeStyle.palette
+            )
         }
         .frame(minWidth: ClientTheme.Metrics.windowMinWidth, minHeight: ClientTheme.Metrics.windowMinHeight)
         .environment(\.clientPalette, store.themeStyle.palette)

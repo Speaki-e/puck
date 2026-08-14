@@ -1,18 +1,35 @@
-import { useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
-import type { SessionStateJSON } from "@/lib/bridge-types";
+import { useEffect, useMemo, useRef } from "react";
+import type { SessionStateJSON, TimelineEntryJSON } from "@/lib/bridge-types";
 import { MessageBubble } from "./MessageBubble";
 import { ToolCallCard } from "./ToolCallCard";
 import { ToolResultRow } from "./ToolResultRow";
+import { RunningStatusLine } from "./RunningStatusLine";
 import { EmptyTranscript } from "./EmptyTranscript";
 
 interface ChatTranscriptProps {
   session: SessionStateJSON;
   assistantName: string;
+  /** Active workspace's project path, for RunningStatusLine. Model is out of
+   *  scope for the web layer -- see RunningStatusLine.tsx. */
+  projectPath: string | null;
 }
 
-export function ChatTranscript({ session, assistantName }: ChatTranscriptProps) {
+type ToolResultEntry = Extract<TimelineEntryJSON, { kind: "toolResult" }>;
+
+export function ChatTranscript({ session, assistantName, projectPath }: ChatTranscriptProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // toolCall and toolResult entries share the same id (the tool_use id --
+  // see ChatSession.swift), so a call's result is folded into its card
+  // instead of rendering as a second, separate row.
+  const resultsByCallId = useMemo(() => {
+    const map = new Map<string, ToolResultEntry>();
+    for (const entry of session.timeline) {
+      if (entry.kind === "toolResult") map.set(entry.id, entry);
+    }
+    return map;
+  }, [session.timeline]);
+  const callIds = useMemo(() => new Set(session.timeline.filter((entry) => entry.kind === "toolCall").map((entry) => entry.id)), [session.timeline]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -38,8 +55,11 @@ export function ChatTranscript({ session, assistantName }: ChatTranscriptProps) 
             case "assistantText":
               return <MessageBubble key={entry.id} isUser={false} text={entry.text} senderLabel={assistantName} />;
             case "toolCall":
-              return <ToolCallCard key={`call:${entry.id}`} tool={entry.tool} args={entry.args} />;
+              return <ToolCallCard key={`call:${entry.id}`} tool={entry.tool} args={entry.args} result={resultsByCallId.get(entry.id) ?? null} />;
             case "toolResult":
+              // Rendered as part of the matching toolCall's card above; only
+              // fall back to a standalone row if that pairing didn't hold.
+              if (callIds.has(entry.id)) return null;
               return <ToolResultRow key={`result:${entry.id}`} ok={entry.ok} data={entry.data} error={entry.error} detail={entry.detail} />;
             case "approvalRequested":
               // Deliberately not rendered as a timeline row -- the sticky
@@ -56,12 +76,7 @@ export function ChatTranscript({ session, assistantName }: ChatTranscriptProps) 
               return null;
           }
         })}
-        {session.isRunning && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" />
-            생각 중…
-          </div>
-        )}
+        {session.isRunning && <RunningStatusLine model={null} projectPath={projectPath} />}
         <div ref={bottomRef} />
       </div>
     </div>

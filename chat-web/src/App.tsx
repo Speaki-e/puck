@@ -26,21 +26,25 @@ function ChatWindow() {
         <TabStrip />
         {state.activeSession ? (
           <>
-            <ChatTranscript session={state.activeSession} assistantName={ASSISTANT_NAME} />
+            <ChatTranscript
+              session={state.activeSession}
+              assistantName={ASSISTANT_NAME}
+              projectPath={state.workspaces.find((workspace) => workspace.id === state.activeSession!.workspaceId)?.projectPath ?? null}
+            />
             <div className="px-4">
               {state.activeSession.pendingApproval && (
                 <ApprovalBanner
                   approval={state.activeSession.pendingApproval}
                   onRespond={(approved) =>
-                    respondApproval(state.activeWorkspaceId, state.activeSessionId, state.activeSession!.pendingApproval!.approvalId, approved)
+                    respondApproval(state.activeSession!.workspaceId, state.activeSession!.id, state.activeSession!.pendingApproval!.approvalId, approved)
                   }
                 />
               )}
             </div>
             <ChatInputBar
               isRunning={state.activeSession.isRunning}
-              onSend={(text) => sendMessage(state.activeWorkspaceId, state.activeSessionId, text)}
-              onCancel={() => cancelRun(state.activeWorkspaceId, state.activeSessionId)}
+              onSend={(text) => sendMessage(state.activeSession!.workspaceId, state.activeSession!.id, text)}
+              onCancel={() => cancelRun(state.activeSession!.workspaceId, state.activeSession!.id)}
             />
           </>
         ) : (

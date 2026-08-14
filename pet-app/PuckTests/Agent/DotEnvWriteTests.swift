@@ -100,7 +100,7 @@ final class AgentConfigurationKeySourceTests: XCTestCase {
     func test_reportsTheEnvironmentWhenItSuppliedTheKey() {
         let configuration = AgentConfiguration.load(environment: ["OPENAI_API_KEY": "sk-env"], searchPaths: [])
 
-        XCTAssertEqual(configuration.keySource, .environment)
+        XCTAssertEqual(configuration.keySource, .environment(variable: "OPENAI_API_KEY"))
     }
 
     func test_reportsTheFileThatSuppliedTheKey() throws {

@@ -141,4 +141,62 @@ final class AgentConfigurationTests: XCTestCase {
         XCTAssertFalse(configuration.isConfigured)
         XCTAssertEqual(configuration.model, AgentConfiguration.defaultModel)
     }
+
+    // MARK: - Provider
+
+    func test_defaultsToOpenAIWhenNothingSelectsAProvider() {
+        let config = AgentConfiguration.load(environment: [:], searchPaths: [])
+        XCTAssertEqual(config.provider, .openai)
+    }
+
+    func test_readsProviderFromEnvironment() {
+        let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "anthropic"], searchPaths: [])
+        XCTAssertEqual(config.provider, .anthropic)
+    }
+
+    func test_unknownProviderFallsBackToOpenAI() {
+        let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "gemini"], searchPaths: [])
+        XCTAssertEqual(config.provider, .openai)
+    }
+
+    func test_selectedProviderDecidesWhichKeyIsRead() {
+        let env = ["AGENT_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "sk-ant-x", "OPENAI_API_KEY": "sk-oai-y"]
+        XCTAssertEqual(AgentConfiguration.load(environment: env, searchPaths: []).apiKey, "sk-ant-x")
+
+        var openAIEnv = env
+        openAIEnv["AGENT_PROVIDER"] = "openai"
+        XCTAssertEqual(AgentConfiguration.load(environment: openAIEnv, searchPaths: []).apiKey, "sk-oai-y")
+    }
+
+    func test_eachProviderHasItsOwnDefaultModel() {
+        let openAI = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "openai"], searchPaths: [])
+        let anthropic = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "anthropic"], searchPaths: [])
+        XCTAssertNotEqual(openAI.model, anthropic.model)
+        XCTAssertFalse(anthropic.model.isEmpty)
+    }
+
+    /// `AGENT_MODEL` is a provider-neutral override, but a legacy
+    /// `OPENAI_MODEL` must keep winning for OpenAI users -- adding the
+    /// neutral variable can't silently change behavior for anyone who
+    /// already relies on the specific one.
+    func test_legacyOpenAIModelVariableStillWinsOverProviderNeutralOne() {
+        let config = AgentConfiguration.load(
+            environment: ["OPENAI_MODEL": "gpt-4.1", "AGENT_MODEL": "gpt-5"],
+            searchPaths: []
+        )
+
+        XCTAssertEqual(config.model, "gpt-4.1")
+    }
+
+    /// With no provider-specific override, the neutral variable still works
+    /// -- it exists precisely so a provider switch doesn't also require
+    /// renaming the model override.
+    func test_agentModelIsUsedWhenNoProviderSpecificOverrideIsSet() {
+        let config = AgentConfiguration.load(
+            environment: ["AGENT_PROVIDER": "anthropic", "AGENT_MODEL": "claude-opus-5"],
+            searchPaths: []
+        )
+
+        XCTAssertEqual(config.model, "claude-opus-5")
+    }
 }

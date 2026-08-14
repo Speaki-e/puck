@@ -1,5 +1,6 @@
-import { MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatusDot, sessionDotState } from "@/components/ui/status-dot";
+import { relativeTime } from "@/lib/relative-time";
 import type { SessionSummaryJSON } from "@/lib/bridge-types";
 
 interface SessionRowProps {
@@ -14,15 +15,13 @@ export function SessionRow({ session, active, onSelect }: SessionRowProps) {
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
+        "flex h-[26px] w-full items-center gap-2 rounded-sm pl-5 pr-2 text-left text-xs transition-colors",
         active ? "bg-brand/14 text-foreground" : "text-muted-foreground hover:bg-hairline-soft",
       )}
     >
-      <MessageSquare className={cn("size-3.5 shrink-0", active && "text-brand")} />
+      <StatusDot state={sessionDotState(session)} />
       <span className="min-w-0 flex-1 truncate">{session.title}</span>
-      {session.isRunning && (
-        <span className="size-3 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/40 border-t-brand" />
-      )}
+      <span className="shrink-0 text-[10px] text-faint">{relativeTime(session.lastActivityAt, Date.now())}</span>
     </button>
   );
 }

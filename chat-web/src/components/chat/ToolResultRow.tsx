@@ -1,4 +1,5 @@
-import { CheckCircle2, XCircle } from "lucide-react";
+import { StatusDot } from "@/components/ui/status-dot";
+import { KVRows } from "./ToolCallCard";
 import type { JSONValue, ToolErrorCode } from "@/lib/bridge-types";
 
 interface ToolResultRowProps {
@@ -8,17 +9,26 @@ interface ToolResultRowProps {
   detail: string | null;
 }
 
+/**
+ * Fallback rendering for a toolResult timeline entry whose matching toolCall
+ * id isn't in the visible timeline. Shouldn't normally happen -- toolCall and
+ * toolResult share the same tool_use id (ChatSession.swift), so ChatTranscript
+ * folds them into a single ToolCallCard and only reaches for this component
+ * when that pairing fails. Reuses ToolCallCard's KVRows so the two never
+ * drift in styling.
+ */
 export function ToolResultRow({ ok, data, error, detail }: ToolResultRowProps) {
-  const body = !ok ? `${error ?? "execution_failed"}${detail ? `: ${detail}` : ""}` : JSON.stringify(data, null, 2);
-
   return (
-    <div className="flex max-w-[420px] items-start gap-2 rounded-xl border border-hairline bg-surface px-3 py-2">
+    <div className="max-w-[420px] space-y-1 rounded-md border border-hairline bg-surface px-2.5 py-1.5">
+      <div className="flex items-center gap-2">
+        <StatusDot state={ok ? "ok" : "error"} />
+        <span className="font-mono text-[11px] text-ink">result</span>
+      </div>
       {ok ? (
-        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+        <KVRows value={data} />
       ) : (
-        <XCircle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+        <KVRows value={{ error: error ?? "execution_failed", ...(detail ? { detail } : {}) }} />
       )}
-      <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground select-text">{body}</pre>
     </div>
   );
 }

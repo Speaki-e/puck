@@ -35,7 +35,7 @@ export function Sidebar() {
       className="flex h-full shrink-0 flex-col border-r border-hairline bg-surface transition-[width] duration-[180ms] ease-in-out"
       style={{ width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH }}
     >
-      <div className="h-7 shrink-0" /> {/* clears the native titlebar traffic lights -- see TopBar.tsx's comment */}
+      <div className="h-7 shrink-0" /> {/* clears the native titlebar traffic lights -- see App.tsx's matching spacer above TabStrip */}
 
       <div className={cn("flex items-center gap-1.5 border-b border-hairline px-2.5 pb-2", !expanded && "flex-col")}>
         <span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-brand text-[11px] font-medium text-on-brand">

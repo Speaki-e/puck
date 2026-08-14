@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/sidebar/Sidebar";
-import { TopBar } from "@/components/topbar/TopBar";
+import { TabStrip } from "@/components/topbar/TabStrip";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { ChatInputBar } from "@/components/chat/ChatInputBar";
 import { ApprovalBanner } from "@/components/chat/ApprovalBanner";
@@ -22,7 +22,8 @@ function ChatWindow() {
     <div className="flex h-screen w-screen bg-canvas text-foreground">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
+        <div className="h-7 shrink-0" /> {/* clears the native titlebar traffic lights -- see Sidebar.tsx's spacer */}
+        <TabStrip />
         {state.activeSession ? (
           <>
             <ChatTranscript session={state.activeSession} assistantName={ASSISTANT_NAME} />

@@ -83,6 +83,26 @@ protocol AgentLLMClient {
     func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn
 }
 
+/// Picks the `AgentLLMClient` implementation matching `configuration()`'s
+/// `provider` -- the one place `AgentHost` (both apps only ever construct one
+/// of these, at `AgentHost.init`) decides which host it is talking to. A
+/// third provider only ever means adding one more case here.
+///
+/// The provider is read once, at construction, to choose the class -- the
+/// returned client still re-reads `configuration()` on every `send` for the
+/// key and model, same as before. Switching providers in Settings while a
+/// run is already wired up therefore takes effect on the next launch, not
+/// mid-run -- the same restart AgentHost's own doc comment already implies
+/// for anything that changes which client class is in play.
+func makeAgentLLMClient(_ configuration: @escaping () -> AgentConfiguration) -> any AgentLLMClient {
+    switch configuration().provider {
+    case .openai:
+        return GPTClient(configuration: configuration)
+    case .anthropic:
+        return ClaudeClient(configuration: configuration)
+    }
+}
+
 final class GPTClient: AgentLLMClient {
     /// Read per request, not captured once: a key typed into Settings has to
     /// take effect without quitting the app, and this is a file read.

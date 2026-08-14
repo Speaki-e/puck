@@ -200,3 +200,25 @@ final class AgentConfigurationTests: XCTestCase {
         XCTAssertEqual(config.model, "claude-opus-5")
     }
 }
+
+/// F15 (task 4): `makeAgentLLMClient` is the single place `AgentHost`'s
+/// construction site (PuckClient/AgentHost.swift) picks a client class --
+/// getting this switch wrong means every request goes to the wrong host
+/// regardless of which key Settings has stored.
+final class MakeAgentLLMClientTests: XCTestCase {
+    func test_factoryReturnsTheClientMatchingTheSelectedProvider() {
+        let openAI = makeAgentLLMClient({ AgentConfiguration.load(environment: ["AGENT_PROVIDER": "openai"], searchPaths: []) })
+        XCTAssertTrue(openAI is GPTClient)
+
+        let anthropic = makeAgentLLMClient({ AgentConfiguration.load(environment: ["AGENT_PROVIDER": "anthropic"], searchPaths: []) })
+        XCTAssertTrue(anthropic is ClaudeClient)
+    }
+
+    /// No `AGENT_PROVIDER` at all resolves to `.openai` (AgentConfiguration's
+    /// own default) -- the factory has to follow that fallback rather than
+    /// crash or pick arbitrarily.
+    func test_factoryDefaultsToGPTClientWhenNoProviderIsSet() {
+        let client = makeAgentLLMClient({ AgentConfiguration.load(environment: [:], searchPaths: []) })
+        XCTAssertTrue(client is GPTClient)
+    }
+}

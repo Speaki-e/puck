@@ -55,8 +55,13 @@ enum L10nKey: String, CaseIterable, Hashable {
     case permissionNeededBubble
 
     // F15: the agent's API key, entered here rather than in a .env.
-    case agentHeader, apiKeyLabel, apiKeySave, apiKeyClear
-    case apiKeySavedFormat, apiKeySourceFormat, apiKeyMissing, apiKeySaveFailed, apiKeyExplanation
+    case agentHeader, apiKeySave, apiKeyClear
+    case apiKeySavedFormat, apiKeySourceFormat, apiKeyMissing, apiKeySaveFailed
+    /// F15 (task 4): which LLM host the agent talks to. `apiKeyLabelFormat`
+    /// and `apiKeyExplanationFormat` take the selected `AgentProvider`'s
+    /// name/env-var so the key field always names the provider it is
+    /// actually editing, instead of always saying "OpenAI".
+    case providerLabel, apiKeyLabelFormat, apiKeyExplanationFormat
     case installedFormat
     case installedMissingRecommendedFormat
     case failedToInstallFormat
@@ -127,15 +132,16 @@ enum Strings {
         .permissionNeededBubble: "그거 하려면 권한이 필요해요. 제가 가리키는 창에서 허용해 주세요!",
 
         .agentHeader: "에이전트",
-        .apiKeyLabel: "OpenAI API 키",
+        .providerLabel: "AI 공급자",
+        .apiKeyLabelFormat: "%1$@ API 키",
         .apiKeySave: "저장",
         .apiKeyClear: "삭제",
         .apiKeySavedFormat: "%1$@에 저장했어요",
         .apiKeySourceFormat: "사용 중 — 출처: %1$@",
         .apiKeyMissing: "키가 없어요 — 아직 명령을 수행할 수 없습니다.",
         .apiKeySaveFailed: "키 파일을 저장하지 못했어요.",
-        .apiKeyExplanation:
-            "본인만 읽을 수 있는 .env 파일에 저장됩니다. 환경변수 OPENAI_API_KEY나 프로젝트 폴더의 .env가 있으면 그쪽이 우선합니다.",
+        .apiKeyExplanationFormat:
+            "본인만 읽을 수 있는 .env 파일에 저장됩니다. 환경변수 %1$@나 프로젝트 폴더의 .env가 있으면 그쪽이 우선합니다.",
         .installedFormat: "'%1$@' 설치 완료.",
         .installedMissingRecommendedFormat: "'%1$@' 설치 완료 — 권장 클립 누락(대기 이미지로 대체): %2$@",
         .failedToInstallFormat: "'%1$@' 설치 실패: %2$@",

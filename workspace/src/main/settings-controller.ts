@@ -35,6 +35,7 @@ export class SettingsController {
       await this.logger.write("info", "settings_updated", {
         logLevel: updated.logLevel,
         fileSizeLimitBytes: updated.fileSizeLimitBytes,
+        codingAgent: updated.codingAgent,
       });
       return this.snapshot();
     });

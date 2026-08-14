@@ -1,4 +1,5 @@
 import type { JSONValue } from "@speaki-e/protocol";
+import type { CodingAgentKind } from "./acp-command.js";
 
 export interface AgentHostRequestMap {
   ping: { now: number };
@@ -8,6 +9,8 @@ export interface AgentHostRequestMap {
     sessionId: string;
     task: string;
     projectPath: string;
+    /** 설정(W7)의 codingAgent 스냅샷 -- 비어 있으면 AcpAdapter가 "claude"로 기본 처리한다. */
+    agentKind?: CodingAgentKind;
   };
   cancelCodeEditor: { requestId: string };
   crashForTest: Record<string, never>;

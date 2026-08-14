@@ -26,8 +26,14 @@
 //      as bridge.sock and the logs, and the only one of these that a shipped
 //      (non-Debug) build can read.
 //
-//  Keys: `OPENAI_API_KEY`, and `OPENAI_MODEL` to try a different model
-//  without a rebuild.
+//  Same order decides `AGENT_PROVIDER` (`openai` or `anthropic`, default
+//  `openai`; an unrecognized value falls back to `openai` rather than
+//  crashing -- see `AgentProvider.resolved(fromRawValue:)`). The provider then
+//  decides which key is read: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`. Model
+//  override is provider-specific too -- `OPENAI_MODEL` / `ANTHROPIC_MODEL` --
+//  with the provider-neutral `AGENT_MODEL` as a fallback for either one, so
+//  `OPENAI_MODEL` keeps winning for existing OpenAI users even if `AGENT_MODEL`
+//  is also set.
 //
 
 import Foundation
@@ -35,6 +41,7 @@ import Foundation
 struct AgentConfiguration {
     let apiKey: String?
     let model: String
+    let provider: AgentProvider
     /// Which of the search paths actually supplied the key. Surfaced in
     /// Settings because "I changed the key and nothing happened" is otherwise
     /// unanswerable -- an env var or a nearer .env silently outranking the one
@@ -42,20 +49,28 @@ struct AgentConfiguration {
     let keySource: KeySource?
 
     enum KeySource: Equatable {
-        case environment
+        case environment(variable: String)
         case file(URL)
 
         var displayName: String {
             switch self {
-            case .environment: return "환경변수 OPENAI_API_KEY"
+            case .environment(let variable): return "환경변수 \(variable)"
             case .file(let url):
                 return url.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
             }
         }
     }
 
-    /// Used when nothing names one.
+    /// Used when nothing names one, for `.openai`.
     static let defaultModel = "gpt-4o"
+
+    /// Used when nothing names one, for `.anthropic`. `claude-sonnet-5` is
+    /// Anthropic's "best combination of speed and intelligence" model per
+    /// platform.claude.com/docs/en/about-claude/models/overview (checked
+    /// 2026-08-15) -- the same balanced-default role `gpt-4o` plays above,
+    /// rather than the priciest frontier model. Anthropic revs its lineup
+    /// often; re-check that page when this stops being current.
+    static let defaultAnthropicModel = "claude-sonnet-5"
 
     var isConfigured: Bool { !(apiKey ?? "").isEmpty }
 
@@ -63,40 +78,68 @@ struct AgentConfiguration {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
     ) -> AgentConfiguration {
-        if let fromEnvironment = environment["OPENAI_API_KEY"]?.nilIfBlank {
+        let provider = provider(environment: environment, searchPaths: searchPaths)
+        let keyVariable = provider.apiKeyEnvironmentVariable
+        if let fromEnvironment = environment[keyVariable]?.nilIfBlank {
             return AgentConfiguration(
                 apiKey: fromEnvironment,
-                model: model(environment: environment, searchPaths: searchPaths),
-                keySource: .environment
+                model: model(provider: provider, environment: environment, searchPaths: searchPaths),
+                provider: provider,
+                keySource: .environment(variable: keyVariable)
             )
         }
         for directory in searchPaths {
             let file = directory.appendingPathComponent(".env")
-            if let fromFile = DotEnv.parse(fileAt: file)["OPENAI_API_KEY"]?.nilIfBlank {
+            if let fromFile = DotEnv.parse(fileAt: file)[keyVariable]?.nilIfBlank {
                 return AgentConfiguration(
                     apiKey: fromFile,
-                    model: model(environment: environment, searchPaths: searchPaths),
+                    model: model(provider: provider, environment: environment, searchPaths: searchPaths),
+                    provider: provider,
                     keySource: .file(file)
                 )
             }
         }
         return AgentConfiguration(
             apiKey: nil,
-            model: model(environment: environment, searchPaths: searchPaths),
+            model: model(provider: provider, environment: environment, searchPaths: searchPaths),
+            provider: provider,
             keySource: nil
         )
     }
 
-    /// Resolved independently of the key: a `.env` that only sets the model is
-    /// a reasonable thing to have next to one that only sets the key.
-    private static func model(environment: [String: String], searchPaths: [URL]) -> String {
-        if let fromEnvironment = environment["OPENAI_MODEL"]?.nilIfBlank { return fromEnvironment }
+    /// Resolved the same way the key is: process environment beats the
+    /// nearest `.env` that sets it. An unrecognized value (a stale `.env`, a
+    /// provider this build predates) falls back to `.openai` rather than
+    /// crashing -- mirrors `ClientThemeStyle.resolved(fromDefaultsValue:)`.
+    private static func provider(environment: [String: String], searchPaths: [URL]) -> AgentProvider {
+        if let fromEnvironment = environment["AGENT_PROVIDER"]?.nilIfBlank {
+            return AgentProvider.resolved(fromRawValue: fromEnvironment)
+        }
         for directory in searchPaths {
-            if let fromFile = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))["OPENAI_MODEL"]?.nilIfBlank {
-                return fromFile
+            if let fromFile = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))["AGENT_PROVIDER"]?.nilIfBlank {
+                return AgentProvider.resolved(fromRawValue: fromFile)
             }
         }
-        return defaultModel
+        return .openai
+    }
+
+    /// Resolved independently of the key: a `.env` that only sets the model is
+    /// a reasonable thing to have next to one that only sets the key.
+    ///
+    /// Checks the provider-specific variable (`OPENAI_MODEL` /
+    /// `ANTHROPIC_MODEL`) before the provider-neutral `AGENT_MODEL`, at each
+    /// search path, so an existing `OPENAI_MODEL` keeps winning for OpenAI
+    /// users even if `AGENT_MODEL` is also set somewhere.
+    private static func model(provider: AgentProvider, environment: [String: String], searchPaths: [URL]) -> String {
+        let providerVariable = provider.modelEnvironmentVariable
+        if let fromEnvironment = environment[providerVariable]?.nilIfBlank { return fromEnvironment }
+        if let fromEnvironment = environment["AGENT_MODEL"]?.nilIfBlank { return fromEnvironment }
+        for directory in searchPaths {
+            let values = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))
+            if let fromFile = values[providerVariable]?.nilIfBlank { return fromFile }
+            if let fromFile = values["AGENT_MODEL"]?.nilIfBlank { return fromFile }
+        }
+        return provider.defaultModel
     }
 
     /// Where Settings writes a key typed into it: the one search path both
@@ -146,6 +189,50 @@ struct AgentConfiguration {
         #else
         return nil
         #endif
+    }
+}
+
+/// Which LLM host the agent talks to. Surfaced in Settings as a picker;
+/// `AgentConfiguration` uses it to pick the right API key and default model.
+enum AgentProvider: String, CaseIterable {
+    case openai
+    case anthropic
+
+    /// Shown in Settings' provider picker.
+    var displayName: String {
+        switch self {
+        case .openai: return "ChatGPT (OpenAI)"
+        case .anthropic: return "Claude (Anthropic)"
+        }
+    }
+
+    var apiKeyEnvironmentVariable: String {
+        switch self {
+        case .openai: return "OPENAI_API_KEY"
+        case .anthropic: return "ANTHROPIC_API_KEY"
+        }
+    }
+
+    var modelEnvironmentVariable: String {
+        switch self {
+        case .openai: return "OPENAI_MODEL"
+        case .anthropic: return "ANTHROPIC_MODEL"
+        }
+    }
+
+    var defaultModel: String {
+        switch self {
+        case .openai: return AgentConfiguration.defaultModel
+        case .anthropic: return AgentConfiguration.defaultAnthropicModel
+        }
+    }
+
+    /// Same resolve-with-fallback shape as
+    /// `ClientThemeStyle.resolved(fromDefaultsValue:)` -- a raw value this
+    /// build doesn't recognize (a stale `.env`, a future provider) falls back
+    /// to `.openai` instead of crashing.
+    static func resolved(fromRawValue raw: String?) -> AgentProvider {
+        raw.flatMap(AgentProvider.init(rawValue:)) ?? .openai
     }
 }
 

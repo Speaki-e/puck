@@ -20,15 +20,17 @@ class FakeUtilityProcess extends EventEmitter {
 }
 
 const forkedProcesses: FakeUtilityProcess[] = [];
-const fork = vi.fn(() => {
+const forkOptions: Array<{ env?: Record<string, string> }> = [];
+const fork = vi.fn((_modulePath: string, _args: string[], options: { env?: Record<string, string> }) => {
   const child = new FakeUtilityProcess();
   forkedProcesses.push(child);
+  forkOptions.push(options);
   setImmediate(() => child.emit("spawn"));
   return child;
 });
 
 vi.mock("electron", () => ({
-  utilityProcess: { fork: (...args: unknown[]) => fork(...(args as [])) },
+  utilityProcess: { fork: (...args: unknown[]) => fork(...(args as [string, string[], { env?: Record<string, string> }])) },
 }));
 
 function sendReady(child: FakeUtilityProcess): void {
@@ -38,7 +40,41 @@ function sendReady(child: FakeUtilityProcess): void {
 describe("AgentHostController", () => {
   afterEach(() => {
     forkedProcesses.length = 0;
+    forkOptions.length = 0;
     fork.mockClear();
+  });
+
+  it("claude/codex/openai 키를 모두 자식 프로세스 env로 전달한다 (Gap 1: codex-acp가 무인증으로 뜨는 문제)", async () => {
+    const { AgentHostController } = await import("./agent-host-controller.js");
+    const logs = await mkdtemp(path.join(os.tmpdir(), "workspace-agenthost-log-"));
+    const controller = new AgentHostController(
+      "fake-module-path.js",
+      new JsonlLogger(logs),
+      process.cwd(),
+      "anthropic-secret",
+      "codex-secret",
+      "openai-secret",
+    );
+
+    await controller.start();
+
+    expect(forkOptions[0]?.env).toMatchObject({
+      ANTHROPIC_API_KEY: "anthropic-secret",
+      CODEX_API_KEY: "codex-secret",
+      OPENAI_API_KEY: "openai-secret",
+    });
+  });
+
+  it("codex/openai 키가 없으면 해당 env 변수를 아예 넣지 않는다", async () => {
+    const { AgentHostController } = await import("./agent-host-controller.js");
+    const logs = await mkdtemp(path.join(os.tmpdir(), "workspace-agenthost-log-"));
+    const controller = new AgentHostController("fake-module-path.js", new JsonlLogger(logs));
+
+    await controller.start();
+
+    expect(forkOptions[0]?.env).not.toHaveProperty("ANTHROPIC_API_KEY");
+    expect(forkOptions[0]?.env).not.toHaveProperty("CODEX_API_KEY");
+    expect(forkOptions[0]?.env).not.toHaveProperty("OPENAI_API_KEY");
   });
 
   it("spawn 시 준비 중 상태를, ready 수신 시 준비됨 상태를 emit한다", async () => {

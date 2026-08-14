@@ -75,6 +75,10 @@ export async function startWorkspaceApplication(): Promise<void> {
     logger,
     app.getAppPath(),
     claudeApiKey,
+    // codex-acp는 secrets store가 아니라 환경 변수로만 인증한다 -- pet-app 쪽 codex 지원(Gap 1)도
+    // 아직 secrets store를 두지 않고 .env를 그대로 프로세스 env에 흘려보내는 동일한 경로를 쓴다.
+    process.env.CODEX_API_KEY,
+    process.env.OPENAI_API_KEY,
   );
   agentHost.on("status", (status: string) => controller.sendAgentStatus(status));
   await agentHost.start();

@@ -4,6 +4,132 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-15: model hosting providers -- OpenAI or Anthropic for the pet-app agent, Claude or Codex for workspace's `code_editor`
+
+Both apps could only ever talk to one model host each: `pet-app`'s own agent
+loop was OpenAI-only (`GPTClient`), and `workspace`'s `code_editor` tool
+always shelled out to Claude Code over ACP. This adds a second option on
+each side, independently -- they are different subsystems with different
+protocols, not one provider switch.
+
+**`pet-app`'s agent loop: `AgentLLMClient` split, `GPT*` names kept.**
+`pet-app/Puck/Agent/GPTClient.swift` used to be both the wire client and the
+only shape `AgentRunner` knew about. `protocol AgentLLMClient { func
+send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn }`
+was pulled out of it so a second implementation could sit next to it;
+`AgentRunner` now takes `any AgentLLMClient` instead of `GPTClient` directly.
+The `GPT*` request/response type names (`GPTMessage`, `GPTToolCall`,
+`GPTTurn`, `GPTToolSpec`) were kept even though they now cross provider
+lines -- renaming them would touch every call site for no behavioral gain,
+since the shapes really are the same three request fields and two response
+fields regardless of who serves them (see the doc comment directly above
+`protocol AgentLLMClient`).
+
+**`ClaudeClient`: no SDK, four Messages-API differences.**
+`pet-app/Puck/Agent/ClaudeClient.swift` is a hand-rolled Anthropic Messages
+API client, matching `GPTClient`'s existing no-SDK policy (a tool-use loop
+needs three request fields and reads two response fields; a dependency for
+that is a dependency to keep updated, and there is no official Anthropic
+Swift SDK to reach for anyway). Its header documents the four differences
+from Chat Completions that would have silently misbehaved if copy-pasted:
+auth is `x-api-key` + `anthropic-version: 2023-06-01`, not `Authorization:
+Bearer`; `system` is a top-level request field, not a `role: "system"`
+message; tool use arrives as content blocks (an assistant reply's `content`
+mixes `text` and `tool_use` blocks, and a tool result goes back inside a
+*user* message as a `tool_result` block -- there is no `role: "tool"`); and
+`max_tokens` is required (fixed at 4096, since `AgentRunner`'s turns are
+short tool-call exchanges, not long-form generation).
+
+**`AgentProvider` + `ANTHROPIC_API_KEY`, back-compatible default.**
+`AgentConfiguration` (`pet-app/Puck/Agent/AgentConfiguration.swift`) gained
+`provider: AgentProvider` (`.openai` / `.anthropic`), resolved through the
+same environment-then-`.env`-search-path order the API key already used, via
+`AGENT_PROVIDER` (default `openai`; an unrecognized value falls back to
+`openai` rather than crashing -- `AgentProvider.resolved(fromRawValue:)`).
+Anthropic reads `ANTHROPIC_API_KEY` and defaults to model
+`claude-sonnet-5` (`AgentConfiguration.defaultAnthropicModel`, taken from
+Anthropic's official model docs as their balanced speed/intelligence
+default, the same role `gpt-4o` plays for OpenAI) unless `ANTHROPIC_MODEL`
+or the provider-neutral `AGENT_MODEL` names something else. Defaulting to
+`.openai` means every existing `.env` with just `OPENAI_API_KEY` keeps
+working unchanged -- the provider field is additive, not a breaking
+migration.
+
+**Surfaced to the user:** a provider picker (segmented `Picker` over
+`AgentProvider.allCases`) in `pet-app/PuckClient/AgentSettingsView.swift` --
+deliberately not `Puck/Settings/SettingsView.swift`, whose header disclaims
+owning agent settings. It reads/writes `AGENT_PROVIDER` in the same `.env`
+the API key field already writes to (`AgentConfiguration.writableEnvFile`).
+
+**Gap fixed -- provider switches now take effect without a relaunch.**
+`AgentHost.init` (`pet-app/PuckClient/AgentHost.swift`) constructs exactly
+one `AgentRunner`, once, for the process's lifetime. Choosing the
+`AgentLLMClient` *class* at that same moment -- as the original
+`makeAgentLLMClient` did, switching on `configuration().provider` once at
+construction -- meant a provider change in Settings only took effect on the
+next relaunch, even though the key itself was already live (`GPTClient` and
+`ClaudeClient` both re-read `configuration()` on every `send`, precisely so
+a key typed into Settings works without quitting the app). That was an
+inconsistency, not a deliberate choice: the class-level `provider` decision
+and the request-level `apiKey`/`model` decisions disagreed about how live
+"live" should be. Fixed with `RoutingAgentLLMClient`
+(`pet-app/Puck/Agent/GPTClient.swift`), a thin `AgentLLMClient` that holds
+one instance of each underlying client (cheap -- just a closure and a
+`URLSession`) and re-reads `configuration().provider` on every `send` to
+pick which one handles that turn. `makeAgentLLMClient` now always returns a
+`RoutingAgentLLMClient` rather than switching once.
+`PuckTests/Agent/RoutingAgentLLMClientTests.swift` proves a provider flip
+between two `send` calls on the same router instance reaches the newly
+selected client and not the old one, without reconstructing anything.
+
+**`workspace`'s `code_editor`: ACP command generalized, Codex via a wrapper
+package.** `resolveAgentCommand(kind: CodingAgentKind, appPath)` in
+`workspace/src/shared/acp-command.ts` replaces a Claude-only command
+resolver; `CodingAgentKind` is `"claude" | "codex"`. Codex does not speak ACP
+natively -- it reaches the same `AcpAdapter` protocol through
+`@agentclientprotocol/codex-acp` (pinned at `1.2.0`, added to the
+`workspace` Electron build's `asarUnpack` list alongside the existing Claude
+Code ACP package), the same way `@agentclientprotocol/claude-agent-acp`
+already stood in for Claude Code. `AcpAdapter`
+(`workspace/src/agent-host/acp-adapter.ts`) takes an `agentKind` option
+(defaults `"claude"` for back-compatibility) and, when it is `"codex"`,
+forwards `CODEX_API_KEY`/`OPENAI_API_KEY` from its own process env into the
+spawned agent's env (and still forwards `ANTHROPIC_API_KEY` for the Claude
+case). The `codingAgent` setting is threaded end-to-end -- `SettingsStore` /
+`settings-contract.ts` → `agent-runtime-coordinator.ts`'s
+`getCodingAgent` hook → `tool-executors.ts` → the `agent_host_dispatch`
+payload → `agent-host/index.ts`'s `createAdapterFor` → `AcpAdapter`'s
+`agentKind` -- but there is currently no renderer control that lets a user
+set it from a settings screen; it is settable only via the `settings:update`
+IPC handler (`SettingsController.installIpc` in
+`workspace/src/main/settings-controller.ts`). That renderer tree is slated
+for deletion, so the omission was deliberate rather than an oversight.
+
+**Gap fixed -- Codex's key never reached the ACP child process.**
+`AcpAdapter` runs inside the Agent Host child process, spawned by
+`workspace/src/main/agent-host-controller.ts` via `utilityProcess.fork`.
+That fork only ever put `ANTHROPIC_API_KEY` into the child's `env` (sourced
+from `claudeApiKey`, itself sourced in `workspace-application.ts` from the
+secrets store with `process.env.ANTHROPIC_API_KEY` as a one-time seed/
+fallback). So even though `AcpAdapter` already knew to read
+`CODEX_API_KEY`/`OPENAI_API_KEY` from its own process env when
+`agentKind === "codex"`, those variables never arrived -- selecting
+`"codex"` spawned it unauthenticated. Fixed by adding `codexApiKey`/
+`openAiApiKey` constructor parameters to `AgentHostController`, forwarded
+into the child's `env` the same conditional way `ANTHROPIC_API_KEY` already
+is (`...(this.codexApiKey ? { CODEX_API_KEY: this.codexApiKey } : {})`, and
+likewise for `OPENAI_API_KEY`) -- minimal-env discipline kept, no
+`...process.env` spread. `workspace-application.ts` sources both directly
+from `process.env.CODEX_API_KEY`/`process.env.OPENAI_API_KEY`, the same
+"environment variable, no secrets-store entry yet" path the existing
+`openAiCodeEditor` wiring a few lines below it already uses for
+`OPENAI_API_KEY` -- there is no codex/openai secrets-store key yet, so this
+does not invent a second mechanism alongside the Claude one, it just doesn't
+extend the secrets store to a place the plan didn't ask for it.
+`workspace/src/main/agent-host-controller.test.ts` gained two cases: all
+three keys land in the forked child's `env` when supplied, and none of them
+are present (not even as empty strings) when omitted.
+
 ## 2026-08-14: design system v2 -- new mood, light/dark only, new status vocabulary
 
 Full art-direction replacement of `ClientPalette`/`ClientTheme` and the two

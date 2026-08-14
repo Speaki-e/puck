@@ -4,7 +4,7 @@
 > 전제한 "저장소마다 독립된 protocol 버전 pin"이라는 문제 자체가 사라졌다 -- 전부 같은 커밋을
 > 공유한다. 아래는 합치기 전 시점의 드리프트 점검 기록으로 남겨둔다.
 
-TODO.md W0/공통 "저장소 간 protocol 버전 호환 매트릭스 작성" 항목의 산출물이다. 코드 변경은 없다.
+저장소 간 protocol 버전 호환 매트릭스를 작성해달라는 요청의 산출물이다. 코드 변경은 없다.
 이 저장소(workspace)가 쓰는 `@speaki-e/protocol` 버전과, 그 protocol을 실제로 공유하는 다른
 저장소(pet-app, ai-module)가 지금 어떤 버전을 기대/반영하고 있는지 로컬에 체크아웃된 세 저장소
 (`../protocol`, `../pet-app`, `../ai-module`)를 직접 열어 확인한 결과다.
@@ -36,9 +36,8 @@ TODO.md W0/공통 "저장소 간 protocol 버전 호환 매트릭스 작성" 항
   드리프트가 전혀 없다.
 - 다만 이건 "커밋을 고정"한 것이지 "자동으로 최신을 따라간다"는 뜻이 아니다 -- protocol 저장소가
   다음 커밋을 만들면 workspace는 그 시점부터 뒤처진 채로 남는다(사람이 `pnpm update` 등으로 pin을
-  올려야 한다). TODO.md의 W0 P0 항목("protocol PR: `state_snapshot`, `request_id`, 확장
-  `run_cancel(run_id)` 계약 확정")이 아직 협의 중이라, 지금 pin을 올리지 않고 있는 것 자체는
-  의도된 상태다.
+  올려야 한다). `state_snapshot`/`request_id`/확장 `run_cancel(run_id)` 계약을 확정하는 protocol
+  PR이 아직 협의 중이라(`TODO.md` 참고), 지금 pin을 올리지 않고 있는 것 자체는 의도된 상태다.
 - `isBridgeMessage`(`node_modules/@speaki-e/protocol/dist/validate.js`)로 실제 wire 메시지를
   런타임 검증하고 있어(`pet-bridge.ts`), 타입 정의와 런타임 검증이 항상 같은 커밋에서 나온다 --
   버전 불일치로 인한 "컴파일은 되는데 실제로는 다른 스키마" 문제가 구조적으로 생기기 어렵다.
@@ -66,26 +65,31 @@ protocol 저장소가 `swift/` 아래 파일을 다시 바꾸면, pet-app이 그
 드리프트가 생긴다 -- 지금은 우연히 최신이지만, 이 매트릭스가 그 사실을 자동으로 보장해주지는
 않는다(재확인 방법: 이 문서의 diff 절차를 다시 실행).
 
-## `ai-module`
+## `ai-module` (전량 폐기됨 -- 아래는 순수 히스토리)
 
-**확인 불가.** 2026-08-04 기준 저장소에 커밋이 하나(`chore: add .gitignore`)뿐이고 소스 코드가
-전혀 없다 -- protocol을 어떤 방식으로 소비할지(npm 의존성인지, 별도 언어라 Python/기타 미러를 두는
-지), 어떤 버전을 기대하는지 확인할 대상 자체가 없다.
+**2026-08-12 갱신:** ai-module은 결국 이 상태(커밋 1개, 코드 없음) 그대로 영구 폐기됐다 --
+`../docs/decisions.md` "workspace becomes a plain editor" 참고. 즉 아래 "코드가 생기면 다시
+확인해야 할 것" 목록은 더 이상 미래에 할 일이 아니라, 그 시점까지의 조사 기록일 뿐이다. 4번 항목이
+가리키는 `MockAgentRuntime`도 이미 없다 -- `agent-runtime-coordinator.ts`는 이제 `MockAgentRuntime`
+없이 `DirectCodeEditorRuntime`을 직접 쓴다.
 
-**코드가 생기면 다시 확인해야 할 것:**
+**확인 불가 (2026-08-04 기준, 폐기 전 조사 시점).** 당시 저장소에 커밋이 하나(`chore: add
+.gitignore`)뿐이고 소스 코드가 전혀 없었다 -- protocol을 어떤 방식으로 소비할지(npm 의존성인지,
+별도 언어라 Python/기타 미러를 두는지), 어떤 버전을 기대하는지 확인할 대상 자체가 없었다.
+
+**(폐기 전 시점에 적어뒀던) 코드가 생기면 다시 확인해야 할 것:**
 
 1. `package.json`(또는 해당 언어의 의존성 매니페스트)이 `@speaki-e/protocol`을 어떤 버전/커밋으로
    고정하는지 -- workspace의 pin(`4244922...`)과 같은지, 뒤처졌는지.
 2. ai-module이 실제로 협의 대기 중인 확장 계약(`state_snapshot`, `request_id`, 확장
-   `run_cancel(run_id)`, `docs/session-workspace-metadata-review.md`에서 언급한 W4 공통 항목들)을
-   전제로 설계돼 있는지 -- 아직 protocol PR이 안 올라간 상태이므로, ai-module 쪽 설계가 그 확장을
-   먼저 가정하고 있다면 workspace/protocol과 순서를 맞춰야 한다.
+   `run_cancel(run_id)`, `docs/session-workspace-metadata-review.md`에서 언급한 항목들)을 전제로
+   설계돼 있는지.
 3. `TOOL_REGISTRY`/`ToolTimeouts`(도구 이름, timeout, 인자 스키마)를 ai-module의 tool-use 루프가
    그대로 참조하는지, 아니면 자체 사본을 두는지 -- 자체 사본이면 pet-app과 같은 수동 동기화 문제가
    생긴다.
-4. `src/main/app/agent-runtime-coordinator.ts`의 `MockAgentRuntime`이 대체하고 있는 실제 `AgentRuntime`/`ApprovalPort` 포트
-   계약(`shared/ports.ts`)과 ai-module의 실제 인터페이스가 일치하는지(W6 공통 "ai-module 인터페이스가
-   현재 protocol 버전과 일치하는지 리뷰"의 실행판).
+4. (당시 기준) `agent-runtime-coordinator.ts`의 `MockAgentRuntime`이 대체하고 있던 실제
+   `AgentRuntime`/`ApprovalPort` 포트 계약(`shared/ports.ts`)과 ai-module의 실제 인터페이스가
+   일치하는지.
 
 ## 재확인 방법 (다음에 이 문서를 갱신할 때)
 

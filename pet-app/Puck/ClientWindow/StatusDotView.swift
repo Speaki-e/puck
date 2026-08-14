@@ -42,6 +42,8 @@ struct StatusDotView: View {
                     : .default,
                 value: isPulsing
             )
-            .onAppear { if status == .active { isPulsing = true } }
+            .task(id: status) {
+                isPulsing = status == .active
+            }
     }
 }

@@ -7,10 +7,14 @@
 //
 //  All movement logic (F3) works purely in screen pixels; this is the only
 //  place a pixel position gets converted to/from RealityKit world space, at
-//  render time. PetARView's camera is placed far away with a narrow FOV
-//  specifically so perspective distortion is negligible and this mapping can
-//  stay a simple linear scale instead of a full projection — see
+//  render time. The (now-removed) RealityKit camera was placed far away with
+//  a narrow FOV specifically so perspective distortion is negligible and this
+//  mapping can stay a simple linear scale instead of a full projection — see
 //  plan/02_pet-app.md F1 ("카메라를 멀리 + 좁은 FOV로 원근왜곡 최소화").
+//
+//  Unused by any production avatar since the 2026-07-29 2D switch removed
+//  PetARView/USDZAvatar (RealityKit's Y-up world space they targeted no
+//  longer has a caller); kept only for its own test coverage.
 
 import CoreGraphics
 import simd

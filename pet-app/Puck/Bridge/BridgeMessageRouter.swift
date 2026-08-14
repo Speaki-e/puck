@@ -8,9 +8,8 @@
 //
 //  BridgeServer delivers messages on its own background queue, but everything
 //  downstream of here is main-thread-only:
-//    - EventRouter reactions drive CharacterController -> USDZAvatar, i.e.
-//      RealityKit entity mutation (addChild/removeFromParent/playAnimation),
-//      which is not safe off the main thread.
+//    - EventRouter reactions drive CharacterController -> SpriteAvatar, i.e.
+//      CALayer/AppKit mutation, which is not safe off the main thread.
 //    - pet-app-executor handlers read NSWorkspace and WindowListWatcher.windows,
 //      the latter being mutated by a 10Hz timer that runs on main.
 //  Handlers that do genuinely slow work (RunShellHandler, RunAppleScriptHandler)

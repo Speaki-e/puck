@@ -8,7 +8,7 @@
 
 import AppKit
 
-/// Transparent, borderless window hosting one display's PetARView.
+/// Transparent, borderless window hosting one display's SpriteLayerView.
 /// plan/02_pet-app.md F1. `canBecomeKey`/`canBecomeMain` are false so this
 /// never steals focus from whatever app the user is actually working in —
 /// F6's text-input bubble is a separate window that's the deliberate

@@ -138,8 +138,7 @@ final class SFXPlayer: SFXTriggering {
         // ramp this node's volume down over ~0.2s instead of an immediate stop.
         // AVAudioPlayerNode doesn't expose a per-node volume ramp directly —
         // this needs either a per-node AVAudioMixerNode tap or a manual timer-
-        // driven volume step, deliberately not implemented blind (matches the
-        // alpha-halo mitigation precedent in PetARView).
+        // driven volume step, deliberately not implemented blind.
         currentLoopNode?.stop()
         currentLoopNode = nil
         currentLoopKey = nil

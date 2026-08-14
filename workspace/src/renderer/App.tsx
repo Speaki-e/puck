@@ -263,7 +263,6 @@ export function App() {
   };
 
   const title = useMemo(() => workspace?.projectPath?.split(/[\\/]/).at(-1) ?? "Workspace", [workspace]);
-  const dirtyCount = state.tabs.filter(isDirty).length;
 
   return (
     <main className="workspace-shell">
@@ -279,19 +278,10 @@ export function App() {
       <section className="editor-layout">
         <aside className="sidebar">
           <div className="sidebar-heading">
-            <div>
-              <span className="eyebrow">PROJECT</span>
-              <h2>Explorer</h2>
-            </div>
+            <h2>Explorer</h2>
             <span className="file-count">{tree.length}</span>
           </div>
           <FileTree entries={tree} activePath={state.activePath} workingPaths={workingPaths} onOpen={(filePath) => void openFile(filePath)} />
-          <div className="sidebar-footer">
-            <Icon name="branch" />
-            <span>main</span>
-            <span className="sidebar-spacer" />
-            <span>{dirtyCount ? `${dirtyCount} unsaved` : "clean"}</span>
-          </div>
         </aside>
 
         <section className="editor-pane">

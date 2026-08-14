@@ -128,7 +128,6 @@ export function EditorSurface({
           </>
         ) : (
           <div className="empty-editor">
-            <div className="mesh-orb" aria-hidden><span /><span /><span /></div>
             <span className="eyebrow">LIGHTWEIGHT CODE WORKSPACE</span>
             <h1>프로젝트를 열고,<br />아이디어를 코드로 만드세요.</h1>
             <p>왼쪽 탐색기에서 파일을 선택하거나 Agent에게<br />원하는 변경을 자연어로 요청할 수 있습니다.</p>

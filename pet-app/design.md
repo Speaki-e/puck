@@ -17,6 +17,15 @@
 > 화면(`Puck/Settings/*.swift`)과 네이티브 에디터 뷰(`Puck/ClientWindow/Editor/*.swift`,
 > `StatusDotView`/`ClientStatusBarView`) — chat-web/workspace의 CSS도 같은 원시값을 공유한다
 > (§2 참고, 확인함).
+>
+> **v3 — 2026-08-15 클라이언트 레이아웃 재작업.** 바로 위 문단이 "이번 v2는 그 레이아웃
+> 재설계를 하지 않았다"고 적어둔 그 레이아웃을, v3가 다시 손댔다 — 여전히 전부 `chat-web/`
+> 쪽이고 pet-app Swift 코드(§1-3, §5, §9.5)는 그대로다. Swift 쪽 변경은 셋뿐이다:
+> `ChatSession.lastActivityAt`/`lastRunOk`(세션 활동 시각·마지막 실행 결과), `StatusDotView`의
+> `pulses` 파라미터, `ClientStatusBarView`가 그리는 내용(§4.5). 아래 §6은 이제 **v3 기준 현재
+> 상태**로 다시 썼다 — 사이드바가 워크스페이스 트리로, 상단 pill 탑바가 탭 스트립으로, 툴
+> 호출/결과 두 줄이 카드 하나로 바뀐 게 핵심이다. §4.5도 v3에서 바뀐 부분(펄스 긴장 해소,
+> 상태 바 실제 표시 내용)을 반영해 갱신했다.
 
 F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제로 존재하는 값 그대로** 기록한 문서다.
 새 디자인 제안이 아니라 현황 스냅샷이며, 값이 바뀌면 이 문서가 아니라 아래 소스가 먼저 바뀐다.
@@ -157,8 +166,15 @@ ChatView 계열)와 함께 삭제됐다.
 상태를 나타내므로 모션이 없다.
 
 **`ClientStatusBarView`**는 `ClientWindowView`의 콘텐츠 아래(항상 표시되는 얇은 바, height 22,
-`palette.surface` 배경 + 위쪽 1px `palette.surfaceBorder` 헤어라인)에 워크스페이스 이름(mono)과
-상태 점 하나를 보여준다. `dotStatus(for:)`가 `EditorAvailability`를 `DotStatus`로 매핑한다:
+`palette.surface` 배경 + 위쪽 1px `palette.surfaceBorder` 헤어라인)에 상태 점 + 프로젝트 경로 +
+세로 헤어라인 구분선 + 모델 이름, 이렇게 네 조각을 왼쪽부터 순서대로 보여준다(v3, Task 3 —
+이전엔 워크스페이스 이름 하나뿐이었다). 프로젝트 경로는 `abbreviatedPath(_:home:)`로 홈 디렉터리
+접두사만 `~`로 줄인 값(`/Users/x/dev/p` → `~/dev/p`, 경로 경계에서만 치환하므로 `/Users/xyz`가
+홈이 `/Users/x`일 때 잘못 잘리지 않는다)이고, 프로젝트가 없는 워크스페이스(`projectPath == nil`)는
+그 워크스페이스 이름("일상 대화" 등)을 그대로 쓴다. 모델 이름은 `AgentConfiguration.load().model`을
+매 렌더마다 새로 읽는다 — 스토어에서 주입받지 않는 이유는 코드 주석 그대로: 모델이 바뀌려면
+리빌드나 `.env` 수정이 필요하지, 이 뷰가 실시간으로 관찰해야 할 값이 아니기 때문. 두 텍스트 모두
+`ClientTheme.Typography.mono` + `palette.textSecondary`. `dotStatus(for:)`가 `EditorAvailability`를 `DotStatus`로 매핑한다:
 `.noProject → .idle`, `.ready → .success`, `.unavailable → .error`. **`.active`는 이 매핑에서 절대
 나오지 않는다** — 상태 바 자체는 idle/success/error 세 값만 보여준다.
 
@@ -167,14 +183,17 @@ deliberately not called 'connection', since that term means the pet-app↔worksp
 elsewhere in this codebase and this bar doesn't observe that." 즉 이 바가 보여주는 건 브릿지 소켓
 연결 여부가 **아니라** 에디터/프로젝트 상태다 — 이름을 헷갈리지 않게 의도적으로 고른 것.
 
-**두 번째 소비처, 그리고 아직 해소되지 않은 긴장**: `EditorTabStripView`(Task 7)가 더러워진(unsaved)
-파일 탭 옆에 `StatusDotView(status: .active, ..., diameter: 5)`를 붙인다. 디자인 리뷰에서 지적된
-지점: 원래 스펙(위 design spec §4)에서 `.active`는 "실행 중" 같은 **짧게 지속되는 진행 상태**를
-위해 설계됐는데, dirty 플래그는 사용자가 저장하기 전까지 무기한 지속될 수 있고 그동안 계속
-펄스한다 — 세션 내내 켜져 있는 게 가능한 유일한 `.active` 사용처다. 이게 명백히 잘못됐다는
-뜻은 아니다("저장 안 한 파일이 있다"는 신호 자체는 유용하다) — 다만 `.active`의 원래 의미에서
-꽤 벌어져 있고, 이 문서를 쓰는 시점까지 그대로 남아 있는 **열린 질문**이다. 계속 펄스하게 둘지,
-dirty 표시는 펄스 없는 다른 표현으로 바꿀지는 별도 결정이 필요하다.
+**두 번째 소비처, 그리고 v3에서 해소된 긴장**: `EditorTabStripView`가 더러워진(unsaved) 파일 탭
+옆에 `StatusDotView(status: .active, palette: palette, diameter: 5, pulses: false)`를 붙인다. v2
+문서가 여기 적어뒀던 긴장 — `.active`는 원래 "실행 중" 같은 **짧게 지속되는 진행 상태**를 위해
+설계됐는데, dirty 플래그는 사용자가 저장하기 전까지 무기한 지속되면서도 계속 펄스했다 — 는 v3
+(Task 2)에서 `StatusDotView`에 `pulses: Bool = true` 파라미터를 추가하는 것으로 풀렸다.
+`EditorTabStripView`는 이제 `pulses: false`를 넘겨서, 색은 `.active`(accent)를 그대로 쓰되 애니메이션
+없이 정지해 있다. 즉 세션 어휘에서 `.active`의 의미는 이제 확실히 "지금 진짜로 실행 중"(짧게
+지속) 하나로 좁혀졌고, dirty 표시처럼 무기한 지속되는 상태는 `.active`의 색만 빌리되 펄스는 끈
+별도 표현으로 분리됐다 — 이 구분은 chat-web 쪽 `StatusDot`(아래 §6의 "사이드바 구성"/"탭
+스트립" 절, `sessionDotState`)에서도 그대로 지켜진다: 실행 중일 때만 `active`(펄스), 마지막
+실행 결과는 `ok`/`error`(정지), 아직 한 번도 실행 안 했으면 `idle`(정지)이다.
 
 ## 5. 표면
 
@@ -204,11 +223,11 @@ dirty 표시는 펄스 없는 다른 표현으로 바꿀지는 별도 결정이 
 
 ## 6. 레이아웃
 
-> 아래 이 절부터 §9까지는 위 배너에서 이미 밝혔듯 **2026-08-13 chat-web 이전 상태의 기록**이다.
-> 사이드바/탑바/말풍선은 지금 pet-app Swift 코드에 없고 `chat-web/`(React/Tailwind/shadcn)로
-> 옮겨갔다 — 이번 v2 작업은 그 레이아웃을 다시 서술하거나 검증하지 않았다(스코프 밖).
+> **이 절은 v3(2026-08-15) 기준 현재 상태다.** 여기 서술하는 화면은 전부 `chat-web/`
+> (React/Tailwind/shadcn)이 그린다 — pet-app Swift에는 이 레이아웃 코드가 없다. 창 크롬(아래
+> 첫 항목)만 예외로 Swift(`PuckClient/AppDelegate.swift`) 소관이다.
 
-### 창 크롬
+### 창 크롬 (Swift)
 
 `.titled + .closable + .resizable + .miniaturizable + .fullSizeContentView`, `titlebarAppearsTransparent = true`, `titleVisibility = .hidden`. 콘텐츠가 타이틀바 아래까지 올라가 사이드바 배경이 신호등까지 닿는다.
 
@@ -217,51 +236,88 @@ dirty 표시는 펄스 없는 다른 표현으로 바꿀지는 별도 결정이 
 ### 골격
 
 ```
-HStack(spacing: 0)
-├ ClientSidebarView              220 / 68, 우측 1px hairline
-└ VStack(spacing: 0)             minWidth 420
-  ├ topBar                       세션 선택 pill · (spacer) · 설정 기어
-  ├ Divider().opacity(0.5)
-  └ ChatView
+App.tsx
+├ Sidebar                    220 / 68 (접힘), 우측 1px hairline, bg-surface
+└ 메인 컬럼 (flex-1)
+  ├ h-7 스페이서             신호등 자리 비우기 (Sidebar도 같은 값)
+  ├ TabStrip                 h-34, bg-surface, 아래 1px hairline
+  ├ ChatTranscript
+  ├ RunningStatusLine        실행 중일 때만
+  ├ ApprovalBanner           승인 대기 중일 때만
+  └ ChatInputBar
+ClientStatusBarView (Swift)  창 전체 폭, h-22 — §4.5
 ```
 
-- 상단 여백 28pt는 투명 타이틀바/신호등을 비우는 값. 사이드바도 같은 28pt `Color.clear`로 시작한다.
-- 사이드바는 메인 컬럼과 **같은 흰색**이고 hairline으로만 구분한다 — 더 어두운 채움이 아니다(Figma 그대로).
-- 접기/펼치기 토글은 사이드바 우상단(푸터 아님). 펼침이면 워크스페이스 옆에 나란히, 접힘이면 세로로 쌓는다(68pt엔 한 줄에 둘이 안 들어간다).
-- 접기 애니메이션은 `.easeInOut(duration: 0.18)`.
+사이드바 폭은 `EXPANDED_WIDTH = 220` / `COLLAPSED_WIDTH = 68`(v2 이전 Swift 값 그대로 승계),
+접기 전환은 `transition-[width] duration-[180ms] ease-in-out`.
 
-### 사이드바 구성
+### 사이드바 구성 (v3에서 전면 교체)
 
-워크스페이스 스위처(팝오버) → 새 채팅 버튼 → `채팅 N개` 섹션 헤더 → 세션 목록.
-접힘 상태에선 세션 목록이 사라진다. 세션 전환은 사이드바를 펼치거나 상단바 pill로 한다.
+**워크스페이스 트리**다. v2까지는 워크스페이스 스위처(팝오버)로 하나를 고른 뒤 그 워크스페이스의
+세션만 평평하게 나열했는데, 이제 **모든 워크스페이스를 펼쳐서 세션을 그 아래 중첩**한다. 다른
+워크스페이스의 세션을 보려고 팝오버를 열 필요가 없다.
+
+- 워크스페이스 그룹 = 캐럿 + 이름 + 세션 수, `projectPath`가 있으면 그 아래 mono 소자 한 줄
+- 접기/펼치기는 그룹 단위 로컬 상태(`collapsedWorkspaceIds`), 영속화하지 않는다
+- 새 채팅은 **그룹별 호버 버튼**(`SquarePen`)이고 `newSession(workspace.id, "새 채팅")`을 부른다
+  — v2에서 스위처 팝오버가 갖고 있던 동작이 여기로 옮겨왔다
+- 세션 행 = `StatusDot` + 제목 + 상대 시간(`relativeTime`), 활성 행은 `bg-brand/14`
+- `WorkspaceSwitcher.tsx`/`SessionList.tsx`는 삭제됐다
+
+**활성 행 판정은 `state.activeSession`에서 읽는다** — `state.activeSessionId`가 아니다. 후자는
+hydrate/워크스페이스 목록 푸시 때만 갱신되고 `switchSession`마다 갱신되지 않아서, 탭으로 세션을
+바꾸면 엉뚱한 행이 강조된다. 게다가 워크스페이스별로 스코프를 걸어(`workspace.id === activeWorkspaceId`)
+다른 워크스페이스의 동명 세션 id가 잘못 강조되는 것도 막는다. `App.tsx`의 메시지 라우팅도 같은
+이유로 같은 값을 쓴다(아래 참고).
+
+### 탭 스트립 (v3 신규)
+
+상단 pill 하나뿐이던 탑바(`TopBar.tsx`/`SessionSelector.tsx`, 둘 다 삭제)를 대체한다.
+
+- 탭 = `StatusDot` + 제목(`max-w-[200px] truncate`) + `×`, 탭 자체는 `max-w-[260px]`
+- 활성 탭은 `bg-canvas`(본문과 같은 색으로 이어짐) + 상단 2px `bg-brand` 인디케이터
+- 우측 끝 `+`(w-30)는 새 세션, 그 옆에 `EditorToggleButton`·`SettingsButton`
+- **열린 탭 목록은 렌더러 로컬 상태다.** 사이드바든 탭이든 세션을 고르면 없으면 추가되고 있으면
+  활성화된다. `×`는 **탭만 닫고 세션은 지우지 않는다** — 세션은 사이드바에 그대로 남는다.
+  활성 탭을 닫으면 이웃 탭이 활성화된다
 
 ### 채팅 영역
 
-- 트랜스크립트/빈 상태/입력바 모두 `contentMaxWidth` 720으로 중앙 정렬.
-- 입력바는 `safeAreaInset(edge: .bottom)`이다 — VStack 행이 아니라. 트랜스크립트가 입력 카드 **아래로 스크롤해 지나가야** 고정된 것처럼 읽힌다.
-- 입력 컨테이너만 `Capsule()`(레퍼런스의 `rounded-[9999px]`), 나머지 카드/버블은 24 라운딩.
-- 그 아래 "…는 실수를 할 수 있어요." 디스클레이머 캡션.
+- 트랜스크립트/빈 상태/입력바 모두 720px로 중앙 정렬
+- 메시지 라우팅(`sendMessage`/`cancelRun`/`respondApproval`)은 `state.activeSession.workspaceId`/`.id`를
+  쓴다. v3 이전엔 `state.activeWorkspaceId`/`activeSessionId`를 썼는데, 위 사이드바 항목이 설명한
+  staleness 때문에 **세션을 바꾼 뒤 보낸 메시지가 이전 세션으로 가는 실제 버그**였다. 탭이 생기며
+  전환이 일상 경로가 되자 드러났다(Task 7에서 수정)
+- `state.activeWorkspaceId`/`activeSessionId` 필드 자체는 리듀서에 남아 있다 — 다른 소비처가 있어서
+  제거하지 않았고, 라우팅에만 쓰지 않는다
+
+### 툴 호출 표현 (v3에서 카드 하나로 병합)
+
+v2까지 툴 호출(`ToolCallCard`)과 툴 결과(`ToolResultRow`)가 별도 표면 두 개였는데, `ChatSession.swift`가
+둘이 같은 `tool_use` id를 공유한다고 명시하고 있어 **호출 하나당 카드 하나**로 합쳤다.
+`ChatTranscript`가 id로 짝지어 넘기고, `ToolResultRow`는 짝을 못 찾은 경우의 방어적 폴백으로만 남아
+`ToolCallCard`가 export하는 `KVRows`를 공유한다(스타일 중복 없음).
+
+- 헤더: `StatusDot` + 도구명(mono, `text-ink`)
+- 본문: `키: 값` 나열 — 키 `text-faint`, 값 `text-mute`, 전부 mono
+- 카드: `bg-surface` + `border-hairline` + `rounded-md`
+
+### 실행 상태 줄 (v3 신규)
+
+`RunningStatusLine` — 활성 세션이 실행 중일 때만 나타난다. 좌측에 스피너 + "실행 중… `esc` 로 중단",
+우측에 프로젝트 경로(mono, `text-faint`).
+
+**모델 이름은 여기 없다.** `model={null}`로 넘어가고 경로만 그린다 — 모델은 브릿지에 실려 있지 않고
+네이티브 상태 바(§4.5)만 `AgentConfiguration`에서 직접 읽는다. 웹 쪽으로 끌어오는 건 의도적으로
+미뤄둔 **후속 과제**이지 누락이 아니다.
 
 ### 말풍선
 
-사용자/어시스턴트가 **같은 채움**(`accent.opacity(0.06)`)을 쓰고, 구분은 오직 아바타+이름 행과 정렬(좌/우)로만 한다. 텍스트는 양쪽 다 `textPrimary` — 이 정도로 옅은 채움은 흰 글씨를 못 버틴다.
-어시스턴트 말풍선은 호버 시 아래에 복사 pill이 페이드인한다(`.easeInOut(0.12)`). 위 행을 밀지 않도록 오버레이가 아니라 아래에 덧붙인다.
-
-### 타임라인 엔트리별 표현
-
-| 엔트리 | 표현 |
-|---|---|
-| 사용자/어시스턴트 메시지 | MessageBubble |
-| 툴 호출 | `DisclosureGroup` + 렌치 아이콘, 인자는 mono, `card` 표면 |
-| 툴 결과 | 성공/실패 원형 아이콘(`statusSuccess`/`statusError`) + mono 텍스트, `card` 표면 |
-| 승인 요청 | `statusWarning` 색 라벨 |
-| 완료 | seal / 경고 아이콘 + `summary` 폰트 |
-
-승인 배너의 기본 액션은 **색이 아니라 굵기**로 표시한다(허용 = semibold, 거부 = `statusError` 색).
+사용자/어시스턴트가 **같은 채움**을 쓰고, 구분은 아바타+이름 행과 정렬로만 한다.
 
 ### 빈 상태
 
-호박 마크 72×72 + 인사말 2줄. 그게 전부다. 프롬프트 추천 카드와 마크 뒤 글로우는 제거됐다.
+호박 마크 + 인사말 2줄. 프롬프트 추천 카드와 마크 뒤 글로우는 없다.
 
 ## 7. 상태 표현 규칙
 

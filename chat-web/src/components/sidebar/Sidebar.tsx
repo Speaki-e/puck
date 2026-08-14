@@ -30,6 +30,12 @@ export function Sidebar() {
     });
   };
 
+  // Same staleness pitfall App.tsx's routing hit: state.activeWorkspaceId/
+  // activeSessionId only update on hydrate/workspace-list pushes, not on every
+  // switchSession. state.activeSession is the one that round-trips reliably.
+  const activeWorkspaceId = state.activeSession?.workspaceId;
+  const activeSessionId = state.activeSession?.id;
+
   return (
     <aside
       className="flex h-full shrink-0 flex-col border-r border-hairline bg-surface transition-[width] duration-[180ms] ease-in-out"
@@ -62,7 +68,7 @@ export function Sidebar() {
                 key={workspace.id}
                 workspace={workspace}
                 sessions={state.sessionsByWorkspace[workspace.id] ?? []}
-                activeSessionId={state.activeSessionId}
+                activeSessionId={workspace.id === activeWorkspaceId ? activeSessionId : undefined}
                 collapsed={collapsedWorkspaceIds.has(workspace.id)}
                 onToggle={() => toggleWorkspace(workspace.id)}
                 onSelectSession={(sessionId) => switchSession(workspace.id, sessionId)}
@@ -95,7 +101,7 @@ export function Sidebar() {
 interface WorkspaceGroupProps {
   workspace: WorkspaceJSON;
   sessions: SessionSummaryJSON[];
-  activeSessionId: string;
+  activeSessionId: string | undefined;
   collapsed: boolean;
   onToggle(): void;
   onSelectSession(sessionId: string): void;

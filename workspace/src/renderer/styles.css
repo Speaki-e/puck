@@ -76,12 +76,21 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .project-path { max-width: 280px; overflow: hidden; color: var(--mute); text-overflow: ellipsis; white-space: nowrap; }
 .project-dot { width: 7px; height: 7px; border: 1px solid #4b4b4b; border-radius: 50%; background: #202020; }
 .project-dot.connected { border-color: #0c9b4a; background: #19b65d; box-shadow: 0 0 0 3px rgba(25, 182, 93, .1); }
-.button-ghost, .button-primary-small, .button-primary { display: inline-flex; height: 32px; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 500; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+.button-ghost, .button-primary-small, .button-primary { display: inline-flex; height: 32px; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 500; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
 .button-ghost:hover:not(:disabled) { border-color: #444; background: var(--hairline-soft); }
 .button-ghost:disabled { color: #4d4d4d; cursor: default; }
-.button-primary-small, .button-primary { border-color: #ededed; background: #ededed; color: #111; }
-.button-primary-small:hover, .button-primary:hover { background: #fff; transform: translateY(-1px); }
-.button-primary { height: 40px; padding: 0 16px; border-radius: 100px; font-size: 13px; }
+/* Primary action, matching client's own primary CTA (ChatInputBar's send
+   button: bg-brand text-white) rather than shadcn's generic --primary --
+   the two apps' most prominent buttons should read as the same brand. */
+.button-primary-small, .button-primary { border-color: var(--brand); background: var(--brand); color: #fff; }
+.button-primary-small:hover, .button-primary:hover { background: color-mix(in oklch, var(--brand), white 12%); transform: translateY(-1px); }
+/* Same radius token as every other button (var(--radius-md)) -- a full
+   100px pill only ever existed here; nothing in client's actual shadcn
+   Button (rounded-lg at every size) uses a pill shape for a labeled
+   button, only for icon-sized circular elements (avatars, the round
+   send/stop button, dots). Height/padding/font-size still scale up for
+   this button's larger role, shape doesn't need to. */
+.button-primary { height: 40px; padding: 0 16px; font-size: 13px; }
 .titlebar-actions { display: flex; height: 100%; align-items: center; justify-content: flex-end; gap: 10px; -webkit-app-region: no-drag; }
 .project-button { flex: 0 0 auto; }
 .window-actions { display: flex; height: 100%; align-items: stretch; margin: 0 -14px 0 0; }
@@ -94,14 +103,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .close-symbol::before, .close-symbol::after { position: absolute; top: 5px; left: 0; width: 11px; height: 1px; background: currentColor; content: ""; transform: rotate(45deg); }
 .close-symbol::after { transform: rotate(-45deg); }
 
-.editor-layout { display: grid; grid-template-columns: 274px minmax(0, 1fr); min-width: 0; min-height: 0; padding: 10px 10px 0; gap: 10px; }
+/* 240px -- was 274px, brought closer to client's own sidebar (220px
+   expanded) now that the header is one compact row instead of two and the
+   footer's gone; still slightly wider since file names/nesting genuinely
+   need more room than a flat session list. */
+.editor-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-width: 0; min-height: 0; padding: 10px 10px 0; gap: 10px; }
 .sidebar, .editor-pane { min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--hairline); background: var(--surface); box-shadow: 0 1px 1px rgba(0, 0, 0, .35); }
-.sidebar { display: grid; grid-template-rows: 65px minmax(0, 1fr) 35px; border-radius: 12px 12px 0 0; }
-.sidebar-heading { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--hairline); }
-.sidebar-heading h2 { margin: 1px 0 0; font-size: 15px; font-weight: 600; letter-spacing: -.32px; }
-.file-count { display: grid; min-width: 22px; height: 22px; place-items: center; border: 1px solid var(--hairline); border-radius: 6px; color: var(--mute); background: var(--canvas); font-family: "Geist Mono", monospace; font-size: 10px; }
+/* One header row, no footer row -- client's own sidebar has neither a
+   two-line eyebrow+heading header nor a footer; the git-branch/dirty-count
+   info the footer used to show is still visible per-file via .dirty-dot,
+   so nothing was actually lost by dropping the redundant row. */
+.sidebar { display: grid; grid-template-rows: 44px minmax(0, 1fr); border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+.sidebar-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--hairline); }
+/* font-weight 500, no tightened letter-spacing -- matches client's own
+   heaviest sidebar text (WorkspaceSwitcher's active workspace name: text-sm
+   font-medium, no tracking). The 600-weight + -.32px tracking this had
+   before is a "hero heading" treatment nothing in client's sidebar uses. */
+.sidebar-heading h2 { margin: 1px 0 0; font-size: 14px; font-weight: 500; }
+.file-count { display: grid; min-width: 22px; height: 22px; place-items: center; border: 1px solid var(--hairline); border-radius: var(--radius-md); color: var(--mute); background: var(--canvas); font-family: "Geist Mono", monospace; font-size: 10px; }
 .tree-container { display: grid; grid-template-rows: 49px minmax(0, 1fr); min-height: 0; }
-.tree-search { display: flex; height: 30px; align-items: center; gap: 7px; margin: 10px 10px 9px; padding: 0 8px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--canvas); color: var(--mute); }
+.tree-search { display: flex; height: 30px; align-items: center; gap: 7px; margin: 10px 10px 9px; padding: 0 8px; border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--canvas); color: var(--mute); }
 .tree-search:focus-within { border-color: #915f31; background: #151515; box-shadow: 0 0 0 2px rgba(237, 140, 51, .1); }
 .tree-search svg { width: 14px; height: 14px; flex: 0 0 auto; }
 .tree-search input { min-width: 0; flex: 1; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 11px; }
@@ -109,7 +130,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .tree-search button { padding: 0; border: 0; background: transparent; color: var(--mute); cursor: pointer; }
 .tree-scroll { min-height: 0; overflow: auto; padding: 2px 6px 12px; scrollbar-width: thin; scrollbar-color: #ddd transparent; }
 .file-tree, .file-tree ul { margin: 0; padding: 0; list-style: none; }
-.tree-row { position: relative; display: flex; width: 100%; height: 29px; align-items: center; gap: 5px; padding-right: 8px; border: 0; border-radius: 5px; background: transparent; color: var(--body); text-align: left; white-space: nowrap; cursor: pointer; }
+.tree-row { position: relative; display: flex; width: 100%; height: 29px; align-items: center; gap: 5px; padding-right: 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--body); text-align: left; white-space: nowrap; cursor: pointer; }
 .tree-row:hover { background: var(--canvas); color: var(--ink); }
 .tree-row.active { background: var(--hairline-soft); color: var(--ink); font-weight: 500; }
 .tree-row.active::before { position: absolute; top: 6px; bottom: 6px; left: 2px; width: 2px; border-radius: 2px; background: var(--ink); content: ""; }
@@ -128,11 +149,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .working-dot span { width: 5px; height: 5px; border-radius: 50%; background: #f5a623; animation: pulse 1.4s infinite; }
 .empty-tree { display: grid; height: 160px; place-content: center; padding: 20px; color: var(--body); text-align: center; font-size: 12px; }
 .empty-tree small { margin-top: 5px; color: var(--mute); font-size: 10px; }
-.sidebar-footer { display: flex; align-items: center; gap: 7px; padding: 0 11px; border-top: 1px solid var(--hairline); color: var(--mute); font-family: "Geist Mono", monospace; font-size: 9px; }
-.sidebar-footer .icon { width: 13px; height: 13px; }
-.sidebar-spacer { flex: 1; }
 
-.editor-pane { display: grid; grid-template-rows: 42px 38px minmax(0, 1fr); border-radius: 12px 12px 0 0; }
+.editor-pane { display: grid; grid-template-rows: 42px 38px minmax(0, 1fr); border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
 .tab-strip { display: flex; min-width: 0; align-items: stretch; border-bottom: 1px solid var(--hairline); background: var(--canvas); }
 .window-controls { display: flex; width: 54px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 5px; border-right: 1px solid var(--hairline); }
 .window-controls i { width: 6px; height: 6px; border-radius: 50%; background: #d8d8d8; }
@@ -155,7 +173,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .breadcrumbs span.current { color: var(--body); }
 .breadcrumbs b { padding: 0 6px; color: #c9c9c9; font-weight: 400; }
 .breadcrumbs .muted { color: var(--faint); }
-.language-badge, .readonly-badge { padding: 3px 5px; border-radius: 4px; background: var(--hairline-soft); color: var(--mute); font-family: "Geist Mono", monospace; font-size: 8px; text-transform: uppercase; }
+/* client's own Badge (ui/badge.tsx) is rounded-4xl (a pill) at this same
+   small label-chip scale, not a soft-corner rectangle -- badges and buttons
+   read as two different shape languages by design in that system, so this
+   follows suit rather than reusing the button radius tokens. */
+.language-badge, .readonly-badge { padding: 3px 5px; border-radius: var(--radius-4xl); background: var(--hairline-soft); color: var(--mute); font-family: "Geist Mono", monospace; font-size: 8px; text-transform: uppercase; }
 .readonly-badge { color: var(--warning); background: #281f10; }
 .save-button { height: 26px; padding: 0 8px; font-size: 10px; }
 .save-button .icon { width: 12px; height: 12px; }
@@ -166,7 +188,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 .image-preview img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
 .image-metadata { display: flex; align-items: center; gap: 12px; padding: 0 14px; border-top: 1px solid var(--hairline); background: rgba(17,17,17,.95); color: var(--mute); font-family: "Geist Mono", monospace; font-size: 9px; }
 .image-metadata strong { color: var(--body); font-weight: 500; }
-.conflict-banner { position: absolute; z-index: 20; top: 14px; right: 18px; left: 18px; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #664d1f; border-radius: 8px; background: rgba(36, 28, 15, .97); box-shadow: 0 8px 20px -8px rgba(0, 0, 0, .7); }
+.conflict-banner { position: absolute; z-index: 20; top: 14px; right: 18px; left: 18px; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #664d1f; border-radius: var(--radius-lg); background: rgba(36, 28, 15, .97); box-shadow: 0 8px 20px -8px rgba(0, 0, 0, .7); }
 .conflict-symbol { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 50%; background: #f5a623; color: white; font-weight: 600; }
 .conflict-copy { display: flex; min-width: 160px; flex: 1; flex-direction: column; }
 .conflict-copy strong { font-size: 11px; }.conflict-copy span { color: var(--mute); font-size: 9px; }
@@ -174,10 +196,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); out
 
 .empty-editor { position: relative; display: flex; height: 100%; align-items: center; justify-content: center; flex-direction: column; overflow: hidden; padding: 48px; text-align: center; }
 .empty-editor::before { position: absolute; inset: 0; background-image: linear-gradient(var(--hairline-soft) 1px, transparent 1px), linear-gradient(90deg, var(--hairline-soft) 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(circle at center, black, transparent 67%); opacity: .55; content: ""; }
-.empty-editor > *:not(.mesh-orb) { position: relative; z-index: 2; }
-.mesh-orb { position: absolute; top: 50%; left: 50%; width: 460px; height: 310px; transform: translate(-50%, -52%); opacity: .12; filter: blur(64px); }
-.mesh-orb span { position: absolute; width: 190px; height: 190px; border-radius: 50%; }.mesh-orb span:first-child { top: 0; left: 20px; background: #00dfd8; }.mesh-orb span:nth-child(2) { top: 30px; left: 140px; background: #7928ca; }.mesh-orb span:last-child { right: 10px; bottom: 0; background: #ff4d4d; }
-.empty-editor h1 { margin: 12px 0 15px; color: var(--ink); font-size: clamp(30px, 3.4vw, 46px); font-weight: 600; line-height: 1.04; letter-spacing: -2.1px; }
+.empty-editor > * { position: relative; z-index: 2; }
+/* No mesh-orb glow -- the teal/purple/red blur here had nothing to do with
+   the app's actual palette (brand orange, monochrome grays) and read as a
+   different product's marketing page next to client's minimal empty state. */
+.empty-editor h1 { margin: 12px 0 15px; color: var(--ink); font-size: clamp(24px, 2.4vw, 32px); font-weight: 600; line-height: 1.15; letter-spacing: -1.2px; }
 .empty-editor p { margin: 0; color: var(--body); font-size: 13px; line-height: 21px; }
 .empty-actions { display: flex; align-items: center; gap: 18px; margin-top: 26px; }
 .empty-actions > span { display: flex; align-items: center; gap: 4px; color: var(--mute); font-size: 9px; }
@@ -188,13 +211,13 @@ kbd { min-width: 23px; padding: 4px 5px; border: 1px solid #3d3d3d; border-botto
 .status-pulse { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px rgba(237, 140, 51, .08); }
 .status-text { overflow: hidden; color: var(--body); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
-.settings-panel { display: flex; width: min(440px, 92vw); max-height: 82vh; flex-direction: column; gap: 16px; overflow-y: auto; padding: 20px; border: 1px solid var(--hairline); border-radius: 12px; background: #101010; box-shadow: 0 24px 60px -20px rgba(0,0,0,.8); }
+.settings-panel { display: flex; width: min(440px, 92vw); max-height: 82vh; flex-direction: column; gap: 16px; overflow-y: auto; padding: 20px; border: 1px solid var(--hairline); border-radius: var(--radius-xl); background: #101010; box-shadow: 0 24px 60px -20px rgba(0,0,0,.8); }
 .settings-panel header { display: flex; align-items: center; justify-content: space-between; }
 .settings-panel h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .settings-panel h3 { margin: 0 0 8px; color: var(--body); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .settings-panel section { border-top: 1px solid var(--hairline-soft); padding-top: 14px; }
 .settings-panel section:first-of-type { border-top: none; padding-top: 0; }
-.settings-panel input, .settings-panel select { width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 12px; }
+.settings-panel input, .settings-panel select { width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); font-size: 12px; }
 .settings-hint { margin: 6px 0 0; color: var(--mute); font-size: 11px; }
 .settings-row { display: flex; align-items: center; gap: 8px; }
 .settings-row input[type="range"] { flex: 1; height: auto; padding: 0; border: none; background: transparent; }

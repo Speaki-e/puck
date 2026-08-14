@@ -20,10 +20,10 @@ export function installDevMockBridge(): void {
     activeSessionId: "default",
     sessionsByWorkspace: {
       default: [
-        { id: "default", workspaceId: "default", title: "일상 대화", isRunning: false },
-        { id: "s2", workspaceId: "default", title: "다이내믹 아일랜드 제거", isRunning: false },
+        { id: "default", workspaceId: "default", title: "일상 대화", isRunning: false, lastActivityAt: null, lastRunOk: null },
+        { id: "s2", workspaceId: "default", title: "다이내믹 아일랜드 제거", isRunning: false, lastActivityAt: null, lastRunOk: true },
       ],
-      w2: [{ id: "default", workspaceId: "w2", title: "일상 대화", isRunning: false }],
+      w2: [{ id: "default", workspaceId: "w2", title: "일상 대화", isRunning: false, lastActivityAt: null, lastRunOk: null }],
     },
     activeSession: {
       id: "default",

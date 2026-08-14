@@ -63,6 +63,20 @@ final class ChatSession: ObservableObject, Identifiable {
     @Published private(set) var pendingApproval: (approvalId: String, summary: String)?
     @Published private(set) var isRunning = false
 
+    /// When this session last saw any agent event. Drives the sidebar's relative
+    /// time ("12분", "어제") -- nothing else in the app tracked time before v3.
+    @Published private(set) var lastActivityAt: Date?
+
+    /// Outcome of the most recent completed run, or nil if none has completed.
+    /// Derived from the timeline rather than stored: `.done` already carries `ok`,
+    /// and a second copy could disagree with it.
+    var lastRunOk: Bool? {
+        for entry in timeline.reversed() {
+            if case .done(_, let ok, _) = entry { return ok }
+        }
+        return nil
+    }
+
     init(id: String, workspaceId: String, title: String, origin: SessionOrigin) {
         self.id = id
         self.workspaceId = workspaceId
@@ -94,6 +108,7 @@ final class ChatSession: ObservableObject, Identifiable {
     /// workspace_id/session_id first -- this type has no notion of "is this
     /// event mine".
     func apply(_ event: BridgeEvent) {
+        lastActivityAt = Date()
         switch event {
         case .agentThinking:
             isRunning = true

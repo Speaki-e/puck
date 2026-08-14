@@ -228,8 +228,16 @@ HStack(spacing: 0)
 - `ToyTile` — 그리드 타일. 채움은 아이템 **자기 아트워크의 틴트**(`0.14`, 꺼내둔 상태면 `0.28` + 1.5pt 링). 이 창에서 색이 살아남는 유일한 자리이며 앱 accent와 무관
 - `SettingsActionRow` — 텍스트 + 셰브론, 호버 전까지 버튼 크롬 없음
 
+## 9.5 코드 에디터 표면 (2026-08-14 신규)
+
+`Puck/ClientWindow/Editor/`(파일트리·탭·`CodeEditSourceEditor` 호스팅)는 chrome(파일트리 행, 탭, 빈 상태, 충돌 배너)에 §2의 `ClientPalette`를 그대로 쓴다 — 새 표면이라고 별도 색 체계를 만들지 않았다.
+
+구문 강조만 예외다. `CodeEditorHostView.theme(for:)`가 `ClientPalette`에서 4개 값(`background`/`lineHighlight`=`surface`/`textPrimary`/`textSecondary`/`accent`)을 그대로 물려받고, 그 위에 코드 전용으로 고정된 3색(키워드 보라·타입 청록·리터럴 녹색, 팔레트 무관 고정 hex)을 얹는다 — 문자열 리터럴은 accent(`#ed8c33`)를 재사용. 코드 색 팔레트는 UI 색 토큰 11개보다 훨씬 많은 구분이 필요해서 나온 의도적 예외이지, 누락이 아니다.
+
+**미검증 항목**: 이 3색(보라/청록/녹색)은 `.dark`/`.glass`(어두운 배경) 기준으로 고른 값이라 `.light` 팔레트(흰 배경)에서도 대비가 충분한지 실제로 확인된 적이 없다 — 렌더링해서 눈으로 봐야 판단 가능한 사안이라 이번 정리에서는 건드리지 않았다.
+
 ## 10. 이 문서에 없는 것
 
 - 펫 오버레이(F1)·텍스트 입력 버블(F6)은 `ClientTheme` 토큰을 쓰지 않는 별개 표면이다.
-- 에디터 뷰(`EditorWebView`)는 아직 어디에도 호스팅되지 않는다("에디터는 따로 할거라 토글 빼").
+- ~~에디터 뷰(`EditorWebView`)는 아직 어디에도 호스팅되지 않는다~~ — **2026-08-14 해소**. `EditorWebView`(workspace가 서빙하는 웹 뷰) 자체는 삭제되고 네이티브 `Puck/ClientWindow/Editor/`로 대체됐다(위 9.5절, `docs/decisions.md` 참고). "에디터는 따로 할거라 토글 빼"는 그 사이 임시 상태를 설명하던 문장이라 더 이상 유효하지 않다.
 - 다크/글래스 팔레트의 `success`/`failure`/`warning`은 아직 시스템 색(`.green`/`.red`/`.orange`) 그대로다. 라이트 테마도 동일.

@@ -29,7 +29,9 @@ export interface SessionSummaryJSON {
   workspaceId: string;
   title: string;
   isRunning: boolean;
-  lastActivityAt: number | null;
+  /** Absent (not null) when the session has never seen an event -- Swift's
+   *  encoder omits the key for a nil Date rather than writing null. */
+  lastActivityAt?: number | null;
   lastRunOk: boolean | null;
 }
 

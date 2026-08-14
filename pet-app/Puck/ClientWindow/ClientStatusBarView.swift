@@ -3,11 +3,10 @@
 //  Puck
 //
 //  Design system v2 (2026-08-14) -- a persistent thin status bar, new UI
-//  (docs/superpowers/specs/2026-08-14-design-system-v2-design.md §4).
-//  Reports the active workspace's *editor/project* status -- deliberately
-//  not called "connection", since that term means the pet-app<->workspace
-//  bridge socket elsewhere in this codebase and this bar doesn't observe
-//  that.
+//  (docs/decisions.md). Reports the active workspace's *editor/project*
+//  status -- deliberately not called "connection", since that term means
+//  the pet-app<->workspace bridge socket elsewhere in this codebase and
+//  this bar doesn't observe that.
 //
 
 import SwiftUI
@@ -30,7 +29,11 @@ struct ClientStatusBarView: View {
     var body: some View {
         HStack(spacing: ClientTheme.Metrics.spacingSmall) {
             StatusDotView(status: dotStatus(for: availability), palette: palette)
-            Text(workspace?.name ?? "default")
+            // "일상 대화" matches ClientWindowStore.casualSessionTitle -- the
+            // default workspace's own name, not an English placeholder
+            // (every sibling string here is Korean, e.g. ConflictBannerView's
+            // "디스크에서 파일이 변경됐습니다").
+            Text(workspace?.name ?? "일상 대화")
                 .font(ClientTheme.Typography.mono)
                 .foregroundStyle(palette.textSecondary)
             Spacer()

@@ -2,8 +2,7 @@
 //  ClientPalette.swift
 //  Puck
 //
-//  Design system v2 (2026-08-14) -- see
-//  docs/superpowers/specs/2026-08-14-design-system-v2-design.md. Two
+//  Design system v2 (2026-08-14) -- see docs/decisions.md. Two
 //  independently art-directed palettes (light/dark), not a light/dark axis
 //  crossed with a flat/glass axis -- `.glass` is gone (macOS 26+-only
 //  upkeep cost wasn't worth it for a mood nobody asked to keep).

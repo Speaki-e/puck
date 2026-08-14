@@ -54,7 +54,7 @@ export function ChatInputBar({ isRunning, onSend, onCancel }: ChatInputBarProps)
               aria-label="전송"
               className={cn(
                 "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors",
-                draft.trim() ? "bg-brand text-white" : "bg-hairline-soft text-muted-foreground",
+                draft.trim() ? "bg-brand text-on-brand" : "bg-hairline-soft text-muted-foreground",
               )}
             >
               <ArrowUp className="size-4" />

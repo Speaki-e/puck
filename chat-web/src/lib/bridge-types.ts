@@ -15,7 +15,7 @@ export type ToolErrorCode =
   | "unknown_tool"
   | "cancelled";
 
-export type ThemeStyle = "light" | "dark" | "glass";
+export type ThemeStyle = "light" | "dark";
 
 export interface WorkspaceJSON {
   id: string;

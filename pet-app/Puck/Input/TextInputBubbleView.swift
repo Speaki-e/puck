@@ -39,8 +39,7 @@ final class TextInputBubbleView: NSView {
         configureAttachmentViews()
     }
 
-    /// Real Liquid Glass on macOS 26 (the AppKit side of the same gate
-    /// GlassSurface applies in SwiftUI), the Spotlight-style vibrant slab it
+    /// Real Liquid Glass on macOS 26, the Spotlight-style vibrant slab it
     /// always had before that. The background is a sibling *below* the text
     /// field, not its superview -- the field stays a direct subview so
     /// first-responder wiring and tests keep finding it in `subviews`.

@@ -1,7 +1,12 @@
 /** Sidebar/tab timestamps. Korean, deliberately coarse -- this is a glanceable
  *  hint, not a log. `now` is injected so it is testable without faking clocks. */
-export function relativeTime(epochMs: number | null, now: number): string {
-  if (epochMs === null) return "";
+export function relativeTime(epochMs: number | null | undefined, now: number): string {
+  // Not `=== null`: Swift omits the key entirely when `lastActivityAt` is nil,
+  // so this arrives as `undefined` over the bridge even though the mirrored
+  // type says `number | null`. A strict null check let that through and the
+  // NaN fell past every comparison below into the date branch, rendering
+  // "NaN월 NaN일" in the sidebar. Guard the value, not the declared type.
+  if (epochMs === null || epochMs === undefined || !Number.isFinite(epochMs)) return "";
   const diff = now - epochMs;
   if (diff < 0) return "방금";
   const min = Math.floor(diff / 60_000);

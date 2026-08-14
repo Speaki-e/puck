@@ -7,6 +7,16 @@ describe("relativeTime", () => {
   it("returns an empty string when there is no timestamp", () => {
     expect(relativeTime(null, NOW)).toBe("");
   });
+  // Regression: Swift omits the key for a nil Date, so this arrives as
+  // undefined, not null. A `=== null` guard let it through and every
+  // comparison below failed against NaN, so it reached the date branch and
+  // rendered "NaN월 NaN일" in the real app.
+  it("returns an empty string when the key was omitted entirely", () => {
+    expect(relativeTime(undefined, NOW)).toBe("");
+  });
+  it("returns an empty string for a non-finite value", () => {
+    expect(relativeTime(Number.NaN, NOW)).toBe("");
+  });
   it("treats under a minute as 방금", () => {
     expect(relativeTime(NOW - 30_000, NOW)).toBe("방금");
   });

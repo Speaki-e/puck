@@ -73,7 +73,7 @@ final class AgentHost {
         })
         self.editorFileDelegate = EditorFileDelegate(resolveProjectPath: resolveProjectPath)
         self.runner = AgentRunner(
-            client: GPTClient(configuration: { .load() }),
+            client: makeAgentLLMClient({ .load() }),
             dispatcher: dispatcher,
             approve: { [weak self] _, approvalId in
                 await self?.awaitApproval(id: approvalId) ?? false
@@ -169,17 +169,21 @@ final class AgentHost {
     }
 
     func run(command: String, workspaceId: String, sessionId: String) {
+        let configuration = configuration
         guard configuration.isConfigured else {
             // Said as a normal agent turn rather than an alert -- it belongs
             // in the transcript next to the message that couldn't be answered.
             // Names the actual paths that were searched rather than "check
             // your config" -- the search order is the answer to the question
-            // this message provokes.
+            // this message provokes. Names the key variable the *selected*
+            // provider reads, not always OpenAI's -- switching to Anthropic
+            // in Settings and still being told to set OPENAI_API_KEY is the
+            // exact confusion the provider picker exists to prevent.
             let searched = AgentConfiguration.defaultSearchPaths
                 .map { $0.appendingPathComponent(".env").path }
                 .joined(separator: "\n")
             let message = """
-            OpenAI API 키가 없어요. 아래 중 한 곳의 .env에 OPENAI_API_KEY=... 를 넣어주세요.
+            \(configuration.provider.displayName) API 키가 없어요. 아래 중 한 곳의 .env에 \(configuration.provider.apiKeyEnvironmentVariable)=... 를 넣어주세요.
             \(searched)
             """
             _ = broadcast(.event(.textChunk(text: message), workspaceId: workspaceId, sessionId: sessionId))

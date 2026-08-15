@@ -4,7 +4,7 @@
 //
 //  F15 · owner: 박해영 (Haeyoung Park)
 //  The agent's provider choice and API key, moved here from Puck's own
-//  SettingsView -- byeolki, 2026-08-02: "기존 셰이디앱에 있던 에이전트 관련
+//  SettingsView -- the agent's settings belong to this app rather than
 //  설정은 전부 셰이디에이전트 설정으로 옮기고". The agent that actually reads
 //  the key (AgentHost, in this process) runs here, not in Puck -- Puck's
 //  panel only ever showed this field because PuckClient had no Settings
@@ -36,8 +36,8 @@ struct AgentSettingsView: View {
     private func text(_ key: L10nKey) -> String { Strings.text(key) }
 
     /// Reuses Puck's own SettingsSection/SettingsStackedRow rather than
-    /// hand-approximating their padding/typography -- byeolki, 2026-08-02:
-    /// "패딩이나 폰트사이즈, 높이 같은게 아직 안 맞는 부분이 있는거 같은데".
+    /// hand-approximating their padding/typography, which drifted visibly
+    /// when it was tried.
     /// The first version of this file rebuilt the layout by eye instead of
     /// reusing the real components, and it drifted: the section title was
     /// missing SettingsSection's `.secondary` tint (read as a heading, not a

@@ -6,7 +6,7 @@
 //  The Claude-Desktop-style client window used to live in-process inside
 //  Puck; it moved here (2026-07-30) so it can be a regular, Dock-
 //  resident app rather than sharing Puck's LSUIElement lifecycle
-//  (byeolki: "별도의 앱으로 해서 dock에 상시 표시"). Puck still hosts
+//  so it has a permanent Dock presence of its own. Puck still hosts
 //  bridge.sock -- this app is just another client of it, identifying
 //  itself with client_hello role "gui" (protocol 3.7).
 //
@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clientThemeStyleObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // byeolki: "둘이 같이 가야하는거임" -- launching either app brings up
+        // The two processes go together -- launching either app brings up
         // the other, since this app is useless without Puck hosting
         // bridge.sock on the other end.
         CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.puckBundleID)
@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// byeolki, 2026-08-01: "PuckClient를 끄는 건 그냥 창을 닫아버리든
+    /// Closing this app's window should be enough to put it away --
     /// 커맨드 큐를 하든 가능한데" -- closing the window quits the app, same
     /// as Cmd+Q, rather than lingering in the Dock with no window the way
     /// Mail/Notes do. This never touches Puck: CompanionAppLauncher only
@@ -97,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Theme (ClientThemeStyle, synced from Puck's Settings)
 
-    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
+    /// The theme follows the pet's, so changing it from the menu bar
     /// 셰이디 설정으로 변경할 수 있어야하거든" -- this process has no
     /// SettingsStore of its own (same reasoning as everywhere else this
     /// process reads Puck's UserDefaults domain directly instead), so it
@@ -159,7 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .userInput(let input):
             // Mirrored from pet-app's quick-capture bubble: typing there has
             // to bring this window up with the text already in the chat
-            // (byeolki, 2026-07-30). Only shows the window if the message
+            // Only shows the window if the message
             // actually landed in a session -- an unknown workspace/session
             // would pop an empty window for nothing.
             if clientWindowStore.showUserMessage(input.text, workspaceId: input.workspaceId, sessionId: input.sessionId) {
@@ -181,7 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings (F15 agent config, moved here 2026-08-02)
 
     /// Wired from ClientMainMenu's "설정…" (Cmd+,) item via the responder
-    /// chain -- byeolki: "기존 셰이디앱에 있던 에이전트 관련 설정은 전부
+    /// chain -- the agent's settings belong to this app rather than
     /// 셰이디에이전트 설정으로 옮기고". `@objc` and this exact selector name
     /// are load-bearing: ClientMainMenu references `Selector(("showSettings:"))`
     /// as a raw string rather than `#selector(AppDelegate.showSettings(_:))`

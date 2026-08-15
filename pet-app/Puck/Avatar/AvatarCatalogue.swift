@@ -3,8 +3,8 @@
 //  Puck
 //
 //  F2 · owner: 박해영 (Haeyoung Park)
-//  Which avatar packages are actually installed -- byeolki, 2026-08-01:
-//  "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고". AvatarInstaller
+//  Which avatar packages are actually installed -- needed so the avatar can
+//  be switched like flipping between presets. AvatarInstaller
 //  already lets differently-named packages coexist on disk; this just
 //  enumerates them for a preset picker.
 //

@@ -44,13 +44,13 @@ extension NSWindow {
     /// The house window chrome (client window, settings window): content runs
     /// up under a transparent titlebar so the view's own vibrant background
     /// reaches the traffic lights, instead of a separate gray titlebar strip
-    /// -- the plain-titlebar look was part of what read as "default macOS
-    /// settings pane" (byeolki: "맥 기본 설정창처럼 생겼네").
+    /// -- the plain-titlebar look was part of what read as a generic
+    /// default macOS settings pane rather than something custom.
     ///
     /// 2026-08-02: tried adding `isOpaque = false`/`backgroundColor = .clear`
     /// here too, on the theory that the window's own opaque default
-    /// background was leaking through around the traffic lights (byeolki:
-    /// "신호등만 색이 다르게 보임"). Made it worse, not better -- a real
+    /// background was leaking through around the traffic lights, visibly
+    /// mismatched from the rest of the chrome. Made it worse, not better -- a real
     /// screenshot showed a visibly translucent patch appear right where the
     /// traffic lights sit. Reverted. The likely reason: unlike
     /// `OverlayWindow`/`TextInputBubbleWindow` (both `.borderless`, no

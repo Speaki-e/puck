@@ -4,8 +4,7 @@
 //
 //  Shared · owner: 박해영 (Haeyoung Park)
 //  All user-facing text in the Settings window, the merged Avatar tab, and
-//  the menu bar, in Korean only -- byeolki: "한국어 언어모드도
-//  만들어주고". A flat key/table lookup rather than Apple's .lproj/
+//  the menu bar, in Korean only. A flat key/table lookup rather than Apple's .lproj/
 //  Localizable.strings + Bundle mechanism, because the language here was an
 //  in-app setting the user could flip live, not a fixed-at-launch system
 //  locale -- there is no real bundle to swap.
@@ -23,9 +22,8 @@ enum L10nKey: String, CaseIterable, Hashable {
     case tabGeneral, tabSound, tabMovement
 
     case appearanceLabel, appearanceSystem, appearanceLight, appearanceDark
-    /// The client (chat) window's own theme -- byeolki, 2026-08-02: "테마는
-    /// 셰이디앱과 동기화 되어서 메뉴막대를 통한 셰이디 설정으로 변경할 수
-    /// 있어야하거든". A separate setting from `appearanceLabel` above (that
+    /// The client (chat) window's own theme, kept in sync with the menu bar
+    /// settings the way Shady-style apps do. A separate setting from `appearanceLabel` above (that
     /// one is system-wide light/dark/system; this one is the client
     /// window's own light/dark ClientThemeStyle).
     case clientThemeLabel
@@ -37,10 +35,10 @@ enum L10nKey: String, CaseIterable, Hashable {
     case avoidClimbingLabel, speedLabel, toySizeLabel, toyPumpkin, toyWand
 
     case avatarsHeader, importAvatarButton, importPanelPrompt
-    /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
-    /// 해주고" -- picking a different installed avatar as a preset.
+    /// Picking a different installed avatar as a preset.
     case avatarSelectButton
-    /// "아바타 패키지 형태도 사용자에게 알려줘야함" -- condensed from
+    /// The avatar package format needs to be explained to end users too --
+    /// condensed from
     /// docs/avatar-spec.md for end users, not the full creator-facing spec.
     case avatarPackageFormatExplanation
     case sizeHeader

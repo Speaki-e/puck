@@ -29,9 +29,8 @@ final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
         hasShadow = true
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        // Drag it anywhere by its blurred background (byeolki: "드래그해서
-        // 위치도 옮길 수 있게", 2026-07-30). Dragging by the text itself still
-        // selects text, as it does in any field.
+        // Drag it anywhere by its blurred background. Dragging by the text
+        // itself still selects text, as it does in any field.
         isMovableByWindowBackground = true
         delegate = self
     }
@@ -78,8 +77,7 @@ final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
         // Puck is LSUIElement/.accessory, and a background app's window
         // can be "key" without the app being active -- the keystrokes still
         // go to whatever app is frontmost, so the bubble appeared but typing
-        // landed somewhere else (byeolki: "단축키 입력하면 바로 입력 모드로
-        // 가게"). Activating is what actually hands the keyboard over;
+        // landed somewhere else. Activating is what actually hands the keyboard over;
         // closeAndRestoreFocus() gives it back afterwards.
         NSApp.activate(ignoringOtherApps: true)
         // Spotlight fades in rather than popping. Short enough not to be in

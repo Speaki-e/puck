@@ -48,8 +48,9 @@ final class ClientWindowStore: ObservableObject {
     @Published var activeWorkspaceId: String
     @Published var activeSessionId: String
 
-    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
-    /// 셰이디 설정으로 변경할 수 있어야하거든" -- a Puck Settings item now
+    /// The theme should stay in sync with the menu bar settings, the same
+    /// way Shady-style apps let you flip theme from the menu bar -- so it's
+    /// a Puck Settings item now
     /// (SettingsStore.clientThemeStyle), not a ClientWindow-local one. This
     /// store doesn't persist or own the value at all; PuckClient's
     /// AppDelegate seeds it at launch (reading Puck's UserDefaults domain)
@@ -133,7 +134,7 @@ final class ClientWindowStore: ObservableObject {
                 sessionOrder.append(key)
             }
             if origin == .agent {
-                // byeolki: the agent branching a casual chat into a task
+                // The agent branching a casual chat into a task
                 // session should bring the user along automatically, not
                 // leave them to notice a new sidebar entry on their own.
                 activeWorkspaceId = workspaceId
@@ -147,7 +148,8 @@ final class ClientWindowStore: ObservableObject {
 
     /// The agent decided this turn is real work and opened a task session for
     /// it (F15 open_task_session, 2026-08-12). This is a **move**, not a
-    /// branch: byeolki -- "프롬프트 쓴 세션은 닫고 새로 넘어가야지".
+    /// branch: the session the prompt was typed into should close once the
+    /// task session takes over, not linger alongside it.
     ///
     /// - the user's own message goes with it, because ChatView echoed it into
     ///   the source session locally and it would otherwise vanish with that
@@ -237,9 +239,9 @@ final class ClientWindowStore: ObservableObject {
 
     /// Shows text the user typed *somewhere else* (pet-app's quick-capture
     /// bubble, mirrored over the socket as user_input) in this window's chat,
-    /// and switches to the session it was sent to -- byeolki, 2026-07-30:
-    /// "입력창에 내용을 작성하면 창이 새로 열리면서 ... 입력한 내용이
-    /// 보여지게". Messages sent from this window's own input bar are echoed
+    /// and switches to the session it was sent to -- submitting from the
+    /// quick-capture bubble should bring this window up showing what was
+    /// typed. Messages sent from this window's own input bar are echoed
     /// by ChatView instead; those never come back over the socket.
     ///
     /// - Returns: whether it landed in an existing session (an unknown

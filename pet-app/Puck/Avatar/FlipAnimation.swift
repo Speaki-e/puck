@@ -5,8 +5,7 @@
 //  F2 · owner: 강상우 (Sangwoo Kang)
 //  The turn the pet plays when it changes direction — the sprite narrows to
 //  nothing edge-on and opens back out the other way, like a sheet of paper
-//  being turned over (byeolki: "오른쪽 왼쪽 방향 바뀔떄 종이 뒤집어지는 모션",
-//  2026-07-29).
+//  being turned over.
 //
 //  This used to happen by accident: `position`/`transform` were animating
 //  implicitly, so a facing change eased its scaleX from +1 to -1 over Core

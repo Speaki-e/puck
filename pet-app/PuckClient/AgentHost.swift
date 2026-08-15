@@ -57,9 +57,8 @@ final class AgentHost {
 
     /// Set by AppDelegate: reveal the editor pane on this workspace's file.
     /// Called when the agent opens a file for the user to look at, and for
-    /// every file a code_editor run touches -- byeolki, 2026-08-15: "핵심
-    /// 코드 보여달라고 할때 에디터에서 보여주는", "코드 작성을 할때 에디터로
-    /// 실시간으로 업데이트 보여주면서".
+    /// every file a code_editor run touches: asking to be shown code should
+    /// put it on screen, and watching one get written should follow along.
     var onRevealInEditor: ((_ workspaceId: String, _ path: String) -> Void)?
 
     /// Set by AppDelegate: the local side of open_task_session, which has no

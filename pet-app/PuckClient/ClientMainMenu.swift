@@ -5,8 +5,8 @@
 //  F13 · owner: 박해영 (Haeyoung Park)
 //  PuckClient's main menu, built in code.
 //
-//  byeolki (2026-07-30): "client 커맨드 q처럼 기본적인 커맨드 다 먹히게".
-//  An AppKit app assembled by hand (no MainMenu.xib -- this project generates
+//  The standard commands have to work here like anywhere else. An AppKit app
+//  assembled by hand (no MainMenu.xib -- this project generates
 //  its Xcode project and has no nibs) starts with *no* main menu at all, and
 //  every standard shortcut is a menu item's key equivalent: with no menu,
 //  Cmd+Q/W/M and even Cmd+C/V in the chat's text field are dead keys. This is
@@ -40,8 +40,7 @@ enum ClientMainMenu {
         // there. Same reasoning as the undo/redo items below. Resolved via
         // the responder chain (nil target): AppKit checks NSApp.delegate as
         // a target-for-action fallback, which is where AppDelegate implements
-        // this -- byeolki, 2026-08-02: "기존 셰이디앱에 있던 에이전트 관련
-        // 설정은 전부 셰이디에이전트 설정으로 옮기고".
+        // this -- the agent's settings live in this app, not the pet's.
         menu.addItem(title: "설정…", action: Selector(("showSettings:")), keyEquivalent: ",")
         menu.addItem(.separator())
         menu.addItem(title: "\(appName) 가리기", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -54,8 +53,8 @@ enum ClientMainMenu {
         menu.addItem(title: "모두 보기", action: #selector(NSApplication.unhideAllApplications(_:)))
         menu.addItem(.separator())
         // Quits this app only. The pet is a separate process (Puck) and
-        // keeps running -- byeolki, same day: "이 새로 열린창을 최소화하거나
-        // 종료하게 된다고해서 펫이 사라지면 안됨".
+        // keeps running: quitting or minimising this window must never take
+        // the pet down with it.
         menu.addItem(title: "\(appName) 종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         return menu
     }

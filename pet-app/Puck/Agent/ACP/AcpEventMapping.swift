@@ -44,6 +44,35 @@ enum AcpEventMapping {
         }
     }
 
+    /// Paths this update reports writing to that resolve outside `root`.
+    ///
+    /// Ported from byeolki's workspace-side check (2026-08-15) before that app
+    /// was deleted, because the Swift port had no equivalent.
+    ///
+    /// **Mitigation, not containment.** There is no OS sandbox around the ACP
+    /// child, so this cannot stop or verify what it writes. What it can do is
+    /// read the locations the child *voluntarily reports* over the protocol
+    /// and flag write-shaped ones that land outside the project. A child that
+    /// writes without reporting, or misreports where it wrote, is invisible
+    /// here and the write still happens. This only turns a protocol-reported
+    /// escape into a loud failure instead of a silent one.
+    static func writesOutside(root: String, in update: AcpSessionUpdate) -> [String] {
+        guard update.kind == .toolCall || update.kind == .toolCallUpdate else { return [] }
+        let call = update.raw["update"] ?? update.raw
+        // Only operations that change the filesystem; a read outside the
+        // project is not what this is looking for.
+        guard let kind = call["kind"]?.stringValue,
+              ["edit", "delete", "move"].contains(kind)
+        else { return [] }
+
+        let normalizedRoot = URL(fileURLWithPath: root).standardizedFileURL.path
+        return (call["locations"]?.arrayValue ?? []).compactMap { location in
+            guard let path = location["path"]?.stringValue else { return nil }
+            let resolved = URL(fileURLWithPath: path).standardizedFileURL.path
+            return PathContainment.isInside(root: normalizedRoot, candidate: resolved) ? nil : resolved
+        }
+    }
+
     /// The file this update is about, if it names one. Same field the pet's
     /// detail.path jump reads -- pulled out separately so the editor can
     /// follow along without going through a BridgeEvent first.

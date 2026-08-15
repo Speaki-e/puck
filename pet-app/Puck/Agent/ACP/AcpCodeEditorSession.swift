@@ -36,6 +36,9 @@ final class AcpCodeEditorSession {
 
     private let lock = NSLock()
     private var summary = ""
+    /// Write-shaped locations the agent reported outside the project. Detection
+    /// only -- see AcpEventMapping.writesOutside.
+    private var writesOutsideProject: Set<String> = []
     private var sessionID: String?
     private var isCancelled = false
 
@@ -116,6 +119,19 @@ final class AcpCodeEditorSession {
             let stopReason = finished["stopReason"]?.stringValue ?? AcpStopReason.endTurn.rawValue
             if stopReason == AcpStopReason.cancelled.rawValue { return .cancelled() }
             let text = currentSummary().trimmingCharacters(in: .whitespacesAndNewlines)
+            let escaped = currentWritesOutsideProject()
+            guard escaped.isEmpty else {
+                // Reported as a failure rather than a footnote on a success:
+                // the run wrote where it was not asked to, and the user has to
+                // know which paths to go look at.
+                return CodeEditorResult(
+                    ok: false,
+                    summary: "이 작업이 프로젝트 밖의 파일을 수정했다고 보고했어요. 확인이 필요합니다.",
+                    changedFiles: [],
+                    error: "wrote_outside_project",
+                    detail: escaped.sorted().joined(separator: "\n")
+                )
+            }
             return CodeEditorResult(
                 ok: true,
                 summary: text.isEmpty ? "ACP 작업 완료 (\(stopReason))" : text,
@@ -151,9 +167,12 @@ final class AcpCodeEditorSession {
     // MARK: - Internals
 
     private func applyUpdate(_ update: AcpSessionUpdate) {
-        if !update.text.isEmpty {
-            lock.lock(); summary += update.text; lock.unlock()
+        lock.lock()
+        if !update.text.isEmpty { summary += update.text }
+        for path in AcpEventMapping.writesOutside(root: projectPath, in: update) {
+            writesOutsideProject.insert(path)
         }
+        lock.unlock()
         onUpdate(update)
     }
 
@@ -179,6 +198,11 @@ final class AcpCodeEditorSession {
     private func currentSummary() -> String {
         lock.lock(); defer { lock.unlock() }
         return summary
+    }
+
+    private func currentWritesOutsideProject() -> Set<String> {
+        lock.lock(); defer { lock.unlock() }
+        return writesOutsideProject
     }
 
     private static func detail(from error: Error) -> String {

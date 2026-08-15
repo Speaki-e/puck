@@ -87,8 +87,21 @@ final class ClientWindowStore: ObservableObject {
     func handleClientUpdate(_ message: BridgeMessage) {
         switch message {
         case .workspaceCreate(let workspaceId, let name, let projectPath):
-            workspaces.append(ClientWorkspace(id: workspaceId, name: name, projectPath: projectPath))
-            seedDefaultSession(forWorkspace: workspaceId)
+            // Idempotent, for the same reason session_create below is: this
+            // arrives both when a workspace is created and when pet-app
+            // replays its registry on connect (2026-08-15), and the replay
+            // includes the "default" workspace this store already seeded for
+            // itself. Appending blindly duplicated every sidebar row on
+            // reconnect. A repeat updates in place instead -- name and project
+            // path can legitimately have changed since.
+            if let index = workspaces.firstIndex(where: { $0.id == workspaceId }) {
+                workspaces[index].name = name
+                workspaces[index].projectPath = projectPath
+                workspaces[index].refreshEditorAvailability()
+            } else {
+                workspaces.append(ClientWorkspace(id: workspaceId, name: name, projectPath: projectPath))
+                seedDefaultSession(forWorkspace: workspaceId)
+            }
 
         case .sessionCreate(let workspaceId, let sessionId, let title, let origin):
             let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)

@@ -37,6 +37,28 @@ final class WorkspaceCoordinator {
         self.log = log
     }
 
+    /// Every persisted workspace as the `workspace_create` that announces it.
+    ///
+    /// PuckClient's sidebar is rebuilt from these messages and nothing else,
+    /// so without a replay it started every launch holding only the "default"
+    /// workspace it seeds locally -- projects the user had added were on disk
+    /// but unreachable, and the editor pane, which needs a project path, could
+    /// not be opened for any of them. Nothing replayed them before either;
+    /// workspace announced only `editor_view_ready` on connect, which
+    /// `handleClientUpdate` dropped.
+    ///
+    /// Safe to send more than once: `handleClientUpdate` matches on id and
+    /// updates in place.
+    func replayForNewClient() -> [BridgeMessage] {
+        workspaces.list().map { record in
+            .workspaceCreate(
+                workspaceId: record.id,
+                name: record.name,
+                projectPath: record.realProjectPath
+            )
+        }
+    }
+
     /// - Returns: the confirmations to broadcast to gui connections, in order,
     ///   or an empty array when the request could not be honoured. Returning
     ///   messages rather than sending them keeps this testable without a socket

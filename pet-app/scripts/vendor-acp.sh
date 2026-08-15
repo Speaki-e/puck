@@ -7,8 +7,10 @@
 # between them, and a node_modules tree inside an .app bundle is both large and
 # awkward to sign. esbuild flattens each to one file (claude 2.2MB, codex
 # 1.1MB), which is small enough to commit -- and committing them is the point:
-# a fresh checkout builds Puck with Xcode alone, no npm step, the same way
-# ChatWeb's built bundle is committed rather than built by Xcode.
+# these bundles change only when the pinned versions do, so paying an npm
+# install per checkout would buy nothing. (Unlike ChatWeb, whose built bundle
+# is gitignored and rebuilt by sync-chat-web.sh, because its source changes
+# constantly.)
 #
 # Run this only when bumping the pinned versions in scripts/acp/package.json,
 # then commit the regenerated .mjs files. This is the one Node dependency left

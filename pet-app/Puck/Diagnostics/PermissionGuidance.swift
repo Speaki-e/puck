@@ -4,8 +4,8 @@
 //
 //  F10/F11 · owner: 박해영 (Haeyoung Park)
 //  Which permission a tool needs, and whether the pet should go and ask for
-//  it (byeolki, 2026-07-31: "권한이 필요한 부분이 테스크에 있으면 그 권한
-//  요청 창을 띄워주고 그걸 클릭해달라고 펫 말풍선으로 표현").
+//  it -- surfacing the system permission dialog and having the pet point at
+//  it with a speech bubble telling the user to click it.
 //
 //  A permission_denied used to reach the user as a sentence in the chat
 //  transcript and nothing else -- which is the one place they are not

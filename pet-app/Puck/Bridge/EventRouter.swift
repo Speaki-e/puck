@@ -44,8 +44,7 @@ enum StateKind: Equatable, CaseIterable {
     /// idle roll, never from a socket event.
     case climbToCeiling
     case ceiling
-    /// Double-tap "petting" interaction (2026-07-29, byeolki's request for
-    /// more interactions). Never reachable from a socket event, same as
+    /// Double-tap "petting" interaction (2026-07-29). Never reachable from a socket event, same as
     /// chaseBall/kickBall.
     case petting
     /// F13 (2026-07-29): holds still while the Option+Shift+Space client
@@ -118,8 +117,7 @@ enum EventRouter {
 
     /// The speech bubble gets the headline, not the whole answer.
     ///
-    /// byeolki, 2026-08-12: "pet이 ai 답변을 전부 출력하지 말고 핵심부분만
-    /// 간결하게". agent_done's summary is whatever the agent that produced it
+    /// agent_done's summary is whatever the agent that produced it
     /// felt like putting there -- for the F15 local agent it is literally the
     /// full reply text, and an ACP/editor run can hand back several
     /// paragraphs. The full text is already in the chat transcript

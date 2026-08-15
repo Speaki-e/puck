@@ -7,9 +7,9 @@
 //  (2026-08-14) dropped the `.glass` theme -- see docs/decisions.md for
 //  the rationale. A distinct setting from Puck's system-wide AppAppearance
 //  (Settings' light/dark/system toggle, used by the pet overlay/Settings),
-//  but not a separate ClientWindow-local one either -- byeolki, 2026-08-02:
-//  "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한 셰이디 설정으로 변경할 수
-//  있어야하거든". Persisted in Puck's own UserDefaults domain (SettingsStore)
+//  but not a separate ClientWindow-local one either -- theme should stay in
+//  sync with the menu bar settings, the same way Shady-style apps let you
+//  flip theme from the menu bar. Persisted in Puck's own UserDefaults domain (SettingsStore)
 //  and broadcast to PuckClient over DistributedNotificationCenter, the same
 //  shape AppAppearance's old cross-process wiring used -- PuckClient's
 //  AppDelegate is the only consumer, seeding ClientWindowStore.themeStyle

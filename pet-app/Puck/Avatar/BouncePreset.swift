@@ -79,9 +79,8 @@ enum BouncePreset: Equatable {
         }
     }
 
-    /// The rainbow, in order, one colour per half turn (byeolki: "뒤집힐 때
-    /// 색갈을 무지개 차례대로", 2026-07-29), so the pet's front and back are
-    /// never the same colour and each flip reveals the next one.
+    /// The rainbow, in order, one colour per half turn, so the pet's front
+    /// and back are never the same colour and each flip reveals the next one.
     ///
     /// The caller offsets the angle by a quarter turn before dividing,
     /// because the boundaries of `angle / .pi` are where the sprite is fully
@@ -173,8 +172,7 @@ enum BouncePreset: Equatable {
 
         case .climb:
             // Rocking side to side on the way up, like something small
-            // hauling itself up one side at a time (byeolki: "위로 올라갈때
-            // 귀엽게 올라가게 해봐", 2026-07-29). Rotation is the whole
+            // hauling itself up one side at a time. Rotation is the whole
             // effect -- a scale-only version of this reads as the sprite
             // being squeezed, not as the pet leaning.
             //
@@ -196,8 +194,7 @@ enum BouncePreset: Equatable {
 
         case .spin:
             // Turning about its own vertical axis -- the pet flips over like
-            // a sheet of paper, several times (byeolki: "회전이 아니라
-            // 뒤집는거를 원함", 2026-07-29). Deliberately NOT an in-plane
+            // a sheet of paper, several times. Deliberately NOT an in-plane
             // rotation: that tips the pet over sideways, which reads as it
             // falling rather than as a happy little spin.
             //

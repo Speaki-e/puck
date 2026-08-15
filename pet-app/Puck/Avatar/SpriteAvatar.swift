@@ -170,8 +170,7 @@ final class SpriteAvatar: AvatarPlayable {
         applyTransform()
     }
 
-    /// F3 wall-climbing (2026-07-29, byeolki: "벽 타는 것도 사진 돌려서
-    /// 올라가게 해주고"): rotates the sprite 90deg while the "climb" clip is
+    /// F3 wall-climbing: rotates the sprite 90deg while the "climb" clip is
     /// playing -- ClimbState (a window's side) and ClimbToCeilingState (open
     /// air, toward the ceiling) both use it, so both get the rotation for
     /// free with no per-state wiring. The rotation fact itself lives on

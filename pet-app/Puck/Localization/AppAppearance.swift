@@ -3,7 +3,7 @@
 //  Puck
 //
 //  Shared · owner: 박해영 (Haeyoung Park)
-//  In-app light/dark override -- byeolki: "화이트모드 다크모드 추가하고".
+//  In-app light/dark override.
 //  An explicit user setting (Settings' General tab) rather than only ever
 //  following the system appearance -- .system still exists as the option
 //  that does that.
@@ -33,8 +33,9 @@ enum AppAppearance: String, Equatable, CaseIterable {
     /// which SwiftUI's modifier never touches. Set this alongside
     /// `.preferredColorScheme` (see AppDelegate in both targets) so glass/
     /// blur backgrounds actually match an explicit Light/Dark override
-    /// instead of silently continuing to follow the real system appearance
-    /// -- byeolki, 2026-08-01: "시스템모드랑 다크모드랑 생긴게 다른데?".
+    /// instead of silently continuing to follow the real system appearance,
+    /// since dark mode and the system's own dark appearance don't render
+    /// identically across AppKit chrome.
     var nsApplicationAppearance: NSAppearance? {
         switch self {
         case .system: return nil

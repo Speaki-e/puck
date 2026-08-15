@@ -56,8 +56,7 @@ extension ChatTimelineEntry: Identifiable {
         // user types, and every run ends with one. Two rows sharing an id in
         // the transcript's ForEach is undefined behaviour -- what it did in
         // practice was throw the scroll position to the top of the list the
-        // moment a second run finished (byeolki, 2026-08-12: "프롬프트 하나
-        // 끝나면 계속 맨위로 스크롤되는거").
+        // moment a second run finished.
         case .done(let id, _, _): return id
         }
     }
@@ -103,8 +102,8 @@ final class ChatSession: ObservableObject, Identifiable {
     }
 
     /// The send landed, so the agent owes an answer -- shown as the "생각 중"
-    /// row until the first text_chunk replaces it (byeolki, 2026-08-12: "ai가
-    /// 답변 생성하는 동안 로딩 보여줘").
+    /// row until the first text_chunk replaces it -- the user should see that
+    /// the agent is working while it generates a reply, not a blank gap.
     ///
     /// Set here rather than waiting for agent_thinking: that event is produced
     /// by the agent, put on the socket, and relayed back to this app, so the

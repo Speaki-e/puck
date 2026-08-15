@@ -50,11 +50,10 @@ final class TextInputBubbleView: NSView {
             glass.cornerRadius = Self.cornerRadius
             background = glass
         } else {
-            // Spotlight's own look, as closely as AppKit gives it for free
-            // (byeolki: "이거 spotlight 느낌으로 만들어줘", 2026-07-30): one wide
-            // translucent slab holding one line of large text, and nothing else --
-            // the leading glyph this had at first just read as clutter ("그 왼쪽에
-            // 띄운 이상한 심볼 삭제", 2026-07-30).
+            // Spotlight's own look, as closely as AppKit gives it for free:
+            // one wide translucent slab holding one line of large text, and
+            // nothing else -- the leading glyph this had at first just read
+            // as clutter and was removed.
             let effect = NSVisualEffectView()
             effect.material = .hudWindow
             effect.blendingMode = .behindWindow
@@ -64,8 +63,7 @@ final class TextInputBubbleView: NSView {
             effect.layer?.masksToBounds = true
             // A layer corner radius rounds the CONTENTS; the behind-window blur is
             // drawn to the view's own shape and stayed a full rectangle, so the
-            // panel read as a rounded box sitting on a square backdrop (byeolki:
-            // "완전 직사각형 배경 위에 둥근 사각형이 나온듯한 느낌", 2026-07-30).
+            // panel read as a rounded box sitting on a square backdrop.
             // Only maskImage reshapes the blur itself.
             effect.maskImage = Self.roundedMask
             // The hairline that keeps the panel from dissolving into a light
@@ -104,7 +102,7 @@ final class TextInputBubbleView: NSView {
     /// This is the pet *speaking*, so it drops the Spotlight typography: the
     /// bar's 24pt single line is right for a capture field the user is aiming
     /// at, and wrong for a bubble the size of a sentence sitting over a
-    /// character's head (byeolki, 2026-07-31: "말풍선이 펫한테서 나오게").
+    /// character's head.
     func showMessage(_ text: String) {
         isShowingMessage = true
         textField.isEditable = false
@@ -177,8 +175,7 @@ final class TextInputBubbleView: NSView {
         ])
     }
 
-    /// F14 (2026-08-01, byeolki: "마우스 드래그를 통해서 캡쳐 후
-    /// attachments를 삽입할 수 있도록"): a trailing capture button, and a
+    /// F14: a trailing capture button, and a
     /// leading thumbnail that only appears once something's been captured --
     /// hidden by default so the panel stays the same plain single line it
     /// was before this.

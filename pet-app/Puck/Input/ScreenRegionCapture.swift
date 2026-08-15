@@ -3,9 +3,8 @@
 //  Puck
 //
 //  F14 · owner: 박해영 (Haeyoung Park)
-//  Interactive screen-region capture for attaching to a message (byeolki,
-//  2026-08-01: "마우스 드래그를 통해서 캡쳐 후 attachments를 삽입할 수
-//  있도록 해줘"). Shells out to /usr/sbin/screencapture -i rather than
+//  Interactive drag-to-select screen-region capture for attaching to a
+//  message. Shells out to /usr/sbin/screencapture -i rather than
 //  reimplementing drag-to-select: it already draws the system's own
 //  crosshair overlay, handles Space to switch to window-capture mode, and
 //  Escape to cancel -- exactly the interaction this needs, for free.

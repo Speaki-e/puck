@@ -6,9 +6,8 @@
 //  Where the pet's *visible* pixels actually are, as a rectangle.
 //
 //  Two things stand between the layer's bounds and what the eye sees, and
-//  both have to be undone to keep the pet inside the screen (byeolki: "이 펫
-//  에셋의 태두리를 사각형으로 정확히 잡고 그 태두리 기반으로 화면경계에서
-//  튕기게", 2026-07-29):
+//  both have to be undone to keep the pet's actual visible edges -- not its
+//  layer bounds -- bouncing correctly off the screen boundary:
 //
 //  1. `contentsGravity = .resizeAspect` fits the image inside the layer
 //     without distorting it, so unless the image's aspect ratio matches the

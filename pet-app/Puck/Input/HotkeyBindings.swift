@@ -37,8 +37,7 @@ struct HotkeyBindings: Equatable {
     /// Space = keyCode 49. PTT = Option+Space (hold), text input =
     /// Option+Shift+Space, character summon = Option+Cmd+Space. Toy summons
     /// mirror ToyCatalogue.all's fixed order: keyCode 18/19 ("1"/"2") +
-    /// Option+Shift summon toy[0]/toy[1] (byeolki, 2026-08-01: "option shift
-    /// 1, 2로 toy 소환 가능하게 해줘").
+    /// Option+Shift summon toy[0]/toy[1].
     static let defaults = HotkeyBindings(
         pushToTalk: HotkeyBinding(keyCode: 49, modifierFlags: [.maskAlternate]),
         textInput: HotkeyBinding(keyCode: 49, modifierFlags: [.maskAlternate, .maskShift]),

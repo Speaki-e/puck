@@ -51,8 +51,7 @@ final class BridgeServer {
     /// zero and non-zero -- true on the first one connecting, false once the
     /// last one disconnects (protocol 3.7, 2026-07-30). NOT wired to
     /// pin/unpin the character: PuckClient is a Dock-resident app
-    /// expected to stay running continuously (byeolki: "둘이 같이
-    /// 가야하는거임"), so tying the pin to "is a gui connected" would freeze
+    /// expected to stay running continuously, so tying the pin to "is a gui connected" would freeze
     /// the pet in place for as long as PuckClient is alive, not just
     /// while its window is actually being used. Pin/unpin stays with the
     /// local, in-process quick-capture bubble (Option+Shift+Space), which

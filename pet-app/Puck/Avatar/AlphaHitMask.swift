@@ -8,8 +8,7 @@
 //
 //  Every asset here is background-removed art, so the picture is a silhouette
 //  floating in a transparent canvas and its bounding box is a poor stand-in
-//  for it (byeolki: "내가 쓰는 에셋들이 전부 배경이 제거된 이미지들이어서
-//  이미지의 실제 보이는 부분은 이미지보다 작거든", 2026-07-30). A rectangle
+//  for it. A rectangle
 //  can only ever be too big -- around the pet's hair and skirt, or around a
 //  wand that is mostly empty space either side of a thin stick -- so clicks
 //  land on it in places where nothing is drawn.
@@ -79,8 +78,7 @@ struct AlphaHitMask: Equatable {
     ///   - point: position within the image, 0...1 on each axis, top-left origin.
     ///   - tolerance: how far away, in the same 0...1 units, still counts as a
     ///     hit. Grabbing a 130pt character by its exact silhouette is
-    ///     needlessly fiddly -- and byeolki has complained about a hitbox
-    ///     being hard to grab before -- so callers dilate the mask a little
+    ///     needlessly fiddly, so callers dilate the mask a little
     ///     rather than demanding pixel precision.
     func isDrawn(atUnit point: CGPoint, tolerance: CGFloat = 0) -> Bool {
         guard tolerance > 0 else { return isDrawn(atCell: cell(for: point)) }

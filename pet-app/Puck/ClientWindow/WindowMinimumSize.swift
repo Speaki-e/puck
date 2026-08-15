@@ -22,32 +22,81 @@ struct WindowMinimumSize: NSViewRepresentable {
     let width: CGFloat
     let height: CGFloat
 
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
         // Applied on the next runloop pass: at makeNSView time the view is not
         // in a window yet, so `view.window` is nil.
-        DispatchQueue.main.async { apply(to: view) }
+        DispatchQueue.main.async {
+            apply(to: view)
+            context.coordinator.observe(view.window, floor: floor)
+        }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { apply(to: nsView) }
+        DispatchQueue.main.async {
+            apply(to: nsView)
+            context.coordinator.observe(nsView.window, floor: floor)
+        }
+    }
+
+    private var floor: CGSize { CGSize(width: width, height: height) }
+
+    /// Puts the floor back whenever the window ends up under it.
+    ///
+    /// `minSize` alone is not enough: AppKit enforces it while the user drags
+    /// a corner and not at all for a frame set any other way -- a display
+    /// change, window restoration, Stage Manager, or anything scripting the
+    /// window. Under the floor the panes do not compress, they overflow: the
+    /// sidebar slides out of view and the editor's empty state is cut off
+    /// mid-sentence.
+    final class Coordinator {
+        private var observer: NSObjectProtocol?
+        private var floor: CGSize = .zero
+        private weak var observed: NSWindow?
+
+        func observe(_ window: NSWindow?, floor: CGSize) {
+            self.floor = floor
+            guard let window, window !== observed else { return }
+            observed = window
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResizeNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self, let window = notification.object as? NSWindow else { return }
+                Self.grow(window, toAtLeast: self.floor)
+            }
+        }
+
+        deinit {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+        }
+
+        static func grow(_ window: NSWindow, toAtLeast floor: CGSize) {
+            let size = window.frame.size
+            guard size.width < floor.width || size.height < floor.height else { return }
+            var frame = window.frame
+            // From the top-left, the corner macOS windows are anchored to:
+            // growing from the origin would walk the title bar off screen.
+            frame.origin.y -= max(0, floor.height - size.height)
+            frame.size = CGSize(
+                width: max(size.width, floor.width),
+                height: max(size.height, floor.height)
+            )
+            window.setFrame(frame, display: true)
+        }
     }
 
     private func apply(to view: NSView) {
         guard let window = view.window else { return }
         window.minSize = CGSize(width: width, height: height)
         // Raising the floor above the current size does not resize the window
-        // on its own -- AppKit only enforces minSize during a user drag. Left
-        // alone, opening the editor in an already-narrow window would produce
-        // exactly the squeezed layout the floor exists to prevent.
-        let size = window.frame.size
-        guard size.width < width || size.height < height else { return }
-        var frame = window.frame
-        // Grown from the top-left, the corner macOS windows are anchored to:
-        // growing from the origin would walk the title bar off the screen.
-        frame.origin.y -= max(0, height - size.height)
-        frame.size = CGSize(width: max(size.width, width), height: max(size.height, height))
-        window.setFrame(frame, display: true, animate: true)
+        // on its own, so opening the editor in an already-narrow window has to
+        // grow it here.
+        Coordinator.grow(window, toAtLeast: floor)
     }
 }

@@ -40,6 +40,7 @@ enum ToolTimeouts {
         // workspace executor
         "code_editor": 600,
         "open_in_editor": 10,
+        "list_files": 15,
         "read_file": 10,
         // ai-module executor -- never dispatched, so this never actually
         // applies; 0 mirrors tools.ts's placeholder value (2026-07-29).

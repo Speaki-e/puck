@@ -52,6 +52,10 @@ typealias AgentCodeEditorDelegation = (_ task: String) async -> DispatchedToolRe
 /// PuckClient's own editor-pane state to answer anyway.
 typealias AgentFileDelegation = (_ path: String) async -> DispatchedToolResult
 
+/// Lists the active workspace's project files. Takes no path -- which project
+/// is a property of the run, not something the model chooses.
+typealias AgentFileListing = () async -> DispatchedToolResult
+
 /// Branches the casual conversation into its own task session; everything the
 /// run emits after this is addressed to the new one.
 typealias AgentTaskSessionOpener = (_ title: String, _ brief: String) -> Void
@@ -74,6 +78,10 @@ final class AgentRunner {
     /// being connected, only on the active workspace having a project bound.
     private let delegateReadFile: AgentFileDelegation?
     private let delegateOpenInEditor: AgentFileDelegation?
+    /// Offered whenever read_file is: both answer from the same project root,
+    /// and a model that can read a file but not find one is the situation this
+    /// was added to fix.
+    private let delegateListFiles: AgentFileListing?
     /// protocol section 7's `src: "agent"` lines. Without them a failed call
     /// is an opaque uuid in pet-app's log with no tool name and no reason.
     private let logger: ToolExecutionLogging?
@@ -97,6 +105,7 @@ final class AgentRunner {
         openTaskSession: AgentTaskSessionOpener? = nil,
         delegateReadFile: AgentFileDelegation? = nil,
         delegateOpenInEditor: AgentFileDelegation? = nil,
+        delegateListFiles: AgentFileListing? = nil,
         logger: ToolExecutionLogging? = nil
     ) {
         self.logger = logger
@@ -108,11 +117,13 @@ final class AgentRunner {
         self.openTaskSession = delegateCodeEditor == nil ? nil : openTaskSession
         self.delegateReadFile = delegateReadFile
         self.delegateOpenInEditor = delegateOpenInEditor
+        self.delegateListFiles = delegateListFiles
         toolSpecs = Self.petToolSpecs
             + (delegateCodeEditor == nil ? [] : [Self.codeEditorSpec])
             + (self.openTaskSession == nil ? [] : [Self.openTaskSessionSpec])
             + (delegateReadFile == nil ? [] : [Self.readFileSpec])
             + (delegateOpenInEditor == nil ? [] : [Self.openInEditorSpec])
+            + (delegateListFiles == nil ? [] : [Self.listFilesSpec])
         messages = [.system(Self.systemPrompt)]
     }
 
@@ -120,9 +131,46 @@ final class AgentRunner {
     /// inherit the last one's context.
     func reset() {
         messages = [.system(Self.systemPrompt)]
+        announcedWorkspaceContext = nil
     }
 
+    /// Describes the workspace this run belongs to. Injected per run rather
+    /// than baked into the system prompt: the user can switch workspaces
+    /// between turns, and a prompt built at init would keep naming the first
+    /// one forever.
+    ///
+    /// Without it the model had no idea a project was open at all. Asked to
+    /// analyze "this directory" it reached for get_frontmost_window -- the
+    /// only tool whose name sounded spatial -- got a window title back, and
+    /// correctly concluded it had nothing to answer with.
+    struct WorkspaceContext: Equatable {
+        let name: String
+        /// nil for a chat-only workspace.
+        let projectPath: String?
+
+        var promptLine: String {
+            guard let projectPath else {
+                return "Current workspace: \(name). No project folder is bound to it, so there are no files to read or list."
+            }
+            return "Current workspace: \(name), bound to the project at \(projectPath). "
+                + "\"this project\" / \"this directory\" / \"여기\" mean that folder. "
+                + "Paths you pass to file tools are relative to it."
+        }
+    }
+
+    /// Set by the host before each run. Kept as a property rather than a `run`
+    /// parameter so the many existing call sites and tests stay untouched.
+    var workspaceContext: WorkspaceContext?
+
+    /// What was last announced to the model, so a ten-turn conversation in one
+    /// workspace does not accumulate ten identical system lines.
+    private var announcedWorkspaceContext: WorkspaceContext?
+
     func run(command: String) async {
+        if let workspaceContext, workspaceContext != announcedWorkspaceContext {
+            messages.append(.system(workspaceContext.promptLine))
+            announcedWorkspaceContext = workspaceContext
+        }
         messages.append(.user(command))
         emit(.agentThinking)
 
@@ -223,6 +271,10 @@ final class AgentRunner {
                 return
             }
             result = await delegateOpenInEditor(path)
+        } else if call.name == Self.listFilesToolName, let delegateListFiles {
+            // No arguments to validate: which project is a property of the
+            // run, not something the model picks.
+            result = await delegateListFiles()
         } else {
             result = await dispatcher.execute(tool: call.name, arguments: arguments)
         }
@@ -313,6 +365,14 @@ final class AgentRunner {
         parameters: ToolRegistry.tool(named: readFileToolName)?.parameters ?? []
     )
 
+    static let listFilesToolName = "list_files"
+
+    private static let listFilesSpec: GPTToolSpec = GPTToolSpec(
+        name: listFilesToolName,
+        description: description(for: listFilesToolName),
+        parameters: ToolRegistry.tool(named: listFilesToolName)?.parameters ?? []
+    )
+
     private static let openInEditorSpec: GPTToolSpec = GPTToolSpec(
         name: openInEditorToolName,
         description: description(for: openInEditorToolName),
@@ -330,7 +390,9 @@ final class AgentRunner {
         case "list_running_apps":
             return "List the apps currently running, with pid, name and bundle_id. Use this to find a pid before find_ui_element."
         case "get_frontmost_window":
-            return "Describe the window the user is looking at: owner app, title, and frame. Returns null when there is none."
+            return """
+            Describe the window the user is looking at: owner app, title, and frame. Returns null when             there is none. This is about a *window on screen*, not about files -- it cannot tell you             which directory or project anything is in. For that, use list_files.
+            """
         case "find_ui_element":
             return """
             Query an app's Accessibility tree for one element and return its {role, title, frame, enabled}. \

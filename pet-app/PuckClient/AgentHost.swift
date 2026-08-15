@@ -28,6 +28,8 @@ final class AgentHost {
     /// second process being alive.
     private let codeEditorRunner: CodeEditorRunner
     private let resolveProjectPath: (String) -> String?
+    /// What to tell the model about the workspace a run belongs to.
+    private let describeWorkspace: (String) -> AgentRunner.WorkspaceContext?
     /// read_file/open_in_editor's implementation -- see EditorFileDelegate.
     private let editorFileDelegate: EditorFileDelegate
     private var runner: AgentRunner!
@@ -64,8 +66,13 @@ final class AgentHost {
         _ userMessage: String
     ) -> Void)?
 
-    init(broadcast: @escaping (BridgeMessage) -> Bool, resolveProjectPath: @escaping (String) -> String?) {
+    init(
+        broadcast: @escaping (BridgeMessage) -> Bool,
+        resolveProjectPath: @escaping (String) -> String?,
+        describeWorkspace: @escaping (String) -> AgentRunner.WorkspaceContext? = { _ in nil }
+    ) {
         self.broadcast = broadcast
+        self.describeWorkspace = describeWorkspace
         self.dispatcher = PetToolDispatcher(send: broadcast)
         self.resolveProjectPath = resolveProjectPath
         self.editorFileDelegate = EditorFileDelegate(resolveProjectPath: resolveProjectPath)
@@ -131,6 +138,12 @@ final class AgentHost {
                     return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
                 }
                 return await self.editorFileDelegate.openInEditor(path: path, workspaceId: self.activeWorkspaceId)
+            },
+            delegateListFiles: { [weak self] in
+                guard let self else {
+                    return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
+                }
+                return await self.editorFileDelegate.listFiles(workspaceId: self.activeWorkspaceId)
             },
             // Same directory Puck's executor writes to, so `id` joins the
             // agent's tool_call/tool_result with pet-app's exec lines in one
@@ -285,6 +298,9 @@ final class AgentHost {
         activeWorkspaceId = workspaceId
         activeSessionId = sessionId
         activeCommand = command
+        // Before the run, not at init: which workspace is active changes
+        // between turns, and the runner only re-announces it when it differs.
+        runner.workspaceContext = describeWorkspace(workspaceId)
         Task { await runner.run(command: command) }
     }
 

@@ -133,6 +133,12 @@ enum ToolRegistry {
         Tool(name: "read_file", executor: .delegated, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
         ]),
+        // 2026-08-15: without this the agent could read a file only if the
+        // user named one, and had no way to learn what the project contained
+        // -- "이 디렉토리 분석해줘" dead-ended in get_frontmost_window, which
+        // reports a window and knows nothing about directories. No parameters:
+        // the project is whichever one the active workspace is bound to.
+        Tool(name: "list_files", executor: .delegated, approval: .notRequired, parameters: []),
         // Branches the casual conversation into a task session. Never crosses
         // the socket, which is why its registry timeout is a placeholder 0
         // rather than a duration.

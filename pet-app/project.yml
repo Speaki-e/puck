@@ -138,6 +138,16 @@ targets:
       - path: Puck/Resources/FileIcons
         type: folder
         buildPhase: resources
+      # And the ACP agents, because this is also the app that runs code_editor
+      # (AgentHost -> CodeEditorRunner -> AcpAgentProcess). Puck's target picks
+      # these up implicitly by sourcing the whole Puck/ folder; this target
+      # lists files one by one, so leaving them out shipped a PuckClient that
+      # failed every edit with agentScriptMissing while Puck.app carried the
+      # scripts it never uses.
+      - path: Puck/Resources/acp-claude.mjs
+        buildPhase: resources
+      - path: Puck/Resources/acp-codex.mjs
+        buildPhase: resources
     info:
       path: PuckClient/Resources/Info.plist
       properties:

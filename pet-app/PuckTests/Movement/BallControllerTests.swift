@@ -117,7 +117,7 @@ final class BallControllerTests: XCTestCase {
         XCTAssertFalse(controller.isActive)
     }
 
-    /// The toy is permanent (byeolki: "던지고 사라지지 않게 계속 남아있게") --
+    /// The toy is permanent --
     /// a kick has to end with it back in play, not gone.
     func test_aKickedToyStaysOnScreenAndComesBackToRest() {
         let controller = BallController(parent: CALayer())
@@ -159,8 +159,7 @@ final class BallControllerTests: XCTestCase {
     }
 }
 
-/// Resting the toy on a surface by its artwork rather than by its layer
-/// (byeolki: "호박 테두리 실제 이미지 border", 2026-07-29).
+/// Resting the toy on a surface by its artwork rather than by its layer.
 final class BallToyVisualBoundsTests: XCTestCase {
     private func makeController() -> BallController {
         BallController(parent: CALayer())
@@ -214,8 +213,8 @@ final class BallToyVisualBoundsTests: XCTestCase {
     }
 }
 
-/// Picking the toy up with the cursor (byeolki: "호박도 펫처럼 커서로 집을 수
-/// 있게", 2026-07-29).
+/// Picking the toy up with the cursor, the same way the pet itself can be
+/// picked up.
 final class BallToyGrabTests: XCTestCase {
     private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
 
@@ -362,7 +361,7 @@ final class BallToyLiftTests: XCTestCase {
 
 extension BallToyLiftTests {
     /// The throw has to clear the pet's head by a visible margin, not just
-    /// hop off it (byeolki: "던지는 높이 좀 더 높이").
+    /// hop off it.
     func test_theThrowGoesWellAboveTheHead() {
         let controller = BallController(parent: CALayer())
         controller.spawn(at: CGPoint(x: 200, y: 100))
@@ -385,7 +384,7 @@ extension BallToyLiftTests {
     }
 }
 
-/// Resizing the toy (byeolki: "호박 크기도 조절 가능 하게", 2026-07-29).
+/// Resizing the toy.
 final class BallToyScaleTests: XCTestCase {
     private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
 
@@ -533,8 +532,7 @@ extension BallToyScaleTests {
     }
 }
 
-/// Carrying a toy above the pet's head, spinning (byeolki: "지팡이는 펫 머리
-/// 위에서 회전되게", 2026-07-29).
+/// Carrying a toy above the pet's head, spinning.
 final class BallToyCarryTests: XCTestCase {
     private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
 
@@ -668,9 +666,7 @@ extension BallToyCarryTests {
     }
 }
 
-/// A long toy comes to rest lying on its side, not standing on its end
-/// (byeolki: "이 긴 막대가 계속 이미지의 형태로 비정상적으로 서있는데",
-/// 2026-07-30).
+/// A long toy comes to rest lying on its side, not standing on its end.
 final class BallToyRestingOrientationTests: XCTestCase {
     private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
 
@@ -740,8 +736,7 @@ final class BallToyRestingOrientationTests: XCTestCase {
     }
 }
 
-/// Bouncing a toy off whatever it just landed on (byeolki: "머리 위에 두면
-/// 통통 튕겨서 내려가게", 2026-07-30).
+/// Bouncing a toy off whatever it just landed on.
 final class BallToyBounceTests: XCTestCase {
     private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
 

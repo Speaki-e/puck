@@ -116,7 +116,6 @@ final class MovementSolverTests: XCTestCase {
         )
     }
 
-    /// byeolki: "진짜 공 던지는것 처럼 쭉 일정하게 떨어지게" (2026-07-29).
     /// A fall settles at a steady speed the way a real falling object does
     /// under air resistance, instead of accelerating right up to the moment
     /// it hits -- which read as the pet being yanked onto the floor.
@@ -154,8 +153,7 @@ final class MovementSolverTests: XCTestCase {
         XCTAssertLessThan(velocity * CGFloat(dt), 25, "and a readable distance per frame")
     }
 
-    /// byeolki: "이새끼 창위에 있다가 떨어지는 속도가 너무 느림. 내가 잡아서
-    /// 위에서 놓아서 떨어지는 속도랑 너무 다름" -- a short fall (off a window)
+    /// A short fall (off a window)
     /// must pick up real speed within a much shorter distance than a drop down
     /// the whole screen, or it never gets past "floaty" before it lands. Uses
     /// the DEFAULT gravity (no override) so this pins the live tuning, not
@@ -204,8 +202,8 @@ final class MovementSolverTests: XCTestCase {
         XCTAssertEqual(step.velocity, 0)
     }
 
-    // MARK: - Bouncing on landing, opt-in via bounceOnLanding: true (byeolki:
-    // "퉁퉁 튕겨서 사악 미끄러지게" -- a hard landing, e.g. after being
+    // MARK: - Bouncing on landing, opt-in via bounceOnLanding: true (a hard
+    // landing, e.g. after being
     // thrown and bouncing off a wall, should bounce a couple of times before
     // it settles, not stop dead on contact). Only FallState (the pet itself)
     // opts in; BallPhysics does not, see the default-behavior test above.
@@ -282,7 +280,7 @@ final class MovementSolverTests: XCTestCase {
         XCTAssertFalse(step.hasLanded)
     }
 
-    // MARK: - Ground friction (byeolki: "퉁퉁 튕겨서 사악 미끄러지게" -- once
+    // MARK: - Ground friction (once
     // it has touched down, horizontal speed should decay to a slide-to-a-stop
     // rather than staying constant or dropping to zero instantly)
 

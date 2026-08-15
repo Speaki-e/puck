@@ -3,8 +3,8 @@
 //  Puck
 //
 //  F3/F4 test · owner: 박해영 (Haeyoung Park)
-//  Choosing a window to go and climb (byeolki: "너무 바닥에 붙어있는데 어느정도
-//  위로 기어 올라가도 됨", 2026-07-29).
+//  Choosing a window to go and climb, so the pet climbs windows now and then
+//  instead of staying glued to the floor.
 //
 //  The target has to be one WalkState's own blockingWindow check will then
 //  pick up, so these assert the handoff conditions rather than just "some

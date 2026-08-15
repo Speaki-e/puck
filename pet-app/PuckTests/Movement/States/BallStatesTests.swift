@@ -61,7 +61,7 @@ final class ChaseBallStateTests: XCTestCase {
         XCTAssertEqual(world.requestedTransitions.count, 1)
     }
 
-    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    /// Settings' movement-speed slider.
     func test_respectsACustomWalkSpeed() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 100))
         world.walkSpeed = MovementSolver.walkSpeed * 2
@@ -76,8 +76,7 @@ final class ChaseBallStateTests: XCTestCase {
 }
 
 /// Playing with the toy overhead: catch, throw, repeat -- then get bored and
-/// throw it away (byeolki: "다시 잡아서 던진다는 개념으로 / 일정 시간동안
-/// 던진 뒤엔 대충 던지고 나서 할거 하게", 2026-07-29).
+/// throw it away after a while.
 final class JuggleBallStateTests: XCTestCase {
     /// Runs one full catch-and-throw round, returning the throws it caused.
     private func playRound(_ state: JuggleBallState, in world: TestStateWorld) {
@@ -225,7 +224,7 @@ final class KickBallStateTests: XCTestCase {
 }
 
 /// A spin-style toy is played with differently but for the same length of
-/// time (byeolki: "지팡이는 펫 머리 위에서 회전되게", 2026-07-29).
+/// time.
 final class JuggleBallSpinStyleTests: XCTestCase {
     private func spinning() -> JuggleBallState {
         let state = JuggleBallState()

@@ -92,7 +92,7 @@ final class LandingSurfaceResolverTests: XCTestCase {
     /// same rule WalkState.blockingWindow already applies when *climbing*
     /// into one, but this is the choke point for every OTHER way the pet
     /// ends up somewhere (a drop, falling off the ceiling, anything routed
-    /// through Fall) -- byeolki: "그런 창들은 위에 못 올라가게 해줘".
+    /// through Fall).
     func test_windowTooTallToStandOnWithoutClipping_isNotACandidate() {
         let win = window(CGRect(x: 0, y: 50, width: 800, height: 1000)) // top edge only 50px below the screen top
 

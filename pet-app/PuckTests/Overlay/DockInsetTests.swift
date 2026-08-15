@@ -7,7 +7,7 @@
 //  bottom of the physical screen, which is exactly where the Dock sits --
 //  since the Dock's window level is higher than our overlay's, the pet's
 //  lower half rendered *underneath* the Dock instead of standing in front of
-//  it (byeolki's report: "박혀있음", looks buried/stuck into it). This computes
+//  it -- it looked buried/stuck into the Dock. This computes
 //  how much to leave clear at the bottom, from NSScreen's own
 //  frame/visibleFrame difference, without touching GlobalScreenSpace's
 //  screen-space model (which several other subsystems depend on the

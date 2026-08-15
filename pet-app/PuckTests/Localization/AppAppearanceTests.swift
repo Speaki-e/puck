@@ -3,7 +3,7 @@
 //  Puck
 //
 //  Shared test · owner: 박해영 (Haeyoung Park)
-//  byeolki: "화이트모드 다크모드 추가하고" -- an explicit in-app appearance
+//  An explicit in-app appearance
 //  override (Settings' General tab) rather than only ever following the
 //  system appearance.
 //
@@ -25,8 +25,7 @@ final class AppAppearanceTests: XCTestCase {
         XCTAssertEqual(AppAppearance.dark.colorScheme, .dark)
     }
 
-    // byeolki, 2026-08-01: "테마가 내가 아마 다크모드일텐데, 시스템모드랑
-    // 다크모드랑 생긴게 다른데?" -- ClientWindowStore.appearance (PuckClient,
+    // ClientWindowStore.appearance (PuckClient,
     // a separate process from Puck's own SettingsStore) never actually
     // received the Settings picker's value, so it stayed permanently at
     // .system regardless of what was picked. defaultsKey/resolved(...) let

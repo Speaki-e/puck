@@ -42,8 +42,8 @@ final class IdleStateTests: XCTestCase {
     /// edge (LandingSurfaceResolver treats window tops as valid landing
     /// surfaces) -- if that window closes or minimizes while the pet is
     /// idling there, nothing previously checked for it (only WalkOnTopState
-    /// did). byeolki: "창에 올려두고 화면에서 창이 없어지면 자동으로
-    /// 떨어지게 해줘".
+    /// did) -- the pet should fall automatically once the window it's resting
+    /// on disappears.
     func test_theSupportingSurfaceDisappearing_requestsFall() {
         let world = TestStateWorld(position: CGPoint(x: 400, y: 200))
         world.landingY = 200 // resting exactly on a window's top edge

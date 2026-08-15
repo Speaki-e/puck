@@ -110,7 +110,7 @@ final class WalkStateTests: XCTestCase {
         XCTAssertEqual(world.requestedTransitions.first, .idle)
     }
 
-    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    /// Settings' movement-speed slider.
     func test_respectsACustomWalkSpeed() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 100))
         world.walkSpeed = MovementSolver.walkSpeed * 2

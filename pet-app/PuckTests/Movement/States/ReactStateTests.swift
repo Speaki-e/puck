@@ -75,8 +75,8 @@ final class ReactDragStateTests: XCTestCase {
     }
 
     /// Dragging a window keeps the grabbed point under the cursor; grabbing
-    /// the pet must not re-center it on the cursor either (byeolki: "구글 창
-    /// 같은걸 드래그 할때처럼").
+    /// the pet must not re-center it on the cursor either, the same way
+    /// dragging any ordinary window works.
     func test_grabbingDoesNotMoveThePet() {
         let world = TestStateWorld(position: CGPoint(x: 500, y: 400))
         let state = ReactDragState()
@@ -102,8 +102,7 @@ final class ReactDragStateTests: XCTestCase {
         XCTAssertEqual(world.body.position.y, 450, accuracy: 0.5)
     }
 
-    /// The pet is carried, not moving under its own power (byeolki: "이동한다는
-    /// 개념이 아니라 잡고 끌려간다는 개념"), so it has no speed of its own to
+    /// The pet is carried, not moving under its own power, so it has no speed of its own to
     /// lag behind at: it is wherever the cursor is on the very next frame,
     /// however far the cursor jumped.
     func test_tracksTheCursorWithinASingleFrame_howeverFarItMoved() {
@@ -155,7 +154,7 @@ final class ReactDragStateTests: XCTestCase {
         XCTAssertEqual(world.body.position, droppedPosition)
     }
 
-    // MARK: - Throwing (byeolki: "드래그해서 던지면 던져지게", 2026-07-29)
+    // MARK: - Throwing
 
     /// Drags the cursor at a steady `speed` px/sec to the right for `seconds`.
     private func swipe(_ state: ReactDragState, speed: CGFloat, seconds: TimeInterval, in world: TestStateWorld) {
@@ -245,7 +244,7 @@ final class ReactDragStateTests: XCTestCase {
 }
 
 /// Stroking the pet's head holds the reaction open, then hands off to the
-/// twirl (byeolki: "쓰담쓰담 끝나면 일정 시간동안 빙글 빙글 돌기", 2026-07-29).
+/// twirl for a while.
 final class PettingStrokeTests: XCTestCase {
     func test_strokingHoldsTheReactionOpenIndefinitely() {
         let world = TestStateWorld()
@@ -322,8 +321,7 @@ final class SpinStateTests: XCTestCase {
     }
 }
 
-/// The flip itself. Turning about the vertical axis, not in the image plane
-/// (byeolki: "회전이 아니라 뒤집는거를 원함").
+/// The flip itself. Turning about the vertical axis, not in the image plane.
 final class SpinBouncePresetTests: XCTestCase {
     private let preset = BouncePreset.spin
 
@@ -400,8 +398,7 @@ final class SpinBouncePresetTests: XCTestCase {
     }
 }
 
-/// The rainbow wash over the flips (byeolki: "뒤집힐 때 색갈을 무지개 차례대로
-/// 뒤집히게", 2026-07-29).
+/// The rainbow wash over the flips, one hue in order per flip.
 final class SpinRainbowTests: XCTestCase {
     private let preset = BouncePreset.spin
 

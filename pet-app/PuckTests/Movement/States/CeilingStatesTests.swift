@@ -8,9 +8,8 @@
 //  along it, bouncing off the horizontal bounds instead of falling off.
 //
 //  ClimbToCeiling requires an actual window edge to climb, the same way
-//  ClimbState does -- byeolki: "이거 화면에 있는 벽? 통해서만 올라갈 수
-//  있게 해줘 그냥 아무 지형에서 올라가버리냐" (it was climbing from
-//  anywhere, not just via a real wall on screen).
+//  ClimbState does -- climbing must only happen via a real on-screen wall,
+//  not from arbitrary terrain (it used to climb from anywhere).
 //
 
 import XCTest
@@ -81,7 +80,7 @@ final class ClimbToCeilingStateTests: XCTestCase {
         XCTAssertEqual(world.requestedTransitions.count, 1)
     }
 
-    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    /// Settings' movement-speed slider.
     func test_respectsACustomWalkSpeed() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 400))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
@@ -174,7 +173,7 @@ final class CeilingStateTests: XCTestCase {
         XCTAssertEqual(world.requestedTransitions.count, 1)
     }
 
-    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    /// Settings' movement-speed slider.
     func test_respectsACustomWalkSpeed() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
         world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)

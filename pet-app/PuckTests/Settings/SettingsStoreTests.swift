@@ -60,7 +60,6 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(SettingsStore(defaults: defaults).isMuteComplaintEnabled)
     }
 
-    // byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고"
     func test_selectedAvatarName_defaultsToDummy() {
         XCTAssertEqual(SettingsStore(defaults: defaults).selectedAvatarName, "dummy")
     }
@@ -133,7 +132,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(received, true)
     }
 
-    // byeolki: "화이트모드 다크모드 추가하고" -- an explicit in-app appearance setting.
+    // An explicit in-app appearance setting.
     func test_appearance_defaultsToSystem() {
         XCTAssertEqual(SettingsStore(defaults: defaults).appearance, .system)
     }
@@ -154,9 +153,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(received, .light)
     }
 
-    // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
-    // 셰이디 설정으로 변경할 수 있어야하거든" -- the client window's theme
-    // moved here from being a ClientWindow-local setting.
+    // The client window's theme
+    // moved here from being a ClientWindow-local setting, so it stays in
+    // sync with the menu bar settings.
     func test_clientThemeStyle_defaultsToDark() {
         XCTAssertEqual(SettingsStore(defaults: defaults).clientThemeStyle, .dark)
     }

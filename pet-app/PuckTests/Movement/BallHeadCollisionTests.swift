@@ -3,8 +3,7 @@
 //  Puck
 //
 //  F12 test · owner: 박해영 (Haeyoung Park)
-//  byeolki: "축구공을 소환하면 캐릭터 머리로 떨어져서 통 튀어서 없어지게
-//  해줘" -- a ball falling near the character should hit its head instead of
+//  A ball falling near the character should hit its head instead of
 //  passing straight through to the floor.
 //
 
@@ -41,7 +40,7 @@ final class BallHeadCollisionTests: XCTestCase {
 }
 
 /// A toy with real width bonks the head when it *overlaps* it, not only when
-/// its middle is over it (byeolki, 2026-07-29: the pumpkin is ~40pt wide).
+/// its middle is over it (the pumpkin is ~40pt wide).
 final class BallHeadCollisionWidthTests: XCTestCase {
     private let pet = CGPoint(x: 500, y: 400)
     private let avatar = CGSize(width: 130, height: 133)

@@ -125,6 +125,66 @@ final class WorkspaceCoordinatorTests: XCTestCase {
         XCTAssertNotEqual(firstId, secondId)
     }
 
+    // MARK: - Replay on connect
+
+    func testEveryPersistedWorkspaceIsReplayedToANewClient() throws {
+        let project = try makeProject()
+        let coordinator = makeCoordinator()
+        _ = coordinator.handle(.workspaceCreateRequest(name: "puck", projectPath: project.path))
+
+        let replay = coordinator.replayForNewClient()
+
+        // The default workspace plus the created one. Without this, a restart
+        // left the sidebar holding only the default, and a project-backed
+        // workspace -- the only kind the editor pane can open -- was on disk
+        // but unreachable.
+        XCTAssertEqual(replay.count, 2)
+        let names: [String] = replay.compactMap {
+            guard case .workspaceCreate(_, let name, _) = $0 else { return nil }
+            return name
+        }
+        XCTAssertEqual(names, ["기본 워크스페이스", "puck"])
+    }
+
+    func testTheReplayCarriesTheProjectPathTheEditorNeeds() throws {
+        let project = try makeProject()
+        let coordinator = makeCoordinator()
+        _ = coordinator.handle(.workspaceCreateRequest(name: "puck", projectPath: project.path))
+
+        let replayed = coordinator.replayForNewClient().first {
+            guard case .workspaceCreate(_, let name, _) = $0 else { return false }
+            return name == "puck"
+        }
+
+        guard case .workspaceCreate(_, _, let projectPath) = replayed else {
+            return XCTFail("the created workspace was not replayed")
+        }
+        XCTAssertEqual(
+            EditorAvailability.resolve(projectPath: projectPath),
+            .ready(rootURL: URL(fileURLWithPath: project.resolvingSymlinksInPath().path, isDirectory: true))
+        )
+    }
+
+    func testAReplayIsIdempotentInTheClientStore() throws {
+        let project = try makeProject()
+        let coordinator = makeCoordinator()
+        _ = coordinator.handle(.workspaceCreateRequest(name: "puck", projectPath: project.path))
+        let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
+
+        // Twice, as a reconnect would deliver it.
+        for _ in 0..<2 {
+            for message in coordinator.replayForNewClient() { store.handleClientUpdate(message) }
+        }
+
+        let ids = store.workspaces.map(\.id)
+        XCTAssertEqual(ids.count, Set(ids).count, "a reconnect must not duplicate sidebar rows")
+        XCTAssertEqual(store.workspaces.filter { $0.name == "puck" }.count, 1)
+        XCTAssertEqual(
+            store.workspaces.filter { $0.id == WorkspaceRegistry.defaultWorkspaceID }.count, 1,
+            "the store seeds its own default; the replay carries one too"
+        )
+    }
+
     // MARK: - Relay
 
     func testCreateRequestsNoLongerLeaveForWorkspace() {

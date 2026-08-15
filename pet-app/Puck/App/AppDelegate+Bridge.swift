@@ -49,7 +49,14 @@ extension AppDelegate {
             // Fires on BridgeServer's own queue, and send() takes that queue
             // synchronously -- hop off it before sending, or it deadlocks.
             DispatchQueue.main.async {
-                guard let self, let pending = self.pendingClientMirror else { return }
+                guard let self else { return }
+                // Rebuild the client's sidebar from the registry before
+                // anything else: a mirrored message addressed to a workspace
+                // PuckClient does not know about yet would be dropped.
+                for workspace in router.workspaceCoordinator?.replayForNewClient() ?? [] {
+                    _ = self.bridgeServer?.send(workspace, to: .gui)
+                }
+                guard let pending = self.pendingClientMirror else { return }
                 self.pendingClientMirror = nil
                 self.bridgeServer?.send(pending, to: .gui)
             }

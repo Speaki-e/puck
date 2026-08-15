@@ -5,10 +5,16 @@
 //  F13 · owner: 박해영 (Haeyoung Park)
 //  The "Claude Desktop"-style client window (plan/02_pet-app.md F13).
 //
-//  Chat rebuild (2026-08-13, docs/decisions.md): sidebar, top bar, and
-//  transcript all moved into ClientChatWebView (React/Tailwind/shadcn) --
-//  this view is now just that web view, plus the native EditorPaneView pane
-//  when the (web-driven) editor toggle is on.
+//  Chat rebuild (2026-08-13): sidebar, top bar and transcript moved into
+//  ClientChatWebView (React/Tailwind/shadcn). Undone 2026-08-15: they are
+//  ChatPaneView now, native, and the web bundle is gone. The reason web was
+//  chosen -- iterating fast toward a bespoke shadcn look -- stopped applying
+//  when the target became stock Apple components. See
+//  docs/superpowers/specs/2026-08-15-native-chat-design.md.
+//
+//  The editor toggle is this view's own state again rather than something the
+//  web view drove through a bridge handler, which is also what let it grow a
+//  keyboard shortcut (⇧⌘E).
 //
 //  Native editor pane (F13 continued): EditorPaneView reads files itself via
 //  WorkspaceFileService instead of loading a URL workspace serves, so this
@@ -21,7 +27,6 @@ import SwiftUI
 
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
-    let chatBridge: ClientChatBridge
     @State private var isEditorOpen = false
 
     private var activeWorkspace: ClientWorkspace? {
@@ -33,8 +38,8 @@ struct ClientWindowView: View {
             Group {
                 if isEditorOpen, let availability = activeWorkspace?.editorAvailability {
                     HSplitView {
-                        ClientChatWebView(bridge: chatBridge)
-                            .frame(minWidth: 320, idealWidth: 420)
+                        ChatPaneView(store: store, isEditorOpen: $isEditorOpen)
+                            .frame(minWidth: 480, idealWidth: 620)
                         EditorPaneView(
                             workspaceId: store.activeWorkspaceId,
                             availability: availability,
@@ -43,7 +48,7 @@ struct ClientWindowView: View {
                         .frame(minWidth: 360)
                     }
                 } else {
-                    ClientChatWebView(bridge: chatBridge)
+                    ChatPaneView(store: store, isEditorOpen: $isEditorOpen)
                 }
             }
             ClientStatusBarView(
@@ -54,8 +59,11 @@ struct ClientWindowView: View {
         }
         .frame(minWidth: ClientTheme.Metrics.windowMinWidth, minHeight: ClientTheme.Metrics.windowMinHeight)
         .environment(\.clientPalette, store.themeStyle.palette)
-        .onAppear {
-            chatBridge.setEditorOpenChangeHandler { isOpen in isEditorOpen = isOpen }
+        // Closing the editor when the active workspace can't show one: the
+        // toggle is sticky across workspace switches, and a pane left open on
+        // a chat-only workspace would render its empty state for no reason.
+        .onChange(of: store.activeWorkspaceId) {
+            if activeWorkspace?.canOpenEditor != true { isEditorOpen = false }
         }
     }
 }

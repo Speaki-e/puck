@@ -22,7 +22,12 @@ struct ChatPaneView: View {
     var body: some View {
         NavigationSplitView {
             ChatSidebarView(store: store)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240)
+                // Allowed to compress to 180: at the 960pt window minimum the
+                // three panes (sidebar, chat, editor) are already tight, and a
+                // sidebar that refuses to give any width back is what squeezed
+                // the composer's placeholder onto two lines. A capped maximum
+                // stops it eating the chat when the window is wide instead.
+                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
         } detail: {
             detail
         }

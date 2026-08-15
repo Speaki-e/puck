@@ -29,6 +29,13 @@ struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
     @State private var isEditorOpen = false
 
+    /// The window cannot go narrower than what it is currently showing. Two
+    /// panes need more room than one, so the floor moves with the toggle
+    /// rather than being a single compromise that is wrong for both.
+    private var minimumWindowWidth: CGFloat {
+        isEditorOpen ? ClientTheme.Metrics.windowMinWidthWithEditor : ClientTheme.Metrics.windowMinWidth
+    }
+
     private var activeWorkspace: ClientWorkspace? {
         store.workspaces.first { $0.id == store.activeWorkspaceId }
     }
@@ -38,14 +45,19 @@ struct ClientWindowView: View {
             Group {
                 if isEditorOpen, let availability = activeWorkspace?.editorAvailability {
                     HSplitView {
+                        // Each is the real minimum of what it contains, and
+                        // windowMinWidthWithEditor is their sum -- rather than
+                        // the other way round, which is how the editor came to
+                        // declare 360 while needing 540 and got its file tree
+                        // clipped at the smallest window.
                         ChatPaneView(store: store, isEditorOpen: $isEditorOpen)
-                            .frame(minWidth: 480, idealWidth: 620)
+                            .frame(minWidth: 560, idealWidth: 620)
                         EditorPaneView(
                             workspaceId: store.activeWorkspaceId,
                             availability: availability,
                             onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
                         )
-                        .frame(minWidth: 360)
+                        .frame(minWidth: 540)
                     }
                 } else {
                     ChatPaneView(store: store, isEditorOpen: $isEditorOpen)
@@ -57,7 +69,11 @@ struct ClientWindowView: View {
                 palette: store.themeStyle.palette
             )
         }
-        .frame(minWidth: ClientTheme.Metrics.windowMinWidth, minHeight: ClientTheme.Metrics.windowMinHeight)
+        // No .frame(minWidth:) here: sizingOptions = [] on the hosting
+        // controller means SwiftUI's minimum never becomes a real resize
+        // limit anyway (see PuckClient's AppDelegate), and stating it twice
+        // is how the two drifted apart before. The window owns its floor.
+        .background(WindowMinimumSize(width: minimumWindowWidth, height: ClientTheme.Metrics.windowMinHeight))
         .environment(\.clientPalette, store.themeStyle.palette)
         // Closing the editor when the active workspace can't show one: the
         // toggle is sticky across workspace switches, and a pane left open on

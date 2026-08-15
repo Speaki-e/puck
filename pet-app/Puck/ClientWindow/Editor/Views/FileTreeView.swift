@@ -68,6 +68,13 @@ struct FileTreeView: View {
             Text(entry.name)
                 .font(ClientTheme.Typography.caption)
                 .lineLimit(1)
+                // lineLimit alone still lets a long name push the row wider
+                // than the column and get clipped at the edge. Truncating at
+                // the middle keeps both the start of the name and its
+                // extension, which is what identifies a file.
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .help(entry.name)
         } icon: {
             FileIconView(entry: entry)
         }

@@ -29,16 +29,26 @@ struct EditorPaneView: View {
         case .noProject, .unavailable:
             EditorEmptyStateView(availability: availability)
         case .ready(let rootURL):
-            if let store {
+            if let store, store.workspaceId == workspaceId {
                 EditorPaneContentView(store: store)
+                    // Re-attach on a workspace switch. SwiftUI reuses this view
+                    // when only its properties change, so onAppear does not
+                    // fire again -- without this the pane kept showing the
+                    // first project it was ever opened on while the sidebar,
+                    // the status bar and the chat had all moved on.
+                    .onChange(of: workspaceId) { attachStore(root: rootURL) }
             } else {
                 Color.clear.onAppear { attachStore(root: rootURL) }
             }
         }
     }
 
+    /// Idempotent for the workspace already attached; swaps the store
+    /// otherwise. The pool keeps one store per workspace alive for the
+    /// process's life, so switching back and forth costs nothing and keeps
+    /// each workspace's open tabs.
     private func attachStore(root: URL) {
-        guard store == nil else { return }
+        guard store?.workspaceId != workspaceId else { return }
         do {
             store = try EditorPaneStorePool.shared.store(forWorkspace: workspaceId, root: root, onRootChanged: onUnavailable)
         } catch {

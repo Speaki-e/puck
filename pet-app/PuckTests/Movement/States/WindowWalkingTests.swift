@@ -44,9 +44,7 @@ final class WalkStateWindowTests: XCTestCase {
     /// A window tall enough to leave no headroom above it (near-fullscreen)
     /// is skipped rather than climbed -- climbing it would clip the
     /// character's head off the top of the screen, the same geometry
-    /// problem ceiling-crawling had (byeolki: "화면이 다 차있는 창은 그
-    /// 위로 올라가면 캐릭터가 짤려버리니까 그런 창 위에는 안 올라갔으면
-    /// 좋겠어").
+    /// problem ceiling-crawling had.
     func test_windowTooTallToClimbWithoutClipping_isNotTreatedAsBlocking() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 500))
         world.avatarHeight = 140
@@ -99,7 +97,7 @@ final class ClimbStateTests: XCTestCase {
         XCTAssertTrue(world.avatar.facings.isEmpty)
     }
 
-    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    /// Settings' movement-speed slider.
     func test_respectsACustomWalkSpeed() {
         let world = TestStateWorld(position: CGPoint(x: 300, y: 500))
         world.walkSpeed = MovementSolver.walkSpeed * 2
@@ -171,7 +169,7 @@ final class WalkOnTopStateTests: XCTestCase {
         XCTAssertGreaterThan(world.body.position.x, 305, "should be walking right, into the window")
     }
 
-    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    /// Settings' movement-speed slider.
     func test_respectsACustomWalkSpeed() {
         let world = TestStateWorld(position: CGPoint(x: 305, y: 200))
         world.walkSpeed = MovementSolver.walkSpeed * 2

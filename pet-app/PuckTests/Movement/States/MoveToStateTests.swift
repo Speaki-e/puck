@@ -68,7 +68,7 @@ final class MoveToStateTests: XCTestCase {
         XCTAssertEqual(world.body.position.x, 900, accuracy: MovementSolver.arrivalRadius)
     }
 
-    /// Settings' movement-speed slider (byeolki's request, 2026-07-29).
+    /// Settings' movement-speed slider.
     func test_respectsACustomWalkSpeed() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 100))
         world.walkSpeed = MovementSolver.walkSpeed * 2

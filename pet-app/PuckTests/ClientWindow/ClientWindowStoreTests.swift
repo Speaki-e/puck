@@ -83,7 +83,7 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.activeSessionId, "default", "a user-requested new chat doesn't steal focus from what they were doing")
     }
 
-    /// byeolki's design: the agent branching a casual chat into a task
+    /// The agent branching a casual chat into a task
     /// session should immediately bring the user along.
     func test_sessionCreate_agentOrigin_switchesActiveWorkspaceAndSession() {
         let (store, _) = makeStore()
@@ -130,7 +130,7 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.workspaces.first { $0.id == "w2" }?.canOpenEditor, false)
     }
 
-    /// byeolki, 2026-08-12: "프롬프트 쓴 세션은 닫고 새로 넘어가야지" -- a move,
+    /// A move,
     /// not a branch, so the chat the prompt was written in must not be left
     /// behind holding it.
     func test_moveTurnToTaskSession_closesTheChatItCameFromAndBringsTheMessage() {
@@ -226,7 +226,7 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(transport.broadcasted, [.userInput(UserInput(text: "go on", source: .text, workspaceId: "w2", sessionId: "s9"))])
     }
 
-    /// byeolki (2026-07-30): text typed into pet-app's quick-capture bubble
+    /// Text typed into pet-app's quick-capture bubble
     /// has to show up here. It arrives as a user_input with no workspace/
     /// session (the bubble knows nothing about either), which means the
     /// default workspace's casual session.
@@ -260,8 +260,7 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertFalse(store.showUserMessage("hi", workspaceId: "nope", sessionId: "nope"))
     }
 
-    // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
-    // 셰이디 설정으로 변경할 수 있어야하거든" -- themeStyle moved to being a
+    // themeStyle moved to being a
     // Puck Settings item (see SettingsStoreTests' clientThemeStyle cases),
     // externally set here by PuckClient's AppDelegate rather than persisted
     // by this store, so there's nothing left to round-trip or fire a

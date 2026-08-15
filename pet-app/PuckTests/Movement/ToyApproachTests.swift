@@ -3,8 +3,7 @@
 //  Puck
 //
 //  F12 test · owner: 박해영 (Haeyoung Park)
-//  Where the pet stands to play with the toy (byeolki: "펫이 호박을 밟지
-//  못하게", 2026-07-29).
+//  Where the pet stands to play with the toy, so it doesn't stand on top of it.
 //
 
 import XCTest

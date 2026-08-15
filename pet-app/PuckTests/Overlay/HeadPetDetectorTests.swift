@@ -4,8 +4,7 @@
 //
 //  F1 test · owner: 강상우 (Sangwoo Kang)
 //  Recognising a stroke over the pet's head, and — just as importantly — not
-//  recognising anything else (byeolki: "마우스 포인터로 펫 머리 위를 쓰담 쓰담",
-//  2026-07-29). Petting fires on plain cursor movement with no click to
+//  recognising anything else. Petting fires on plain cursor movement with no click to
 //  confirm intent, so the false-positive cases below matter more than the
 //  happy path.
 //

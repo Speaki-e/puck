@@ -3,8 +3,7 @@
 //  Puck
 //
 //  Avatar test · owner: 박해영 (Haeyoung Park)
-//  byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고"
-//  -- a preset picker needs to know what's actually installed. Multiple
+//  A preset picker needs to know what's actually installed. Multiple
 //  differently-named avatar folders already coexist fine on disk
 //  (AvatarInstaller only ever touches its own destination name), so this is
 //  purely an enumeration, not a storage change.

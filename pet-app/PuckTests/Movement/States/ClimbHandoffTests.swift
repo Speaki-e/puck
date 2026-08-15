@@ -3,8 +3,9 @@
 //  Puck
 //
 //  F3/F4 test · owner: 박해영 (Haeyoung Park)
-//  The Climb -> WalkOnTop handoff, end to end through the real states
-//  (byeolki, 2026-07-31: "창 위로 올라갔는데 바로 떨어지는데?").
+//  The Climb -> WalkOnTop handoff, end to end through the real states --
+//  a regression where the pet climbed onto a window and immediately fell
+//  back off.
 //
 //  WindowWalkingTests covers each edge of the transition table on its own.
 //  What it never covered is the seam: the position Climb actually leaves the

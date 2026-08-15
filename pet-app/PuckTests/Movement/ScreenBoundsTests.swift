@@ -4,9 +4,7 @@
 //
 //  F3 test · owner: 박해영 (Haeyoung Park)
 //  Keeping the pet on screen and bouncing it off the edges, measured by the
-//  artwork's own outline (byeolki: "이거 화면 밖으로 나가지 못하게 해야함 / 이
-//  펫 에셋의 태두리를 사각형으로 정확히 잡고 그 태두리 기반으로 화면경계에서
-//  튕기게", 2026-07-29).
+//  artwork's own outline rather than the layer's bounding box.
 //
 
 import XCTest
@@ -135,7 +133,7 @@ final class ScreenBoundsTests: XCTestCase {
 
     // MARK: - Ceiling
 
-    /// byeolki: "위쪽 화면도" — thrown up hard, the pet must come off the top
+    /// Thrown up hard, the pet must come off the top
     /// of the screen instead of leaving it.
     func test_ceiling_bouncesTheHeadOffTheTop() {
         // The outline reaches 120pt above the position, so the head meets
@@ -201,7 +199,7 @@ final class ScreenBoundsTests: XCTestCase {
         XCTAssertEqual(bounce.position.y, 120)
     }
 
-    // MARK: - bounceOffFloor (byeolki: "퉁퉁 튕겨서 사악 미끄러지게" -- a hard
+    // MARK: - bounceOffFloor (a hard
     // landing should bounce a couple of times and slide, not stop dead the
     // instant it touches down)
 

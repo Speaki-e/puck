@@ -67,9 +67,8 @@ final class SpriteAvatarTests: XCTestCase {
     /// A CALayer that isn't a view's backing layer animates position/transform
     /// implicitly, 0.25s per assignment. The FSM assigns 60 times a second, so
     /// what renders is a value perpetually easing toward a target that already
-    /// moved -- the sprite trails the pet and slides past where it stopped
-    /// (byeolki: "전체적으로 펫이 움직이는 방식이 너무 비정상적이고 부드럽지
-    /// 못해"). Every per-frame property has to opt out, or the frame loop's
+    /// moved -- the sprite trails the pet and slides past where it stopped,
+    /// reading as janky rather than smooth. Every per-frame property has to opt out, or the frame loop's
     /// output gets smoothed behind its back.
     func test_spriteLayer_hasImplicitAnimationsDisabled() throws {
         try writePNG(named: "idle", color: .red)
@@ -180,7 +179,7 @@ final class SpriteAvatarTests: XCTestCase {
     /// USDZAvatar's root-at-feet rig convention) -- CALayer's own `position`
     /// is its *center* by default, so SpriteAvatar has to convert, or the
     /// pet floats half its height above wherever the FSM thinks it's
-    /// standing (this is the bug byeolki reported: the pet hanging in empty
+    /// standing (this was an observed bug: the pet hanging in empty
     /// space instead of standing on the Dock).
     func test_setScreenPosition_treatsInputAsGroundPoint_notLayerCenter() throws {
         try writePNG(named: "idle", color: .red)
@@ -296,7 +295,7 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(avatar.spriteLayer.affineTransform().a, 1, accuracy: 0.0001)
     }
 
-    // MARK: - Turning (byeolki: "종이 뒤집어지는 모션")
+    // MARK: - Turning (the paper-flip motion)
 
     /// The turn has to be recomputed from elapsed time on every frame, not
     /// handed to Core Animation: applyTransform rewrites the layer transform
@@ -368,7 +367,7 @@ final class SpriteAvatarTests: XCTestCase {
 
     // MARK: - Climbing rotation (F3 wall-climbing, 2026-07-29)
 
-    /// byeolki: "벽 타는 것도 사진 돌려서 올라가게 해주고" -- climbing (both
+    /// Climbing (both
     /// ClimbState and ClimbToCeilingState share the "climb" clip) rotates
     /// the sprite 90 degrees, the same way isUpsideDown flips it for the
     /// ceiling. Derived from the clip name already passed into updateBounce

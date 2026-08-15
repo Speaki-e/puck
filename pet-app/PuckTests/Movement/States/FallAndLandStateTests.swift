@@ -87,7 +87,7 @@ final class FallStateTests: XCTestCase {
         XCTAssertEqual(fastFall, freshFall, accuracy: 1, "a re-entered fall starts from rest")
     }
 
-    // MARK: - Being thrown (byeolki: "드래그해서 던지면 던져지게", 2026-07-29)
+    // MARK: - Being thrown
 
     func test_launchVelocityCarriesThePetSideways() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
@@ -121,7 +121,7 @@ final class FallStateTests: XCTestCase {
         XCTAssertGreaterThan(second.y - first.y, first.y, "but a greater drop each interval")
     }
 
-    /// byeolki: "화면경계에서 튕기게" — a throw at a wall comes back off it
+    /// A throw at a wall comes back off it
     /// rather than stopping dead against it, and never leaves the screen.
     func test_aThrowBouncesOffTheEdgeOfTheRoamableArea() {
         let world = TestStateWorld(position: CGPoint(x: 900, y: 0))
@@ -139,7 +139,7 @@ final class FallStateTests: XCTestCase {
         XCTAssertLessThan(world.body.position.x, afterBounce, "and keeps travelling the other way")
     }
 
-    /// byeolki: "위쪽 화면도" — an upward throw comes off the top of the
+    /// An upward throw comes off the top of the
     /// screen and falls back, rather than disappearing above it.
     func test_anUpwardThrowBouncesOffTheTopOfTheScreen() {
         let world = TestStateWorld(position: CGPoint(x: 500, y: 300))
@@ -202,9 +202,8 @@ final class FallStateTests: XCTestCase {
         XCTAssertEqual(world.body.position.x, 100, "the next fall is straight down")
     }
 
-    // MARK: - Bouncing + sliding on landing (byeolki: "이거 던져서 뭐 벽에
-    // 튕겨서 떨어지면 지면에 닿자마자 멈춰버리는데. 퉁퉁 튕겨서 사악
-    // 미끄러지게" -- a hard throw landing should bounce a couple of times
+    // MARK: - Bouncing + sliding on landing (a hard throw landing should
+    // bounce a couple of times
     // and slide, not stop dead the instant it touches the ground)
 
     func test_aHardThrow_bouncesOnLandingInsteadOfStoppingDead() {

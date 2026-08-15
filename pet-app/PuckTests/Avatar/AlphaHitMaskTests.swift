@@ -3,8 +3,7 @@
 //  Puck
 //
 //  F1 test · owner: 강상우 (Sangwoo Kang)
-//  Hit testing against what is actually drawn, not the box around it
-//  (byeolki: "내가 보이는 부분만을 누를 수 있게", 2026-07-30).
+//  Hit testing against what is actually drawn, not the box around it.
 //
 
 import XCTest

@@ -3,7 +3,7 @@
 //  Puck
 //
 //  F13 test · owner: 박해영 (Haeyoung Park)
-//  byeolki: "client 커맨드 q처럼 기본적인 커맨드 다 먹히게" -- PuckClient
+//  PuckClient
 //  shipped with no main menu at all, which on AppKit means no key
 //  equivalents either. These pin the shortcuts that were missing.
 //
@@ -36,8 +36,7 @@ final class ClientMainMenuTests: XCTestCase {
         }
     }
 
-    // byeolki, 2026-08-02: "기존 셰이디앱에 있던 에이전트 관련 설정은 전부
-    // 셰이디에이전트 설정으로 옮기고" -- the item this shortcut fires.
+    // The item this shortcut fires.
     func test_make_settingsItem_targetsTheResponderChain() {
         let settings = ClientMainMenu.make().items
             .compactMap(\.submenu)

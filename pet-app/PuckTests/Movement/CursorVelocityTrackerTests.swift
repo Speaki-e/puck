@@ -4,7 +4,8 @@
 //
 //  F3 test · owner: 박해영 (Haeyoung Park)
 //  The shared "how hard was that flick" measurement behind both the pet's
-//  throw and the toy's (byeolki: "호박도 펫처럼 잡아 던질 수 있게").
+//  throw and the toy's, since the toy can be grabbed and thrown the same
+//  way the pet can.
 //
 
 import XCTest

@@ -68,7 +68,7 @@ final class BallPhysicsTests: XCTestCase {
 
     // MARK: - juggle(_:) (F12 juggle-before-kick variety, 2026-07-29)
 
-    /// byeolki's request for more diverse motions/interactions -- a small
+    /// A small
     /// vertical pop that falls back down and rests again, reusing the exact
     /// same .falling->.resting arc a drop already takes (an upward initial
     /// velocity decelerates under gravity, peaks, then falls back down).
@@ -171,7 +171,7 @@ final class BallPhysicsTests: XCTestCase {
         XCTAssertEqual(state.phase, .resting)
     }
 
-    // MARK: - Screen edges (byeolki: "그 호박도 펫처럼 화면밖으로 못나가고 튕기게")
+    // MARK: - Screen edges (the toy bounces off the screen bounds like the pet does)
 
     func test_kicked_bouncesOffTheSideInsteadOfLeaving() {
         // Heading right, already past the right edge of a 1000-wide area.
@@ -243,7 +243,7 @@ final class BallPhysicsTests: XCTestCase {
 }
 
 /// A toy that has landed still has to notice when what it landed on goes
-/// away (byeolki: "펫이 움직이면 장난감이 공중부양을 해", 2026-07-30).
+/// away, rather than floating in place.
 final class BallRestingSurfaceTests: XCTestCase {
     private let roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
 

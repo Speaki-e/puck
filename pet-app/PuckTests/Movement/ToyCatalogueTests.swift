@@ -3,8 +3,8 @@
 //  Puck
 //
 //  F12 test · owner: 박해영 (Haeyoung Park)
-//  The toy list and its artwork, one directory per toy under Resources/Toys
-//  (byeolki: "장난감 에셋 정리하는 폴더도 만들어서 각각 정리해줘").
+//  The toy list and its artwork, one directory per toy under Resources/Toys,
+//  keeping each toy's assets organized separately.
 //
 
 import XCTest

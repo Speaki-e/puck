@@ -3,8 +3,7 @@
 //  Puck
 //
 //  F2 test · owner: 강상우 (Sangwoo Kang)
-//  The paper-flip turn's pure math (byeolki: "오른쪽 왼쪽 방향 바뀔떄 종이
-//  뒤집어지는 모션", 2026-07-29).
+//  The paper-flip turn's pure math.
 //
 
 import XCTest

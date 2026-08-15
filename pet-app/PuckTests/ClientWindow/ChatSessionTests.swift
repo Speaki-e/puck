@@ -165,8 +165,7 @@ final class ChatSessionTests: XCTestCase {
     /// A session takes as many prompts as the user types, so agent_done lands
     /// once per run, not once per session. While `.done` had a fixed id, the
     /// second one collided with the first in the transcript's ForEach and the
-    /// scroll jumped to the top of the list every time a run finished
-    /// (byeolki, 2026-08-12).
+    /// scroll jumped to the top of the list every time a run finished.
     func test_severalRunsInOneSession_produceDistinctDoneIds() {
         let session = makeSession()
         session.apply(.agentDone(ok: true, summary: "첫 번째"))

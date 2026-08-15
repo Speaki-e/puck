@@ -95,8 +95,8 @@ final class EventRouterTests: XCTestCase {
 
     /// The bubble is one line beside a 100px character, and agent_done's
     /// summary is whatever the producing agent put there -- for the F15 local
-    /// agent, the entire reply (byeolki, 2026-08-12: "전부 출력하지 말고 핵심
-    /// 부분만 간결하게"). The full text is in the transcript either way.
+    /// agent, the entire reply. The bubble should keep only the headline, not
+    /// dump the whole answer. The full text is in the transcript either way.
     func test_agentDone_bubbleKeepsOnlyTheHeadline() {
         let wall = """
         hello.ts에 주석을 추가했어요. 파일 맨 위에 한 줄 주석을 넣었고, \

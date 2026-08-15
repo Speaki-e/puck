@@ -177,7 +177,7 @@ final class BouncePresetTests: XCTestCase {
     }
 }
 
-/// The climb waddle (byeolki: "위로 올라갈때 귀엽게 올라가게 해봐", 2026-07-29).
+/// The climb waddle.
 final class ClimbBouncePresetTests: XCTestCase {
     private let preset = BouncePreset.climb
 

@@ -3,8 +3,7 @@
 //  Puck
 //
 //  F11 test · owner: 박해영 (Haeyoung Park)
-//  Bringing a launched app to the front (byeolki, 2026-07-31: "킨 앱이나 그런
-//  것들이 창 맨 앞으로 나오게"). The retry exists because a cold-launched app
+//  Bringing a launched app to the front. The retry exists because a cold-launched app
 //  has no windows to raise for a moment -- so what has to be pinned is that it
 //  keeps trying, and that it stops.
 //

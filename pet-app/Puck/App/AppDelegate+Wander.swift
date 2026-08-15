@@ -40,9 +40,9 @@ extension AppDelegate {
         case .climbToCeiling:
             // ClimbToCeilingState falls back to .fall on its own if there's no
             // wall underfoot, but that costs one visible frame of the climb
-            // clip flashing before it drops -- byeolki: "이거 화면에 있는
-            // 벽? 통해서만 올라갈 수 있게 해줘 그냥 아무 지형에서
-            // 올라가버리냐". Checking here avoids ever entering the state
+            // clip flashing before it drops -- climbing should only ever
+            // happen against an actual on-screen wall, never arbitrary
+            // terrain. Checking here avoids ever entering the state
             // without a wall to begin with.
             guard let body = characterBody,
                   WindowSupport.windowBeingClimbed(at: body.position, in: overlayLocalWindows(excluding: nil)) != nil else {
@@ -78,9 +78,9 @@ extension AppDelegate {
     /// fraction of its width. Targeting the literal edges meant a good share
     /// of wanders ended with the pet pressed into a corner, where it then sat
     /// until the next timer -- and screen-edge containment holds it there
-    /// exactly, so it reads as being stuck rather than as having wandered
-    /// (byeolki: "펫이 너무 구석이 박히고"). It can still be *carried* or
-    /// thrown into a corner; it just won't choose one.
+    /// exactly, so it reads as being stuck rather than as having wandered.
+    /// It can still be *carried* or thrown into a corner; it just won't
+    /// choose one.
     static let roamEdgeMargin: CGFloat = 0.08
 
     private static func randomRoamPoint(in area: CGRect) -> CGPoint {

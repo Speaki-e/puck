@@ -21,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     var avatar: SpriteAvatar?
     var sfxPlayer: SFXPlayer?
     var clickThroughController: ClickThroughController?
-    /// byeolki's request, 2026-07-29: menu bar Hide/Show toggle.
+    /// Backs the menu bar's Hide/Show toggle.
     var isCharacterHidden = false
     var spaceChangeObserver: NSObjectProtocol?
     var avatarHitboxSize: CGSize = .zero
@@ -91,8 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     var toyBox: ToyBox?
     /// When the pet last finished playing. Play used to restart the instant
     /// the thrown toy settled, so a toy left out meant the pet did nothing
-    /// else ever again (byeolki: "장난감을 너무 많이 가지고 놀진 않게 약간
-    /// 시간을 가지게", 2026-07-30).
+    /// else ever again -- the pet needs a break between games rather than
+    /// playing nonstop.
     var toyPlayEndedAt: TimeInterval?
     /// How long the pet goes without picking a toy up again. Long enough for
     /// a wander or two in between, short enough that a toy put out for it
@@ -166,9 +166,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         setUpAppearance()
         setUpClientThemeStyle()
 
-        // byeolki: "둘이 같이 가야하는거임" -- PuckClient (the F13 client
-        // window, now a separate Dock-resident app) is useless without this
-        // process hosting bridge.sock, so each launches the other.
+        // The two processes have to come up together -- PuckClient (the F13
+        // client window, now a separate Dock-resident app) is useless without
+        // this process hosting bridge.sock, so each launches the other.
         setUpMenuBar()
         setUpOverlayAndAvatar()
         setUpWindowSensing()

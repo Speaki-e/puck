@@ -3,9 +3,8 @@
 //  Puck
 //
 //  Shared · owner: 박해영 (Haeyoung Park)
-//  The one file to edit when the app gets renamed again (byeolki,
-//  2026-08-01: "다음에도 프로그램 명이 바뀔 수 있으니까 알아서 잘 config
-//  설정 해놔. 나중에 바꿀때 오래걸리지 말구"). The PetAgent -> Shaydi
+//  The one file to edit when the app gets renamed again -- future renames
+//  should be quick, not another manual sweep. The PetAgent -> Shaydi
 //  rename touched ~340 files by hand because nothing was centralized --
 //  every bundle-id string and Application Support path was a separate
 //  literal scattered across both targets.

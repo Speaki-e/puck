@@ -82,9 +82,10 @@ extension AppDelegate {
         }
     }
 
-    /// byeolki (2026-07-30): "입력창에 내용을 작성하면 창이 새로 열리면서
-    /// ... 입력한 내용이 보여지게". The bubble stays the lightweight capture
-    /// it is; what it submits goes to workspace as usual *and* is mirrored to
+    /// Submitting from the quick-capture bubble should also bring up the
+    /// client window showing what was typed. The bubble stays the lightweight
+    /// capture it is; what it submits goes to workspace as usual *and* is
+    /// mirrored to
     /// PuckClient, which brings its window up showing the text. Closing
     /// or quitting that window changes nothing here -- it's a separate
     /// process, and the pet doesn't observe its presence.
@@ -140,8 +141,8 @@ extension AppDelegate {
         bubbleView.showInput()
     }
 
-    /// F14 (byeolki, 2026-08-01: "마우스 드래그를 통해서 캡쳐 후
-    /// attachments를 삽입할 수 있도록 해줘"). Shells out to screencapture -i
+    /// F14: interactive drag-to-select screen capture, attached as one of the
+    /// bubble's attachments. Shells out to screencapture -i
     /// rather than the bubble hiding itself first: the system's own capture
     /// overlay draws on top of everything regardless, and hiding/reshowing
     /// the panel around an async, human-paced drag risked exactly the
@@ -191,8 +192,7 @@ extension AppDelegate {
     }
 
     /// Puts the bubble over the pet's head, so what it says comes from it
-    /// rather than from the middle of the screen (byeolki, 2026-07-31:
-    /// "말풍선이 펫한테서 나오게").
+    /// rather than from the middle of the screen.
     ///
     /// Only speech does this. The Option+Shift+Space input panel stays put at
     /// its own fixed spot (bottom-center, see makeBubble) -- it's a capture
@@ -252,8 +252,7 @@ extension AppDelegate {
         bubbleWindow.setContentSize(size)
         bubbleWindow.contentView = bubbleView
 
-        // Bottom-center (byeolki, 2026-08-01: "모달 뜨는걸 중앙 하단으로
-        // 변경") -- centred across, hovering just above the Dock.
+        // Bottom-center -- centred across, hovering just above the Dock.
         // visibleFrame already excludes the Dock/menu bar, so this margin is
         // just breathing room, not Dock clearance.
         let frame = screen.visibleFrame

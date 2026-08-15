@@ -19,8 +19,7 @@ extension AppDelegate {
         menuBarController = menuBar
     }
 
-    /// The panel the status item drops (byeolki, 2026-07-31: "이 설정 이거
-    /// 위에 아이콘 누르면 바로 나오게"). Rebuilt per open so it reflects live
+    /// The panel the status item drops. Rebuilt per open so it reflects live
     /// state -- which toys are out, whether the pet is hidden, whether
     /// Accessibility has been granted since last time.
     private func makeSettingsPanel() -> NSViewController {
@@ -42,7 +41,7 @@ extension AppDelegate {
         return NSHostingController(rootView: view)
     }
 
-    /// byeolki's request, 2026-07-29: hide/show the pet without quitting the
+    /// Hides/shows the pet without quitting the
     /// app. orderOut/orderFrontRegardless rather than alphaValue -- an
     /// ordered-out window also stops receiving/dispatching mouse events, so
     /// there's nothing left to click on a hidden pet either.

@@ -8,8 +8,7 @@
 //  Never the source tree's *tracked* files: plan/04_ai-module.md section 3.1
 //  says the key is injected and the module stores none of it, and a key in a
 //  committed file is a key in git history. `.env` is already in .gitignore,
-//  which is what makes it a safe place to put one (byeolki, 2026-07-31:
-//  ".env 에 api 키 넣을 수 있게 해줘").
+//  which is what makes it a safe place to put one.
 //
 //  Looked up in this order, first hit wins:
 //

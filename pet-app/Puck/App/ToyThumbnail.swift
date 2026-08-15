@@ -3,8 +3,7 @@
 //  Puck
 //
 //  F12 · owner: 강상우 (Sangwoo Kang)
-//  Menu-bar icons for the toy list (byeolki: "이미지와 함께 장난감 이름이
-//  나오고", 2026-07-30).
+//  Menu-bar icons for the toy list, shown alongside each toy's name.
 //
 //  The one thing that actually needs care here is proportions. The wand's art
 //  is 310x804; fitted into a square box it renders as a squashed smear, which

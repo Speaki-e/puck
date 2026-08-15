@@ -133,8 +133,8 @@ extension AppDelegate {
     /// How long the pet sulks about being muted.
     private static let mutedComplaintDuration: TimeInterval = 2
 
-    /// byeolki (2026-07-31): muting the pet mid-session gets a sulk -- the
-    /// angry face plus "제 목소리가 시끄러우신거에요?" for two seconds.
+    /// Muting the pet mid-session gets a sulk -- the angry face plus
+    /// "제 목소리가 시끄러우신거에요?" for two seconds.
     ///
     /// It has to be a bubble rather than a line: the complaint is *about*
     /// being muted, so playing it as audio is the one thing that can't work.
@@ -142,13 +142,12 @@ extension AppDelegate {
     /// Only on mute going ON, only from the Settings toggle (Focus's
     /// auto-mute, which sets SFXPlayer directly rather than through the
     /// store, isn't the user telling the pet to be quiet), and only when
-    /// SettingsStore.isMuteComplaintEnabled is on -- byeolki, 2026-08-01:
-    /// "그거 그냥 캐릭터 이동 없이 현재 캐릭터에 뜨게 해주고, 이런거 설정
-    /// 가능하도록 해줘". This used to also drag the pet to center screen
-    /// (moveCharacter to controller.roamableArea's midpoint); that's gone --
-    /// the sulk now happens wherever the pet already is. pinCharacter is
-    /// still what holds it there for the duration, since a wandering pet
-    /// mid-sulk would read as broken either way.
+    /// SettingsStore.isMuteComplaintEnabled is on -- it's a togglable
+    /// preference, not a forced behavior. This used to also drag the pet to
+    /// center screen (moveCharacter to controller.roamableArea's midpoint);
+    /// that's gone -- the sulk now happens wherever the pet already is.
+    /// pinCharacter is still what holds it there for the duration, since a
+    /// wandering pet mid-sulk would read as broken either way.
     func showMutedComplaint() {
         guard characterController != nil else { return }
 

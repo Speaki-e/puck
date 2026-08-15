@@ -29,9 +29,8 @@ extension AppDelegate {
         box.onLanded = { [weak self] toy, position in
             guard let self, let ball = self.toyBox?.controller(for: toy) else { return }
             // A toy that fell onto the character's head bonks off it
-            // immediately instead of resting there to be chased (byeolki:
-            // "캐릭터 머리로 떨어져서 통 튀어서"). It stays in play after the
-            // bounce -- nothing removes the toy any more.
+            // immediately instead of resting there to be chased. It stays
+            // in play after the bounce -- nothing removes the toy any more.
             // Compared at the toy's bottom edge, not its centre: the toy
             // rests with its artwork on the surface, so its centre sits a
             // good 20pt above whatever it landed on. Comparing centres here
@@ -119,8 +118,7 @@ extension AppDelegate {
 
     /// Menu bar toy list — puts the chosen toy out at the cursor, onto
     /// whatever's below it (F4's landing-surface logic, same as Fall), or
-    /// takes it away if it was already out (byeolki: "그걸 눌러서
-    /// 나오게하고 다시 눌러서 없애는", 2026-07-30).
+    /// takes it away if it was already out.
     /// Returns the toys that are out afterwards -- the settings window's toy
     /// grid seeds itself from the same answer the menu bar gets, so the two
     /// switches for one toy box can't drift apart.
@@ -136,8 +134,7 @@ extension AppDelegate {
     }
 
     /// Option+Shift+1/2 (F6) summon ToyCatalogue.all[0]/[1] directly, reusing
-    /// toggleToy's on/off semantics -- byeolki, 2026-08-01: "option shift 1,
-    /// 2로 toy 소환 가능하게 해줘".
+    /// toggleToy's on/off semantics.
     func summonToy(at index: Int) {
         guard ToyCatalogue.all.indices.contains(index) else { return }
         toggleToy(ToyCatalogue.all[index])

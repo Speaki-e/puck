@@ -26,6 +26,24 @@ enum CodingAgentKind: String, Codable, CaseIterable {
         }
     }
 
+    /// The CLI the ACP shim drives. Neither shim is self-contained: each
+    /// spawns its vendor's own ~256MB native binary, which this repo does not
+    /// vendor -- the user's install is used instead.
+    var vendorCLIName: String {
+        switch self {
+        case .claude: return "claude"
+        case .codex: return "codex"
+        }
+    }
+
+    /// The variable the shim itself reads to skip its own module resolution.
+    var vendorCLIEnvironmentVariable: String {
+        switch self {
+        case .claude: return "CLAUDE_CODE_EXECUTABLE"
+        case .codex: return "CODEX_PATH"
+        }
+    }
+
     /// The environment variable the agent reads its credentials from. codex
     /// accepts either, and both are forwarded when present -- CODEX_API_KEY
     /// first because it is the more specific of the two.
@@ -45,18 +63,18 @@ enum AcpAgentCommandError: Error, Equatable {
     /// The vendored .mjs is missing from the app bundle -- a packaging bug,
     /// not a user-environment one.
     case agentScriptMissing(CodingAgentKind)
-    /// codex-acp is only a shim around the real codex binary, which this repo
-    /// does not vendor (see scripts/vendor-acp.sh).
-    case codexCLINotFound
+    /// The agent's own vendor CLI is missing. Both ACP packages are only
+    /// shims around a ~256MB per-platform native binary that this repo does
+    /// not vendor (see scripts/vendor-acp.sh).
+    case vendorCLINotFound(CodingAgentKind)
 }
 
 struct AcpAgentCommand: Equatable {
     let executable: URL
     let arguments: [String]
-    /// Extra environment the agent needs beyond the credentials -- currently
-    /// only CODEX_PATH, which tells codex-acp where the codex binary is
-    /// instead of letting it resolve @openai/codex out of a node_modules tree
-    /// that does not exist inside Puck.app.
+    /// Extra environment the agent needs beyond the credentials: the path to
+    /// its vendor CLI. Both shims otherwise resolve that binary out of a
+    /// node_modules tree that does not exist inside Puck.app.
     let extraEnvironment: [String: String]
 }
 
@@ -92,19 +110,32 @@ enum AcpAgentCommandResolver {
         return nil
     }
 
-    /// codex-acp spawns this rather than resolving @openai/codex as a module.
-    static func resolveCodexCLI(
+    /// The vendor CLI each shim actually drives -- `claude` for
+    /// claude-agent-acp, `codex` for codex-acp. Honours the same override
+    /// variable the shim itself reads, so a user who already set it keeps
+    /// their choice.
+    static func resolveVendorCLI(
+        for kind: CodingAgentKind,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         fileExists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) -> URL? {
-        if let explicit = environment["CODEX_PATH"], fileExists(explicit) {
+        if let explicit = environment[kind.vendorCLIEnvironmentVariable], fileExists(explicit) {
             return URL(fileURLWithPath: explicit)
         }
+        let name = kind.vendorCLIName
         for directory in environment["PATH"]?.split(separator: ":") ?? [] {
-            let candidate = "\(directory)/codex"
+            let candidate = "\(directory)/\(name)"
             if fileExists(candidate) { return URL(fileURLWithPath: candidate) }
         }
-        for candidate in ["/opt/homebrew/bin/codex", "/usr/local/bin/codex"] where fileExists(candidate) {
+        // Where npm-global and the two package managers put it, in that order.
+        var wellKnown: [String] = []
+        if let home = environment["HOME"] {
+            wellKnown.append("\(home)/.npm-global/bin/\(name)")
+            wellKnown.append("\(home)/.local/bin/\(name)")
+        }
+        wellKnown.append("/opt/homebrew/bin/\(name)")
+        wellKnown.append("/usr/local/bin/\(name)")
+        for candidate in wellKnown where fileExists(candidate) {
             return URL(fileURLWithPath: candidate)
         }
         return nil
@@ -114,15 +145,12 @@ enum AcpAgentCommandResolver {
         for kind: CodingAgentKind,
         scriptURL: URL?,
         node: URL?,
-        codexCLI: URL?
+        vendorCLI: URL?
     ) throws -> AcpAgentCommand {
         guard let node else { throw AcpAgentCommandError.nodeNotFound }
         guard let scriptURL else { throw AcpAgentCommandError.agentScriptMissing(kind) }
-        var extraEnvironment: [String: String] = [:]
-        if kind == .codex {
-            guard let codexCLI else { throw AcpAgentCommandError.codexCLINotFound }
-            extraEnvironment["CODEX_PATH"] = codexCLI.path
-        }
+        guard let vendorCLI else { throw AcpAgentCommandError.vendorCLINotFound(kind) }
+        let extraEnvironment = [kind.vendorCLIEnvironmentVariable: vendorCLI.path]
         return AcpAgentCommand(
             executable: node,
             arguments: [scriptURL.path],

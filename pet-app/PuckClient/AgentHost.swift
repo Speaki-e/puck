@@ -82,7 +82,7 @@ final class AgentHost {
                         for: kind,
                         scriptURL: AcpAgentCommandResolver.bundledScriptURL(for: kind),
                         node: AcpAgentCommandResolver.resolveNode(),
-                        codexCLI: kind == .codex ? AcpAgentCommandResolver.resolveCodexCLI() : nil
+                        vendorCLI: AcpAgentCommandResolver.resolveVendorCLI(for: kind)
                     )
                     let process = AcpAgentProcess(
                         command: command,

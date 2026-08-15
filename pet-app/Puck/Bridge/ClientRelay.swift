@@ -17,17 +17,24 @@ enum ClientRelay {
     ///   that are connection-lifecycle only (client_hello).
     static func targetRole(for message: BridgeMessage) -> ClientRole? {
         switch message {
-        case .userInput, .approvalResponse, .runCancel:
-            return .workspace
-
-        case .event, .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
+        // user_input now goes to gui, not workspace (2026-08-15). It carries
+        // what the user typed into the pet's quick-capture bubble or spoke
+        // over push-to-talk, and its consumer is whoever runs the agent --
+        // which was workspace's agent and is now PuckClient's. Left pointing
+        // at workspace it would be relayed to nobody, silently breaking both
+        // of those inputs.
+        case .userInput, .event, .workspaceCreate, .sessionCreate:
             return .gui
 
-        // workspace_create_request / session_create_request stopped going
-        // outward on 2026-08-15: BridgeMessageRouter answers them from the
-        // in-process WorkspaceRegistry instead. Relaying them as well would
-        // create a second, competing workspace id for the same click.
+        // Handled where they land rather than forwarded:
+        // - workspace_create_request/session_create_request: answered from the
+        //   in-process WorkspaceRegistry (BridgeMessageRouter). Relaying them
+        //   as well would mint a competing workspace id for one click.
+        // - approval_response/run_cancel: PuckClient resolves both against its
+        //   own AgentHost without the socket (ClientWindowStore's
+        //   onApprovalResolved/onRunCancelled).
         case .workspaceCreateRequest, .sessionCreateRequest,
+             .approvalResponse, .runCancel,
              .clientHello, .toolDispatch, .toolCancel, .toolResult:
             return nil
         }

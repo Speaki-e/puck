@@ -133,20 +133,17 @@ enum SessionOrigin: String, Codable {
     case agent
 }
 
-/// workspace -> pet-app: no editor view for a workspace (e.g. no project_path bound), protocol 3.5.
-enum EditorViewUnavailableReason: String, Codable {
-    case noProjectPath = "no_project_path"
-}
 
-/// Who is on the other end of a bridge.sock connection: workspace (the agent backend)
-/// or gui (a chat/editor client -- historically pet-app itself, now also
-/// PuckClient once the F13 client window moved to its own process, 2026-07-30).
-/// pet-app relays by role once more than one connection role can be open at a time:
-/// userInput/workspaceCreateRequest/sessionCreateRequest/approvalResponse/runCancel go
-/// to the workspace connection; event/workspaceCreate/sessionCreate/editorViewReady/
-/// editorViewUnavailable go to gui connections. Sent once, right after connecting.
+/// Who is on the other end of a bridge.sock connection. Only `gui` remains:
+/// the `workspace` role named the Electron backend, which was deleted on
+/// 2026-08-15 once pet-app took over the registries and code_editor. The enum
+/// stays rather than collapsing to nothing because client_hello still carries
+/// a role on the wire, and an unknown value has to be rejected rather than
+/// assumed. Sent once, right after connecting.
+///
+/// Relay targets now: user_input/event/workspace_create/session_create reach
+/// gui connections; everything else is handled where it lands (ClientRelay).
 enum ClientRole: String, Codable {
-    case workspace
     case gui
 }
 
@@ -180,13 +177,6 @@ enum BridgeMessage: Equatable {
     /// workspace -> pet-app: confirms a session now exists.
     case sessionCreate(workspaceId: String, sessionId: String, title: String, origin: SessionOrigin)
 
-    // --- editor view (2026-07-29, protocol 3.5) ---
-
-    /// workspace -> pet-app: the embeddable editor view bundle for this workspace is
-    /// being served at url, for pet-app's WKWebView to load. This traffic never crosses
-    /// bridge.sock itself -- url points at workspace's own local loopback server.
-    case editorViewReady(workspaceId: String, url: String)
-    case editorViewUnavailable(workspaceId: String, reason: EditorViewUnavailableReason)
 
     // --- approval response / run cancel (2026-07-29, protocol 3.6) ---
 
@@ -210,8 +200,6 @@ extension BridgeMessage: Codable {
         case workspaceCreate = "workspace_create"
         case sessionCreateRequest = "session_create_request"
         case sessionCreate = "session_create"
-        case editorViewReady = "editor_view_ready"
-        case editorViewUnavailable = "editor_view_unavailable"
         case approvalResponse = "approval_response"
         case runCancel = "run_cancel"
     }
@@ -346,17 +334,6 @@ extension BridgeMessage: Codable {
                 origin: try container.decode(SessionOrigin.self, forKey: .origin)
             )
 
-        case .editorViewReady:
-            self = .editorViewReady(
-                workspaceId: try container.decode(String.self, forKey: .workspaceId),
-                url: try container.decode(String.self, forKey: .url)
-            )
-
-        case .editorViewUnavailable:
-            self = .editorViewUnavailable(
-                workspaceId: try container.decode(String.self, forKey: .workspaceId),
-                reason: try container.decode(EditorViewUnavailableReason.self, forKey: .reason)
-            )
 
         case .approvalResponse:
             self = .approvalResponse(
@@ -459,15 +436,6 @@ extension BridgeMessage: Codable {
             try container.encode(title, forKey: .title)
             try container.encode(origin, forKey: .origin)
 
-        case .editorViewReady(let workspaceId, let url):
-            try container.encode(TypeKey.editorViewReady, forKey: .type)
-            try container.encode(workspaceId, forKey: .workspaceId)
-            try container.encode(url, forKey: .url)
-
-        case .editorViewUnavailable(let workspaceId, let reason):
-            try container.encode(TypeKey.editorViewUnavailable, forKey: .type)
-            try container.encode(workspaceId, forKey: .workspaceId)
-            try container.encode(reason, forKey: .reason)
 
         case .approvalResponse(let approvalId, let approved):
             try container.encode(TypeKey.approvalResponse, forKey: .type)

@@ -51,7 +51,7 @@ final class UserInputSenderTests: XCTestCase {
 
         let delivery = sender.send(text: "README 열어줘", source: .text)
 
-        XCTAssertEqual(delivery, .workspaceDisconnected)
+        XCTAssertEqual(delivery, .notDelivered)
         XCTAssertTrue(transport.broadcasted.isEmpty, "must not write into a socket with no client")
     }
 
@@ -61,7 +61,7 @@ final class UserInputSenderTests: XCTestCase {
     func test_withNoTransportAtAll_reportsDisconnected() {
         let sender = UserInputSender { nil }
 
-        XCTAssertEqual(sender.send(text: "안녕", source: .text), .workspaceDisconnected)
+        XCTAssertEqual(sender.send(text: "안녕", source: .text), .notDelivered)
     }
 
     /// TOCTOU: hasConnectedClients can be true at the check but the client
@@ -75,7 +75,7 @@ final class UserInputSenderTests: XCTestCase {
 
         let delivery = sender.send(text: "테스트 돌려줘", source: .voice)
 
-        XCTAssertEqual(delivery, .workspaceDisconnected)
+        XCTAssertEqual(delivery, .notDelivered)
     }
 
     /// The transport is consulted per send, not captured once — a client that
@@ -87,7 +87,7 @@ final class UserInputSenderTests: XCTestCase {
         XCTAssertEqual(sender.send(text: "first", source: .text), .sent)
 
         transport.hasConnectedClients = false
-        XCTAssertEqual(sender.send(text: "second", source: .text), .workspaceDisconnected)
+        XCTAssertEqual(sender.send(text: "second", source: .text), .notDelivered)
         XCTAssertEqual(transport.broadcasted.count, 1, "the second send must not have gone out")
     }
 
@@ -144,7 +144,7 @@ final class UserInputSenderTests: XCTestCase {
         let transport = StubTransport(hasConnectedClients: false)
         let sender = UserInputSender { transport }
 
-        XCTAssertEqual(sender.createWorkspace(name: "x", projectPath: nil), .workspaceDisconnected)
+        XCTAssertEqual(sender.createWorkspace(name: "x", projectPath: nil), .notDelivered)
         XCTAssertTrue(transport.broadcasted.isEmpty)
     }
 }

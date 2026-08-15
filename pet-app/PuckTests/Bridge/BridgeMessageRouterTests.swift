@@ -196,27 +196,20 @@ final class BridgeMessageRouterTests: XCTestCase {
         XCTAssertEqual(receivedOnMainThread, true)
     }
 
-    func test_onClientUpdate_firesFor_sessionCreate_editorViewReady_editorViewUnavailable() {
+    /// Was three messages; the editor-view pair went with the WKWebView
+    /// editor (2026-08-15), leaving session_create as the only other one.
+    func test_onClientUpdate_firesFor_sessionCreate() {
         let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
         var received: [BridgeMessage] = []
-        let allReceived = expectation(description: "all three client updates delivered")
+        let delivered = expectation(description: "the client update was delivered")
         router.onClientUpdate = { message in
             received.append(message)
-            if received.count == 3 { allReceived.fulfill() }
+            delivered.fulfill()
         }
 
         router.handle(.sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent), reply: { _ in })
-        router.handle(.editorViewReady(workspaceId: "w1", url: "http://127.0.0.1:1/editor"), reply: { _ in })
-        router.handle(.editorViewUnavailable(workspaceId: "w3", reason: .noProjectPath), reply: { _ in })
 
-        wait(for: [allReceived], timeout: 2)
-        XCTAssertEqual(
-            received,
-            [
-                .sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent),
-                .editorViewReady(workspaceId: "w1", url: "http://127.0.0.1:1/editor"),
-                .editorViewUnavailable(workspaceId: "w3", reason: .noProjectPath),
-            ]
-        )
+        wait(for: [delivered], timeout: 2)
+        XCTAssertEqual(received, [.sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent)])
     }
 }

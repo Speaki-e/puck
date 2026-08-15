@@ -233,18 +233,13 @@ final class BridgeMessageCodableTests: XCTestCase {
 
     // MARK: - editor view (workspace -> pet-app, 2026-07-29)
 
-    func test_decodesEditorViewReady() throws {
-        let json = #"{"type":"editor_view_ready","workspace_id":"w1","url":"http://127.0.0.1:53912/editor"}"#
-        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
+    /// editor_view_ready / editor_view_unavailable were deleted with the
+    /// WKWebView editor they described (2026-08-15). Nothing sends them, and
+    /// an unknown type is already covered by the malformed-message tests.
+    func test_rejectsTheDeletedEditorViewMessages() {
+        let json = #"{"type":"editor_view_ready","workspace_id":"w1","url":"http://127.0.0.1:1/e"}"#
 
-        XCTAssertEqual(message, .editorViewReady(workspaceId: "w1", url: "http://127.0.0.1:53912/editor"))
-    }
-
-    func test_decodesEditorViewUnavailable() throws {
-        let json = #"{"type":"editor_view_unavailable","workspace_id":"w1","reason":"no_project_path"}"#
-        let message = try decoder.decode(BridgeMessage.self, from: Data(json.utf8))
-
-        XCTAssertEqual(message, .editorViewUnavailable(workspaceId: "w1", reason: .noProjectPath))
+        XCTAssertThrowsError(try decoder.decode(BridgeMessage.self, from: Data(json.utf8)))
     }
 
     // MARK: - approval response / run cancel (pet-app -> workspace, 2026-07-29)

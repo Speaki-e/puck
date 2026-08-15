@@ -227,19 +227,20 @@ final class BridgeServer {
 extension BridgeServer: UserInputTransport {
     /// Read live rather than remembered: BridgeConnection.onClose removes a
     /// connection as soon as the transport reports it gone, so this flips to
-    /// false the moment workspace disconnects.
+    /// false the moment the client goes away.
     ///
-    /// gui-role connections don't count -- PuckClient is a chat *view*,
-    /// it can't act on user input. While it did count, the always-running
-    /// client made every send look delivered and F6's "워크스페이스 꺼져
-    /// 있어요" bubble became unreachable.
+    /// This counted *non*-gui connections until 2026-08-15, because the thing
+    /// that acted on user input was workspace and PuckClient was only a chat
+    /// view. Deleting workspace inverted that: PuckClient hosts the agent now,
+    /// so it is the only connection that can act on anything, and counting
+    /// anything else would report the pet's bubble as delivered into a void.
     var hasConnectedClients: Bool {
-        !workspaceFacingConnections().isEmpty
+        !agentFacingConnections().isEmpty
     }
 
-    /// protocol section 2 expects a single workspace client, but sending to
-    /// every open connection keeps this correct if a second one ever attaches
-    /// (and costs nothing when there is one).
+    /// One PuckClient is expected, but sending to every gui connection keeps
+    /// this correct if a second one ever attaches (and costs nothing when
+    /// there is one).
     ///
     /// Returns whether there was anyone to send to, queried fresh at this
     /// exact call -- a caller that pre-checked `hasConnectedClients` earlier
@@ -247,15 +248,15 @@ extension BridgeServer: UserInputTransport {
     /// runs on this same queue), so the true answer is decided here, not there.
     @discardableResult
     func broadcast(_ message: BridgeMessage) -> Bool {
-        let connections = workspaceFacingConnections()
+        let connections = agentFacingConnections()
         connections.forEach { $0.send(message) }
         return !connections.isEmpty
     }
 
-    /// A connection that hasn't sent client_hello yet has no role; it's
-    /// counted as workspace-facing, since workspace is what a role-less
-    /// (pre-3.7) client is.
-    private func workspaceFacingConnections() -> [BridgeConnection] {
-        currentConnections().filter { $0.role != .gui }
+    /// Connections that can act on user input -- gui ones, which is all that
+    /// is left. A connection that has not sent client_hello yet has no role
+    /// and does not count: it may never identify itself at all.
+    private func agentFacingConnections() -> [BridgeConnection] {
+        currentConnections().filter { $0.role == .gui }
     }
 }

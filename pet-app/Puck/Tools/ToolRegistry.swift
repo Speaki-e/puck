@@ -27,14 +27,16 @@ import Foundation
 
 enum ToolRegistry {
     /// Which side runs the tool. `pet-app` tools travel over bridge.sock as
-    /// tool_dispatch; `workspace` tools are executed in-process by whoever
-    /// hosts the editor.
+    /// tool_dispatch; `delegated` ones are run by the agent's own host through
+    /// a closure it was constructed with, never over the socket.
+    ///
+    /// The `workspace` and `ai-module` cases are gone with the apps that named
+    /// them (2026-08-15). `ai-module` never dispatched anything in the first
+    /// place -- its one entry was always handled inline -- and `workspace`'s
+    /// three tools are all delegated now, which is what `delegated` says.
     enum Executor: String {
         case petApp = "pet-app"
-        case workspace
-        /// Handled inline by the agent's own loop -- never dispatched over the
-        /// socket, so it has no timeout that means anything.
-        case aiModule = "ai-module"
+        case delegated
     }
 
     /// A parameter's JSON type, as it appears in the tool's argument object.
@@ -114,28 +116,27 @@ enum ToolRegistry {
         Tool(name: "run_applescript", executor: .petApp, approval: .required, parameters: [
             Parameter(name: "script", type: .string, isRequired: true),
         ]),
-        // workspace executor -- none of these are dispatched over bridge.sock
+        // Delegated executor -- none of these are dispatched over bridge.sock
         // like a .petApp tool; each is offered to the model only when
-        // AgentRunner is constructed with the matching delegate closure (see
-        // delegateCodeEditor/delegateReadFile/delegateOpenInEditor), same as
-        // code_editor already was. code_editor still reaches into workspace's
-        // ACP subprocess through that delegation; open_in_editor/read_file no
-        // longer touch the workspace app's process at all -- PuckClient's own
-        // editor pane (Puck/ClientWindow/Editor) reads files itself.
-        Tool(name: "code_editor", executor: .workspace, approval: .acpInternal, parameters: [
+        // AgentRunner is constructed with the matching delegate closure
+        // (delegateCodeEditor/delegateReadFile/delegateOpenInEditor).
+        // code_editor spawns an ACP agent through CodeEditorRunner;
+        // open_in_editor/read_file are answered by PuckClient's own native
+        // editor pane (Puck/ClientWindow/Editor).
+        Tool(name: "code_editor", executor: .delegated, approval: .acpInternal, parameters: [
             Parameter(name: "task", type: .string, isRequired: true),
             Parameter(name: "project_path", type: .string, isRequired: true),
         ]),
-        Tool(name: "open_in_editor", executor: .workspace, approval: .notRequired, parameters: [
+        Tool(name: "open_in_editor", executor: .delegated, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
         ]),
-        Tool(name: "read_file", executor: .workspace, approval: .notRequired, parameters: [
+        Tool(name: "read_file", executor: .delegated, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
         ]),
-        // ai-module executor -- branches the casual conversation into a task
-        // session. Never crosses the socket, which is why its registry
-        // timeout is a placeholder 0 rather than a duration.
-        Tool(name: "open_task_session", executor: .aiModule, approval: .notRequired, parameters: [
+        // Branches the casual conversation into a task session. Never crosses
+        // the socket, which is why its registry timeout is a placeholder 0
+        // rather than a duration.
+        Tool(name: "open_task_session", executor: .delegated, approval: .notRequired, parameters: [
             Parameter(name: "title", type: .string, isRequired: true),
             Parameter(name: "brief", type: .string, isRequired: true),
         ]),

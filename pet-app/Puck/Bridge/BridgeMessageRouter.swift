@@ -32,10 +32,11 @@ final class BridgeMessageRouter {
     /// Emitted for protocol 3.2 status events, already on the main thread.
     var onEventReaction: ((EventReaction) -> Void)?
 
-    /// Emitted for the workspace/session/editor-view confirmations workspace
-    /// sends pet-app (protocol 3.4/3.5, 2026-07-29) -- workspace_create,
-    /// session_create, editor_view_ready, editor_view_unavailable. Already on
-    /// the main thread, like onEventReaction. F13's client-window store (task
+    /// Emitted for the workspace/session confirmations (protocol 3.4).
+    /// They used to arrive from workspace; WorkspaceCoordinator produces them
+    /// in-process now, and the editor-view pair that sat alongside them is
+    /// gone with the WKWebView editor it described. Already on the main
+    /// thread, like onEventReaction. F13's client-window store (task
     /// #134) is the intended consumer; kept as the raw BridgeMessage rather
     /// than a bespoke type since this router shouldn't need to know that
     /// store's shape.
@@ -100,7 +101,7 @@ final class BridgeMessageRouter {
                 self.onChatEvent?(event, workspaceId, sessionId)
             }
 
-        case .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
+        case .workspaceCreate, .sessionCreate:
             dispatchToMain { [weak self] in
                 self?.onClientUpdate?(message)
             }

@@ -4,6 +4,70 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-15: workspace, protocol and ai-module are deleted; pet-app absorbs what was left
+
+`workspace` (Electron + Monaco + ACP) is gone, and with it the last non-Swift
+process in the product. `protocol` and `ai-module` went at the same time, for
+reasons that follow from it.
+
+Only three things in `workspace` were still doing work by this point. The
+2026-08-14 native editor entry below had already replaced the editor pane, and
+the renderer, `editor-gateway.ts` and `file-service.ts` (~1,500 lines) were
+dead behind it.
+
+- **The workspace/session registries.** `workspace-registry.ts` owned workspace
+  metadata, so PuckClient's "새 워크스페이스" had to travel over the bridge and
+  come back. Ported to `Puck/Workspaces/WorkspaceRegistry.swift`, keeping the
+  on-disk shape (`{version: 1, workspaces: [...]}`) so there is no migration.
+- **`code_editor`.** `agent-host/` spawned an ACP agent in an Electron utility
+  process. Now `Puck/Agent/ACP/` spawns it directly: the six JSON-RPC methods
+  the TS adapter used, hand-rolled the way `ClaudeClient` hand-rolls the
+  Anthropic Messages API.
+- **The bridge client.** `pet-bridge.ts` existed to connect the other two to
+  pet-app's socket. With both in-process there is nothing to connect.
+
+**Order mattered more than the deletion did.** Deleting `workspace` first would
+have killed workspace *creation*, not just `code_editor` -- and a workspace is
+where a project path comes from, so `EditorAvailability` would have resolved
+`.noProject` forever and the native editor could never open again. The
+registry was ported first for that reason, and the deletion came last, when
+nothing was lost by it.
+
+**`user_input` changed direction.** It was relayed to the `workspace` role and
+carries what the user typed into the pet's bubble or spoke over push-to-talk.
+Its consumer is whoever runs the agent, which is PuckClient now, so it targets
+`gui` -- left alone it would have been relayed to nobody and silently broken
+both inputs. `BridgeServer`'s `UserInputTransport` inverted for the same
+reason: it excluded gui connections precisely because they could not act, and
+now they are the only ones that can. F6's offline bubble means "the chat window
+is closed" rather than "workspace is down".
+
+**`protocol` died as a consequence, not a decision.** Its job was to hold one
+contract against two implementations -- TypeScript types on one side, hand-
+maintained Swift mirrors on the other, with `swift-mirror.test.ts` guarding the
+drift. With no TypeScript consumer left there is no second implementation, so
+the guard compares a thing to itself. The Swift copies in `pet-app/Puck` are
+the contract now. `ai-module` was already dead (its README said so) and only
+appeared in `workspace`'s pnpm workspace members.
+
+**Neither ACP agent is self-contained, and neither is vendored whole.**
+`claude-agent-acp` and `codex-acp` are shims around ~256MB per-platform native
+binaries. The shims are esbuilt to one committed `.mjs` each (3.3MB total,
+`scripts/vendor-acp.sh`); the binaries are the user's own install, reached
+through the variable each shim already reads (`CLAUDE_CODE_EXECUTABLE`,
+`CODEX_PATH`). That resolution is lazy -- `initialize` succeeds long before it
+happens -- which shipped a bundle that answered the handshake and could not
+open a session, so both the build-time probe and the integration test now run
+through `session/new`.
+
+Node is still required for `code_editor` and nothing else. Without it, or
+without the selected agent's CLI, that one tool reports why and the rest of the
+app is unaffected.
+
+Implementation: `pet-app/Puck/Workspaces/`, `pet-app/Puck/Agent/ACP/`,
+`pet-app/scripts/vendor-acp.sh`. Spec:
+`docs/superpowers/specs/2026-08-15-workspace-to-swift-design.md`.
+
 ## 2026-08-15: model hosting providers -- OpenAI or Anthropic for the pet-app agent, Claude or Codex for workspace's `code_editor`
 
 Both apps could only ever talk to one model host each: `pet-app`'s own agent

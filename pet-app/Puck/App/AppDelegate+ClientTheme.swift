@@ -12,8 +12,9 @@ import Foundation
 extension AppDelegate {
     // MARK: - Client (chat) window theme, broadcast to PuckClient
 
-    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
-    /// 셰이디 설정으로 변경할 수 있어야하거든" -- ClientThemeStyle (the
+    /// The theme should stay in sync with the menu bar settings, the same
+    /// way Shady-style apps let you flip theme from the menu bar rather than
+    /// digging into a window -- so ClientThemeStyle (the
     /// client window's own light/dark theme, separate from the
     /// system-wide appearance above) is a Settings item here, but only
     /// PuckClient's client window actually renders with it -- this process

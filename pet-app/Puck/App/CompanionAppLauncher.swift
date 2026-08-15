@@ -5,7 +5,7 @@
 //  Shared · owner: 박해영 (Haeyoung Park)
 //  Puck (the pet) and PuckClient (the Dock-resident chat window,
 //  2026-07-30) are now separate apps that should come up together --
-//  byeolki: "둘이 같이 가야하는거임". Each launches the other on its own
+//  each launches the other on its own
 //  startup if it isn't already running. isRunning/launch are injected so
 //  the decision is testable without NSWorkspace/NSRunningApplication.
 //

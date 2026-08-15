@@ -12,8 +12,7 @@ import AppKit
 extension AppDelegate {
     // MARK: - Appearance (light/dark override)
 
-    /// byeolki, 2026-08-01: "테마가 내가 아마 다크모드일텐데, 시스템모드랑
-    /// 다크모드랑 생긴게 다른데?" -- .preferredColorScheme (SettingsView)
+    /// .preferredColorScheme (SettingsView)
     /// only recolors SwiftUI content; NSPopover's own chrome and any
     /// NSVisualEffectView material follow NSApp.appearance instead, which
     /// nothing was setting. Seeded here at launch and kept live via

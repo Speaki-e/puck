@@ -5,8 +5,7 @@
 //  Shared · owner: Sangwoo Kang / Haeyoung Park
 //  The status item, and the panel it drops down.
 //
-//  2026-07-31 (byeolki: "이 설정 이거 위에 아이콘 누르면 바로 나오게 그
-//  창을"): this used to be an NSMenu whose "설정…" item opened a separate
+//  This used to be an NSMenu whose "설정…" item opened a separate
 //  settings window. Now the icon drops the settings panel itself, the way
 //  the pokoPet reference does -- one click, no menu in between.
 //
@@ -19,9 +18,8 @@
 
 import AppKit
 
-/// Which action a click on the status item icon performs -- byeolki,
-/// 2026-08-01: "Puck를 없애려면 메뉴막대에서 우클릭해서... PuckClient를
-/// 좌클릭하면 나오게". Split so the common case (open the chat) is one
+/// Which action a click on the status item icon performs. Split so the
+/// common case (open the chat) is one
 /// click, while the pet's own controls (toys, hide, quit) sit one click
 /// further behind a right-click, where they don't get hit by accident.
 enum MenuBarClick: Equatable {

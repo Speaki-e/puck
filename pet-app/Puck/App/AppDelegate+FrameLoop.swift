@@ -69,8 +69,8 @@ extension AppDelegate {
                     // took it; kicked means it is mid-throw, by the user or by
                     // the pet itself. Without this the pet re-attaches it to
                     // its head on the very next frame, and a spun toy can never
-                    // be thrown at all (byeolki: "지팡이도 다른 장난감처럼
-                    // 던져지고", 2026-07-29).
+                    // be thrown at all -- every toy, including spin-style ones
+                    // like the wand, has to remain throwable like the rest.
                     let petMayHold = ball.state.map { $0.phase != .held && $0.phase != .kicked } ?? false
                     if isPlaying, spins, petMayHold, ball === toyBox.focused {
                         ball.carry(
@@ -115,7 +115,7 @@ extension AppDelegate {
     /// list is polled briefly rather than read once.
     /// A tool was blocked by a missing permission: put the system's own
     /// request dialog on screen, and have the pet walk over and ask the user
-    /// to click it (byeolki, 2026-07-31).
+    /// to click it.
     ///
     /// Pointing rather than clicking is not a shortcut -- macOS will not let
     /// any app click a security dialog on the user's behalf, which
@@ -173,8 +173,7 @@ extension AppDelegate {
     }
 
     /// The pet's "there you go" -- fired before the app opens, so the window
-    /// coming up half a second later looks like the pet did it (byeolki,
-    /// 2026-07-31: "약간 이 펫이 켜주는 느낌을 내고 싶은데").
+    /// coming up half a second later looks like the pet did it.
     ///
     /// Point, not a bespoke state: it is the gesture the pet already uses for
     /// "look at this", and the arm is up for the whole lead-in rather than for

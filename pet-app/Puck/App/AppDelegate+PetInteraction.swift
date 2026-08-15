@@ -46,10 +46,10 @@ extension AppDelegate {
     }
 
     /// Whether the cursor is on the pet's drawn artwork rather than on the
-    /// transparent canvas around it. Converted into the pet's own space and
-    /// then answered by the avatar, which is the only thing that knows how it
-    /// is currently drawn (byeolki: "내가 보이는 부분만을 누를 수 있게",
-    /// 2026-07-30).
+    /// transparent canvas around it -- only the pet's actual visible
+    /// silhouette should be clickable, not the whole bounding box. Converted
+    /// into the pet's own space and then answered by the avatar, which is
+    /// the only thing that knows how it is currently drawn.
     func isCursorOnPet(_ cursor: CGPoint) -> Bool {
         guard let body = characterBody else { return false }
         let local = windowLocalPoint(fromGlobalAppKit: cursor)
@@ -71,14 +71,13 @@ extension AppDelegate {
     }
 
     /// How far outside the artwork still counts as clicking it. Grabbing a
-    /// ~130pt character by its exact silhouette is needlessly fiddly, and
-    /// byeolki has reported a hitbox being hard to grab before -- but this is
-    /// a fraction of the 28pt the old rectangle padded by, because it now
-    /// hugs the drawing rather than a box around it.
+    /// ~130pt character by its exact silhouette is needlessly fiddly -- but
+    /// this is a fraction of the 28pt the old rectangle padded by, because it
+    /// now hugs the drawing rather than a box around it.
     private static let hitTestTolerance: CGFloat = 8
 
-    /// Picking the toy up with the cursor (byeolki: "호박도 펫처럼 커서로
-    /// 집을 수 있게", 2026-07-29). The same rigid model the pet's drag uses:
+    /// Picking the toy up with the cursor, the same way the pet itself can be
+    /// picked up. The same rigid model the pet's drag uses:
     /// the grab offset is captured once so whatever point was grabbed stays
     /// under the cursor, and the toy is assigned outright rather than eased.
     func handleToyGesture(_ gesture: PetGesture) {
@@ -125,8 +124,7 @@ extension AppDelegate {
     }
 
     /// Stroking the pet's head makes it happy, and letting go sets it
-    /// twirling (byeolki: "마우스 포인터로 펫 머리 위를 쓰담 쓰담 하면 기분
-    /// 좋은 표정 + 쓰담쓰담 끝나면 일정 시간동안 빙글 빙글 돌기", 2026-07-29).
+    /// twirling for a while.
     func handleCursorMoved(_ cursor: CGPoint, overHead: Bool) {
         apply(headPetDetector.cursorMoved(to: cursor, overHead: overHead, now: CACurrentMediaTime()))
     }

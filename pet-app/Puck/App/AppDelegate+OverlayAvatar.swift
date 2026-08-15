@@ -50,8 +50,8 @@ extension AppDelegate {
         settingsStore.onWalkSpeedMultiplierChanged = { [weak self] multiplier in
             self?.characterController?.walkSpeed = MovementSolver.walkSpeed * multiplier
         }
-        // byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
-        // 해주고" -- Settings' avatar picker writes this; activateAvatar
+        // The avatar should be switchable live, like flipping a preset --
+        // Settings' avatar picker writes this; activateAvatar
         // tears down whatever's running and swaps the new package in live.
         settingsStore.onSelectedAvatarChanged = { [weak self] name in self?.switchAvatar(to: name) }
         // autoMuteOnFocus existed as a setting with nothing acting on it --
@@ -252,8 +252,9 @@ extension AppDelegate {
         return CGSize(width: window.frame.width, height: window.frame.height - dockInset)
     }
 
-    /// byeolki's request, 2026-07-29: "전체화면 되면 dock위가 아니라 화면
-    /// 위로 다니게 바꿔줘" -- OverlayWindow already joins fullscreen Spaces
+    /// In a fullscreen Space the pet should roam over the whole screen, not
+    /// stay confined above where the Dock would be -- OverlayWindow already
+    /// joins fullscreen Spaces
     /// (.fullScreenAuxiliary), but nothing previously re-checked
     /// groundAwareSize after initial setup, so roamableArea stayed reserved
     /// for the Dock's height even in a fullscreen Space where the Dock isn't

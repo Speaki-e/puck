@@ -115,3 +115,22 @@ final class EditorRevealRequestTests: XCTestCase {
         XCTAssertEqual(store.activeWorkspaceId, ClientWindowStore.defaultWorkspaceId)
     }
 }
+
+/// Transcript grouping (2026-08-16). What starts a new exchange is a display
+/// rule, but it is derived from the timeline rather than guessed at in the
+/// view, so it is worth pinning down.
+final class ChatTimelineGroupingTests: XCTestCase {
+    func testWhatAPersonOrTheAgentSaysStartsANewTurn() {
+        XCTAssertTrue(ChatTimelineEntry.userMessage(id: UUID(), text: "hi").startsNewTurn)
+        XCTAssertTrue(ChatTimelineEntry.assistantText(id: UUID(), text: "ok").startsNewTurn)
+    }
+
+    func testTheMachineryOfARunDoesNot() {
+        // A call, its result, the approval it needed and the line that ends
+        // the run all belong to the turn that produced them.
+        XCTAssertFalse(ChatTimelineEntry.toolCall(id: "t1", tool: "read_file", args: nil).startsNewTurn)
+        XCTAssertFalse(ChatTimelineEntry.toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil).startsNewTurn)
+        XCTAssertFalse(ChatTimelineEntry.approvalRequested(id: UUID(), approvalId: "a1", summary: "쉘 실행").startsNewTurn)
+        XCTAssertFalse(ChatTimelineEntry.done(id: UUID(), ok: true, summary: "완료").startsNewTurn)
+    }
+}

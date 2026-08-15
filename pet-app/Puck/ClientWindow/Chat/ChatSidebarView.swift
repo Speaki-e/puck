@@ -34,15 +34,22 @@ struct ChatSidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
-            Button {
-                isAddingWorkspace = true
-            } label: {
-                Label("새 워크스페이스", systemImage: "plus")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(spacing: 0) {
+                Divider()
+                Button {
+                    isAddingWorkspace = true
+                } label: {
+                    Label("새 워크스페이스", systemImage: "plus.circle")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.borderless)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
             }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            // Sits on the sidebar material rather than floating over the list,
+            // so the scrolling content passes behind a real edge.
+            .background(.bar)
         }
         .sheet(isPresented: $isAddingWorkspace) {
             NewWorkspaceSheet(store: store)
@@ -76,6 +83,8 @@ private struct WorkspaceHeader: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(workspace.name)
             if let projectPath = workspace.projectPath {
+                // Same size as the name would shout twice; the path is
+                // context for the name, not a second title.
                 // Abbreviated with the home tilde and truncated at the head:
                 // the leading /Users/<name>/ is the least informative part of
                 // a project path, and the folder name is the part that

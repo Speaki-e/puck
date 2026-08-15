@@ -17,13 +17,29 @@ struct ChatTranscriptView: View {
     let onApproval: (Bool) -> Void
 
     var body: some View {
+        if session.timeline.isEmpty && !session.isRunning {
+            EmptyTranscript()
+        } else {
+            transcript
+        }
+    }
+
+    private var transcript: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
+                // 14, and tool rows tighten to 6 against the call above them
+                // (see row spacing below): a call and its result are one
+                // thought, two messages are two.
+                LazyVStack(alignment: .leading, spacing: 14) {
                     ForEach(session.timeline) { entry in
                         row(for: entry)
                             .id(entry.id)
                             .frame(maxWidth: .infinity, alignment: alignment(for: entry))
+                            // A run's own rows -- the tool calls it made and
+                            // the line that ends it -- read as one block under
+                            // the message that caused them, rather than as
+                            // separate turns.
+                            .padding(.top, entry.startsNewTurn ? 6 : -6)
                     }
                     if session.isRunning {
                         RunningStatusLine()
@@ -230,6 +246,30 @@ private struct DoneRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
+    }
+}
+
+/// Shown instead of an empty scroll view. Carried over from chat-web's
+/// EmptyTranscript, which the native rewrite dropped -- a new chat opened onto
+/// a blank rectangle with no indication it was ready for input.
+private struct EmptyTranscript: View {
+    @Environment(\.clientPalette) private var palette
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("🎃")
+                .font(.system(size: 34))
+                .frame(width: 72, height: 72)
+                .background(palette.accent.opacity(0.12), in: .circle)
+            VStack(spacing: 4) {
+                Text("무엇을 도와드릴까요?")
+                    .font(.title3.weight(.semibold))
+                Text("코드든 잡담이든, 편하게 말 걸어보세요.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

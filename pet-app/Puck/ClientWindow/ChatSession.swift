@@ -28,6 +28,18 @@ enum ChatTimelineEntry: Equatable {
     case done(id: UUID, ok: Bool, summary: String)
 }
 
+extension ChatTimelineEntry {
+    /// Whether this row begins a new exchange. Only what a person said, or the
+    /// agent's own prose answering it, starts one; a tool call and its outcome
+    /// belong to the turn that produced them.
+    var startsNewTurn: Bool {
+        switch self {
+        case .userMessage, .assistantText: return true
+        case .toolCall, .toolResult, .approvalRequested, .done: return false
+        }
+    }
+}
+
 extension ChatTimelineEntry: Identifiable {
     // toolCall and toolResult share the same underlying tool_use id (that's
     // the point -- it's how a view correlates them), so their *displayed

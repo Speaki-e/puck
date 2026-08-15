@@ -197,7 +197,7 @@ final class ClientWindowStore: ObservableObject {
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
         if let onUserCommand {
             onUserCommand(text, activeWorkspaceId, activeSessionId)
-            // Not `.workspaceDisconnected`: the agent is right here, so the
+            // Not `.notDelivered`: the agent is right here, so the
             // "워크스페이스가 꺼져 있어요" banner would be a lie even though no
             // workspace is connected.
             return .sent

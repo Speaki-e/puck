@@ -1,9 +1,0 @@
-packages:
-  - "packages/*"
-  - "../ai-module"
-  - "../protocol"
-
-allowBuilds:
-  electron: true
-  electron-winstaller: true
-  esbuild: true

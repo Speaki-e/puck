@@ -94,6 +94,9 @@ final class BridgeServerTests: XCTestCase {
     /// The real defect behind the stale-connection bug: AppDelegate cached a
     /// BridgeConnection forever, so it had no way to notice a disconnect.
     /// hasConnectedClients must track the live socket, not a remembered one.
+    /// The client identifies itself first: since 2026-08-15 only a gui-role
+    /// connection counts (it is the one that hosts the agent), and a
+    /// connection that has not said client_hello yet has no role at all.
     func test_hasConnectedClients_followsTheClientLifecycle() {
         XCTAssertFalse(server.hasConnectedClients, "no client has connected yet")
 
@@ -102,6 +105,7 @@ final class BridgeServerTests: XCTestCase {
         server.onMessage = { _, _ in connected.fulfill() }
         client.stateUpdateHandler = { state in
             if case .ready = state {
+                self.send(.clientHello(role: .gui), on: client)
                 var data = try! JSONEncoder().encode(BridgeMessage.userInput(UserInput(text: "hi", source: .text)))
                 data.append(0x0A)
                 client.send(content: data, completion: .contentProcessed { _ in })
@@ -189,15 +193,18 @@ final class BridgeServerTests: XCTestCase {
         }
     }
 
-    func test_guiOriginatedMessage_relaysToTheWorkspaceConnection() {
-        let workspaceReceived = expectation(description: "workspace connection received the relayed message")
+    /// Was gui -> workspace; user_input's target flipped to gui on 2026-08-15,
+    /// when PuckClient became the process that runs the agent. Two gui clients
+    /// stand in for "the pet's bubble sent this, the chat window ran it".
+    func test_userInput_relaysToGUIConnections() {
+        let workspaceReceived = expectation(description: "the second gui connection received the relayed message")
 
         let workspaceClient = makeClient()
         let guiClient = makeClient()
         let workspaceBuffer = ReceiveBuffer()
 
         workspaceClient.stateUpdateHandler = { state in
-            if case .ready = state { self.send(.clientHello(role: .workspace), on: workspaceClient) }
+            if case .ready = state { self.send(.clientHello(role: .gui), on: workspaceClient) }
         }
         guiClient.stateUpdateHandler = { state in
             if case .ready = state {
@@ -219,7 +226,7 @@ final class BridgeServerTests: XCTestCase {
         guiClient.cancel()
     }
 
-    func test_workspaceOriginatedEvent_relaysToTheGUIConnection() {
+    func test_event_relaysToTheGUIConnection() {
         let guiReceived = expectation(description: "gui connection received the relayed event")
 
         let workspaceClient = makeClient()
@@ -231,7 +238,7 @@ final class BridgeServerTests: XCTestCase {
         }
         workspaceClient.stateUpdateHandler = { state in
             if case .ready = state {
-                self.send(.clientHello(role: .workspace), on: workspaceClient)
+                self.send(.clientHello(role: .gui), on: workspaceClient)
                 self.send(.event(.agentThinking, workspaceId: "w1", sessionId: "s1"), on: workspaceClient)
             }
         }
@@ -252,10 +259,13 @@ final class BridgeServerTests: XCTestCase {
     }
 
     /// The quick-capture bubble's text is mirrored to PuckClient with
-    /// send(_:to: .gui) (2026-07-30) -- broadcast() deliberately doesn't
-    /// reach it, and a gui connection on its own must not make the pet
-    /// believe workspace is up (F6's offline bubble depends on that).
-    func test_sendToGUI_reachesTheGUIConnectionAndDoesNotCountAsAWorkspaceClient() {
+    /// Inverted on 2026-08-15. A gui connection used to be excluded from
+    /// broadcast() and from hasConnectedClients, because the process that
+    /// could act on user input was workspace and PuckClient was only a view.
+    /// With workspace deleted, PuckClient hosts the agent, so it is the only
+    /// thing broadcast() can reach -- and F6's offline bubble now means "the
+    /// chat window is closed" rather than "workspace is down".
+    func test_guiConnectionIsWhatBroadcastReaches() {
         let guiReceived = expectation(description: "gui connection received the mirrored user_input")
         let guiPresent = expectation(description: "server registered the gui role")
         server.onGUIPresenceChanged = { present in if present { guiPresent.fulfill() } }
@@ -273,9 +283,11 @@ final class BridgeServerTests: XCTestCase {
         guiClient.start(queue: .main)
         wait(for: [guiPresent], timeout: 5)
 
-        XCTAssertFalse(server.hasConnectedClients, "a gui client can't act on user input")
-        XCTAssertFalse(server.broadcast(.userInput(UserInput(text: "사파리 켜줘", source: .text))), "broadcast has no workspace to reach")
-        XCTAssertTrue(server.send(.userInput(UserInput(text: "사파리 켜줘", source: .text)), to: .gui))
+        XCTAssertTrue(server.hasConnectedClients, "the gui client is the one that runs the agent now")
+        XCTAssertTrue(
+            server.broadcast(.userInput(UserInput(text: "사파리 켜줘", source: .text))),
+            "the pet's bubble and push-to-talk reach the agent through exactly this"
+        )
 
         wait(for: [guiReceived], timeout: 5)
         guiClient.cancel()

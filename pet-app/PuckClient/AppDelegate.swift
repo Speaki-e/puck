@@ -138,10 +138,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // delta to chat-web -- see ClientChatBridge.applyEvent's own
             // comment for why this replaces a direct handleChatEvent call.
             chatBridge.applyEvent(event, workspaceId: workspaceId, sessionId: sessionId)
-            // workspace's agent_done is also how a delegated code_editor call
-            // finds out it finished (CodeEditorDelegate).
             agentHost.handle(event, sessionId: sessionId)
-        case .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
+        case .workspaceCreate, .sessionCreate:
             clientWindowStore.handleClientUpdate(message)
             chatBridge.refreshWorkspacesAndSessions()
         case .toolResult(let result):

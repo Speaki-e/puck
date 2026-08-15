@@ -183,9 +183,11 @@ extension AppDelegate {
         stateBeforePin = nil
     }
 
-    /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선".
+    /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선". What is missing is
+    /// PuckClient now, not workspace -- it hosts the agent as of 2026-08-15 --
+    /// so the wording names the chat window the user would actually open.
     private func showWorkspaceOfflineBubble() {
-        showNoticeBubble("워크스페이스가 꺼져 있어요", for: 2.5)
+        showNoticeBubble("채팅 창이 꺼져 있어요", for: 2.5)
     }
 
     /// Puts the bubble over the pet's head, so what it says comes from it

@@ -32,9 +32,12 @@ protocol UserInputTransport: AnyObject {
 
 enum UserInputDelivery: Equatable {
     case sent
-    /// Nothing is listening: the socket server never started, or workspace
-    /// is not connected (or has since gone away).
-    case workspaceDisconnected
+    /// Nothing is listening: the socket server never started, or PuckClient
+    /// (which hosts the agent) is not connected. Named for the outcome rather
+    /// than for who is missing -- it meant "workspace is gone" until that app
+    /// was deleted on 2026-08-15, and a name that says which process is down
+    /// only has to be renamed again the next time that changes.
+    case notDelivered
 }
 
 final class UserInputSender {
@@ -94,9 +97,9 @@ final class UserInputSender {
 
     private func broadcast(_ message: BridgeMessage) -> UserInputDelivery {
         guard let transport = transport(), transport.hasConnectedClients else {
-            return .workspaceDisconnected
+            return .notDelivered
         }
         let delivered = transport.broadcast(message)
-        return delivered ? .sent : .workspaceDisconnected
+        return delivered ? .sent : .notDelivered
     }
 }

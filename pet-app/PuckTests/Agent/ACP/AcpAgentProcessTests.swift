@@ -59,7 +59,7 @@ final class AcpAgentCommandResolverTests: XCTestCase {
                 for: .claude,
                 scriptURL: URL(fileURLWithPath: "/x/acp-claude.mjs"),
                 node: nil,
-                codexCLI: nil
+                vendorCLI: URL(fileURLWithPath: "/usr/bin/claude")
             )
         ) { XCTAssertEqual($0 as? AcpAgentCommandError, .nodeNotFound) }
     }
@@ -70,46 +70,87 @@ final class AcpAgentCommandResolverTests: XCTestCase {
                 for: .claude,
                 scriptURL: nil,
                 node: URL(fileURLWithPath: "/usr/bin/node"),
-                codexCLI: nil
+                vendorCLI: URL(fileURLWithPath: "/usr/bin/claude")
             )
         ) { XCTAssertEqual($0 as? AcpAgentCommandError, .agentScriptMissing(.claude)) }
     }
 
-    func testClaudeRunsTheBundledScriptUnderNode() throws {
+    func testTheBundledScriptIsRunUnderNode() throws {
         let command = try AcpAgentCommandResolver.command(
             for: .claude,
             scriptURL: URL(fileURLWithPath: "/x/acp-claude.mjs"),
             node: URL(fileURLWithPath: "/usr/bin/node"),
-            codexCLI: nil
+            vendorCLI: URL(fileURLWithPath: "/usr/bin/claude")
         )
 
         XCTAssertEqual(command.executable.path, "/usr/bin/node")
         XCTAssertEqual(command.arguments, ["/x/acp-claude.mjs"])
-        XCTAssertTrue(command.extraEnvironment.isEmpty, "claude is self-contained; nothing to point it at")
     }
 
-    func testCodexIsPointedAtTheUsersOwnCLI() throws {
-        let command = try AcpAgentCommandResolver.command(
+    func testEachAgentIsPointedAtItsOwnVendorCLI() throws {
+        // Neither shim is self-contained: each resolves a ~256MB native binary
+        // out of a node_modules tree that does not exist inside Puck.app, and
+        // does it lazily -- at session/new, long after initialize succeeds.
+        let claude = try AcpAgentCommandResolver.command(
+            for: .claude,
+            scriptURL: URL(fileURLWithPath: "/x/acp-claude.mjs"),
+            node: URL(fileURLWithPath: "/usr/bin/node"),
+            vendorCLI: URL(fileURLWithPath: "/usr/local/bin/claude")
+        )
+        let codex = try AcpAgentCommandResolver.command(
             for: .codex,
             scriptURL: URL(fileURLWithPath: "/x/acp-codex.mjs"),
             node: URL(fileURLWithPath: "/usr/bin/node"),
-            codexCLI: URL(fileURLWithPath: "/opt/homebrew/bin/codex")
+            vendorCLI: URL(fileURLWithPath: "/opt/homebrew/bin/codex")
         )
 
-        // Without CODEX_PATH, codex-acp resolves @openai/codex out of a
-        // node_modules tree that does not exist inside Puck.app.
-        XCTAssertEqual(command.extraEnvironment["CODEX_PATH"], "/opt/homebrew/bin/codex")
+        XCTAssertEqual(claude.extraEnvironment["CLAUDE_CODE_EXECUTABLE"], "/usr/local/bin/claude")
+        XCTAssertEqual(codex.extraEnvironment["CODEX_PATH"], "/opt/homebrew/bin/codex")
     }
 
-    func testCodexWithoutItsCLIIsRefusedRatherThanSpawnedToFail() {
-        XCTAssertThrowsError(
-            try AcpAgentCommandResolver.command(
-                for: .codex,
-                scriptURL: URL(fileURLWithPath: "/x/acp-codex.mjs"),
-                node: URL(fileURLWithPath: "/usr/bin/node"),
-                codexCLI: nil
-            )
-        ) { XCTAssertEqual($0 as? AcpAgentCommandError, .codexCLINotFound) }
+    func testAnAgentWithoutItsVendorCLIIsRefusedRatherThanSpawnedToFail() {
+        for kind in CodingAgentKind.allCases {
+            XCTAssertThrowsError(
+                try AcpAgentCommandResolver.command(
+                    for: kind,
+                    scriptURL: URL(fileURLWithPath: "/x/agent.mjs"),
+                    node: URL(fileURLWithPath: "/usr/bin/node"),
+                    vendorCLI: nil
+                )
+            ) { XCTAssertEqual($0 as? AcpAgentCommandError, .vendorCLINotFound(kind)) }
+        }
+    }
+
+    func testTheVendorCLIOverrideVariableWins() {
+        let found = AcpAgentCommandResolver.resolveVendorCLI(
+            for: .claude,
+            environment: ["CLAUDE_CODE_EXECUTABLE": "/custom/claude", "PATH": "/usr/bin"],
+            fileExists: { $0 == "/custom/claude" || $0 == "/usr/bin/claude" }
+        )
+
+        XCTAssertEqual(found?.path, "/custom/claude", "a user who already set it keeps their choice")
+    }
+
+    func testTheVendorCLIIsFoundOnPath() {
+        let found = AcpAgentCommandResolver.resolveVendorCLI(
+            for: .codex,
+            environment: ["PATH": "/usr/bin:/opt/bin"],
+            fileExists: { $0 == "/opt/bin/codex" }
+        )
+
+        XCTAssertEqual(found?.path, "/opt/bin/codex")
+    }
+
+    func testTheVendorCLIFallsBackToNpmGlobal() {
+        // Where `npm i -g @anthropic-ai/claude-code` lands when a prefix is set,
+        // which PATH may not cover for a GUI app launched from Finder.
+        let found = AcpAgentCommandResolver.resolveVendorCLI(
+            for: .claude,
+            environment: ["PATH": "/usr/bin", "HOME": "/Users/x"],
+            fileExists: { $0 == "/Users/x/.npm-global/bin/claude" }
+        )
+
+        XCTAssertEqual(found?.path, "/Users/x/.npm-global/bin/claude")
     }
 
     func testEachAgentNamesADistinctBundledScript() {
@@ -127,9 +168,12 @@ final class AcpAgentCommandResolverTests: XCTestCase {
 /// machine without node is a supported configuration (code_editor is simply
 /// unavailable there), so this must not turn into a red suite.
 final class AcpAgentProcessIntegrationTests: XCTestCase {
-    func testTheVendoredClaudeAgentCompletesTheHandshake() async throws {
+    func testTheVendoredClaudeAgentOpensARealSession() async throws {
         guard let node = AcpAgentCommandResolver.resolveNode() else {
             throw XCTSkip("no node on this machine; code_editor is unavailable here by design")
+        }
+        guard let vendorCLI = AcpAgentCommandResolver.resolveVendorCLI(for: .claude) else {
+            throw XCTSkip("no claude CLI on this machine; the claude agent is unavailable here by design")
         }
         guard let script = AcpAgentCommandResolver.bundledScriptURL(for: .claude, in: Bundle(for: Self.self))
             ?? AcpAgentCommandResolver.bundledScriptURL(for: .claude) else {
@@ -137,27 +181,39 @@ final class AcpAgentProcessIntegrationTests: XCTestCase {
         }
 
         let command = try AcpAgentCommandResolver.command(
-            for: .claude, scriptURL: script, node: node, codexCLI: nil
+            for: .claude, scriptURL: script, node: node, vendorCLI: vendorCLI
         )
         let agent = AcpAgentProcess(
             command: command,
             projectPath: NSTemporaryDirectory(),
-            // No key: `initialize` is answered before any credential is needed,
-            // which is exactly the part worth testing without one.
+            // No key on purpose: everything up to session/new works without
+            // one, and only session/prompt needs real credentials -- which a
+            // build machine has no reason to hold.
             credentials: [:]
         )
         try agent.start()
         defer { agent.kill() }
 
-        let result = try await agent.connection.request(
+        let initialized = try await agent.connection.request(
             method: AcpMethod.initialize,
             params: .object([
                 "protocolVersion": .number(Double(acpProtocolVersion)),
                 "clientCapabilities": .object([:]),
             ])
         )
+        XCTAssertEqual(initialized["protocolVersion"]?.numberValue, Double(acpProtocolVersion))
+        XCTAssertEqual(initialized["agentInfo"]?["name"]?.stringValue, "@agentclientprotocol/claude-agent-acp")
 
-        XCTAssertEqual(result["protocolVersion"]?.numberValue, Double(acpProtocolVersion))
-        XCTAssertEqual(result["agentInfo"]?["name"]?.stringValue, "@agentclientprotocol/claude-agent-acp")
+        // session/new, not just initialize. This is where the shim resolves its
+        // native binary, and an initialize-only assertion once passed against a
+        // bundle that could not open a session at all.
+        let session = try await agent.connection.request(
+            method: AcpMethod.sessionNew,
+            params: .object([
+                "cwd": .string(NSTemporaryDirectory()),
+                "mcpServers": .array([]),
+            ])
+        )
+        XCTAssertNotNil(session["sessionId"]?.stringValue)
     }
 }

@@ -14,14 +14,20 @@
 # then commit the regenerated .mjs files. This is the one Node dependency left
 # in the repo, and it is build-time only.
 #
-# ## codex needs the codex CLI, which is NOT vendored
+# ## Neither agent is self-contained: both need their vendor's CLI
 #
-# @agentclientprotocol/codex-acp is only a shim: it spawns the real `codex`
-# binary, which ships as a 262MB per-platform native package (@openai/codex).
-# Vendoring that would multiply the app's size for one optional agent, so
-# AcpAgentProcess points codex-acp at the user's own install through CODEX_PATH
-# instead (codex-acp reads it -- see startCodexConnection). No codex on the
-# machine means the codex agent is unavailable; claude is unaffected.
+# Both ACP packages are shims. claude-agent-acp resolves @anthropic-ai/
+# claude-agent-sdk to find a 256MB native binary; codex-acp resolves
+# @openai/codex to find a 262MB one. Vendoring either would multiply the app's
+# size, so AcpAgentProcess points each shim at the user's own install through
+# the variable the shim already reads -- CLAUDE_CODE_EXECUTABLE and CODEX_PATH.
+# Without that CLI installed, that agent is unavailable and the other is
+# unaffected.
+#
+# The resolution is lazy, which is a trap: `initialize` is answered long before
+# the binary is needed, so a bundle missing it looks perfectly healthy until
+# the first real edit. That is why the smoke test below goes all the way to
+# session/new -- an initialize-only probe shipped exactly that bug once.
 set -e
 cd "$(dirname "$0")/.."
 
@@ -62,16 +68,35 @@ mkdir -p "$DEST"
 bundle "@agentclientprotocol/claude-agent-acp" "acp-claude.mjs"
 bundle "@agentclientprotocol/codex-acp" "acp-codex.mjs"
 
-# Smoke test: an agent that can't answer `initialize` is not worth shipping,
-# and this catches a bundling regression (a dynamic require esbuild couldn't
-# see) at build time rather than the first time someone asks for an edit.
-if command -v node > /dev/null 2>&1; then
-    probe='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}'
-    if ! printf '%s\n' "$probe" | node "$DEST/acp-claude.mjs" 2>/dev/null | grep -q '"protocolVersion"'; then
+# Smoke test: initialize *and* session/new. The second is the one that matters
+# -- it is where the shim dynamically resolves its native binary, so it is the
+# step that catches an import esbuild could not inline. Requires node and the
+# claude CLI; skipped rather than failed without them, since neither absence is
+# a bundling bug.
+#
+# codex-acp is deliberately not probed: same shape, and its CLI is a 262MB
+# install that a machine building this repo has no reason to have.
+if command -v node > /dev/null 2>&1 && command -v claude > /dev/null 2>&1; then
+    probe_output=$(
+        {
+            printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}'
+            sleep 2
+            printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"session/new\",\"params\":{\"cwd\":\"$(pwd)\",\"mcpServers\":[]}}"
+            sleep 5
+        } | CLAUDE_CODE_EXECUTABLE="$(command -v claude)" node "$DEST/acp-claude.mjs" 2>/dev/null
+    )
+    if ! printf '%s' "$probe_output" | grep -q '"protocolVersion"'; then
         echo "error: acp-claude.mjs did not answer initialize" >&2
         exit 1
     fi
-    echo "smoke test: acp-claude.mjs answers initialize"
-    # codex-acp is deliberately not probed here -- it needs the codex CLI,
-    # which this machine may not have, and its absence is not a bundling bug.
+    if ! printf '%s' "$probe_output" | grep -q '"sessionId"'; then
+        echo "error: acp-claude.mjs answered initialize but could not open a session." >&2
+        echo "       Usually a dependency esbuild could not inline -- check the" >&2
+        echo "       error's data.details in the output below." >&2
+        printf '%s\n' "$probe_output" | tail -3 >&2
+        exit 1
+    fi
+    echo "smoke test: acp-claude.mjs answers initialize and opens a session"
+else
+    echo "smoke test: skipped (needs both node and the claude CLI)"
 fi

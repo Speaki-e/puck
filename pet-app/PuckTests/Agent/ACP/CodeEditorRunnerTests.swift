@@ -226,18 +226,23 @@ final class CodeEditorRunnerTests: XCTestCase {
         XCTAssertTrue(result.summary.contains("Node.js"))
     }
 
-    func testAMissingCodexCLIExplainsTheAlternative() async {
-        let runner = CodeEditorRunner(environment: makeEnvironment(
-            agent: { _, _ in throw AcpAgentCommandError.codexCLINotFound },
-            kind: .codex
-        ))
+    func testAMissingVendorCLINamesTheOneToInstall() async {
+        for kind in CodingAgentKind.allCases {
+            let runner = CodeEditorRunner(environment: makeEnvironment(
+                agent: { _, _ in throw AcpAgentCommandError.vendorCLINotFound(kind) },
+                kind: kind
+            ))
 
-        let result = await runner.run(
-            requestId: "r1", workspaceId: "w1", projectPath: project.path, task: "go"
-        )
+            let result = await runner.run(
+                requestId: "r1", workspaceId: "w1", projectPath: project.path, task: "go"
+            )
 
-        XCTAssertTrue(result.summary.contains("codex"))
-        XCTAssertTrue(result.summary.contains("claude"), "and says what to do instead")
+            XCTAssertFalse(result.ok)
+            XCTAssertTrue(
+                result.summary.contains(kind.vendorCLIName),
+                "the message has to name the missing CLI, not just say something failed"
+            )
+        }
     }
 
     // MARK: - Changed files

@@ -180,8 +180,10 @@ actor CodeEditorRunner {
         switch error as? AcpAgentCommandError {
         case .nodeNotFound:
             return "코드 편집에는 Node.js가 필요합니다. 설치 후 다시 시도해 주세요."
-        case .codexCLINotFound:
-            return "codex CLI를 찾을 수 없습니다. 설치하거나 설정에서 claude를 선택해 주세요."
+        case .vendorCLINotFound(let missing):
+            // Both agents need their vendor's own CLI installed; neither ships
+            // inside Puck.app (see scripts/vendor-acp.sh).
+            return "\(missing.vendorCLIName) CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요."
         case .agentScriptMissing:
             return "코딩 에이전트(\(kind.rawValue))가 앱에 포함되어 있지 않습니다."
         case .none:

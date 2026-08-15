@@ -36,8 +36,7 @@ final class LaunchAppHandler: ToolHandler {
     var onAppLaunched: ((pid_t) -> Void)?
 
     /// Fired the instant a launch is asked for, *before* the app is opened, so
-    /// the pet can be seen doing something first (byeolki, 2026-07-31: "약간
-    /// 이 펫이 켜주는 느낌을 내고 싶은데"). Ordering is the whole trick: a
+    /// the pet can be seen doing something first. Ordering is the whole trick: a
     /// window that appears before the pet moves reads as the app opening on
     /// its own, with the pet wandering over afterwards.
     var onLaunchRequested: (() -> Void)?
@@ -76,7 +75,7 @@ final class LaunchAppHandler: ToolHandler {
 
         let configuration = NSWorkspace.OpenConfiguration()
         // Deliberately NOT letting the workspace raise it. The app must end up
-        // in front (byeolki: "킨 앱이나 그런 것들이 창 맨 앞으로 나오게"), but
+        // in front, but
         // *when* is the point: raising it here would put the window up before
         // the pet has visibly done anything. bringToFront owns the timing.
         configuration.activates = false

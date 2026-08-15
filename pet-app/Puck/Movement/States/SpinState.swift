@@ -3,9 +3,8 @@
 //  Puck
 //
 //  F3 · owner: 박해영 (Haeyoung Park)
-//  The happy flips the pet does after being petted (byeolki: "쓰담쓰담 끝나면
-//  일정 시간동안 빙글 빙글 돌기" → "회전이 아니라 뒤집는거를 원함",
-//  2026-07-29). It turns about its own vertical axis, like a sheet of paper
+//  The happy flips the pet does after being petted, for a while afterward.
+//  It turns about its own vertical axis, like a sheet of paper
 //  being turned over repeatedly -- not an in-plane rotation, which tips the
 //  pet sideways and reads as falling over.
 //

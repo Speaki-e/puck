@@ -9,8 +9,7 @@
 //  ("임의 | 캐릭터 드래그/드롭 | ReactDrag(커서 추종) → Fall",
 //  plan/02_pet-app.md section 3).
 //
-//  While held, the pet is **not moving** — it is being carried (byeolki:
-//  "이동한다는 개념이 아니라 잡고 끌려간다는 개념", 2026-07-29). So this state
+//  While held, the pet is **not moving** — it is being carried. So this state
 //  runs no locomotion at all: no easing, no speed, no MovementSolver. The pet
 //  is rigidly attached to the cursor and its position is assigned outright,
 //  exactly like dragging a window ("구글 창 같은걸 드래그 할때처럼"). Every

@@ -104,8 +104,8 @@ struct SettingsView: View {
         .frame(width: MenuBarController.panelSize.width, height: MenuBarController.panelSize.height)
         .preferredColorScheme(appearance.colorScheme)
         // `.id` forces SwiftUI to discard and rebuild this subtree instead of
-        // diffing it in place -- byeolki, 2026-08-01: "라이트 테마에서 다크
-        // 테마로 가면 멀쩡한데, 라이트 테마에서 시스템 테마로 가면 이상함."
+        // diffing it in place: Light->System looked broken while Light->Dark
+        // rendered fine.
         // Explicit->explicit (Light->Dark) is a genuine value change SwiftUI
         // diffs correctly; explicit->nil (System) is a documented SwiftUI
         // quirk where `.preferredColorScheme(nil)` sometimes fails to
@@ -212,7 +212,7 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         SettingsSection(title: text(.tabGeneral)) {
-            // byeolki: "화이트모드 다크모드 추가하고" -- an explicit override,
+            // An explicit override,
             // not just passively following the system (.system does that).
             SettingsStackedRow(label: text(.appearanceLabel)) {
                 Picker("", selection: $appearance) {
@@ -224,8 +224,8 @@ struct SettingsView: View {
                 .labelsHidden()
                 .onChange(of: appearance) { store.appearance = $0 }
             }
-            // byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를
-            // 통한 셰이디 설정으로 변경할 수 있어야하거든" -- the client
+            // The client theme should stay in sync with the menu bar
+            // settings the way Shady-style apps do -- the client
             // (chat) window's own theme, moved here from a ClientWindow-
             // local popover so it's controlled from the same place as every
             // other appearance setting.

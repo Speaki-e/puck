@@ -5,8 +5,8 @@
 //  F3/F13 · owner: 박해영 (Haeyoung Park)
 //  Pinned state's StateHandler implementation.
 //
-//  Entered when Option+Shift+Space summons the F13 client window (byeolki,
-//  2026-07-29: "캐릭터를 고정하고 그 옆에 입력 모달을 보이고"). Like Listen
+//  Entered when Option+Shift+Space summons the F13 client window -- the
+//  character should hold still with the input panel beside it. Like Listen
 //  (F7), this is a trivial pass-through -- the "capture current state, enter
 //  Pinned, restore on close" logic lives in AppDelegate (see stateBeforePin),
 //  not here. No dedicated manifest clip exists for this, so it reuses "idle"

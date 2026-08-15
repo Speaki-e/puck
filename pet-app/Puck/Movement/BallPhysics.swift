@@ -14,8 +14,8 @@
 //
 //  2026-07-29: the toy is permanent. It used to be a decorative fling that
 //  expired after 1.2s, and separately a head-bonk was meant to make it
-//  disappear -- byeolki asked for it to stay ("던지고 사라지지 않게 계속
-//  남아있게"), so a kick now always ends by coming to rest somewhere, ready
+//  disappear -- it should stay out and stick around instead, so a kick now
+//  always ends by coming to rest somewhere, ready
 //  to be chased again. `.gone` survives only as a safety valve for a toy with
 //  no surface anywhere below it.
 //
@@ -29,8 +29,7 @@ enum BallPhase: Equatable {
     /// Landed, waiting for the pet to kick it.
     case resting
     /// Picked up by the cursor. Physics is suspended entirely -- the toy is
-    /// wherever the hand puts it (byeolki: "호박도 펫처럼 커서로 집을 수
-    /// 있게", 2026-07-29), the same model ReactDrag uses for the pet.
+    /// wherever the hand puts it, the same model ReactDrag uses for the pet.
     case held
     /// Held by the PET rather than the cursor -- spinning over its head.
     /// Physics is suspended for the same reason `held` suspends it.
@@ -64,8 +63,8 @@ enum BallPhysics {
 
     /// `visualBounds` is the toy's visible outline relative to its position,
     /// so it bounces off a wall when its artwork meets it rather than when
-    /// its centre does -- the same rule the pet uses (byeolki: "그 호박도
-    /// 펫처럼 화면밖으로 못나가고 튕기게", 2026-07-29). Zero means a
+    /// its centre does -- the same rule the pet uses, bouncing off the
+    /// screen edge instead of leaving it. Zero means a
     /// point-sized toy, which is what the drawn-circle fallback and the
     /// existing tests assume.
     static func step(
@@ -91,8 +90,8 @@ enum BallPhysics {
 
         case .resting:
             // Whatever it was resting on can go away -- most obviously the
-            // pet's own head, which walks off (byeolki: "장난감은 펫 머리 위에
-            // 올리고 펫이 움직이면 장난감이 공중부양을 해", 2026-07-30), but
+            // pet's own head, which walks off leaving the toy floating in
+            // place, but
             // equally a window that closes. Without this a resting toy is
             // pinned in the air forever, because nothing else ever re-examines
             // a toy that has already landed.
@@ -155,8 +154,8 @@ enum BallPhysics {
                 }
             }
 
-            // Nothing times out: the toy stays on the desk once thrown
-            // (byeolki: "던지고 사라지지 않게 계속 남아있게"). The bounds
+            // Nothing times out: the toy stays on the desk once thrown.
+            // The bounds
             // check is the one remaining way it can end, and with all four
             // edges now closed it only fires when there is no surface under
             // it at all -- a safety valve, not a rule of play.

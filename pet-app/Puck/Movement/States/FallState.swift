@@ -9,8 +9,7 @@
 //  Fall만 낙하 가속도"). The surface comes from StateContext.landingY, which
 //  F4's LandingSurfaceResolver answers with a window top edge or the floor.
 //
-//  Also where a throw plays out (byeolki: "드래그해서 던지면 던져지게",
-//  2026-07-29). Being thrown is not a state of its own -- it is this same fall
+//  Also where a throw plays out. Being thrown is not a state of its own -- it is this same fall
 //  with a sideways speed to start with, taken from CharacterBody.launchVelocity
 //  on the first frame. Walking off a window leaves that at zero and falls
 //  straight down exactly as before.
@@ -29,8 +28,7 @@ final class FallState: StateHandler {
     private var hasLanded = false
     private var hasTakenLaunchVelocity = false
     /// True once gravity has brought the pet down onto the landing surface
-    /// at least once (a bounce or the final rest) -- byeolki: "퉁퉁 튕겨서
-    /// 사악 미끄러지게". Ground friction only applies from here on, so
+    /// at least once (a bounce or the final rest). Ground friction only applies from here on, so
     /// mid-air/wall-bounce speed during the throw itself is unaffected.
     private var hasTouchedGround = false
 

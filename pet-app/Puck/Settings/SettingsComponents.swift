@@ -3,9 +3,8 @@
 //  Puck
 //
 //  Shared · owner: 박해영 (Haeyoung Park)
-//  The settings window's building blocks, in pokoPet's vocabulary --
-//  byeolki (2026-07-31): "pokopet 설정창과 비슷하게 우리 설정 창도
-//  만들어줘", pointing at that app's menu bar popover.
+//  The settings window's building blocks, in pokoPet's vocabulary -- modeled
+//  after that app's menu bar popover.
 //
 //  What that reference actually is, structurally: one narrow scrolling
 //  column on a single translucent panel. Small grey section labels, compact

@@ -19,7 +19,7 @@ enum PetGesture: Equatable {
     /// Pressed and released without meaningfully moving.
     case tapped
     /// Two taps in quick succession, close together -- "petting" the
-    /// character (2026-07-29, byeolki's request for more interactions).
+    /// character (2026-07-29).
     case doubleTapped
     case dragBegan(CGPoint)
     case dragMoved(CGPoint)

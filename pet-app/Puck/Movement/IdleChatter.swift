@@ -7,8 +7,7 @@
 //
 //  Every other sound in the app is a *reaction* -- to a state entry, a click,
 //  a tool result. A pet that only ever speaks when something happens to it
-//  goes silent for minutes at a time (byeolki: "가끔씩 ... 하게",
-//  2026-07-31), so this is the one timer-driven trigger: while Idle, every
+//  goes silent for minutes at a time, so this is the one timer-driven trigger: while Idle, every
 //  now and then, it says one of whatever lines the avatar happens to carry.
 //
 //  Which lines those are is the avatar's business, not this file's: the keys

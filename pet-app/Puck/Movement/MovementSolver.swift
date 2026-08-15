@@ -27,8 +27,7 @@ enum MovementSolver {
     static let gravity: CGFloat = 2400
     /// The speed a fall settles at, px/sec — what air resistance does to a
     /// real falling object, and the reason a dropped ball reads as descending
-    /// steadily rather than ever faster (byeolki: "진짜 공 던지는것 처럼 쭉
-    /// 일정하게 떨어지게", 2026-07-29).
+    /// steadily rather than ever faster, the way a real thrown ball does.
     ///
     /// Uncapped, the pet spends the last quarter of a long drop moving 35px a
     /// frame, which reads as it being yanked onto the floor rather than
@@ -38,15 +37,15 @@ enum MovementSolver {
     static let terminalVelocity: CGFloat = 1200
     /// How close counts as "there".
     static let arrivalRadius: CGFloat = 2
-    /// Fastest the pet can be thrown, px/sec (byeolki: "드래그해서 던지면
-    /// 던져지게", 2026-07-29). A flick of the wrist can move the cursor
+    /// Fastest the pet can be thrown, px/sec. A flick of the wrist can move the cursor
     /// several thousand px/sec, which would fire the pet off the far edge of
     /// the screen before the eye can follow it; this crosses a display in
     /// roughly half a second, which still reads as a hard throw.
     static let maxThrowSpeed: CGFloat = 2500
     /// How fast horizontal speed decays once the pet has touched the ground
-    /// after a bounce -- byeolki: "퉁퉁 튕겨서 사악 미끄러지게" wants a slide
-    /// to a stop, not an instant one. Frame-rate-independent exponential
+    /// after a bounce -- a slide
+    /// to a stop, not an instant one, is what makes a landing read as bouncy
+    /// rather than stopping dead. Frame-rate-independent exponential
     /// decay, same idiom as ReactDragState's cursor-velocity smoothing.
     static let groundFrictionRate: CGFloat = 3.0
     struct Step: Equatable {
@@ -61,8 +60,7 @@ enum MovementSolver {
         /// True the frame gravity brought the pet down onto (or into) the
         /// landing surface, whether that produced a bounce or the final rest
         /// -- false throughout ordinary free fall. FallState uses this to
-        /// know when to start applying ground friction to horizontal speed
-        /// (byeolki: "퉁퉁 튕겨서 사악 미끄러지게").
+        /// know when to start applying ground friction to horizontal speed.
         let touchedFloor: Bool
     }
 
@@ -130,8 +128,7 @@ enum MovementSolver {
         // BallPhysics's drop reuses this same function with its own
         // separate bounce/juggle mechanics already tuned around landing
         // meaning "resting", so it must not start bouncing too. Only
-        // FallState (the pet itself) opts in (byeolki: "퉁퉁 튕겨서 사악
-        // 미끄러지게").
+        // FallState (the pet itself) opts in.
         bounceOnLanding: Bool = false
     ) -> FallStep {
         let newVelocity = min(velocity + gravity * CGFloat(dt), terminalVelocity)
@@ -153,7 +150,7 @@ enum MovementSolver {
     }
 
     /// Ground friction applied to horizontal speed once FallState has
-    /// touched down (byeolki: "퉁퉁 튕겨서 사악 미끄러지게") -- a slide that
+    /// touched down -- a slide that
     /// decays to a stop, rather than either staying constant forever or
     /// dropping to zero the instant contact happens. Snaps to exactly zero
     /// once negligible so a fall doesn't drift forever at an imperceptible

@@ -12,8 +12,8 @@
 //  is never the position the FSM computed -- it is a presentation value
 //  perpetually easing toward a target that moved again a frame ago, so the
 //  sprite lags behind, overshoots on direction changes, and slides after the
-//  pet has stopped. byeolki: "전체적으로 펫이 움직이는 방식이 너무 비정상적이고
-//  부드럽지 못해" (2026-07-29).
+//  pet has stopped -- the overall movement read as unnatural and janky
+//  rather than smooth.
 //
 //  This masqueraded as physics bugs for a long time, because the symptoms
 //  land on whatever motion is being looked at: a drag that trails the cursor

@@ -7,8 +7,8 @@
 //
 //  Until 2026-07-30 the app had exactly one toy: a single BallController that
 //  was rebuilt in place when the user picked a different one from Settings.
-//  byeolki asked for the menu to put toys out and take them away individually
-//  ("그걸 눌러서 나오게하고 다시 눌러서 없애는"), so several can now be out at
+//  The menu should be able to put toys out and take them away individually,
+//  so several can now be out at
 //  once and each one owns its own layer and physics.
 //
 //  The FSM is deliberately untouched by this. ChaseBall/JuggleBall/KickBall

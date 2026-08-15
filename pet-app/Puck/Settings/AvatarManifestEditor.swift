@@ -23,8 +23,7 @@ enum AvatarManifestEditorError: Error {
 
 enum AvatarManifestEditor {
     /// Where AppDelegate loads the active avatar from -- `name` is
-    /// `SettingsStore.selectedAvatarName` (byeolki, 2026-08-01: "아바타를
-    /// 프리셋 바꾸는거 마냥 바꿀 수 있게 해주고"). Settings edits this same
+    /// `SettingsStore.selectedAvatarName`. Settings edits this same
     /// directory pet-app is actually running against.
     static func currentAvatarDirectory(named name: String) -> URL {
         AvatarCatalogue.avatarsDirectory.appendingPathComponent(name, isDirectory: true)

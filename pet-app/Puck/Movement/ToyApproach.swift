@@ -3,8 +3,8 @@
 //  Puck
 //
 //  F12 · owner: 박해영 (Haeyoung Park)
-//  Where the pet should stand to play with the toy (byeolki: "펫이 호박을
-//  밟지 못하게", 2026-07-29).
+//  Where the pet should stand to play with the toy, so it stands beside the
+//  toy rather than on top of it.
 //
 //  ChaseBall used to be sent the toy's own position, which is the middle of
 //  it. That was harmless only while the toy rested with its centre buried in

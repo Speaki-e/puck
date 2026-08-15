@@ -30,6 +30,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         },
         resolveProjectPath: { [weak self] workspaceId in
             self?.clientWindowStore.workspaces.first { $0.id == workspaceId }?.projectPath
+        },
+        // Tells the agent which project it is looking at. Read fresh per run
+        // rather than captured: the user switches workspaces between turns.
+        describeWorkspace: { [weak self] workspaceId in
+            guard let workspace = self?.clientWindowStore.workspaces.first(where: { $0.id == workspaceId })
+            else { return nil }
+            return AgentRunner.WorkspaceContext(name: workspace.name, projectPath: workspace.projectPath)
         }
     )
     private var window: ClientWindow?

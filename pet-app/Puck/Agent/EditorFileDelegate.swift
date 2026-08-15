@@ -28,6 +28,60 @@ final class EditorFileDelegate {
         self.resolveProjectPath = resolveProjectPath
     }
 
+    /// How many paths `listFiles` will return before truncating. A project
+    /// tree is unbounded and this goes straight into the model's context, so
+    /// the cap is the point -- 400 paths is enough to recognize a project and
+    /// pick the next file to read, and small enough not to crowd out the
+    /// conversation.
+    static let listFileLimit = 400
+
+    /// list_files' delegate body: the project's files as a flat list of
+    /// relative paths.
+    ///
+    /// Added 2026-08-15. The agent could already *read* a file, but only if
+    /// the user named it -- there was no way to find out what was in the
+    /// project, or even that one was open, so "이 디렉토리 분석해줘" had no
+    /// path to an answer and the model fell back to get_frontmost_window,
+    /// which reports a window and knows nothing about directories.
+    ///
+    /// Flat rather than nested: the model only needs paths, and a nested JSON
+    /// tree spends most of its tokens on structure.
+    @MainActor
+    func listFiles(workspaceId: String) async -> DispatchedToolResult {
+        guard let projectPath = resolveProjectPath(workspaceId) else {
+            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "이 워크스페이스에는 연결된 프로젝트가 없어요.")
+        }
+        do {
+            let service = try WorkspaceFileService(root: URL(fileURLWithPath: projectPath, isDirectory: true))
+            var paths: [String] = []
+            Self.flatten(try service.listTree(), into: &paths)
+            let truncated = paths.count > Self.listFileLimit
+            let data = JSONValue.object([
+                "projectPath": .string(projectPath),
+                "files": .array(paths.prefix(Self.listFileLimit).map(JSONValue.string)),
+                "truncated": .bool(truncated),
+                "totalCount": .number(Double(paths.count)),
+            ])
+            return DispatchedToolResult(ok: true, data: data, error: nil, detail: nil)
+        } catch let error as WorkspaceFileServiceError {
+            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.message)
+        } catch {
+            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.localizedDescription)
+        }
+    }
+
+    /// Files only. A directory that holds nothing readable is not something
+    /// the model can act on, and its name is already implied by its children.
+    private static func flatten(_ entries: [FileTreeEntry], into paths: inout [String]) {
+        for entry in entries {
+            if let children = entry.children {
+                flatten(children, into: &paths)
+            } else {
+                paths.append(entry.path)
+            }
+        }
+    }
+
     /// read_file's delegate body. A one-off WorkspaceFileService rather than
     /// going through EditorPaneStorePool -- a plain read has no tab/watcher
     /// state worth keeping alive, unlike openInEditor below.

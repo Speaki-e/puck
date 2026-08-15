@@ -151,7 +151,11 @@ final class EditorPaneStore: ObservableObject {
         }
     }
 
-    private func handleFileSystemChanges(_ changes: [FileSystemChange]) {
+    /// Internal rather than private so the adopt-vs-warn decision can be
+    /// driven directly: FSEvents delivery is WorkspaceFileWatcherTests'
+    /// subject, and going through a real OS event to reach this branch makes
+    /// a logic test depend on scheduling it has no stake in.
+    func handleFileSystemChanges(_ changes: [FileSystemChange]) {
         loadTree()
         for change in changes {
             guard let relativePath = relativePath(for: change.path),
@@ -165,7 +169,17 @@ final class EditorPaneStore: ObservableObject {
             // event alone -- our own just-completed save fires this same
             // event, and would otherwise flag itself as an external conflict.
             guard let fresh = try? service.readFile(at: relativePath), fresh.revision != openTabs[index].revision else { continue }
-            openTabs[index].diskChanged = true
+            // A tab the user has not touched follows the file (2026-08-15).
+            // The conflict banner is the right answer for an edit the user
+            // would lose and the wrong one for a file they are only watching
+            // -- which is the whole of the code_editor case, where every
+            // change is one the agent was asked to make. Dirty tabs still
+            // get the banner: nothing silently overwrites typing.
+            if openTabs[index].isDirty {
+                openTabs[index].diskChanged = true
+            } else {
+                openTabs[index].adopt(fresh)
+            }
         }
     }
 

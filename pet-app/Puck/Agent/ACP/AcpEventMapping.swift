@@ -44,6 +44,15 @@ enum AcpEventMapping {
         }
     }
 
+    /// The file this update is about, if it names one. Same field the pet's
+    /// detail.path jump reads -- pulled out separately so the editor can
+    /// follow along without going through a BridgeEvent first.
+    static func editedPath(in update: AcpSessionUpdate) -> String? {
+        guard update.kind == .toolCall || update.kind == .toolCallUpdate else { return nil }
+        let call = update.raw["update"] ?? update.raw
+        return call["locations"]?.arrayValue?.first?["path"]?.stringValue
+    }
+
     /// ACP reports touched files as `locations: [{path}]`; the pet's contract
     /// is a bare `{path}`. Falls back to the tool's title so a tool_call with
     /// no location still reads as something in the transcript.

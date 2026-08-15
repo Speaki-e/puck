@@ -64,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clientWindowStore.onRunCancelled = { [weak self] in
             self?.agentHost.cancelPendingApprovals()
         }
+        agentHost.onRevealInEditor = { [weak self] workspaceId, _ in
+            self?.clientWindowStore.revealInEditor(workspaceId: workspaceId)
+            self?.showWindow()
+        }
         agentHost.onTaskSessionOpened = { [weak self] workspaceId, sourceSessionId, sessionId, title, userMessage in
             self?.clientWindowStore.moveTurnToTaskSession(
                 workspaceId: workspaceId,

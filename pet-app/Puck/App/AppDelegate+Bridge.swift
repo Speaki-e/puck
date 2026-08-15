@@ -17,6 +17,18 @@ extension AppDelegate {
 
         let router = BridgeMessageRouter(toolExecutor: toolExecutor)
         router.onEventReaction = { [weak self] reaction in self?.applyEventReaction(reaction) }
+        // Workspace/session creation is answered in-process as of 2026-08-15
+        // (was: relayed to workspace, which owned the registries). A registry
+        // that can't open its store is not a reason to refuse to launch --
+        // same independence principle as BridgeServer.start below.
+        if let registry = try? WorkspaceRegistry() {
+            router.workspaceCoordinator = WorkspaceCoordinator(workspaces: registry)
+            router.onWorkspaceConfirmation = { [weak self] confirmation in
+                _ = self?.bridgeServer?.send(confirmation, to: .gui)
+            }
+        } else {
+            AppLogger.shared.log(.error, "WorkspaceRegistry unavailable: new workspaces cannot be created this run")
+        }
         // onClientUpdate/onChatEvent go unset here -- PuckClient's own
         // ClientWindowStore consumes those now (2026-07-30), fed by its own
         // BridgeSocketClient connection, not this in-process router. This

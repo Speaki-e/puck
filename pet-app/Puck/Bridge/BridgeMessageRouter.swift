@@ -48,6 +48,16 @@ final class BridgeMessageRouter {
     /// EventReaction onEventReaction carries.
     var onChatEvent: ((BridgeEvent, _ workspaceId: String, _ sessionId: String) -> Void)?
 
+    /// Answers workspace_create_request / session_create_request locally.
+    /// Left optional so the many tests that only care about tool dispatch or
+    /// event reactions can keep constructing a router with one argument.
+    var workspaceCoordinator: WorkspaceCoordinator?
+
+    /// Where the confirmations produced by `workspaceCoordinator` go -- every
+    /// gui connection, which is what BridgeServer.relay did for them back when
+    /// workspace was the sender. Already on the main thread.
+    var onWorkspaceConfirmation: ((BridgeMessage) -> Void)?
+
     /// - Parameter dispatchToMain: injected so tests can observe the hop.
     ///   Defaults to an async hop to the main queue; it stays async even when
     ///   already on main so ordering is identical from every caller.
@@ -95,7 +105,18 @@ final class BridgeMessageRouter {
                 self?.onClientUpdate?(message)
             }
 
-        case .toolResult, .userInput, .workspaceCreateRequest, .sessionCreateRequest, .approvalResponse, .runCancel:
+        case .workspaceCreateRequest, .sessionCreateRequest:
+            // Answered in-process as of 2026-08-15 -- WorkspaceRegistry lives
+            // here now, so these no longer leave for workspace (Electron) and
+            // come back. ClientRelay stops routing them outward to match.
+            dispatchToMain { [weak self] in
+                guard let self, let coordinator = self.workspaceCoordinator else { return }
+                for confirmation in coordinator.handle(message) {
+                    self.onWorkspaceConfirmation?(confirmation)
+                }
+            }
+
+        case .toolResult, .userInput, .approvalResponse, .runCancel:
             break // pet-app only ever sends these, never receives them
 
         case .clientHello:

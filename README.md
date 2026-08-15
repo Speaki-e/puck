@@ -6,8 +6,18 @@ Monorepo for the Puck project (desktop pet + single AI agent). Two pieces:
   including the agent core (F15). Everything the product does at runtime is
   here.
 - `chat-web` — PuckClient's chat UI (React/Tailwind/shadcn), a static bundle
-  PuckClient loads via `WKWebView.loadFileURL`. Rebuild and re-embed it with
-  `pet-app/scripts/sync-chat-web.sh`; Xcode does not know it exists.
+  PuckClient loads via `WKWebView.loadFileURL`.
+
+## Building
+
+```sh
+cd pet-app
+sh scripts/sync-chat-web.sh   # required: builds chat-web into PuckClient's
+                              # resources, which are gitignored. Xcode has no
+                              # idea chat-web exists, so this is a separate step
+                              # and a fresh checkout will not build without it.
+sh scripts/install.sh         # builds + signs both apps into /Applications
+```
 
 `landing` (the marketing/landing site) and `plan` (product specs) stay separate
 repositories on purpose — not part of this monorepo.
@@ -32,9 +42,13 @@ this repo's log, and the archived GitHub repositories are still read-only.
 
 Puck runs without Node. The one exception is the coding agent behind
 `code_editor`: it is an ACP agent that runs under `node`, vendored as a single
-bundled file by `pet-app/scripts/vendor-acp.sh` (build-time only — the bundles
-are committed). It also needs its vendor's CLI (`claude` or `codex`) installed;
-without one, `code_editor` is unavailable and nothing else is affected.
+bundled file by `pet-app/scripts/vendor-acp.sh`. Those bundles *are* committed,
+so that script only needs running when bumping the pinned agent versions.
+
+The agent also needs its vendor's CLI (`claude` or `codex`) installed — the ACP
+packages are only shims around a ~256MB native binary, which is not vendored.
+Without node or that CLI, `code_editor` reports why and nothing else in the app
+is affected.
 
 See [`docs/decisions.md`](docs/decisions.md) for the rationale behind
 cross-cutting architecture changes.

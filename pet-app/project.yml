@@ -125,13 +125,6 @@ targets:
       - path: Puck/Bridge/UserInputSender.swift
       - path: Puck/App/CompanionAppLauncher.swift
       - path: Puck/App/AppIdentity.swift
-      # Static build of ../chat-web (React/Tailwind/shadcn), synced in by
-      # scripts/sync-chat-web.sh before generate.sh runs. Loaded via
-      # WKWebView.loadFileURL, not served over any network -- see
-      # docs/decisions.md and ClientChatWebView.swift.
-      - path: PuckClient/Resources/ChatWeb
-        type: folder
-        buildPhase: resources
     info:
       path: PuckClient/Resources/Info.plist
       properties:

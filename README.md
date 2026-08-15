@@ -1,22 +1,15 @@
 # Puck
 
-Monorepo for the Puck project (desktop pet + single AI agent). Two pieces:
+Repository for the Puck project (desktop pet + single AI agent). One piece:
 
 - `pet-app` — the Puck (pet) and PuckClient (chat/agent/editor) macOS apps,
-  including the agent core (F15). Everything the product does at runtime is
-  here.
-- `chat-web` — PuckClient's chat UI (React/Tailwind/shadcn), a static bundle
-  PuckClient loads via `WKWebView.loadFileURL`.
+  including the agent core (F15). All Swift.
 
 ## Building
 
 ```sh
 cd pet-app
-sh scripts/sync-chat-web.sh   # required: builds chat-web into PuckClient's
-                              # resources, which are gitignored. Xcode has no
-                              # idea chat-web exists, so this is a separate step
-                              # and a fresh checkout will not build without it.
-sh scripts/install.sh         # builds + signs both apps into /Applications
+sh scripts/install.sh   # builds + signs both apps into /Applications
 ```
 
 `landing` (the marketing/landing site) and `plan` (product specs) stay separate
@@ -25,9 +18,9 @@ repositories on purpose — not part of this monorepo.
 ## What used to be here
 
 The repo was merged from four separate repositories, each preserved as a
-subtree with full commit history. Three of them were deleted on 2026-08-15
-once pet-app absorbed the last thing each still did; their history is still in
-this repo's log, and the archived GitHub repositories are still read-only.
+subtree with full commit history. All of them were deleted on 2026-08-15 once
+pet-app absorbed the last thing each still did; their history is still in this
+repo's log, and the archived GitHub repositories are still read-only.
 
 - `workspace` — the local code editor (Electron + Monaco + ACP). PuckClient's
   editor pane went native SwiftUI first, then took over the workspace registry
@@ -37,6 +30,11 @@ this repo's log, and the archived GitHub repositories are still read-only.
   hold a contract against; the Swift copies in `pet-app/Puck` are now the
   contract.
 - `ai-module` — never built; superseded by pet-app's F15 agent.
+- `chat-web` — PuckClient's chat UI (React/Tailwind/shadcn) in a WKWebView.
+  Chosen to iterate quickly toward a bespoke shadcn look; once the target
+  became stock Apple components, native SwiftUI was the faster way to get
+  there and the web layer was pure cost. Its state always lived in
+  `ClientWindowStore`, so removing it removed a mirror, not a model.
 
 ## Node
 

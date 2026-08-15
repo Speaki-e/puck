@@ -13,7 +13,18 @@
 
 import Foundation
 
-final class AcpAgentProcess {
+/// What CodeEditorRunner needs from a running agent. Exists so the queue and
+/// cancellation logic can be tested against a scripted stream -- spawning node
+/// to prove that two runs on one workspace serialise would be testing the
+/// wrong thing, slowly.
+protocol AcpAgentTransport: AnyObject {
+    var connection: AcpConnection { get }
+    var isRunning: Bool { get }
+    func terminate()
+    func kill()
+}
+
+final class AcpAgentProcess: AcpAgentTransport {
     private let process = Process()
     private let stdinPipe = Pipe()
     private let stdoutPipe = Pipe()

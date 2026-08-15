@@ -106,14 +106,8 @@ final class BridgeConnection {
 
     func start(queue: DispatchQueue) {
         connection.stateUpdateHandler = { [weak self] state in
-            switch state {
-            case .ready:
-                self?.onReady?()
-            case .cancelled, .failed:
-                self?.close()
-            default:
-                break
-            }
+            if case .ready = state { self?.onReady?() }
+            if Self.endsTheConnection(state) { self?.close() }
         }
         connection.start(queue: queue)
         receiveNext()
@@ -143,9 +137,33 @@ final class BridgeConnection {
         connection.cancel()
     }
 
+    /// Which states mean this connection is over and the owner should retry.
+    /// Pure so the classification is testable without a real socket, the same
+    /// way BridgeServer.failureError(for:) is.
+    ///
+    /// `.waiting` counts (2026-08-15). NWConnection parks there when the peer
+    /// is not listening yet -- connecting to a unix path with no socket file,
+    /// which is exactly what PuckClient did when it won the race against
+    /// pet-app binding bridge.sock. It does not leave `.waiting` on its own
+    /// when the socket appears later, so treating it as "not closed" left the
+    /// client parked forever: connected at the fd level, never sending
+    /// client_hello, and invisible to the server, which then believed no gui
+    /// was attached at all.
+    static func endsTheConnection(_ state: NWConnection.State) -> Bool {
+        switch state {
+        case .cancelled, .failed, .waiting: return true
+        case .setup, .preparing, .ready: return false
+        @unknown default: return false
+        }
+    }
+
     private func close() {
         guard !hasClosed else { return }
         hasClosed = true
+        // Cancel rather than just dropping the reference: a connection parked
+        // in `.waiting` keeps its socket and its retries otherwise, and the
+        // owner is about to start a fresh one.
+        connection.cancel()
         onClose?()
     }
 

@@ -169,13 +169,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         // byeolki: "둘이 같이 가야하는거임" -- PuckClient (the F13 client
         // window, now a separate Dock-resident app) is useless without this
         // process hosting bridge.sock, so each launches the other.
-        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.puckClientBundleID)
-
         setUpMenuBar()
         setUpOverlayAndAvatar()
         setUpWindowSensing()
         setUpToolExecutor()
         setUpBridgeServer()
+        // After the socket exists, not before (2026-08-15). Launched first,
+        // PuckClient reliably lost the race and its NWConnection parked in
+        // `.waiting` on a path with no listener. BridgeConnection now treats
+        // that as a close and retries, so this ordering is no longer load-
+        // bearing -- but starting the client into a socket that is already
+        // there beats starting it into one that isn't and recovering.
+        CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.puckClientBundleID)
         setUpGlobalHotkeys()
         setUpFrameLoop()
         setUpSpaceChangeObserving()

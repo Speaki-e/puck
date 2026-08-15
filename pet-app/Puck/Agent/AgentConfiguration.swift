@@ -123,6 +123,71 @@ struct AgentConfiguration {
         return .openai
     }
 
+    /// Which ACP coding agent `code_editor` runs. A **different axis** from
+    /// `provider` above, which picks the pet's own brain: the pet can think
+    /// with OpenAI while handing edits to Claude Code, and that combination is
+    /// a normal one rather than a misconfiguration. Named `codingAgent` to
+    /// match the setting workspace used, so an existing `.env` keeps working.
+    var codingAgent: CodingAgentKind {
+        Self.codingAgent(environment: Self.loadedEnvironment, searchPaths: Self.loadedSearchPaths)
+    }
+
+    static func codingAgent(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
+    ) -> CodingAgentKind {
+        if let fromEnvironment = environment["CODING_AGENT"]?.nilIfBlank,
+           let kind = CodingAgentKind(rawValue: fromEnvironment.lowercased()) {
+            return kind
+        }
+        for directory in searchPaths {
+            if let fromFile = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))["CODING_AGENT"]?.nilIfBlank,
+               let kind = CodingAgentKind(rawValue: fromFile.lowercased()) {
+                return kind
+            }
+        }
+        // claude, not the pet's own provider: it is the agent this repo
+        // vendors self-contained, so it is the one that works with no further
+        // setup (codex additionally needs its CLI installed).
+        return .claude
+    }
+
+    /// The credentials to hand the ACP agent, and nothing else -- the child
+    /// process gets only the variables its own agent reads.
+    ///
+    /// Resolved from the same places the pet's own key is, so a `.env` holding
+    /// one key for both purposes just works. An agent whose key is missing is
+    /// still started: several are authenticated by their own CLI login rather
+    /// than an API key, and refusing to start would break that setup.
+    func codingAgentCredentials(
+        for kind: CodingAgentKind,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
+    ) -> [String: String] {
+        var credentials: [String: String] = [:]
+        for variable in kind.apiKeyEnvironmentVariables {
+            if let fromEnvironment = environment[variable]?.nilIfBlank {
+                credentials[variable] = fromEnvironment
+                continue
+            }
+            for directory in searchPaths {
+                if let fromFile = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))[variable]?.nilIfBlank {
+                    credentials[variable] = fromFile
+                    break
+                }
+            }
+        }
+        // The pet's own Anthropic key doubles as claude-agent-acp's when only
+        // one of the two was ever set -- they are the same credential.
+        if kind == .claude, credentials["ANTHROPIC_API_KEY"] == nil, provider == .anthropic, let apiKey {
+            credentials["ANTHROPIC_API_KEY"] = apiKey
+        }
+        return credentials
+    }
+
+    private static let loadedEnvironment = ProcessInfo.processInfo.environment
+    private static let loadedSearchPaths = AgentConfiguration.defaultSearchPaths
+
     /// Resolved independently of the key: a `.env` that only sets the model is
     /// a reasonable thing to have next to one that only sets the key.
     ///

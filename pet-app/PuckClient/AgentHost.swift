@@ -22,15 +22,20 @@ import AppKit
 final class AgentHost {
     private let broadcast: (BridgeMessage) -> Bool
     private let dispatcher: PetToolDispatcher
-    /// code_editor's executor lives in workspace, so it is delegated over
-    /// user_input rather than dispatched -- see CodeEditorDelegate.
-    private let codeEditorDelegate: CodeEditorDelegate
+    /// code_editor runs here as of 2026-08-15. It used to be delegated over
+    /// user_input to workspace's own agent (CodeEditorDelegate, deleted); now
+    /// this app spawns the ACP agent itself, so the tool completes without a
+    /// second process being alive.
+    private let codeEditorRunner: CodeEditorRunner
+    private let resolveProjectPath: (String) -> String?
     /// read_file/open_in_editor's implementation -- see EditorFileDelegate.
     private let editorFileDelegate: EditorFileDelegate
     private var runner: AgentRunner!
 
     /// approvalId -> the run waiting on the user's answer.
     private var pendingApprovals: [String: CheckedContinuation<Bool, Never>] = [:]
+    /// The code_editor run the 중지 button would cancel, if any.
+    private var activeCodeEditorRequestId: String?
     private let lock = NSLock()
 
     /// Re-read on every access rather than cached: the key can be typed into
@@ -62,16 +67,40 @@ final class AgentHost {
     init(broadcast: @escaping (BridgeMessage) -> Bool, resolveProjectPath: @escaping (String) -> String?) {
         self.broadcast = broadcast
         self.dispatcher = PetToolDispatcher(send: broadcast)
-        self.codeEditorDelegate = CodeEditorDelegate(send: { task, workspaceId, sessionId in
-            broadcast(.userInput(UserInput(
-                text: task,
-                source: .text,
-                workspaceId: workspaceId,
-                sessionId: sessionId,
-                attachments: nil
-            )))
-        })
+        self.resolveProjectPath = resolveProjectPath
         self.editorFileDelegate = EditorFileDelegate(resolveProjectPath: resolveProjectPath)
+
+        // Declared before `runner` so the closures below can capture it; the
+        // approval gate and event sink are attached afterwards, once `self`
+        // exists to weakly capture.
+        var relayEvent: ((BridgeEvent, String) -> Void)?
+        var askPermission: ((AcpPermissionRequest) async -> Bool)?
+        self.codeEditorRunner = CodeEditorRunner(
+            environment: CodeEditorRunnerEnvironment(
+                startAgent: { kind, projectPath in
+                    let command = try AcpAgentCommandResolver.command(
+                        for: kind,
+                        scriptURL: AcpAgentCommandResolver.bundledScriptURL(for: kind),
+                        node: AcpAgentCommandResolver.resolveNode(),
+                        codexCLI: kind == .codex ? AcpAgentCommandResolver.resolveCodexCLI() : nil
+                    )
+                    let process = AcpAgentProcess(
+                        command: command,
+                        projectPath: projectPath,
+                        credentials: AgentConfiguration.load().codingAgentCredentials(for: kind)
+                    )
+                    try process.start()
+                    return process
+                },
+                credentials: { AgentConfiguration.load().codingAgentCredentials(for: $0) },
+                codingAgent: { AgentConfiguration.load().codingAgent }
+            ),
+            onUpdate: { requestId, workspaceId, update in
+                guard let event = AcpEventMapping.event(for: update, callID: requestId) else { return }
+                relayEvent?(event, workspaceId)
+            },
+            resolvePermission: { request in await askPermission?(request) ?? false }
+        )
         self.runner = AgentRunner(
             client: makeAgentLLMClient({ .load() }),
             dispatcher: dispatcher,
@@ -86,11 +115,7 @@ final class AgentHost {
                 guard let self else {
                     return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
                 }
-                return await self.codeEditorDelegate.execute(
-                    task: task,
-                    workspaceId: self.activeWorkspaceId,
-                    sessionId: self.activeSessionId
-                )
+                return await self.runCodeEditor(task: task)
             },
             openTaskSession: { [weak self] title, brief in
                 self?.openTaskSession(title: title, brief: brief)
@@ -114,6 +139,70 @@ final class AgentHost {
             // whole -- interleaved order, never interleaved bytes.
             logger: ToolExecutionLogger()
         )
+
+        // Now that `self` exists, close the two loops the runner was built
+        // with placeholders for. Broadcast rather than applied locally, for
+        // the reason this file's header gives.
+        relayEvent = { [weak self] event, workspaceId in
+            guard let self else { return }
+            _ = self.broadcast(.event(event, workspaceId: workspaceId, sessionId: self.activeSessionId))
+        }
+        askPermission = { [weak self] request in
+            guard let self else { return false }
+            let approvalId = UUID().uuidString
+            let summary = request.toolName.map { "코드 편집: \($0)" } ?? "코딩 에이전트가 승인을 요청했어요."
+            _ = self.broadcast(.event(
+                .awaitApproval(summary: summary, approvalId: approvalId),
+                workspaceId: self.activeWorkspaceId,
+                sessionId: self.activeSessionId
+            ))
+            return await self.awaitApproval(id: approvalId)
+        }
+    }
+
+    /// One code_editor call. The workspace has to have a project directory --
+    /// an agent with nowhere to edit is refused up front rather than started
+    /// and left to fail on its first write.
+    private func runCodeEditor(task: String) async -> DispatchedToolResult {
+        let workspaceId = activeWorkspaceId
+        guard let projectPath = resolveProjectPath(workspaceId) else {
+            return DispatchedToolResult(
+                ok: false,
+                data: nil,
+                error: "execution_failed",
+                detail: "이 워크스페이스에는 프로젝트 폴더가 없어서 코드를 편집할 수 없어요."
+            )
+        }
+        let requestId = UUID().uuidString
+        lock.lock(); activeCodeEditorRequestId = requestId; lock.unlock()
+        defer {
+            lock.lock()
+            if activeCodeEditorRequestId == requestId { activeCodeEditorRequestId = nil }
+            lock.unlock()
+        }
+
+        let result = await codeEditorRunner.run(
+            requestId: requestId,
+            workspaceId: workspaceId,
+            projectPath: projectPath,
+            task: task
+        )
+        return DispatchedToolResult(
+            ok: result.ok,
+            data: result.ok ? .string(result.summary) : nil,
+            error: result.ok ? nil : (result.error == "cancelled" ? "cancelled" : "execution_failed"),
+            detail: result.detail ?? result.summary
+        )
+    }
+
+    /// The chat's 중지 button. Reaches the ACP agent through session/cancel
+    /// rather than a run_cancel on the socket, now that the agent is ours.
+    func cancelActiveCodeEditor() {
+        lock.lock()
+        let requestId = activeCodeEditorRequestId
+        lock.unlock()
+        guard let requestId else { return }
+        Task { _ = await codeEditorRunner.cancel(requestId: requestId) }
     }
 
     /// Every tool_result off the socket, so the dispatcher can match it to
@@ -155,17 +244,19 @@ final class AgentHost {
         }
     }
 
-    /// Every event off the socket. Only the delegate reads them, and only
-    /// agent_done for a session it is waiting on -- the chat timeline and the
-    /// pet's own reactions are fed elsewhere (AppDelegate.handle).
-    func handle(_ event: BridgeEvent, sessionId: String) {
-        codeEditorDelegate.handle(event, sessionId: sessionId)
-    }
+    /// Every event off the socket. Nothing here consumes them any more: the
+    /// one reader was CodeEditorDelegate, waiting on workspace's agent_done to
+    /// finish a delegated edit. code_editor completes in-process now, so the
+    /// chat timeline and the pet's reactions (fed elsewhere, AppDelegate.handle)
+    /// are the only consumers left. Kept as a no-op rather than removed so the
+    /// socket plumbing that calls it stays unchanged.
+    func handle(_ event: BridgeEvent, sessionId: String) {}
 
-    /// pet-app went away: nothing in flight can be answered any more.
+    /// pet-app went away: nothing in flight can be answered any more. Tool
+    /// dispatch still crosses the socket, so it still has to be failed; the
+    /// ACP agent does not, and keeps running.
     func socketDisconnected() {
         dispatcher.failAllInFlight()
-        codeEditorDelegate.failAllInFlight(detail: "pet-app과의 연결이 끊겼어요.")
     }
 
     func run(command: String, workspaceId: String, sessionId: String) {
@@ -219,7 +310,7 @@ final class AgentHost {
         for (_, continuation) in waiting { continuation.resume(returning: false) }
 
         _ = broadcast(.runCancel(sessionId: activeSessionId))
-        codeEditorDelegate.failAllInFlight(error: "cancelled", detail: "사용자가 중지했어요.")
+        cancelActiveCodeEditor()
     }
 
     private func awaitApproval(id: String) async -> Bool {

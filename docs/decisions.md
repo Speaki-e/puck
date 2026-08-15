@@ -4,6 +4,86 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-15: the chat UI goes back to native SwiftUI; chat-web is deleted
+
+The chat window is native again, and `pet-app` is now the whole repository.
+`install.sh` alone builds a fresh checkout: chat-web's bundle was gitignored
+and rebuilt by `sync-chat-web.sh`, which was the only thing that made a clone
+need npm.
+
+**This reverses the 2026-08-13 entry below, and the reason it gives is exactly
+why.** That entry chose a webview because native SwiftUI could not iterate fast
+enough toward a specific bespoke look -- "Orca/Zed-inspired, minimalist,
+shadcn" -- with no devtools, no hot reload, and no exact-value extraction. The
+target changed (byeolki: "iOS 기본 제공 탬플릿 같은거 써서"), and stock SwiftUI
+is the fastest way to look like stock SwiftUI. The premise went, so the
+conclusion went with it.
+
+**It was a view swap, not an architecture change.** The same 2026-08-13 entry
+described chat-web as gaining "a second UI consumer" of `ClientWindowStore` /
+`ChatSession`, which stayed "the real-time source of truth exactly as they are
+today". That held: no state moved, and what was deleted was the mirror --
+`chat-reducer.ts`, the hand-maintained `bridge-types.ts` contract, and
+`ClientChatBridge` pushing deltas across it.
+
+Also smaller than 2,926 lines suggests. ~1,100 of those were shadcn `ui/`
+primitives with direct SwiftUI equivalents (`Menu`, `.alert`, `Picker`,
+`.sheet`, `Slider`, `Toggle`, `ScrollView`), and ~240 were bridge plumbing that
+died with the webview. The app-specific views came to ~700 lines of Swift.
+
+macOS idioms rather than iOS ones, despite how the request was phrased: this is
+a Mac app, and iOS's grouped lists and bottom tab bars read as wrong here.
+`List` with a `Section` per workspace (what Mail and Xcode use for this shape,
+and it brings selection and keyboard navigation for free),
+`NavigationSplitView`, `DisclosureGroup` for tool calls,
+`TextField(axis: .vertical)` for the composer, `Form(.formStyle(.grouped))` for
+the new-workspace sheet, SF Symbols and semantic colors.
+
+The editor toggle gained ⇧⌘E on the way. As a web button it could only be
+clicked -- no keyboard path, and no way for automation to reach it, which is
+why verifying the editor pane kept stalling.
+
+Kept: `ClientPalette`/`ClientTheme` (the editor pane and status bar already use
+them), and the session tab strip, which is not a stock macOS idiom but was a
+deliberate addition two days earlier -- removing it is a product decision, not
+a restyle.
+
+Implementation: `pet-app/Puck/ClientWindow/Chat/`. Spec:
+`docs/superpowers/specs/2026-08-15-native-chat-design.md`.
+
+## 2026-08-15: Material Icon Theme in the editor's file tree
+
+The tree drew one SF Symbol per kind, so every file was the same grey document
+and scanning a project meant reading filenames. Vendored Material Icon Theme
+(MIT, Copyright (c) 2025 Material Extensions) instead of inventing a set --
+it is what VS Code users already read at a glance.
+
+Two findings kept this to one small file plus a vendor script:
+
+- **`NSImage` reads SVG natively on macOS** and keeps it as a vector rep
+  (`_NSSVGImageRep`), verified before committing to the approach. So the icons
+  ship as `.svg` with no rasterizing step, no SVG library, and nothing to keep
+  in sync with a renderer.
+- **The released `.vsix` carries the mapping already resolved.** The git repo
+  stores it as TypeScript (`src/core/icons/fileIcons.ts`) that has to be
+  executed to expand patterns into real extension lists; the published artifact
+  has `dist/material-icons.json` with extension/filename/folder → icon name
+  done. Vendoring the artifact skips reimplementing their resolver.
+
+`scripts/vendor-file-icons.sh` pins 5.37.0, keeps the four maps the tree reads
+(dropping light/high-contrast variants and VS Code language ids), and copies
+only the 1,125 icons those maps reference. 4.8MB. Not subset further: guessing
+which languages matter breaks the moment someone opens a `.rs` or `.ex` file.
+
+The behaviour worth testing is resolution order, and `FileIconThemeTests`
+covers it against the real vendored map -- so a packaging mistake fails a test
+rather than producing a silently icon-less tree. Exact filename beats extension
+(`tsconfig.json` is not a `.json` file), longest extension wins
+(`button.test.ts` is not `button.ts`), lookup is case-insensitive, and folders
+have their own icons including an open variant.
+
+Implementation: `pet-app/Puck/ClientWindow/Editor/Views/FileIconTheme.swift`.
+
 ## 2026-08-15: workspace, protocol and ai-module are deleted; pet-app absorbs what was left
 
 `workspace` (Electron + Monaco + ACP) is gone, and with it the last non-Swift

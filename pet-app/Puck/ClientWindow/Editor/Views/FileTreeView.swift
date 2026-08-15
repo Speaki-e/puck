@@ -69,18 +69,9 @@ struct FileTreeView: View {
                 .font(ClientTheme.Typography.caption)
                 .lineLimit(1)
         } icon: {
-            Image(systemName: icon(for: entry))
-                .font(.system(size: 11))
+            FileIconView(entry: entry)
         }
         .tag(entry.path)
-    }
-
-    private func icon(for entry: FileTreeEntry) -> String {
-        switch entry.kind {
-        case .directory: return "folder"
-        case .symlink: return "arrow.triangle.branch"
-        case .file: return "doc"
-        }
     }
 
     private static func entry(at path: String, in entries: [FileTreeEntry]) -> FileTreeEntry? {

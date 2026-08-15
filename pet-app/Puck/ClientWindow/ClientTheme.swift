@@ -29,10 +29,22 @@ enum ClientTheme {
         /// v2: matches chat-web/workspace's shrunk --radius base (Task 6).
         static let cardCornerRadius: CGFloat = 6
         static let rowCornerRadius: CGFloat = 4
-        /// The client window's own floor -- unchanged by v2, not a density
-        /// concern. See git blame for the original reasoning (sidebar +
-        /// main column minimums) if this ever needs to move again.
-        static let windowMinWidth: CGFloat = 960
+        // The window's floor depends on what it is showing, so there are two
+        // of them (2026-08-15). One number cannot be right for both: it was
+        // 960, which is generous for a chat and 160pt short of a chat plus an
+        // editor -- the shortfall came out of the file tree, whose rows were
+        // clipped rather than truncated at the smallest window.
+        //
+        // Both are derived from the panes rather than picked: each is the sum
+        // of the minimum widths the views inside actually declare, plus the
+        // splitters between them. Change a pane's minimum and change these.
+
+        /// Sidebar (180) + chat column (380). The chat column's floor is what
+        /// keeps the composer's placeholder on one line.
+        static let windowMinWidth: CGFloat = 560
+        /// The above, plus the editor pane: file tree (180) + code (360), and
+        /// two splitters.
+        static let windowMinWidthWithEditor: CGFloat = 1120
         static let windowMinHeight: CGFloat = 640
     }
 

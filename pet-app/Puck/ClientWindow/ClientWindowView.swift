@@ -27,13 +27,15 @@ import SwiftUI
 
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
-    @State private var isEditorOpen = false
+    @State private var editor: EditorPresentation = .hidden
 
     /// The window cannot go narrower than what it is currently showing. Two
     /// panes need more room than one, so the floor moves with the toggle
     /// rather than being a single compromise that is wrong for both.
     private var minimumWindowWidth: CGFloat {
-        isEditorOpen ? ClientTheme.Metrics.windowMinWidthWithEditor : ClientTheme.Metrics.windowMinWidth
+        // Only the split needs the wider floor. Detached, the editor carries
+        // its own window and this one goes back to being a chat window.
+        editor.isAttached ? ClientTheme.Metrics.windowMinWidthWithEditor : ClientTheme.Metrics.windowMinWidth
     }
 
     private var activeWorkspace: ClientWorkspace? {
@@ -43,14 +45,14 @@ struct ClientWindowView: View {
     var body: some View {
         VStack(spacing: 0) {
             Group {
-                if isEditorOpen, let availability = activeWorkspace?.editorAvailability {
+                if editor.isAttached, let availability = activeWorkspace?.editorAvailability {
                     HSplitView {
                         // Each is the real minimum of what it contains, and
                         // windowMinWidthWithEditor is their sum -- rather than
                         // the other way round, which is how the editor came to
                         // declare 360 while needing 540 and got its file tree
                         // clipped at the smallest window.
-                        ChatPaneView(store: store, isEditorOpen: $isEditorOpen)
+                        ChatPaneView(store: store, editor: $editor)
                             .frame(minWidth: 560, idealWidth: 620)
                         EditorPaneView(
                             workspaceId: store.activeWorkspaceId,
@@ -60,7 +62,7 @@ struct ClientWindowView: View {
                         .frame(minWidth: 540)
                     }
                 } else {
-                    ChatPaneView(store: store, isEditorOpen: $isEditorOpen)
+                    ChatPaneView(store: store, editor: $editor)
                 }
             }
             ClientStatusBarView(
@@ -74,18 +76,29 @@ struct ClientWindowView: View {
         // limit anyway (see PuckClient's AppDelegate), and stating it twice
         // is how the two drifted apart before. The window owns its floor.
         .background(WindowMinimumSize(width: minimumWindowWidth, height: ClientTheme.Metrics.windowMinHeight))
+        .detachedEditorWindow(
+            presentation: $editor,
+            workspaceId: store.activeWorkspaceId,
+            availability: activeWorkspace?.editorAvailability ?? .noProject,
+            palette: store.themeStyle.palette,
+            onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
+        )
         .environment(\.clientPalette, store.themeStyle.palette)
         // Closing the editor when the active workspace can't show one: the
         // toggle is sticky across workspace switches, and a pane left open on
         // a chat-only workspace would render its empty state for no reason.
         .onChange(of: store.activeWorkspaceId) {
-            if activeWorkspace?.canOpenEditor != true { isEditorOpen = false }
+            if activeWorkspace?.canOpenEditor != true { editor = .hidden }
         }
         // The agent asked for a file to be on screen. Only obeyed when the
         // workspace can actually show one -- a chat-only workspace would open
         // an empty pane and then have to close it again.
         .onChange(of: store.editorRevealRequests) {
-            if activeWorkspace?.canOpenEditor == true { isEditorOpen = true }
+            // Already detached: the file is on screen, in the other window.
+            // Pulling it into the split would move the editor out from under
+            // whoever put it where it is.
+            guard activeWorkspace?.canOpenEditor == true, editor != .detached else { return }
+            editor = .attached
         }
     }
 }

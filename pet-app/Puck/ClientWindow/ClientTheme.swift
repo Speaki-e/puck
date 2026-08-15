@@ -45,6 +45,9 @@ enum ClientTheme {
         /// The above, plus the editor pane: file tree (180) + code (360), and
         /// two splitters.
         static let windowMinWidthWithEditor: CGFloat = 1120
+        /// The detached editor window: file tree (180) + code (360), without
+        /// the chat's share of the split.
+        static let editorWindowMinWidth: CGFloat = 540
         static let windowMinHeight: CGFloat = 640
     }
 

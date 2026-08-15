@@ -117,3 +117,48 @@ final class AcpBoundaryTests: XCTestCase {
         XCTAssertTrue(AcpEventMapping.writesOutside(root: root, in: chunk).isEmpty)
     }
 }
+
+/// The child environment (2026-08-16). Deliberately minimal -- an ACP child
+/// should not inherit every secret this process happens to hold -- but it was
+/// trimmed past what the vendor CLIs need, and the symptom pointed the wrong
+/// way: a logged-in `claude` reported "Not logged in", which arrived as ACP
+/// error -32000 "Authentication required" and read like a missing API key.
+final class AcpAgentEnvironmentTests: XCTestCase {
+    private func environment(kind: CodingAgentKind = .claude, credentials: [String: String] = [:]) -> [String: String] {
+        let process = AcpAgentProcess(
+            command: AcpAgentCommand(
+                executable: URL(fileURLWithPath: "/usr/bin/node"),
+                arguments: ["/x/agent.mjs"],
+                extraEnvironment: [kind.vendorCLIEnvironmentVariable: "/usr/local/bin/\(kind.vendorCLIName)"]
+            ),
+            projectPath: NSTemporaryDirectory(),
+            credentials: credentials
+        )
+        return process.childEnvironment
+    }
+
+    func testUSERIsPassedSoTheVendorCLICanFindItsKeychainLogin() {
+        XCTAssertEqual(environment()["USER"], NSUserName())
+    }
+
+    func testTheBasicsTheAgentNeedsToRunAtAllArePassed() {
+        let environment = environment()
+        XCTAssertNotNil(environment["PATH"])
+        XCTAssertNotNil(environment["HOME"], "the agents write scratch state under HOME")
+        XCTAssertEqual(environment["NODE_ENV"], "production")
+    }
+
+    func testTheVendorCLIPathIsPassed() {
+        XCTAssertEqual(environment()["CLAUDE_CODE_EXECUTABLE"], "/usr/local/bin/claude")
+    }
+
+    func testOnlyTheSelectedAgentsCredentialsAreForwarded() {
+        let environment = environment(credentials: ["ANTHROPIC_API_KEY": "sk-test"])
+
+        XCTAssertEqual(environment["ANTHROPIC_API_KEY"], "sk-test")
+        // The parent's whole environment is not handed over -- a subprocess
+        // has no business seeing every secret this process happens to hold.
+        XCTAssertNil(environment["OPENAI_API_KEY"])
+        XCTAssertNil(environment["AWS_SECRET_ACCESS_KEY"])
+    }
+}

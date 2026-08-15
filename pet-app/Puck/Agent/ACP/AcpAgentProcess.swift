@@ -33,6 +33,10 @@ final class AcpAgentProcess: AcpAgentTransport {
     private var stderrTail = ""
 
     let connection: AcpConnection
+    /// What the child was given. Exposed so the trimming can be asserted --
+    /// too little breaks the vendor CLI's login, too much hands a subprocess
+    /// secrets it has no business seeing.
+    private(set) var childEnvironment: [String: String] = [:]
 
     /// Fires once, when the process exits for any reason. Carries the tail of
     /// stderr, which is what turns "it died" into something diagnosable.
@@ -59,10 +63,18 @@ final class AcpAgentProcess: AcpAgentTransport {
             // The agents write scratch state under HOME; without it they fall
             // back to "/" and fail in ways that read as protocol errors.
             "HOME": ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory(),
+            // Required, and not obviously so: the vendor CLIs look their saved
+            // login up in the macOS Keychain by account name, and USER is
+            // where they read it. Without it a perfectly logged-in `claude`
+            // reports "Not logged in", which arrives here as ACP error -32000
+            // "Authentication required" -- a message that sends you looking
+            // for a missing API key rather than a missing variable.
+            "USER": ProcessInfo.processInfo.environment["USER"] ?? NSUserName(),
         ]
         environment.merge(command.extraEnvironment) { _, new in new }
         environment.merge(credentials) { _, new in new }
         process.environment = environment
+        childEnvironment = environment
     }
 
     func start() throws {

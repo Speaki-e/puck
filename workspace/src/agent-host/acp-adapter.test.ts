@@ -107,7 +107,7 @@ describe("AcpAdapter", () => {
   });
 
   async function runWithStub(options: AcpAdapterOptions) {
-    const spawnProcess = vi.fn(() => makeStubChild());
+    const spawnProcess = vi.fn((..._args: unknown[]) => makeStubChild());
     const adapter = new AcpAdapter({ ...options, spawnProcess: spawnProcess as never });
     await adapter.run({
       requestId: "stub",

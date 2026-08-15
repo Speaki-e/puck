@@ -15,9 +15,9 @@ import SwiftUI
 
 struct ChatPaneView: View {
     @ObservedObject var store: ClientWindowStore
-    /// Whether the editor pane is showing, owned by ClientWindowView -- the
-    /// toggle lives in this view's toolbar but the split is its parent's.
-    @Binding var isEditorOpen: Bool
+    /// Where the editor is showing, owned by ClientWindowView -- the toggle
+    /// lives in this view's toolbar but the split is its parent's.
+    @Binding var editor: EditorPresentation
 
     var body: some View {
         NavigationSplitView {
@@ -61,18 +61,31 @@ struct ChatPaneView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem {
             Button {
-                isEditorOpen.toggle()
+                editor = editor.toggled
             } label: {
                 Label("에디터", systemImage: "chevron.left.forwardslash.chevron.right")
             }
-            .disabled(activeWorkspace?.canOpenEditor != true)
-            .help(activeWorkspace?.canOpenEditor == true
-                  ? "에디터"
-                  : "이 워크스페이스에는 연결된 프로젝트가 없어요")
+            .disabled(activeWorkspace?.canOpenEditor != true || editor == .detached)
+            .help(editorButtonHelp)
             // A keyboard shortcut, which the web toggle never had: the button
             // was the only way in, so the pane could not be opened without a
             // mouse (and could not be driven by automation at all).
             .keyboardShortcut("e", modifiers: [.command, .shift])
+        }
+        ToolbarItem {
+            Button {
+                editor = editor == .detached ? .attached : .detached
+            } label: {
+                Label(
+                    editor == .detached ? "에디터 붙이기" : "에디터 떼기",
+                    systemImage: editor == .detached
+                        ? "arrow.down.right.and.arrow.up.left"
+                        : "macwindow.on.rectangle"
+                )
+            }
+            .disabled(activeWorkspace?.canOpenEditor != true)
+            .help(editor == .detached ? "에디터를 이 창으로 다시 붙여요" : "에디터를 별도 창으로 떼어내요")
+            .keyboardShortcut("d", modifiers: [.command, .shift])
         }
         ToolbarItem {
             Button {
@@ -81,6 +94,11 @@ struct ChatPaneView: View {
                 Label("설정", systemImage: "gearshape")
             }
         }
+    }
+
+    private var editorButtonHelp: String {
+        guard activeWorkspace?.canOpenEditor == true else { return "이 워크스페이스에는 연결된 프로젝트가 없어요" }
+        return editor == .detached ? "에디터가 별도 창에 열려 있어요" : "에디터"
     }
 
     private var activeWorkspace: ClientWorkspace? {
@@ -110,6 +128,15 @@ struct ChatInputBar: View {
                 .lineLimit(1...8)
                 .focused($isFocused)
                 .onSubmit(send)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                // A field the pointer can find. Bare text on the window looked
+                // like a label until you happened to click it.
+                .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(isFocused ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator), lineWidth: 1)
+                )
 
             if isRunning {
                 Button(role: .cancel, action: onCancel) {

@@ -58,6 +58,28 @@ for _ in $(seq 1 50); do
     sleep 0.2
 done
 
+# Resources the code looks up by name at runtime, per app. A missing one is
+# not a build error -- Bundle.url(forResource:) just returns nil and the
+# feature fails at the moment someone uses it. That is exactly how PuckClient
+# shipped without the ACP agents while Puck.app carried the copies it never
+# uses: the Puck target sources the whole Puck/ folder and picked them up
+# implicitly, PuckClient lists files one by one and had not been told.
+#
+# The unit tests cannot catch this. They resolve against the test bundle,
+# which is built from the Puck target and therefore always has everything.
+check_resource() {
+    if [ ! -e "$DERIVED/Build/Products/Release/$1.app/Contents/Resources/$2" ]; then
+        echo "error: $1.app is missing Resources/$2" >&2
+        echo "       Add it to that target's sources in project.yml." >&2
+        exit 1
+    fi
+}
+# PuckClient runs code_editor and shows the editor pane, so it needs both.
+check_resource PuckClient acp-claude.mjs
+check_resource PuckClient acp-codex.mjs
+check_resource PuckClient FileIcons/icon-map.json
+check_resource Puck Avatars
+
 for app in Puck PuckClient; do
     rm -rf "/Applications/$app.app"
     cp -R "$DERIVED/Build/Products/Release/$app.app" /Applications/

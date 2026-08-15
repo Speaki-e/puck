@@ -11,8 +11,6 @@ import XCTest
 final class ClientRelayTests: XCTestCase {
     func test_guiOriginatedMessages_targetWorkspace() {
         XCTAssertEqual(ClientRelay.targetRole(for: .userInput(UserInput(text: "hi", source: .text))), .workspace)
-        XCTAssertEqual(ClientRelay.targetRole(for: .workspaceCreateRequest(name: "cat house", projectPath: nil)), .workspace)
-        XCTAssertEqual(ClientRelay.targetRole(for: .sessionCreateRequest(workspaceId: "w1", title: "new chat")), .workspace)
         XCTAssertEqual(ClientRelay.targetRole(for: .approvalResponse(approvalId: "a1", approved: true)), .workspace)
         XCTAssertEqual(ClientRelay.targetRole(for: .runCancel(sessionId: "s1")), .workspace)
     }
@@ -26,6 +24,11 @@ final class ClientRelayTests: XCTestCase {
     }
 
     func test_locallyHandledMessages_haveNoTargetRole() {
+        // The two create requests joined this list on 2026-08-15: pet-app owns
+        // WorkspaceRegistry now, so BridgeMessageRouter answers them in-process
+        // instead of relaying them to workspace. See WorkspaceCoordinatorTests.
+        XCTAssertNil(ClientRelay.targetRole(for: .workspaceCreateRequest(name: "cat house", projectPath: nil)))
+        XCTAssertNil(ClientRelay.targetRole(for: .sessionCreateRequest(workspaceId: "w1", title: "new chat")))
         XCTAssertNil(ClientRelay.targetRole(for: .clientHello(role: .gui)))
         XCTAssertNil(ClientRelay.targetRole(for: .toolDispatch(ToolDispatch(id: "t1", tool: "launch_app", args: .object([:])))))
         XCTAssertNil(ClientRelay.targetRole(for: .toolCancel(id: "t1")))

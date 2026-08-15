@@ -17,13 +17,18 @@ enum ClientRelay {
     ///   that are connection-lifecycle only (client_hello).
     static func targetRole(for message: BridgeMessage) -> ClientRole? {
         switch message {
-        case .userInput, .workspaceCreateRequest, .sessionCreateRequest, .approvalResponse, .runCancel:
+        case .userInput, .approvalResponse, .runCancel:
             return .workspace
 
         case .event, .workspaceCreate, .sessionCreate, .editorViewReady, .editorViewUnavailable:
             return .gui
 
-        case .clientHello, .toolDispatch, .toolCancel, .toolResult:
+        // workspace_create_request / session_create_request stopped going
+        // outward on 2026-08-15: BridgeMessageRouter answers them from the
+        // in-process WorkspaceRegistry instead. Relaying them as well would
+        // create a second, competing workspace id for the same click.
+        case .workspaceCreateRequest, .sessionCreateRequest,
+             .clientHello, .toolDispatch, .toolCancel, .toolResult:
             return nil
         }
     }

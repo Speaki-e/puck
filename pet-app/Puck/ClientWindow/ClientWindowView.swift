@@ -81,5 +81,11 @@ struct ClientWindowView: View {
         .onChange(of: store.activeWorkspaceId) {
             if activeWorkspace?.canOpenEditor != true { isEditorOpen = false }
         }
+        // The agent asked for a file to be on screen. Only obeyed when the
+        // workspace can actually show one -- a chat-only workspace would open
+        // an empty pane and then have to close it again.
+        .onChange(of: store.editorRevealRequests) {
+            if activeWorkspace?.canOpenEditor == true { isEditorOpen = true }
+        }
     }
 }

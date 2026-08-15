@@ -24,6 +24,15 @@ struct EditorTab: Identifiable, Equatable {
     /// detected while the tab was open. Cleared by keepMine/useDisk.
     var diskChanged = false
 
+    /// Takes on the file's current contents, discarding nothing -- only
+    /// called for a tab with no unsaved edits (EditorPaneStore's watcher).
+    mutating func adopt(_ fileContent: FileContent) {
+        content = fileContent.content
+        savedContent = fileContent.content
+        revision = fileContent.revision
+        diskChanged = false
+    }
+
     var id: String { path }
     var isDirty: Bool { content != savedContent }
     var isImage: Bool { previewUrl != nil }

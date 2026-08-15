@@ -58,6 +58,23 @@ final class ClientWindowStore: ObservableObject {
     /// undone here) used for Puck's own system-wide AppAppearance.
     @Published var themeStyle: ClientThemeStyle = .dark
 
+    /// Bumped when the agent wants a file on screen -- ClientWindowView opens
+    /// the editor pane in response. A counter rather than a Bool: two files in
+    /// a row have to register as two requests, and the second one must still
+    /// re-open a pane the user closed in between.
+    @Published private(set) var editorRevealRequests = 0
+
+    /// Called when the agent opens a file for the user to look at, or edits
+    /// one during a code_editor run. Switches to the file's workspace first --
+    /// the pane can only show the active one.
+    func revealInEditor(workspaceId: String) {
+        if activeWorkspaceId != workspaceId, workspaces.contains(where: { $0.id == workspaceId }) {
+            activeWorkspaceId = workspaceId
+            activeSessionId = Self.defaultSessionId
+        }
+        editorRevealRequests += 1
+    }
+
     init(sender: UserInputSender) {
         self.sender = sender
         workspaces = [ClientWorkspace(id: Self.defaultWorkspaceId, name: Self.casualSessionTitle, projectPath: nil)]

@@ -55,6 +55,13 @@ final class AgentHost {
     /// carry it into the session it moves the turn to.
     private var activeCommand = ""
 
+    /// Set by AppDelegate: reveal the editor pane on this workspace's file.
+    /// Called when the agent opens a file for the user to look at, and for
+    /// every file a code_editor run touches -- byeolki, 2026-08-15: "핵심
+    /// 코드 보여달라고 할때 에디터에서 보여주는", "코드 작성을 할때 에디터로
+    /// 실시간으로 업데이트 보여주면서".
+    var onRevealInEditor: ((_ workspaceId: String, _ path: String) -> Void)?
+
     /// Set by AppDelegate: the local side of open_task_session, which has no
     /// socket message behind it (protocol 3.4 can create a session but not
     /// close one).
@@ -81,6 +88,7 @@ final class AgentHost {
         // approval gate and event sink are attached afterwards, once `self`
         // exists to weakly capture.
         var relayEvent: ((BridgeEvent, String) -> Void)?
+        var revealInEditor: ((String, String) -> Void)?
         var askPermission: ((AcpPermissionRequest) async -> Bool)?
         self.codeEditorRunner = CodeEditorRunner(
             environment: CodeEditorRunnerEnvironment(
@@ -103,6 +111,13 @@ final class AgentHost {
                 codingAgent: { AgentConfiguration.load().codingAgent }
             ),
             onUpdate: { requestId, workspaceId, update in
+                // Follow the agent file by file while it works. The path comes
+                // from ACP's own tool_call locations, which is also what makes
+                // the pet jump to a new file, so the editor and the pet stay
+                // on the same one.
+                if let path = AcpEventMapping.editedPath(in: update) {
+                    revealInEditor?(workspaceId, path)
+                }
                 guard let event = AcpEventMapping.event(for: update, callID: requestId) else { return }
                 relayEvent?(event, workspaceId)
             },
@@ -137,7 +152,10 @@ final class AgentHost {
                 guard let self else {
                     return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
                 }
-                return await self.editorFileDelegate.openInEditor(path: path, workspaceId: self.activeWorkspaceId)
+                let result = await self.editorFileDelegate.openInEditor(path: path, workspaceId: self.activeWorkspaceId)
+                // Opening a tab in a pane nobody can see is not "showing" it.
+                if result.ok { self.onRevealInEditor?(self.activeWorkspaceId, path) }
+                return result
             },
             delegateListFiles: { [weak self] in
                 guard let self else {
@@ -156,6 +174,16 @@ final class AgentHost {
         // Now that `self` exists, close the two loops the runner was built
         // with placeholders for. Broadcast rather than applied locally, for
         // the reason this file's header gives.
+        revealInEditor = { [weak self] workspaceId, path in
+            guard let self else { return }
+            Task { @MainActor in
+                // Through the same delegate open_in_editor uses, so the tab
+                // lands in the pane the user is looking at rather than a
+                // second, disconnected store.
+                _ = await self.editorFileDelegate.openInEditor(path: path, workspaceId: workspaceId)
+                self.onRevealInEditor?(workspaceId, path)
+            }
+        }
         relayEvent = { [weak self] event, workspaceId in
             guard let self else { return }
             _ = self.broadcast(.event(event, workspaceId: workspaceId, sessionId: self.activeSessionId))

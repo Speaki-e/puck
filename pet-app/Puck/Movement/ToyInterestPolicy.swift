@@ -5,9 +5,9 @@
 //  F12 · owner: 박해영 (Haeyoung Park)
 //  Which toy the pet goes for when more than one is lying around.
 //
-//  Several toys can be out at once as of 2026-07-30 (byeolki: "메뉴를 열면
-//  밑에 이미지와 함께 장난감 이름이 나오고 그걸 눌러서 나오게하고 다시 눌러서
-//  없애는"), which turns "play with the toy" into a choice for the first time.
+//  Several toys can be out at once as of 2026-07-30, via a menu that shows
+//  each toy's name and image and toggles it out/away, which turns "play
+//  with the toy" into a choice for the first time.
 //
 //  The rule is deliberately boring: the nearest one, except the one just
 //  played with. Nearest alone would have the pet loop on whichever toy it is

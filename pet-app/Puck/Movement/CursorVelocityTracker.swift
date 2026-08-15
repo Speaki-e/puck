@@ -5,8 +5,8 @@
 //  F3 · owner: 박해영 (Haeyoung Park)
 //  How fast the cursor is moving, smoothed enough to throw something with.
 //
-//  Extracted from ReactDragState when the toy became throwable too (byeolki:
-//  "호박도 펫처럼 잡아 던질 수 있게", 2026-07-29) -- the pet and the toy have
+//  Extracted from ReactDragState when the toy became throwable too -- the
+//  pet and the toy have
 //  to agree about what "flicked hard" means, or the same gesture launches
 //  them at different speeds.
 //

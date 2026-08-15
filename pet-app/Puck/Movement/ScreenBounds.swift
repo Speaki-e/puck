@@ -28,9 +28,8 @@ enum ScreenBounds {
     /// against the edge in ever-smaller hops instead of settling.
     static let minimumBounceSpeed: CGFloat = 60
     /// Landing loses more energy per bounce than a wall/ceiling hit does — a
-    /// soft flop onto the ground, not a rubber ball off a wall (byeolki:
-    /// "퉁퉁 튕겨서 사악 미끄러지게" wants a couple of quick, decaying
-    /// thumps, not a long bouncy rally).
+    /// soft flop onto the ground, not a rubber ball off a wall: a couple of
+    /// quick, decaying thumps, not a long bouncy rally.
     static let landingRestitution: CGFloat = 0.35
     /// Below this, the pet just rests on the floor rather than playing an
     /// imperceptible micro-bounce.
@@ -121,10 +120,10 @@ enum ScreenBounds {
     }
 
     /// One frame of downward travel that bounces off a landing surface
-    /// instead of stopping dead on it — byeolki: "퉁퉁 튕겨서 사악
-    /// 미끄러지게" (a hard landing, e.g. after being thrown and bouncing off
+    /// instead of stopping dead on it — a hard landing, e.g. after being
+    /// thrown and bouncing off
     /// a wall, should visibly bounce a couple of times before it settles,
-    /// not freeze the instant it touches down). `floorY` is F4's landing
+    /// not freeze the instant it touches down. `floorY` is F4's landing
     /// surface (a window top edge or the screen bottom), not a fixed area
     /// edge — dynamic the same way ceiling/wall bounces aren't.
     static func bounceOffFloor(position: CGPoint, velocity: CGFloat, floorY: CGFloat) -> Bounce {

@@ -29,8 +29,7 @@ struct AvatarManagementView: View {
     /// reasoning as SettingsView's initialToysOut), so this is a seed rather
     /// than a source of truth -- SettingsStore.selectedAvatarName is that.
     var initialSelectedAvatarName: String = "dummy"
-    /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
-    /// 해주고" -- picking a different installed avatar swaps the *running*
+    /// Picking a different installed avatar swaps the *running*
     /// pet immediately, the same live-apply contract onScaleChanged already
     /// has.
     var onSelectAvatar: ((String) -> Void)?
@@ -57,14 +56,13 @@ struct AvatarManagementView: View {
 
     private func text(_ key: L10nKey) -> String { Strings.text(key) }
 
-    // Plain SettingsSections, not cards (2026-07-31, byeolki: "pokopet
-    // 설정창과 비슷하게") -- the window's panel is the only surface. No
+    // Plain SettingsSections, not cards -- modeled after the pokoPet
+    // reference's settings window. The window's panel is the only surface. No
     // ScrollView of its own; SettingsView scrolls the whole column.
     var body: some View {
         VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
             SettingsSection(title: text(.avatarsHeader)) {
-                // The preset picker -- byeolki, 2026-08-01: "아바타를 프리셋
-                // 바꾸는거 마냥 바꿀 수 있게 해주고". Always at least "dummy"
+                // The preset picker. Always at least "dummy"
                 // (AvatarInstaller seeds it on first run), so this list is
                 // never actually empty.
                 ForEach(installedAvatarNames, id: \.self) { name in
@@ -87,7 +85,8 @@ struct AvatarManagementView: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 }
-                // "아바타 패키지 형태도 사용자에게 알려줘야함" -- condensed
+                // The avatar package format needs to be explained to end
+                // users too -- condensed
                 // from docs/avatar-spec.md, which is a repo-only doc an
                 // end user importing a package would never see otherwise.
                 Text(text(.avatarPackageFormatExplanation))

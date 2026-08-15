@@ -39,20 +39,19 @@ final class SettingsStore {
     var onVolumeChanged: ((Float) -> Void)?
     var onMuteChanged: ((Bool) -> Void)?
     var onWalkSpeedMultiplierChanged: ((Double) -> Void)?
-    /// byeolki: "화이트모드 다크모드 추가하고" -- AppDelegate uses this to keep
+    /// AppDelegate uses this to keep
     /// NSApp.appearance (NSPopover chrome, NSVisualEffectView materials --
     /// AppKit-native rendering that .preferredColorScheme never touches) in
     /// sync with a live appearance change instead of only applying it at
     /// launch.
     var onAppearanceChanged: ((AppAppearance) -> Void)?
-    /// byeolki, 2026-08-02: "테마는 셰이디앱과 동기화 되어서 메뉴막대를 통한
-    /// 셰이디 설정으로 변경할 수 있어야하거든" -- AppDelegate uses this to
+    /// The client theme should stay in sync with the menu bar settings, the
+    /// same way Shady-style apps do -- AppDelegate uses this to
     /// broadcast the new value to PuckClient (DistributedNotificationCenter,
     /// same shape as onAppearanceChanged's own broadcast) so the client
     /// window picks it up immediately.
     var onClientThemeStyleChanged: ((ClientThemeStyle) -> Void)?
-    /// byeolki, 2026-08-01: "아바타를 프리셋 바꾸는거 마냥 바꿀 수 있게
-    /// 해주고" -- picking a different installed avatar in Settings has to
+    /// Picking a different installed avatar in Settings has to
     /// swap the *running* pet immediately, not just take effect next launch.
     var onSelectedAvatarChanged: ((String) -> Void)?
 
@@ -99,8 +98,8 @@ final class SettingsStore {
     }
 
     /// Whether muting gets a sulk (angry face + "제 목소리가 시끄러우신거에
-    /// 요?") -- byeolki, 2026-08-01, after asking for the sulk to stop
-    /// moving the pet to center screen: "이런거 설정 가능하도록 해줘". No
+    /// 요?") -- togglable, since the sulk used to also move the pet to center
+    /// screen and that behavior needed to become optional. No
     /// live-callback needed: this is only consulted at the moment mute is
     /// toggled, not applied to something already on screen.
     var isMuteComplaintEnabled: Bool {
@@ -120,7 +119,7 @@ final class SettingsStore {
     }
 
     /// Multiplies MovementSolver.walkSpeed for Walk/Climb/WalkOnTop/MoveTo/
-    /// Ceiling (byeolki's request, 2026-07-29). 1.0 == the default speed.
+    /// Ceiling. 1.0 == the default speed.
     var walkSpeedMultiplier: Double {
         get { defaults.object(forKey: Keys.walkSpeedMultiplier) as? Double ?? 1.0 }
         set {
@@ -129,8 +128,7 @@ final class SettingsStore {
         }
     }
 
-    /// Size of the ball toy, as a multiple of its built-in radius (byeolki:
-    /// "호박 크기도 조절 가능 하게", 2026-07-29). Lives here rather than in
+    /// Size of the ball toy, as a multiple of its built-in radius. Lives here rather than in
     /// the avatar manifest because the toy is bundled with the app, not with
     /// an avatar -- swapping avatars must not resize or remove it.
     var toyScale: Double {

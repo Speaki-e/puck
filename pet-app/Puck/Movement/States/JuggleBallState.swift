@@ -7,8 +7,8 @@
 //  interaction, 02_pet-app.md F12).
 //
 //  2026-07-29: the pet plays with the toy overhead for a while, then throws
-//  it away and gets on with its day (byeolki: "튕긴다는 개념보단 다시 잡아서
-//  던진다는 개념으로 / 일정 시간동안 던진 뒤엔 대충 던지고 나서 할거 하게").
+//  it away and gets on with its day -- catching and re-throwing rather than
+//  a pure bounce, and only for a while before moving on.
 //
 //  Catching, not heading. The toy comes down and STOPS on the pet's head --
 //  it is resting there, physics and all -- and only after a short beat does

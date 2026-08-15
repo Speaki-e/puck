@@ -3,8 +3,7 @@
 //  Puck
 //
 //  F1 · owner: 강상우 (Sangwoo Kang)
-//  Recognises the cursor being rubbed back and forth over the pet's head
-//  (byeolki: "마우스 포인터로 펫 머리 위를 쓰담 쓰담 하면", 2026-07-29).
+//  Recognises the cursor being rubbed back and forth over the pet's head.
 //
 //  Deliberately NOT a click gesture: stroking something is done with an open
 //  hand, and requiring a held button would make it a drag -- which already

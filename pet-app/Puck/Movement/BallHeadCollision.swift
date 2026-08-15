@@ -4,8 +4,7 @@
 //
 //  F12 · owner: 박해영 (Haeyoung Park)
 //  Whether a falling ball's X currently overlaps the character's head, and
-//  if so, where it should land -- byeolki: "축구공을 소환하면 캐릭터
-//  머리로 떨어져서 통 튀어서 없어지게 해줘". Without this, a thrown ball
+//  if so, where it should land. Without this, a thrown ball
 //  falls straight through the character to the floor/window below it,
 //  since LandingSurfaceResolver only knows about windows, not the pet.
 //
@@ -23,8 +22,8 @@ enum BallHeadCollision {
     ///   - ballX: the falling toy's current x (the middle of it).
     ///   - ballHalfWidth: half the toy's *visible* width. Treating the toy as
     ///     a point meant a 40pt pumpkin whose middle cleared the head by a
-    ///     pixel passed straight through it while visibly overlapping
-    ///     (byeolki, 2026-07-29). Pass 0 for a genuinely point-sized toy.
+    ///     pixel passed straight through it while visibly overlapping.
+    ///     Pass 0 for a genuinely point-sized toy.
     ///   - characterPosition: the character's ground/feet point.
     ///   - avatarSize: the rendered avatar's current size (hitbox * scale).
     /// - Returns: the head's Y (top of the avatar) if the toy overlaps the

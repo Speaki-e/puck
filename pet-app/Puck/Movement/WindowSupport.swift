@@ -60,8 +60,8 @@ enum WindowSupport {
 
     /// A point to walk to that will put the pet against the nearest climbable
     /// window's side, so `blockingWindow` picks it up and Walk hands off to
-    /// Climb (2026-07-29, byeolki: "너무 바닥에 붙어있는데 어느정도 위로 기어
-    /// 올라가도 됨").
+    /// Climb -- the pet spends too much time glued to the floor otherwise,
+    /// and should climb up windows now and then.
     ///
     /// The wander scheduler's `.climbNearestWindow` outcome had never been
     /// implemented -- it fell through to a plain random walk -- so a quarter

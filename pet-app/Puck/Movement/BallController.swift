@@ -8,10 +8,9 @@
 //
 //  The toy is a pet-app-bundled decoration, not a user-customizable avatar
 //  asset (plan/02_pet-app.md F12). It started as a plain drawn circle so no
-//  art was needed; it is now byeolki's pumpkin (2026-07-29, "호박 이미지
-//  추가함 저거 가지고 놀게"), which ships in the app bundle rather than in an
-//  avatar package for exactly that reason -- swapping avatars must not take
-//  the toy away.
+//  art was needed; it is now a pumpkin, which ships in the app bundle
+//  rather than in an avatar package for exactly that reason -- swapping
+//  avatars must not take the toy away.
 //
 //  Falls back to the old drawn circle if the image is missing, so a broken
 //  or absent resource costs the toy its looks and not its behaviour.
@@ -36,7 +35,7 @@ final class BallController {
     /// the drawn pumpkin doesn't fill its square box: resting the *centre* on
     /// a surface buries half the toy in the floor, and resting the layer's
     /// bottom edge leaves it floating on the transparent margin below the
-    /// artwork (byeolki: "호박 테두리 실제 이미지 border", 2026-07-29).
+    /// artwork.
     private(set) var visualBounds: CGRect = .zero
     /// The artwork's opaque box and pixel size, kept so a size change can
     /// recompute `visualBounds` without scanning the image's alpha again.
@@ -44,8 +43,7 @@ final class BallController {
     /// Whether this toy comes to rest lying on its side. Derived from the
     /// artwork rather than configured: something far taller than it is wide
     /// cannot stand on its end, and a wand left standing upright on the floor
-    /// like a flagpole is exactly what looks wrong (byeolki: "이 긴 막대가
-    /// 계속 이미지의 형태로 비정상적으로 서있는데", 2026-07-30). Deriving it
+    /// like a flagpole is exactly what looks wrong. Deriving it
     /// also means the next long toy behaves without anyone remembering a flag.
     private var liesDownAtRest = false
     /// Proportion below which a toy is "long" -- taller than it is wide by
@@ -211,8 +209,7 @@ final class BallController {
     /// How the toy is turned right now.
     ///
     /// A toy that twirls overhead also twirls while it's in the air -- one
-    /// that went rigid the moment it was thrown looks broken (byeolki:
-    /// "지팡이도 다른 장난감처럼 던져지고", 2026-07-29). And a long toy comes
+    /// that went rigid the moment it was thrown looks broken. And a long toy comes
     /// to rest lying on its side rather than standing on its end.
     private func applyOrientation(for phase: BallPhase, dt: TimeInterval) {
         switch phase {
@@ -237,8 +234,8 @@ final class BallController {
     /// than drifting, slow enough that the artwork doesn't blur into a smear.
     static let spinRate: CGFloat = 2 * .pi * 1.2
 
-    /// Lets go. With a `velocity` the toy is thrown and flies with it
-    /// (byeolki: "호박도 펫처럼 잡아 던질 수 있게", 2026-07-29); at rest it
+    /// Lets go. With a `velocity` the toy is thrown and flies with it,
+    /// the same way the pet itself can be grabbed and thrown; at rest it
     /// just drops. Thrown, it uses the same `.kicked` motion a kick does, so
     /// it bounces off the walls, ceiling and floor and settles -- there is no
     /// separate "thrown by the user" physics to keep in step.
@@ -253,8 +250,7 @@ final class BallController {
         state = current
     }
 
-    /// Bounces a toy that has just landed, off whatever it landed on
-    /// (byeolki: "머리 위에 두면 통통 튕겨서 내려가게", 2026-07-30).
+    /// Bounces a toy that has just landed, off whatever it landed on.
     ///
     /// Proportional to how hard it arrived, using the same restitution as
     /// every other bounce, so dropping it gently and hurling it down read
@@ -274,8 +270,7 @@ final class BallController {
     }
 
     /// Lifts the toy up over the pet's head and lets it drop back onto it --
-    /// the start of the heading loop (byeolki: "펫의 머리 위로 든 다음에
-    /// 머리 위에서 계속 튕기게", 2026-07-29).
+    /// the start of the heading loop.
     ///
     /// The toy is placed rather than thrown: it is beside the pet when this
     /// runs (ChaseBall stops it there), and arcing it onto a head from the
@@ -284,8 +279,8 @@ final class BallController {
     /// Upward speed of a throw, px/sec. What matters is the height it buys:
     /// peak = speed^2 / (2 * gravity), so at the app's gravity of 2400 this
     /// sends the toy about 117pt up -- most of the pet's own height above its
-    /// head, and about 0.6s in the air (byeolki: "던지는 높이 좀 더 높이",
-    /// 2026-07-29; it was 420, which only cleared the head by ~37pt).
+    /// head, and about 0.6s in the air (it was 420, which only cleared the
+    /// head by ~37pt, not enough to read as a real toss).
     static let throwSpeed: CGFloat = 750
 
     func lift(overX x: CGFloat, headTop: CGFloat, liftSpeed: CGFloat = BallController.throwSpeed) {
@@ -303,8 +298,7 @@ final class BallController {
     ///
     /// A carried toy counts too: a spun wand is still overhead when the pet
     /// gets bored, and without this it was dropped on the spot instead of
-    /// being thrown away like every other toy (byeolki: "지팡이 돌리다가
-    /// 멈추면 대충 던지게", 2026-07-30).
+    /// being thrown away like every other toy.
     func kick(direction: AvatarFacing) {
         guard let current = state, current.phase == .resting || current.phase == .carried else { return }
         state = BallPhysics.kick(current, direction: direction)

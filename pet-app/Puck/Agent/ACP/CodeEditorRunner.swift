@@ -26,6 +26,36 @@ struct CodeEditorRunnerEnvironment {
     var codingAgent: () -> CodingAgentKind
 }
 
+/// The agent processes that are alive right now, reachable without awaiting
+/// the actor. `applicationWillTerminate` gets no chance to await anything, and
+/// a child left behind is a node process plus its ~256MB vendor binary with
+/// nothing on screen to point at it.
+final class LiveAgentProcesses {
+    private let lock = NSLock()
+    private var processes: [ObjectIdentifier: AcpAgentTransport] = [:]
+
+    func add(_ process: AcpAgentTransport) {
+        lock.lock(); processes[ObjectIdentifier(process)] = process; lock.unlock()
+    }
+
+    func remove(_ process: AcpAgentTransport) {
+        lock.lock(); processes.removeValue(forKey: ObjectIdentifier(process)); lock.unlock()
+    }
+
+    /// TERM then KILL, with no wait in between: by the time this runs there is
+    /// nobody left to escalate later, so the guarantee has to be immediate.
+    func endAll() {
+        lock.lock()
+        let all = Array(processes.values)
+        processes.removeAll()
+        lock.unlock()
+        for process in all where process.isRunning {
+            process.terminate()
+            process.kill()
+        }
+    }
+}
+
 actor CodeEditorRunner {
     /// A run that is queued or in flight.
     private struct Run {
@@ -39,6 +69,9 @@ actor CodeEditorRunner {
     private let environment: CodeEditorRunnerEnvironment
     private let onUpdate: (_ requestId: String, _ workspaceId: String, _ update: AcpSessionUpdate) -> Void
     private let resolvePermission: AcpPermissionResolver
+
+    /// Shared with `terminateAll`, which cannot await this actor.
+    nonisolated let liveProcesses = LiveAgentProcesses()
 
     /// workspaceId -> the tail of that workspace's queue, so a new run can
     /// await its predecessor without a lock or a polling loop.
@@ -112,21 +145,32 @@ actor CodeEditorRunner {
         run.cancelled = true
         runs[requestId] = run
         run.session?.cancel()
-        if let process = run.process {
-            // Give session/cancel a moment to land before falling back to
-            // signals -- the TS adapter used the same two seconds.
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                if process.isRunning { process.terminate() }
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                if process.isRunning { process.kill() }
-            }
-        }
+        // Give session/cancel a moment to land before falling back to
+        // signals -- the TS adapter used the same two seconds.
+        if let process = run.process { shutDown(process, cancelGrace: 2) }
         return true
     }
 
-    func cancelAll() {
-        for requestId in runs.keys { _ = cancel(requestId: requestId) }
+    /// The app is going away. Synchronous because the only caller
+    /// (applicationWillTerminate) has nothing to await with.
+    nonisolated func terminateAll() {
+        liveProcesses.endAll()
+    }
+
+    /// The one way a run's agent is ended: SIGTERM, a moment to leave on its
+    /// own, then SIGKILL. `terminate()` alone is a request, not a guarantee,
+    /// and the transport is released as soon as the run finishes, so nothing
+    /// would be left to escalate afterwards.
+    private func shutDown(_ process: AcpAgentTransport, cancelGrace: TimeInterval) {
+        Task {
+            if cancelGrace > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(cancelGrace * 1_000_000_000))
+            }
+            if process.isRunning { process.terminate() }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if process.isRunning { process.kill() }
+            liveProcesses.remove(process)
+        }
     }
 
     // MARK: - Internals
@@ -153,6 +197,7 @@ actor CodeEditorRunner {
                 detail: String(describing: error)
             )
         }
+        liveProcesses.add(process)
 
         let session = AcpCodeEditorSession(
             connection: process.connection,
@@ -167,11 +212,12 @@ actor CodeEditorRunner {
         if runs[requestId]?.cancelled == true {
             session.cancel()
             process.kill()
+            liveProcesses.remove(process)
             return .cancelled(changedFiles: tracker.finish())
         }
 
         var result = await session.run(task: task)
-        process.terminate()
+        shutDown(process, cancelGrace: 0)
         result.changedFiles = tracker.finish()
         return result
     }

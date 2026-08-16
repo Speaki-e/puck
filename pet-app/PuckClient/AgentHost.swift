@@ -245,6 +245,13 @@ final class AgentHost {
         Task { _ = await codeEditorRunner.cancel(requestId: requestId) }
     }
 
+    /// The app is quitting. An ACP child is a node process plus its vendor
+    /// binary, and nothing else reaps it: closing the chat window terminates
+    /// this app, which would otherwise leave a code_editor run orphaned.
+    func endCodeEditorAgents() {
+        codeEditorRunner.terminateAll()
+    }
+
     /// Every tool_result off the socket, so the dispatcher can match it to
     /// the call waiting for it.
     func handle(_ result: ToolResult) {

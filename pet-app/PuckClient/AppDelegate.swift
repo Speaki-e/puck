@@ -95,6 +95,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
+    /// Closing the window quits this app, which with a code_editor run in
+    /// flight means an ACP child with nobody left to end it.
+    func applicationWillTerminate(_ notification: Notification) {
+        agentHost.endCodeEditorAgents()
+    }
+
     // MARK: - Theme (ClientThemeStyle, synced from Puck's Settings)
 
     /// The theme follows the pet's, so changing it from the menu bar

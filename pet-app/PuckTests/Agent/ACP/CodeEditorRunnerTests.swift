@@ -237,6 +237,25 @@ final class CodeEditorRunnerTests: XCTestCase {
         XCTAssertTrue(result.summary.contains("Node.js"))
     }
 
+    /// What the tool actually reports is `reportedDetail`, and an unavailable
+    /// agent's whole point is the sentence telling the user what to install --
+    /// a result that carries only `vendorCLINotFound(...)` is the failure the
+    /// user sees as nothing happening at all.
+    func testAnUnavailableAgentReportsItsInstallInstructionToTheTool() async {
+        let runner = CodeEditorRunner(environment: makeEnvironment(
+            agent: { _, _ in throw AcpAgentCommandError.vendorCLINotFound(.claude) },
+            kind: .claude
+        ))
+
+        let result = await runner.run(
+            requestId: "r1", workspaceId: "w1", projectPath: project.path, task: "go"
+        )
+
+        let reported = result.reportedDetail ?? ""
+        XCTAssertTrue(reported.contains(result.summary), "reported: \(reported)")
+        XCTAssertEqual(reported.split(separator: "\n").first.map(String.init), result.summary)
+    }
+
     func testAMissingVendorCLINamesTheOneToInstall() async {
         for kind in CodingAgentKind.allCases {
             let runner = CodeEditorRunner(environment: makeEnvironment(

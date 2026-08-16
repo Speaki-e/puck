@@ -21,16 +21,29 @@
 import Foundation
 
 final class FocusModeObserver {
-    private static let distributedNotificationName = Notification.Name("com.apple.notificationcenterui.dndStatusChanged")
+    static let distributedNotificationName = Notification.Name("com.apple.notificationcenterui.dndStatusChanged")
 
     private(set) var isFocusActive = false
     /// Called with the new value whenever a status-change notification arrives.
     var onChange: ((Bool) -> Void)?
 
+    /// DistributedNotificationCenter in the app; injectable so tests can
+    /// exercise this wiring over a private, in-process NotificationCenter.
+    /// The distributed centre is a cross-process daemon (distnoted) shared
+    /// with the whole machine: delivery latency is unbounded, and the name
+    /// above is one macOS itself posts, so a test that posts through it is
+    /// racing both the daemon and anything else on the Mac that toggles
+    /// Focus while it runs.
+    private let center: NotificationCenter
+
     private var observerToken: NSObjectProtocol?
 
+    init(center: NotificationCenter = DistributedNotificationCenter.default()) {
+        self.center = center
+    }
+
     func startObserving() {
-        observerToken = DistributedNotificationCenter.default().addObserver(
+        observerToken = center.addObserver(
             forName: Self.distributedNotificationName,
             object: nil,
             queue: .main
@@ -41,7 +54,7 @@ final class FocusModeObserver {
 
     func stopObserving() {
         if let observerToken {
-            DistributedNotificationCenter.default().removeObserver(observerToken)
+            center.removeObserver(observerToken)
         }
         observerToken = nil
     }

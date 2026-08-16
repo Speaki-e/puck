@@ -69,6 +69,12 @@ final class WorkspaceFileWatcherTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let expectation = expectation(description: "onChange fires for a new file")
+        // One write is not one callback. FSEvents reports create and modify
+        // separately and only coalesces them when they land inside the same
+        // 0.1s window, so a second delivery is normal behaviour rather than
+        // something to fail on -- and over-fulfilment is an outright test
+        // failure by default, which is what made this flake.
+        expectation.assertForOverFulfill = false
         let watcher = WorkspaceFileWatcher(
             root: root,
             onChange: { _ in expectation.fulfill() },

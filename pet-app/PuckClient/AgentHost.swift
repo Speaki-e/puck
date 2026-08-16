@@ -338,7 +338,15 @@ final class AgentHost {
         // Before the run, not at init: which workspace is active changes
         // between turns, and the runner only re-announces it when it differs.
         runner.workspaceContext = describeWorkspace(workspaceId)
-        Task { await runner.run(command: command) }
+        Task {
+            await runner.run(command: command)
+            // Backstop for the invariant: every approvalId handed to the UI is
+            // answered or explicitly failed. By the time the run returns
+            // nothing legitimate is still awaiting one -- anything left is an
+            // answer that can never arrive (the window closed, the transcript
+            // moved on), and a continuation left suspended is a leak.
+            self.failPendingApprovals()
+        }
     }
 
     /// The chat's 허용/거부 buttons land here.
@@ -355,14 +363,21 @@ final class AgentHost {
     /// and it is 600s long), so 중지 has to release that too: the ACP agent is
     /// told to stop through session/cancel and then signalled.
     func cancelPendingApprovals() {
+        failPendingApprovals()
+        _ = broadcast(.runCancel(sessionId: activeSessionId))
+        cancelActiveCodeEditor()
+    }
+
+    /// Denies everything still waiting. Answering with `false` rather than
+    /// leaving the continuation suspended: the caller of an approval is a tool
+    /// that has to return something, and "not allowed" is the only safe answer
+    /// to give on its behalf.
+    private func failPendingApprovals() {
         lock.lock()
         let waiting = pendingApprovals
         pendingApprovals.removeAll()
         lock.unlock()
         for (_, continuation) in waiting { continuation.resume(returning: false) }
-
-        _ = broadcast(.runCancel(sessionId: activeSessionId))
-        cancelActiveCodeEditor()
     }
 
     private func awaitApproval(id: String) async -> Bool {

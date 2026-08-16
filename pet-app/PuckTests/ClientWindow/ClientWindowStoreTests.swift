@@ -265,6 +265,45 @@ final class ClientWindowStoreTests: XCTestCase {
     // externally set here by PuckClient's AppDelegate rather than persisted
     // by this store, so there's nothing left to round-trip or fire a
     // callback on at this layer.
+    /// Two permission requests can be outstanding at once (the coding agent
+    /// batches parallel tool calls). Both have to be answerable: an approvalId
+    /// the UI can no longer produce an answer for leaves the agent blocked on
+    /// it for the whole tool timeout.
+    func test_respondToPendingApproval_answersEveryQueuedRequestInTurn() {
+        let (store, transport) = makeStore()
+        store.handleChatEvent(.awaitApproval(summary: "A", approvalId: "a1"), workspaceId: "default", sessionId: "default")
+        store.handleChatEvent(.awaitApproval(summary: "B", approvalId: "a2"), workspaceId: "default", sessionId: "default")
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+
+        XCTAssertEqual(store.respondToPendingApproval(in: session, approved: true), .sent)
+        XCTAssertEqual(store.respondToPendingApproval(in: session, approved: false), .sent)
+
+        let answered: [(String, Bool)] = transport.broadcasted.compactMap {
+            if case .approvalResponse(let approvalId, let approved) = $0 { return (approvalId, approved) }
+            return nil
+        }
+        XCTAssertEqual(answered.map(\.0), ["a1", "a2"])
+        XCTAssertEqual(answered.map(\.1), [true, false])
+        XCTAssertTrue(session.pendingApprovals.isEmpty)
+    }
+
+    /// An answer nobody received must not consume the request -- the user has
+    /// to be able to press the button again once the agent reconnects.
+    func test_respondToPendingApproval_undelivered_keepsTheRequestPending() {
+        let (store, transport) = makeStore()
+        store.handleChatEvent(.awaitApproval(summary: "A", approvalId: "a1"), workspaceId: "default", sessionId: "default")
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+        transport.hasConnectedClients = false
+
+        XCTAssertEqual(store.respondToPendingApproval(in: session, approved: true), .notDelivered)
+
+        XCTAssertEqual(session.pendingApprovals.map(\.approvalId), ["a1"])
+    }
+
     func test_themeStyle_defaultsToDark_untilExternallySet() {
         let (store, _) = makeStore()
 

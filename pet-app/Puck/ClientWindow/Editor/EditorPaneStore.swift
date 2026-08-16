@@ -18,6 +18,10 @@ final class EditorPaneStore: ObservableObject {
     @Published private(set) var openTabs: [EditorTab] = []
     @Published var activeTabPath: String?
     @Published var lastError: WorkspaceFileServiceError?
+    /// Set by `requestClose(path:)` when the tab still holds unsaved edits:
+    /// the view turns it into a confirmation dialog. Nil means nothing is
+    /// waiting on the user.
+    @Published private(set) var pendingClosePath: String?
 
     private let service: WorkspaceFileService
     private var watcher: WorkspaceFileWatcher?
@@ -97,6 +101,43 @@ final class EditorPaneStore: ObservableObject {
         if activeTabPath == path {
             activeTabPath = openTabs.last?.path
         }
+        if pendingClosePath == path { pendingClosePath = nil }
+    }
+
+    /// The close path the UI goes through. A clean tab closes straight away;
+    /// a dirty one raises `pendingClosePath` instead, because dropping the
+    /// tab here would throw away edits that exist nowhere else.
+    func requestClose(path: String) {
+        guard let tab = openTabs.first(where: { $0.path == path }), tab.isDirty else {
+            close(path: path)
+            return
+        }
+        pendingClosePath = path
+    }
+
+    /// Save-then-close. A save that fails (most likely the disk copy moved
+    /// under the tab) leaves the tab open with its draft and its conflict
+    /// banner rather than closing anyway -- the point of asking was not to
+    /// lose the edit.
+    func confirmPendingCloseSaving() {
+        guard let path = pendingClosePath else { return }
+        pendingClosePath = nil
+        save(path: path)
+        guard let tab = openTabs.first(where: { $0.path == path }), !tab.isDirty else { return }
+        close(path: path)
+    }
+
+    /// Discard-then-close. Only reachable from an explicit "저장 안 함", so
+    /// the loss is the user's own decision rather than a side effect of
+    /// hitting the tab's ✕.
+    func confirmPendingCloseDiscarding() {
+        guard let path = pendingClosePath else { return }
+        pendingClosePath = nil
+        close(path: path)
+    }
+
+    func cancelPendingClose() {
+        pendingClosePath = nil
     }
 
     func updateDraft(path: String, content: String) {
@@ -120,6 +161,22 @@ final class EditorPaneStore: ObservableObject {
         } catch {
             lastError = nil
         }
+    }
+
+    /// True when ⌘S / the save button has something to do: an active tab
+    /// that is editable and actually holds unsaved edits.
+    var canSaveActiveTab: Bool {
+        guard let tab = activeTab else { return false }
+        return !tab.readOnly && tab.isDirty
+    }
+
+    /// What ⌘S and the tab strip's save button call. A no-op with no tab
+    /// open, on a read-only tab, or when nothing has been typed -- saving an
+    /// unchanged tab would rewrite the file for no reason and make the
+    /// watcher re-read it.
+    func saveActiveTab() {
+        guard canSaveActiveTab, let path = activeTabPath else { return }
+        save(path: path)
     }
 
     /// Conflict resolution: keep the in-editor draft, re-anchored to disk's
@@ -169,7 +226,7 @@ final class EditorPaneStore: ObservableObject {
             // event alone -- our own just-completed save fires this same
             // event, and would otherwise flag itself as an external conflict.
             guard let fresh = try? service.readFile(at: relativePath), fresh.revision != openTabs[index].revision else { continue }
-            // A tab the user has not touched follows the file (2026-08-15).
+            // A tab the user has not touched follows the file.
             // The conflict banner is the right answer for an edit the user
             // would lose and the wrong one for a file they are only watching
             // -- which is the whole of the code_editor case, where every

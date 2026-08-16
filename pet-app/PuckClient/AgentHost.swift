@@ -227,10 +227,13 @@ final class AgentHost {
             projectPath: projectPath,
             task: task
         )
+        // "cancelled"/"timeout" are protocol codes of their own; everything
+        // else the runner reports is vocabulary the model has no entry for.
+        let passThroughCodes: Set<String> = ["cancelled", "timeout"]
         return DispatchedToolResult(
             ok: result.ok,
             data: result.ok ? .string(result.summary) : nil,
-            error: result.ok ? nil : (result.error == "cancelled" ? "cancelled" : "execution_failed"),
+            error: result.ok ? nil : (passThroughCodes.contains(result.error ?? "") ? result.error : "execution_failed"),
             detail: result.detail ?? result.summary
         )
     }
@@ -347,11 +350,10 @@ final class AgentHost {
     }
 
     /// Denies everything still waiting -- used when the run is cancelled, so
-    /// a pending approval doesn't strand the loop forever. A delegated
-    /// code_editor is stranded the same way (its 600s timeout is the only
-    /// other way out), so 중지 has to release that too: workspace is told to
-    /// abort the run it is doing on our behalf, and the tool call gives up
-    /// without waiting to hear back.
+    /// a pending approval doesn't strand the loop forever. A code_editor run
+    /// is stranded the same way (its own timeout is the only other way out,
+    /// and it is 600s long), so 중지 has to release that too: the ACP agent is
+    /// told to stop through session/cancel and then signalled.
     func cancelPendingApprovals() {
         lock.lock()
         let waiting = pendingApprovals

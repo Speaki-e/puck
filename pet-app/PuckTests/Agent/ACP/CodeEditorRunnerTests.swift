@@ -273,6 +273,94 @@ final class CodeEditorRunnerTests: XCTestCase {
         XCTAssertEqual(result.changedFiles, ["edited.txt"])
     }
 
+    // MARK: - Timeout
+
+    /// The child is alive but wedged -- a stalled network call, a permission
+    /// request nobody answered -- so `session/prompt` never gets a reply and
+    /// nothing else here would ever give up. Unbounded, this is a chat that
+    /// spins until the app is quit.
+    func testARunThatIsNeverAnsweredGivesUpAtTheToolsTimeout() async {
+        let agent = FakeAgent(holdsPrompt: true)
+        let runner = CodeEditorRunner(
+            environment: makeEnvironment(agent: { _, _ in agent }),
+            timeoutSeconds: 0.3
+        )
+
+        // Through an expectation rather than awaited directly: without the
+        // bound this never returns at all, and a hung test says less than a
+        // failing one.
+        let returned = expectation(description: "code_editor returns")
+        var result: CodeEditorResult?
+        Task {
+            result = await runner.run(
+                requestId: "r1", workspaceId: "w1", projectPath: self.project.path, task: "go"
+            )
+            returned.fulfill()
+        }
+        await fulfillment(of: [returned], timeout: 10)
+
+        XCTAssertEqual(result?.error, "timeout")
+        XCTAssertFalse(result?.ok ?? true)
+    }
+
+    func testATimedOutRunTakesItsAgentDownWithIt() async {
+        let agent = FakeAgent(holdsPrompt: true, ignoresTerminate: true)
+        let runner = CodeEditorRunner(
+            environment: makeEnvironment(agent: { _, _ in agent }),
+            timeoutSeconds: 0.3
+        )
+
+        let returned = expectation(description: "code_editor returns")
+        Task {
+            _ = await runner.run(
+                requestId: "r1", workspaceId: "w1", projectPath: self.project.path, task: "go"
+            )
+            returned.fulfill()
+        }
+        await fulfillment(of: [returned], timeout: 10)
+
+        let killed = await eventually { agent.killCount == 1 }
+        XCTAssertTrue(killed, "a timed-out run must not leave its child behind")
+    }
+
+    /// A workspace is only free once its predecessor is finished, timeout
+    /// included -- letting the next run start against a child that is still
+    /// being killed is the interleaving the queue exists to prevent.
+    func testTheQueueMovesOnAfterATimeout() async {
+        let stuck = FakeAgent(holdsPrompt: true)
+        let second = FakeAgent()
+        var handed = 0
+        let runner = CodeEditorRunner(
+            environment: makeEnvironment(agent: { _, _ in
+                handed += 1
+                return handed == 1 ? stuck : second
+            }),
+            timeoutSeconds: 0.3
+        )
+
+        let returned = expectation(description: "both runs return")
+        returned.expectedFulfillmentCount = 2
+        var results: [CodeEditorResult] = []
+        Task {
+            let first = await runner.run(
+                requestId: "r1", workspaceId: "w1", projectPath: self.project.path, task: "a"
+            )
+            results.append(first)
+            returned.fulfill()
+        }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        Task {
+            let next = await runner.run(
+                requestId: "r2", workspaceId: "w1", projectPath: self.project.path, task: "b"
+            )
+            results.append(next)
+            returned.fulfill()
+        }
+        await fulfillment(of: [returned], timeout: 10)
+
+        XCTAssertEqual(results.map(\.error), ["timeout", nil])
+    }
+
     // MARK: - The child is never left behind
 
     /// SIGTERM is a request, not a guarantee, and the transport is released as

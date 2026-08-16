@@ -166,6 +166,11 @@ final class AgentRunner {
     /// workspace does not accumulate ten identical system lines.
     private var announcedWorkspaceContext: WorkspaceContext?
 
+    /// What the transcript ends with when the user presses 중지. Not an error
+    /// string: a stop the user asked for is an outcome, not a failure, so it
+    /// never goes through the `catch` path that reports a reason.
+    static let cancelledSummary = "중지했어요."
+
     func run(command: String) async {
         if let workspaceContext, workspaceContext != announcedWorkspaceContext {
             messages.append(.system(workspaceContext.promptLine))
@@ -175,10 +180,23 @@ final class AgentRunner {
         emit(.agentThinking)
 
         for _ in 0..<Self.maxTurns {
+            if Task.isCancelled {
+                emitCancelled()
+                return
+            }
             let turn: GPTTurn
             do {
                 turn = try await client.send(messages: messages, tools: toolSpecs)
             } catch {
+                // Checked before the error is described: a cancelled
+                // `URLSession.data(for:)` surfaces as URLError(.cancelled)
+                // rather than CancellationError, and reporting either one as
+                // "요청이 취소되었습니다" would make the 중지 button look like a
+                // network failure.
+                if Task.isCancelled {
+                    emitCancelled()
+                    return
+                }
                 let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 emit(.textChunk(text: reason))
                 emit(.agentDone(ok: false, summary: reason))
@@ -199,6 +217,13 @@ final class AgentRunner {
 
             messages.append(.assistant(text: turn.text, toolCalls: turn.toolCalls))
             for call in turn.toolCalls {
+                // Between calls, not only between turns: a turn can ask for
+                // several tools, and a stop pressed during the first one
+                // should not still run the rest.
+                if Task.isCancelled {
+                    emitCancelled()
+                    return
+                }
                 await perform(call)
             }
         }
@@ -206,6 +231,16 @@ final class AgentRunner {
         let hitCeiling = "도구를 \(Self.maxTurns)번 넘게 호출해서 중단했어요."
         emit(.textChunk(text: hitCeiling))
         emit(.agentDone(ok: false, summary: hitCeiling))
+    }
+
+    /// The one exit a cancelled run takes. Emits `agent_done` like every other
+    /// ending does, so the session leaves its running state instead of holding
+    /// a spinner forever; `ok: false` because the turn did not finish what it
+    /// was asked, and EventRouter deliberately gives a failed run no reaction
+    /// (a "task_success" jump for a stop would be worse than none).
+    private func emitCancelled() {
+        emit(.textChunk(text: Self.cancelledSummary))
+        emit(.agentDone(ok: false, summary: Self.cancelledSummary))
     }
 
     private func perform(_ call: GPTToolCall) async {

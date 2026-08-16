@@ -85,23 +85,63 @@ final class AcpAgentProcess: AcpAgentTransport {
         }
         stderrPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            guard !data.isEmpty, let self, let text = String(data: data, encoding: .utf8) else { return }
-            self.stderrLock.lock()
-            // Bounded the same way the TS version bounded it: the last 8KB is
-            // enough to explain a crash, and an agent that logs in a loop must
-            // not grow this without limit.
-            self.stderrTail = String((self.stderrTail + text).suffix(8_192))
-            self.stderrLock.unlock()
+            guard !data.isEmpty, let self else { return }
+            self.appendStderr(data)
         }
         process.terminationHandler = { [weak self] process in
             guard let self else { return }
             self.stdoutPipe.fileHandleForReading.readabilityHandler = nil
             self.stderrPipe.fileHandleForReading.readabilityHandler = nil
+            // What the child wrote just before exiting is still sitting in the
+            // pipe when this fires, and the reader is now gone. Left unread it
+            // is usually the reply that finished the run, so a run that
+            // succeeded would be reported as "the process exited".
+            self.drainRemainingOutput()
             let tail = self.currentStderrTail()
             self.connection.failAllPending(with: AcpError.processExited(detail: tail))
             self.onExit?(process.terminationStatus, tail)
         }
         try process.run()
+    }
+
+    private func appendStderr(_ data: Data) {
+        guard let text = String(data: data, encoding: .utf8) else { return }
+        stderrLock.lock()
+        // Bounded the same way the TS version bounded it: the last 8KB is
+        // enough to explain a crash, and an agent that logs in a loop must
+        // not grow this without limit.
+        stderrTail = String((stderrTail + text).suffix(8_192))
+        stderrLock.unlock()
+    }
+
+    /// Everything both pipes still hold, after the readers are detached.
+    private func drainRemainingOutput() {
+        drainBuffered(stdoutPipe.fileHandleForReading) { [connection] data in connection.receive(data) }
+        drainBuffered(stderrPipe.fileHandleForReading) { [weak self] data in self?.appendStderr(data) }
+    }
+
+    /// Reads what is already buffered, without blocking. Non-blocking on
+    /// purpose: the child has exited so everything it wrote is in the pipe
+    /// already, while a blocking read to EOF would wait on any grandchild that
+    /// inherited the write end -- the vendor CLI the agent spawns is exactly
+    /// that -- and never come back.
+    private func drainBuffered(_ handle: FileHandle, into sink: (Data) -> Void) {
+        let descriptor = handle.fileDescriptor
+        let flags = fcntl(descriptor, F_GETFL, 0)
+        guard flags != -1, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) != -1 else { return }
+        defer { _ = fcntl(descriptor, F_SETFL, flags) }
+
+        var buffer = [UInt8](repeating: 0, count: 65_536)
+        while true {
+            let count = buffer.withUnsafeMutableBytes { read(descriptor, $0.baseAddress, $0.count) }
+            if count > 0 {
+                sink(Data(buffer[0..<count]))
+            } else if count == -1 && errno == EINTR {
+                continue
+            } else {
+                return
+            }
+        }
     }
 
     func currentStderrTail() -> String {

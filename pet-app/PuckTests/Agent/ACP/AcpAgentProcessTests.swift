@@ -153,6 +153,32 @@ final class AcpAgentCommandResolverTests: XCTestCase {
         XCTAssertEqual(found?.path, "/Users/x/.npm-global/bin/claude")
     }
 
+    func testTheVendorCLIFallsBackToTheOfficialInstallerLocation() {
+        // ~/.claude/local/claude is where the official Claude Code installer
+        // puts it, and it is on no default PATH.
+        let found = AcpAgentCommandResolver.resolveVendorCLI(
+            for: .claude,
+            environment: ["PATH": "/usr/bin", "HOME": "/Users/x"],
+            fileExists: { $0 == "/Users/x/.claude/local/claude" },
+            nvmVersions: { _ in [] }
+        )
+
+        XCTAssertEqual(found?.path, "/Users/x/.claude/local/claude")
+    }
+
+    func testTheVendorCLIFallsBackToTheNewestNvmInstall() {
+        // Installed with `npm i -g` under an nvm node: the CLI sits beside that
+        // node, in a directory PATH names only once nvm's shell hook has run.
+        let found = AcpAgentCommandResolver.resolveVendorCLI(
+            for: .codex,
+            environment: ["PATH": "/usr/bin", "HOME": "/Users/x"],
+            fileExists: { $0.hasPrefix("/Users/x/.nvm/versions/node/") },
+            nvmVersions: { _ in ["v18.20.0", "v22.11.0", "v20.9.0"] }
+        )
+
+        XCTAssertEqual(found?.path, "/Users/x/.nvm/versions/node/v22.11.0/bin/codex")
+    }
+
     func testEachAgentNamesADistinctBundledScript() {
         let names = Set(CodingAgentKind.allCases.map(\.bundledScriptName))
         XCTAssertEqual(names.count, CodingAgentKind.allCases.count)

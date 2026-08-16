@@ -221,6 +221,63 @@ final class AcpAgentEnvironmentTests: XCTestCase {
         XCTAssertEqual(environment()["CLAUDE_CODE_EXECUTABLE"], "/usr/local/bin/claude")
     }
 
+    /// launchd's PATH, which is what an app launched from Finder inherits.
+    private static let launchdPath = "/usr/bin:/bin:/usr/sbin:/sbin"
+
+    private func childPath(
+        node: String = "/opt/homebrew/bin/node",
+        vendorCLI: String = "/Users/x/.local/bin/claude",
+        parentPath: String = AcpAgentEnvironmentTests.launchdPath
+    ) -> [String] {
+        AcpAgentProcess.childSearchPath(
+            for: AcpAgentCommand(
+                executable: URL(fileURLWithPath: node),
+                arguments: ["/x/agent.mjs"],
+                extraEnvironment: ["CLAUDE_CODE_EXECUTABLE": vendorCLI]
+            ),
+            environment: ["PATH": parentPath, "HOME": "/Users/x"]
+        ).components(separatedBy: ":")
+    }
+
+    func testTheChildCanFindTheNodeItIsRunningUnder() {
+        // The parent's PATH is launchd's when the app was launched from Finder,
+        // and names none of the directories node or the vendor CLI live in --
+        // so the CLI's own `node`/`git`/`rg` lookups all failed.
+        XCTAssertTrue(childPath().contains("/opt/homebrew/bin"), "got: \(childPath())")
+    }
+
+    func testTheChildCanFindTheVendorCLIsOwnDirectory() {
+        XCTAssertTrue(childPath().contains("/Users/x/.local/bin"), "got: \(childPath())")
+    }
+
+    func testTheWellKnownInstallDirectoriesAreOnTheChildsPath() {
+        let path = childPath()
+        for directory in ["/Users/x/.npm-global/bin", "/Users/x/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"] {
+            XCTAssertTrue(path.contains(directory), "\(directory) missing from \(path)")
+        }
+    }
+
+    func testWhateverTheParentAlreadyHadIsKeptAndComesFirst() {
+        let path = childPath(parentPath: "/custom/bin:/usr/bin")
+
+        XCTAssertEqual(path.first, "/custom/bin", "a user who set their own PATH keeps their order")
+        XCTAssertTrue(path.contains("/usr/bin"))
+    }
+
+    func testTheChildsPathHasNoDuplicates() {
+        let path = childPath(node: "/usr/bin/node", vendorCLI: "/usr/bin/claude")
+
+        XCTAssertEqual(path.count, Set(path).count, "got: \(path)")
+    }
+
+    func testTheSystemDirectoriesSurviveAnEmptyParentPath() {
+        let path = childPath(parentPath: "")
+
+        XCTAssertTrue(path.contains("/usr/bin"))
+        XCTAssertTrue(path.contains("/bin"))
+        XCTAssertFalse(path.contains(""), "got: \(path)")
+    }
+
     func testOnlyTheSelectedAgentsCredentialsAreForwarded() {
         let environment = environment(credentials: ["ANTHROPIC_API_KEY": "sk-test"])
 

@@ -1,3 +1,7 @@
 # Local debug/scratch output, never intentional to commit
 tmp-screenshots/
 .DS_Store
+
+# AI-generated planning/analysis/design docs -- not committed automatically
+docs/superpowers/
+.superpowers/

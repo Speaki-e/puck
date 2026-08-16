@@ -20,12 +20,18 @@ private final class FakeAgent: AcpAgentTransport {
     private(set) var killCount = 0
     /// Set by the test to observe ordering.
     var onPrompt: (() -> Void)?
+    /// Whether the run has got as far as its prompt.
+    private(set) var sawPrompt = false
     private var release: CheckedContinuation<Void, Never>?
     private let holdsPrompt: Bool
+    /// A child that stays alive through SIGTERM, which is the case the
+    /// escalation to SIGKILL exists for.
+    private let ignoresTerminate: Bool
     private var promptID: JSONValue?
 
-    init(holdsPrompt: Bool = false) {
+    init(holdsPrompt: Bool = false, ignoresTerminate: Bool = false) {
         self.holdsPrompt = holdsPrompt
+        self.ignoresTerminate = ignoresTerminate
         var deliver: ((JSONValue) -> Void)!
         let connection = AcpConnection(send: { data in
             guard let frame = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
@@ -40,6 +46,7 @@ private final class FakeAgent: AcpAgentTransport {
             case "session/new":
                 self.reply(id: id, result: .object(["sessionId": .string("s-1")]))
             case "session/prompt":
+                self.sawPrompt = true
                 self.onPrompt?()
                 if self.holdsPrompt {
                     self.promptID = id
@@ -67,7 +74,11 @@ private final class FakeAgent: AcpAgentTransport {
         reply(id: promptID, result: .object(["stopReason": .string(stopReason)]))
     }
 
-    func terminate() { terminateCount += 1; isRunning = false }
+    func terminate() {
+        terminateCount += 1
+        if !ignoresTerminate { isRunning = false }
+    }
+
     func kill() { killCount += 1; isRunning = false }
 }
 
@@ -260,5 +271,54 @@ final class CodeEditorRunnerTests: XCTestCase {
         )
 
         XCTAssertEqual(result.changedFiles, ["edited.txt"])
+    }
+
+    // MARK: - The child is never left behind
+
+    /// SIGTERM is a request, not a guarantee, and the transport is released as
+    /// soon as the run finishes -- so if nothing escalates here, nothing ever
+    /// will, and the run leaves a node process plus its vendor binary behind.
+    func testAnAgentThatIgnoresSIGTERMIsKilledWhenTheRunEnds() async {
+        let agent = FakeAgent(ignoresTerminate: true)
+        let runner = CodeEditorRunner(environment: makeEnvironment(agent: { _, _ in agent }))
+
+        _ = await runner.run(requestId: "r1", workspaceId: "w1", projectPath: project.path, task: "go")
+
+        XCTAssertEqual(agent.terminateCount, 1, "the polite signal comes first")
+        let killed = await eventually { agent.killCount == 1 }
+        XCTAssertTrue(killed, "a child that outlived SIGTERM has to be killed")
+    }
+
+    /// Closing the chat window quits the app mid-edit. Synchronous by
+    /// necessity: applicationWillTerminate has nothing to await with.
+    func testQuittingTheAppEndsAnAgentThatIsStillRunning() async {
+        let agent = FakeAgent(holdsPrompt: true, ignoresTerminate: true)
+        let runner = CodeEditorRunner(environment: makeEnvironment(agent: { _, _ in agent }))
+
+        async let running = runner.run(
+            requestId: "r1", workspaceId: "w1", projectPath: project.path, task: "go"
+        )
+        let started = await eventually { agent.isRunning && agent.sawPrompt }
+        XCTAssertTrue(started)
+
+        runner.terminateAll()
+
+        XCTAssertEqual(agent.killCount, 1, "the child must not outlive the app that spawned it")
+        XCTAssertFalse(agent.isRunning)
+        agent.finishPrompt()
+        _ = await running
+    }
+
+    // MARK: - Helpers
+
+    /// Polls, because the escalation from SIGTERM to SIGKILL is deliberately
+    /// on a delay -- what matters is that it happens, not when.
+    private func eventually(timeout: TimeInterval = 5, _ condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return condition()
     }
 }

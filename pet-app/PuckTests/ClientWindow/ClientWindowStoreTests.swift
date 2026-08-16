@@ -226,6 +226,44 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(transport.broadcasted, [.userInput(UserInput(text: "go on", source: .text, workspaceId: "w2", sessionId: "s9"))])
     }
 
+    /// The input bar has to show a running state the moment the message
+    /// leaves, not once the model's first chunk has crossed the socket and
+    /// come back. Asserted on the store rather than on a view because the
+    /// store is the one funnel every send goes through -- the previous caller
+    /// was a chat view that got rewritten away, taking the feedback with it.
+    func test_sendMessage_marksTheActiveSessionRunningBeforeAnyEventArrives() {
+        let (store, _) = makeStore()
+
+        store.sendMessage("사파리 켜줘", source: .text)
+
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.isRunning, true)
+    }
+
+    /// Same, on the in-process agent path -- which is the one the shipping app
+    /// actually takes, and the one whose deliberate `.sent` shortcut must not
+    /// be mistaken for "nothing was delivered".
+    func test_sendMessage_toTheLocalAgent_marksTheActiveSessionRunning() {
+        let (store, _) = makeStore()
+        var received: [String] = []
+        store.onUserCommand = { text, _, _ in received.append(text) }
+
+        XCTAssertEqual(store.sendMessage("사파리 켜줘", source: .text), .sent)
+
+        XCTAssertEqual(received, ["사파리 켜줘"])
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.isRunning, true)
+    }
+
+    /// A message that never left has no answer coming, so a spinner for it
+    /// would never stop.
+    func test_sendMessage_undelivered_leavesTheSessionIdle() {
+        let (store, transport) = makeStore()
+        transport.hasConnectedClients = false
+
+        XCTAssertEqual(store.sendMessage("사파리 켜줘", source: .text), .notDelivered)
+
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.isRunning, false)
+    }
+
     /// Text typed into pet-app's quick-capture bubble
     /// has to show up here. It arrives as a user_input with no workspace/
     /// session (the bubble knows nothing about either), which means the

@@ -18,6 +18,8 @@ private final class ScriptedAgent {
     /// Answers a request by method name. Returning nil means "stay silent",
     /// which is how the tests exercise a hang.
     var replies: [String: (JSONValue) -> JSONValue?] = [:]
+    /// Answers a request with a JSON-RPC error instead of a result.
+    var errorReplies: [String: (code: Int, message: String)] = [:]
 
     init() {
         connection = AcpConnection(send: { [weak self] data in
@@ -25,10 +27,19 @@ private final class ScriptedAgent {
                   let frame = try? JSONDecoder().decode(JSONValue.self, from: data)
             else { return }
             self.written.append(frame)
-            guard let method = frame["method"]?.stringValue,
-                  let id = frame["id"],
-                  let reply = self.replies[method]?(frame["params"] ?? .null)
-            else { return }
+            guard let method = frame["method"]?.stringValue, let id = frame["id"] else { return }
+            if let failure = self.errorReplies[method] {
+                self.push(.object([
+                    "jsonrpc": .string("2.0"),
+                    "id": id,
+                    "error": .object([
+                        "code": .number(Double(failure.code)),
+                        "message": .string(failure.message),
+                    ]),
+                ]))
+                return
+            }
+            guard let reply = self.replies[method]?(frame["params"] ?? .null) else { return }
             self.push(.object(["jsonrpc": .string("2.0"), "id": id, "result": reply]))
         })
     }
@@ -312,6 +323,62 @@ final class AcpCodeEditorSessionTests: XCTestCase {
         XCTAssertFalse(result.ok)
         XCTAssertEqual(result.error, "acp_error")
         XCTAssertEqual(result.detail, "ENOENT: node not found")
+    }
+
+    // MARK: - Failure detail
+
+    /// The classic case: `-32000 Authentication required`, whose actual
+    /// explanation ("Not logged in") the vendor CLI wrote to stderr. Without
+    /// the tail the message names a symptom and nothing that leads to a cause.
+    func testAnAcpErrorCarriesTheStderrTailThatExplainsIt() async {
+        let agent = ScriptedAgent()
+        agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
+        agent.replies["session/new"] = { _ in .object(["sessionId": .string("s-1")]) }
+        agent.errorReplies["session/prompt"] = (code: -32000, message: "Authentication required")
+        let session = AcpCodeEditorSession(
+            connection: agent.connection,
+            projectPath: "/tmp/project",
+            stderrTail: { "  claude: Not logged in. Run `claude login`.\n" }
+        )
+
+        let result = await session.run(task: "go")
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(
+            result.detail,
+            "ACP error -32000: Authentication required\nclaude: Not logged in. Run `claude login`."
+        )
+    }
+
+    func testAnAcpErrorWithNoStderrIsReportedOnItsOwn() async {
+        let agent = ScriptedAgent()
+        agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
+        agent.replies["session/new"] = { _ in .object(["sessionId": .string("s-1")]) }
+        agent.errorReplies["session/prompt"] = (code: -32000, message: "Authentication required")
+        let session = AcpCodeEditorSession(connection: agent.connection, projectPath: "/tmp/project")
+
+        let result = await session.run(task: "go")
+
+        XCTAssertEqual(result.detail, "ACP error -32000: Authentication required")
+    }
+
+    /// The exited case already reports the tail; it must not be pasted twice.
+    func testAProcessExitDoesNotRepeatTheStderrTail() async {
+        let agent = ScriptedAgent()
+        agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
+        agent.replies["session/new"] = { _ in .object(["sessionId": .string("s-1")]) }
+        let session = AcpCodeEditorSession(
+            connection: agent.connection,
+            projectPath: "/tmp/project",
+            stderrTail: { "boom" }
+        )
+
+        async let outcome = session.run(task: "go")
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        agent.connection.failAllPending(with: AcpError.processExited(detail: "boom"))
+        let result = await outcome
+
+        XCTAssertEqual(result.detail, "boom")
     }
 
     // MARK: - reportedDetail

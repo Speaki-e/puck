@@ -225,16 +225,32 @@ final class ClientWindowStore: ObservableObject {
     }
 
     /// Routes through whichever workspace/session is currently active.
+    ///
+    /// The session is put into its running state here rather than in the view
+    /// that owns the input bar: this is the one funnel every send goes
+    /// through, so a second send button added later cannot forget to do it.
+    /// Only on `.sent` -- a message that never left has no answer coming, and
+    /// a spinner for it would never stop.
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
+        let target = session(workspaceId: activeWorkspaceId, sessionId: activeSessionId)
         if let onUserCommand {
             onUserCommand(text, activeWorkspaceId, activeSessionId)
+            target?.markWaitingForAgent()
             // Not `.notDelivered`: the agent is right here, so the
             // "워크스페이스가 꺼져 있어요" banner would be a lie even though no
             // workspace is connected.
             return .sent
         }
-        return sender.send(text: text, source: source, workspaceId: activeWorkspaceId, sessionId: activeSessionId, attachments: attachments)
+        let delivery = sender.send(
+            text: text,
+            source: source,
+            workspaceId: activeWorkspaceId,
+            sessionId: activeSessionId,
+            attachments: attachments
+        )
+        if delivery == .sent { target?.markWaitingForAgent() }
+        return delivery
     }
 
     /// Shows text the user typed *somewhere else* (pet-app's quick-capture

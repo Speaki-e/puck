@@ -65,12 +65,59 @@ enum AcpEventMapping {
               ["edit", "delete", "move"].contains(kind)
         else { return [] }
 
-        let normalizedRoot = URL(fileURLWithPath: root).standardizedFileURL.path
+        let rootURL = URL(fileURLWithPath: root, isDirectory: true).standardizedFileURL
+        let normalizedRoot = rootURL.path
+        // /tmp is a symlink to /private/tmp on macOS, and standardizedFileURL
+        // does not resolve symlinks, so a project under one spelling and an
+        // agent reporting the other compare as "outside" on every single edit.
+        // Both sides get the same resolution, and a path is only flagged when
+        // it is outside under both spellings.
+        let resolvedRoot = canonicalPath(rootURL)
         return (call["locations"]?.arrayValue ?? []).compactMap { location in
-            guard let path = location["path"]?.stringValue else { return nil }
-            let resolved = URL(fileURLWithPath: path).standardizedFileURL.path
-            return PathContainment.isInside(root: normalizedRoot, candidate: resolved) ? nil : resolved
+            guard let path = location["path"]?.stringValue, !path.isEmpty else { return nil }
+            // A relative path is relative to the agent's cwd, which session/new
+            // set to the project root -- not to this process's cwd, which is
+            // "/" for an app launched from Finder.
+            let absolute = path.hasPrefix("/")
+                ? URL(fileURLWithPath: path)
+                : rootURL.appendingPathComponent(path)
+            let standardized = absolute.standardizedFileURL.path
+            if PathContainment.isInside(root: normalizedRoot, candidate: standardized) { return nil }
+            if PathContainment.isInside(root: resolvedRoot, candidate: canonicalPath(absolute)) { return nil }
+            // Reported as the agent spelled it, standardized -- that is the
+            // path a person has to go and look at.
+            return standardized
         }
+    }
+
+    /// `url` with every symlink in it resolved.
+    ///
+    /// Not `resolvingSymlinksInPath`: that only resolves a path that exists
+    /// (a file the agent is about to create does not), and it strips a leading
+    /// `/private` back off again, which undoes exactly the resolution wanted
+    /// here. This resolves the deepest part that does exist and re-appends the
+    /// rest, so both spellings of a project under `/tmp` land on one answer.
+    private static func canonicalPath(_ url: URL) -> String {
+        let standardized = url.standardizedFileURL
+        var trailing: [String] = []
+        var current = standardized
+        while true {
+            if let resolved = realPath(current.path) {
+                var result = URL(fileURLWithPath: resolved)
+                for component in trailing { result.appendPathComponent(component) }
+                return result.path
+            }
+            let parent = current.deletingLastPathComponent().standardizedFileURL
+            guard parent.path != current.path else { return standardized.path }
+            trailing.insert(current.lastPathComponent, at: 0)
+            current = parent
+        }
+    }
+
+    private static func realPath(_ path: String) -> String? {
+        guard let buffer = realpath(path, nil) else { return nil }
+        defer { free(buffer) }
+        return String(cString: buffer)
     }
 
     /// The file this update is about, if it names one. Same field the pet's

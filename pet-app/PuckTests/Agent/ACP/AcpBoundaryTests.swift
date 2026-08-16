@@ -106,6 +106,75 @@ final class AcpBoundaryTests: XCTestCase {
         XCTAssertTrue(AcpEventMapping.writesOutside(root: root, in: update(kind: "edit", paths: [])).isEmpty)
     }
 
+    func testARelativePathIsResolvedAgainstTheProjectNotThisProcess() {
+        // The shim forwards the model's `file_path` verbatim, so a relative one
+        // reaches here before the CLI rejects it. URL(fileURLWithPath:) would
+        // resolve it against *this* process's cwd -- "/" for an app launched
+        // from Finder -- turning "src/main.swift" into "/src/main.swift" and
+        // failing the whole run on a file inside the project.
+        let flagged = AcpEventMapping.writesOutside(
+            root: root,
+            in: update(kind: "edit", paths: ["src/main.swift"])
+        )
+
+        XCTAssertTrue(flagged.isEmpty, "got: \(flagged)")
+    }
+
+    func testARelativePathThatClimbsOutOfTheProjectIsStillFlagged() {
+        let flagged = AcpEventMapping.writesOutside(
+            root: root,
+            in: update(kind: "edit", paths: ["../secrets/key.txt"])
+        )
+
+        XCTAssertEqual(flagged, ["/Users/x/secrets/key.txt"])
+    }
+
+    func testASymlinkedProjectRootIsNotAnEscape() throws {
+        // /tmp is a symlink to /private/tmp on macOS: the user opens the
+        // project as /tmp/<name> and the agent reports /private/tmp/<name>/...
+        // standardizedFileURL does not resolve symlinks, so before this was
+        // fixed every single edit in such a project failed the run.
+        let name = "puck-acp-boundary-\(UUID().uuidString)"
+        let symlinkedRoot = "/tmp/\(name)"
+        try FileManager.default.createDirectory(atPath: symlinkedRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: symlinkedRoot) }
+        let resolvedRoot = "/private/tmp/\(name)"
+        try XCTSkipUnless(
+            FileManager.default.fileExists(atPath: resolvedRoot),
+            "/tmp is not a symlink to /private/tmp on this machine"
+        )
+
+        XCTAssertTrue(
+            AcpEventMapping.writesOutside(
+                root: symlinkedRoot,
+                in: update(kind: "edit", paths: ["\(resolvedRoot)/src/main.swift"])
+            ).isEmpty
+        )
+        // And the other way round: the project opened by its resolved name,
+        // the agent reporting the symlinked one.
+        XCTAssertTrue(
+            AcpEventMapping.writesOutside(
+                root: resolvedRoot,
+                in: update(kind: "edit", paths: ["\(symlinkedRoot)/src/main.swift"])
+            ).isEmpty
+        )
+    }
+
+    func testASymlinkedRootDoesNotStopRealEscapesFromBeingFlagged() throws {
+        let name = "puck-acp-boundary-\(UUID().uuidString)"
+        let symlinkedRoot = "/tmp/\(name)"
+        try FileManager.default.createDirectory(atPath: symlinkedRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: symlinkedRoot) }
+
+        XCTAssertEqual(
+            AcpEventMapping.writesOutside(
+                root: symlinkedRoot,
+                in: update(kind: "edit", paths: ["/Users/x/.ssh/authorized_keys"])
+            ),
+            ["/Users/x/.ssh/authorized_keys"]
+        )
+    }
+
     func testMessageChunksAreNotBoundaryEvents() {
         let chunk = AcpSessionUpdate(raw: .object([
             "update": .object([

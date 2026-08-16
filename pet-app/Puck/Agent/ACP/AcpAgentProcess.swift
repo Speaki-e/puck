@@ -66,7 +66,7 @@ final class AcpAgentProcess: AcpAgentTransport {
         process.standardError = stderrPipe
 
         var environment = [
-            "PATH": ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin",
+            "PATH": Self.childSearchPath(for: command),
             "NODE_ENV": "production",
             // The agents write scratch state under HOME; without it they fall
             // back to "/" and fail in ways that read as protocol errors.
@@ -83,6 +83,46 @@ final class AcpAgentProcess: AcpAgentTransport {
         environment.merge(credentials) { _, new in new }
         process.environment = environment
         childEnvironment = environment
+    }
+
+    /// What the child gets as PATH.
+    ///
+    /// Not simply the parent's: an app launched from Finder inherits launchd's
+    /// PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), not the user's shell one. The
+    /// vendor CLI shells out to node, git and rg, which live in none of those
+    /// four directories, so a child handed the parent's PATH cannot find the
+    /// tools it was resolved with -- including the node it is running under.
+    ///
+    /// Whatever the parent had comes first, so a user who set their own PATH
+    /// keeps their order; the directories the command was actually resolved
+    /// from are appended, then the usual install locations.
+    static func childSearchPath(
+        for command: AcpAgentCommand,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String {
+        var directories: [String] = []
+        var seen: Set<String> = []
+        func add(_ directory: String) {
+            let trimmed = directory.count > 1 && directory.hasSuffix("/")
+                ? String(directory.dropLast())
+                : directory
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return }
+            directories.append(trimmed)
+        }
+
+        for directory in (environment["PATH"] ?? "").split(separator: ":") { add(String(directory)) }
+        add(command.executable.deletingLastPathComponent().path)
+        // The vendor CLI's own directory: extraEnvironment carries its full
+        // path, and the CLI resolves its siblings relative to PATH, not to
+        // itself. Sorted so the result does not depend on dictionary order.
+        for path in command.extraEnvironment.values.sorted() where path.hasPrefix("/") {
+            add(URL(fileURLWithPath: path).deletingLastPathComponent().path)
+        }
+        for directory in AcpAgentCommandResolver.wellKnownBinDirectories(environment: environment) {
+            add(directory)
+        }
+        for directory in ["/usr/bin", "/bin", "/usr/sbin", "/sbin"] { add(directory) }
+        return directories.joined(separator: ":")
     }
 
     func start() throws {

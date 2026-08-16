@@ -110,6 +110,35 @@ enum AcpAgentCommandResolver {
         return nil
     }
 
+    /// Bin directories worth looking in, and worth handing to the child, on
+    /// top of whatever PATH already names. An app launched from Finder
+    /// inherits launchd's PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which names
+    /// none of these -- so neither the CLI lookup here nor the child's own
+    /// lookup of node/git/rg can rely on PATH alone.
+    static func wellKnownBinDirectories(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        nvmVersions: (URL) -> [String] = { directory in
+            (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        }
+    ) -> [String] {
+        var directories: [String] = []
+        if let home = environment["HOME"] {
+            directories.append("\(home)/.npm-global/bin")
+            directories.append("\(home)/.local/bin")
+            // Where the official Claude Code installer puts `claude`.
+            directories.append("\(home)/.claude/local")
+            // Same layout resolveNode searches, newest first: a node installed
+            // through nvm carries the globally installed CLIs beside it.
+            let nvmRoot = URL(fileURLWithPath: home).appendingPathComponent(".nvm/versions/node")
+            for version in nvmVersions(nvmRoot).sorted(by: >) {
+                directories.append(nvmRoot.appendingPathComponent("\(version)/bin").path)
+            }
+        }
+        directories.append("/opt/homebrew/bin")
+        directories.append("/usr/local/bin")
+        return directories
+    }
+
     /// The vendor CLI each shim actually drives -- `claude` for
     /// claude-agent-acp, `codex` for codex-acp. Honours the same override
     /// variable the shim itself reads, so a user who already set it keeps
@@ -117,7 +146,10 @@ enum AcpAgentCommandResolver {
     static func resolveVendorCLI(
         for kind: CodingAgentKind,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        fileExists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+        fileExists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
+        nvmVersions: (URL) -> [String] = { directory in
+            (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        }
     ) -> URL? {
         if let explicit = environment[kind.vendorCLIEnvironmentVariable], fileExists(explicit) {
             return URL(fileURLWithPath: explicit)
@@ -127,16 +159,10 @@ enum AcpAgentCommandResolver {
             let candidate = "\(directory)/\(name)"
             if fileExists(candidate) { return URL(fileURLWithPath: candidate) }
         }
-        // Where npm-global and the two package managers put it, in that order.
-        var wellKnown: [String] = []
-        if let home = environment["HOME"] {
-            wellKnown.append("\(home)/.npm-global/bin/\(name)")
-            wellKnown.append("\(home)/.local/bin/\(name)")
-        }
-        wellKnown.append("/opt/homebrew/bin/\(name)")
-        wellKnown.append("/usr/local/bin/\(name)")
-        for candidate in wellKnown where fileExists(candidate) {
-            return URL(fileURLWithPath: candidate)
+        // Where the installers put it, in the order worth trying.
+        let wellKnown = wellKnownBinDirectories(environment: environment, nvmVersions: nvmVersions)
+        for directory in wellKnown where fileExists("\(directory)/\(name)") {
+            return URL(fileURLWithPath: "\(directory)/\(name)")
         }
         return nil
     }

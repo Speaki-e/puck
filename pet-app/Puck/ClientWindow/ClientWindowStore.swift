@@ -263,9 +263,15 @@ final class ClientWindowStore: ObservableObject {
         guard let approvalId = session.pendingApproval?.approvalId else { return nil }
         if let onApprovalResolved {
             onApprovalResolved(approvalId, approved)
+            session.resolveApproval(approvalId: approvalId)
             return .sent
         }
-        return sender.respondToApproval(approvalId: approvalId, approved: approved)
+        let delivery = sender.respondToApproval(approvalId: approvalId, approved: approved)
+        // Only dequeued once the answer is actually on its way: an undelivered
+        // answer leaves the request waiting, and the user has to be able to
+        // press the button again rather than face the next one in line.
+        if delivery == .sent { session.resolveApproval(approvalId: approvalId) }
+        return delivery
     }
 
     @discardableResult

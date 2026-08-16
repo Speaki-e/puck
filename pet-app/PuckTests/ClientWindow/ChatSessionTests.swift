@@ -131,6 +131,65 @@ final class ChatSessionTests: XCTestCase {
         XCTAssertEqual(session.timeline.count, 1)
     }
 
+    /// The coding agent batches parallel tool calls, so two permission
+    /// requests can be outstanding at once. A single slot dropped the first
+    /// one: only the second could be answered, and the request behind the
+    /// first waited until the tool timeout expired.
+    func test_twoApprovalsInFlight_bothStayPending_oldestFirst() {
+        let session = makeSession()
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+
+        XCTAssertEqual(session.pendingApprovals.map(\.approvalId), ["a1", "a2"])
+        XCTAssertEqual(session.pendingApproval?.approvalId, "a1")
+    }
+
+    func test_answeringTheOldestApproval_promotesTheNextOne() {
+        let session = makeSession()
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+
+        session.resolveApproval(approvalId: "a1")
+
+        XCTAssertEqual(session.pendingApprovals.map(\.approvalId), ["a2"])
+        XCTAssertEqual(session.pendingApproval?.approvalId, "a2")
+    }
+
+    /// The banner used to read "응답함" for every request as soon as any one of
+    /// them was pending-cleared, so a still-blocking request looked answered.
+    func test_approvalState_isPerRequest() {
+        let session = makeSession()
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+
+        XCTAssertEqual(session.approvalState(for: "a1"), .actionable)
+        XCTAssertEqual(session.approvalState(for: "a2"), .queued)
+
+        session.resolveApproval(approvalId: "a1")
+
+        XCTAssertEqual(session.approvalState(for: "a1"), .resolved)
+        XCTAssertEqual(session.approvalState(for: "a2"), .actionable)
+    }
+
+    func test_repeatedAwaitApprovalForTheSameId_doesNotQueueItTwice() {
+        let session = makeSession()
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
+
+        XCTAssertEqual(session.pendingApprovals.map(\.approvalId), ["a1"])
+    }
+
+    func test_agentDone_clearsEveryPendingApproval() {
+        let session = makeSession()
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+
+        session.apply(.agentDone(ok: false, summary: "stopped"))
+
+        XCTAssertTrue(session.pendingApprovals.isEmpty)
+        XCTAssertEqual(session.approvalState(for: "a2"), .resolved)
+    }
+
     func test_agentDone_clearsRunningAndPendingApproval_andAppendsASummaryEntry() {
         let session = makeSession()
         session.apply(.agentThinking)

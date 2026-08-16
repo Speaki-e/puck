@@ -95,8 +95,15 @@ struct ChatTranscriptView: View {
             // answers, which is the only thing that makes it readable.
             EmptyView()
 
-        case .approvalRequested(_, _, let summary):
-            ApprovalBanner(summary: summary, isResolved: session.pendingApproval == nil, onApproval: onApproval)
+        case .approvalRequested(_, let approvalId, let summary):
+            // Keyed by this row's own approvalId rather than by "is anything
+            // pending": with two requests in flight, the shared flag made the
+            // older one look answered while it was still waiting.
+            ApprovalBanner(
+                summary: summary,
+                state: session.approvalState(for: approvalId),
+                onApproval: onApproval
+            )
 
         case .done(_, let ok, let summary):
             DoneRow(ok: ok, summary: summary)
@@ -212,17 +219,22 @@ private struct ToolCallRow: View {
 
 private struct ApprovalBanner: View {
     let summary: String
-    let isResolved: Bool
+    let state: ApprovalState
     let onApproval: (Bool) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(summary, systemImage: "hand.raised.fill")
-            if isResolved {
+            switch state {
+            case .resolved:
                 Text("응답함")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else {
+            case .queued:
+                Text("앞의 요청에 먼저 응답해 주세요.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case .actionable:
                 HStack {
                     Button("허용") { onApproval(true) }
                         .keyboardShortcut(.defaultAction)

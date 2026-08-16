@@ -62,6 +62,26 @@ extension ChatTimelineEntry: Identifiable {
     }
 }
 
+/// One approval the agent is blocked on. Identified by the protocol's own
+/// `approval_id`: that is the id the answer has to be addressed to, and the
+/// only thing that ties a banner to the request waiting behind it.
+struct PendingApproval: Equatable, Identifiable {
+    let approvalId: String
+    let summary: String
+
+    var id: String { approvalId }
+}
+
+/// What an approval banner can do right now.
+enum ApprovalState: Equatable {
+    /// The one the buttons act on -- the oldest request still unanswered.
+    case actionable
+    /// Asked for, but an older request is still in front of it.
+    case queued
+    /// Answered, or abandoned when the run ended.
+    case resolved
+}
+
 /// One chat session under a workspace. `id`/`workspaceId` are the protocol's
 /// own ids (both "default" for the always-present casual session -- see
 /// ClientWindowStore's composite-key note on why that's not a collision).
@@ -71,8 +91,20 @@ final class ChatSession: ObservableObject, Identifiable {
     let origin: SessionOrigin
     @Published var title: String
     @Published private(set) var timeline: [ChatTimelineEntry] = []
-    @Published private(set) var pendingApproval: (approvalId: String, summary: String)?
+    /// Every approval still waiting on the user, oldest first.
+    ///
+    /// A queue rather than a single slot: the coding agent batches parallel
+    /// tool calls, so two `session/request_permission` calls can be in flight
+    /// at once. With one slot the second overwrote the first, the UI could
+    /// then only ever produce an answer for the second, and the first request's
+    /// caller waited on an answer that could no longer be given -- which stalls
+    /// the agent for the whole tool timeout. Answered oldest-first so the two
+    /// buttons always mean one unambiguous request.
+    @Published private(set) var pendingApprovals: [PendingApproval] = []
     @Published private(set) var isRunning = false
+
+    /// The request the approval buttons answer, or nil when none is waiting.
+    var pendingApproval: PendingApproval? { pendingApprovals.first }
 
     /// When this session last saw any agent event. Drives the sidebar's relative
     /// time ("12분", "어제") -- nothing else in the app tracked time before v3.
@@ -141,13 +173,33 @@ final class ChatSession: ObservableObject, Identifiable {
             timeline.append(.toolResult(id: id, ok: ok, data: data, error: error, detail: detail))
 
         case .awaitApproval(let summary, let approvalId):
-            pendingApproval = (approvalId, summary)
+            // Re-broadcast of an id already queued is not a second request.
+            if !pendingApprovals.contains(where: { $0.approvalId == approvalId }) {
+                pendingApprovals.append(PendingApproval(approvalId: approvalId, summary: summary))
+            }
             timeline.append(.approvalRequested(id: UUID(), approvalId: approvalId, summary: summary))
 
         case .agentDone(let ok, let summary):
             isRunning = false
-            pendingApproval = nil
+            // The run is over, so nothing is waiting on these any more. The
+            // side holding the requests fails whatever is left (AgentHost),
+            // so no answer is silently dropped here.
+            pendingApprovals.removeAll()
             timeline.append(.done(id: UUID(), ok: ok, summary: summary))
         }
+    }
+
+    /// The user answered this request; it stops being pending and the next one
+    /// in line becomes actionable. Unknown ids are ignored -- an answer that
+    /// crossed with `agent_done` is not an error.
+    func resolveApproval(approvalId: String) {
+        pendingApprovals.removeAll { $0.approvalId == approvalId }
+    }
+
+    func approvalState(for approvalId: String) -> ApprovalState {
+        guard let index = pendingApprovals.firstIndex(where: { $0.approvalId == approvalId }) else {
+            return .resolved
+        }
+        return index == 0 ? .actionable : .queued
     }
 }

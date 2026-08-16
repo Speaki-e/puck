@@ -56,6 +56,47 @@ final class LiveAgentProcesses {
     }
 }
 
+/// Runs `work` under a deadline. Returns nil when the deadline won.
+///
+/// The loser is abandoned rather than awaited -- a task group would wait for
+/// it, and what it is waiting on is exactly what the deadline exists to escape
+/// (a stalled network call, an approval nobody will ever answer). Killing the
+/// agent is what actually unblocks it, and that happens at the call site.
+private func withDeadline<Value>(
+    seconds: TimeInterval,
+    work: @escaping () async -> Value
+) async -> Value? {
+    let outcome = FirstOutcome<Value?>()
+    return await withCheckedContinuation { (continuation: CheckedContinuation<Value?, Never>) in
+        outcome.arm(continuation)
+        Task { outcome.resolve(await work()) }
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            outcome.resolve(nil)
+        }
+    }
+}
+
+/// Resumes exactly once, for whichever racer arrives first.
+private final class FirstOutcome<Value> {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Never>?
+
+    /// Called before either racer starts, so there is no window in which a
+    /// result arrives with nothing to hand it to.
+    func arm(_ continuation: CheckedContinuation<Value, Never>) {
+        lock.lock(); self.continuation = continuation; lock.unlock()
+    }
+
+    func resolve(_ value: Value) {
+        lock.lock()
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(returning: value)
+    }
+}
+
 actor CodeEditorRunner {
     /// A run that is queued or in flight.
     private struct Run {
@@ -67,6 +108,13 @@ actor CodeEditorRunner {
     }
 
     private let environment: CodeEditorRunnerEnvironment
+    /// The registry's bound for this tool (ToolTimeouts). Nothing else here
+    /// ever gives up: a child that is alive but wedged -- a stalled network
+    /// call, a permission request nobody answers -- leaves `session/prompt`
+    /// with no reply, and the chat spins until the app is quit. Bounds one
+    /// run's own work rather than the whole queue: a run still waiting its
+    /// turn is bounded by its predecessors, each of which is bounded by this.
+    private let timeoutSeconds: TimeInterval
     private let onUpdate: (_ requestId: String, _ workspaceId: String, _ update: AcpSessionUpdate) -> Void
     private let resolvePermission: AcpPermissionResolver
 
@@ -80,10 +128,12 @@ actor CodeEditorRunner {
 
     init(
         environment: CodeEditorRunnerEnvironment,
+        timeoutSeconds: TimeInterval = ToolTimeouts.seconds(for: "code_editor"),
         onUpdate: @escaping (_ requestId: String, _ workspaceId: String, _ update: AcpSessionUpdate) -> Void = { _, _, _ in },
         resolvePermission: @escaping AcpPermissionResolver = { _ in false }
     ) {
         self.environment = environment
+        self.timeoutSeconds = timeoutSeconds
         self.onUpdate = onUpdate
         self.resolvePermission = resolvePermission
     }
@@ -216,7 +266,17 @@ actor CodeEditorRunner {
             return .cancelled(changedFiles: tracker.finish())
         }
 
-        var result = await session.run(task: task)
+        guard var result = await withDeadline(seconds: timeoutSeconds, work: { await session.run(task: task) }) else {
+            session.cancel()
+            shutDown(process, cancelGrace: 0)
+            return CodeEditorResult(
+                ok: false,
+                summary: "코드 편집이 \(Int(timeoutSeconds))초 안에 끝나지 않아 중단했어요.",
+                changedFiles: tracker.finish(),
+                error: "timeout",
+                detail: "code_editor exceeded \(Int(timeoutSeconds))s"
+            )
+        }
         shutDown(process, cancelGrace: 0)
         result.changedFiles = tracker.finish()
         return result

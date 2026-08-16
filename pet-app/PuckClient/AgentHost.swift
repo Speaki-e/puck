@@ -38,6 +38,9 @@ final class AgentHost {
     private var pendingApprovals: [String: CheckedContinuation<Bool, Never>] = [:]
     /// The code_editor run the 중지 button would cancel, if any.
     private var activeCodeEditorRequestId: String?
+    /// The agent turn the 중지 button cancels. Without it the turn outlived
+    /// every other thing 중지 stops.
+    private let activeRun = AgentRunHandle()
     private let lock = NSLock()
 
     /// Re-read on every access rather than cached: the key can be typed into
@@ -338,8 +341,9 @@ final class AgentHost {
         // Before the run, not at init: which workspace is active changes
         // between turns, and the runner only re-announces it when it differs.
         runner.workspaceContext = describeWorkspace(workspaceId)
-        Task {
-            await runner.run(command: command)
+        activeRun.start { [weak self] in
+            guard let self else { return }
+            await self.runner.run(command: command)
             // Backstop for the invariant: every approvalId handed to the UI is
             // answered or explicitly failed. By the time the run returns
             // nothing legitimate is still awaiting one -- anything left is an
@@ -363,6 +367,10 @@ final class AgentHost {
     /// and it is 600s long), so 중지 has to release that too: the ACP agent is
     /// told to stop through session/cancel and then signalled.
     func cancelPendingApprovals() {
+        // The turn first: everything below releases something the turn is
+        // blocked on, and it has to already be cancelled when it wakes up or
+        // it just carries on to the next tool call.
+        activeRun.cancel()
         failPendingApprovals()
         _ = broadcast(.runCancel(sessionId: activeSessionId))
         cancelActiveCodeEditor()

@@ -266,6 +266,42 @@ final class AcpCodeEditorSessionTests: XCTestCase {
         XCTAssertEqual(answer?["result"]?["outcome"]?["optionId"]?.stringValue, "no")
     }
 
+    func testAnApprovalOfOptionsWithoutKindsCancelsRatherThanPickingTheFirst() async {
+        // The agent named its options but did not classify them, and listed the
+        // rejection first. Selecting "whatever came first" would have answered
+        // the user's 허용 with the agent's 거부 -- so the run is cancelled instead.
+        let agent = ScriptedAgent()
+        agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
+        agent.replies["session/new"] = { _ in .object(["sessionId": .string("s-1")]) }
+        agent.replies["session/prompt"] = { [weak agent] _ in
+            agent?.push(.object([
+                "jsonrpc": .string("2.0"),
+                "id": .number(99),
+                "method": .string("session/request_permission"),
+                "params": .object([
+                    "sessionId": .string("s-1"),
+                    "options": .array([
+                        .object(["optionId": .string("no"), "name": .string("거부")]),
+                        .object(["optionId": .string("yes"), "name": .string("허용")]),
+                    ]),
+                ]),
+            ]))
+            return .object(["stopReason": .string("end_turn")])
+        }
+        let session = AcpCodeEditorSession(
+            connection: agent.connection,
+            projectPath: "/tmp/project",
+            resolvePermission: { _ in true }
+        )
+
+        _ = await session.run(task: "go")
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        let answer = agent.written.first { $0["id"]?.numberValue == 99 }
+        XCTAssertNil(answer?["result"]?["outcome"]?["optionId"]?.stringValue)
+        XCTAssertEqual(answer?["result"]?["outcome"]?["outcome"]?.stringValue, "cancelled")
+    }
+
     func testAnUnknownAgentRequestIsAnsweredRatherThanLeftHanging() async {
         let agent = ScriptedAgent()
         agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
@@ -417,5 +453,64 @@ final class AcpCodeEditorSessionTests: XCTestCase {
         let result = CodeEditorResult(ok: true, summary: "고쳤어요", changedFiles: [])
 
         XCTAssertNil(result.reportedDetail)
+    }
+}
+
+/// Which option an approval and a refusal each map to. The agent owns the
+/// vocabulary, so the resolver picks by `kind` -- and when no option declares
+/// one, it says so rather than guessing.
+final class AcpPermissionOptionTests: XCTestCase {
+    private func request(_ options: [[String: JSONValue]]) -> AcpPermissionRequest {
+        AcpPermissionRequest(raw: .object([
+            "sessionId": .string("s-1"),
+            "options": .array(options.map { .object($0) }),
+        ]))
+    }
+
+    func testAllowPrefersTheOnceOptionOverTheAlwaysOne() {
+        let permission = request([
+            ["optionId": .string("always"), "name": .string("항상 허용"), "kind": .string("allow_always")],
+            ["optionId": .string("once"), "name": .string("허용"), "kind": .string("allow_once")],
+        ])
+
+        XCTAssertEqual(permission.allowOption()?.id, "once")
+    }
+
+    func testAllowAcceptsAnyAllowShapedKind() {
+        let permission = request([
+            ["optionId": .string("no"), "name": .string("거부"), "kind": .string("reject_once")],
+            ["optionId": .string("always"), "name": .string("항상"), "kind": .string("allow_always")],
+        ])
+
+        XCTAssertEqual(permission.allowOption()?.id, "always")
+    }
+
+    /// The bug this pins: falling back to `options.first` handed back a
+    /// *reject* option for an approval whenever the agent omitted `kind` and
+    /// listed its rejection first.
+    func testAllowNeverFallsBackToAnUnclassifiedFirstOption() {
+        let permission = request([
+            ["optionId": .string("no"), "name": .string("거부")],
+            ["optionId": .string("yes"), "name": .string("허용")],
+        ])
+
+        XCTAssertNil(permission.allowOption())
+    }
+
+    func testAllowNeverReturnsAnOptionThatRejects() {
+        let permission = request([
+            ["optionId": .string("no"), "name": .string("거부"), "kind": .string("reject_once")],
+        ])
+
+        XCTAssertNil(permission.allowOption())
+        XCTAssertEqual(permission.rejectOption()?.id, "no")
+    }
+
+    func testRejectStaysNilWhenNothingRejects() {
+        let permission = request([
+            ["optionId": .string("yes"), "name": .string("허용"), "kind": .string("allow_once")],
+        ])
+
+        XCTAssertNil(permission.rejectOption())
     }
 }

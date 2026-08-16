@@ -156,10 +156,12 @@ struct AcpPermissionRequest: Equatable {
 
     /// The option to send back for an approval, or nil when the agent offered
     /// none that allow -- in which case cancelling is the only honest answer.
+    /// Never falls back to "whatever came first": an agent that omits `kind`
+    /// and happens to list its rejection first would turn the user's approval
+    /// into a refusal, which is the one direction this must not get wrong.
     func allowOption() -> Option? {
         options.first { $0.kind == "allow_once" }
             ?? options.first { $0.kind?.hasPrefix("allow") == true }
-            ?? options.first
     }
 
     func rejectOption() -> Option? {

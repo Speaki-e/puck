@@ -71,13 +71,39 @@ private struct EditorPaneContentView: View {
                 EditorTabStripView(
                     tabs: store.openTabs,
                     activeTabPath: store.activeTabPath,
+                    canSave: store.canSaveActiveTab,
                     onSelect: { store.select(path: $0) },
-                    onClose: { store.close(path: $0) }
+                    onClose: { store.requestClose(path: $0) },
+                    onSave: { store.saveActiveTab() }
                 )
                 Divider()
                 EditorContentHostView(store: store)
             }
             .frame(minWidth: 360)
         }
+        // Closing a tab with unsaved edits asks instead of dropping them.
+        // A prompt rather than a silent save: the tab is a live view of a
+        // file the agent also writes, and quietly committing a half-finished
+        // draft on the way out is its own kind of damage. Three answers, in
+        // the order macOS puts them.
+        .confirmationDialog(
+            "저장하지 않은 변경사항이 있어요",
+            isPresented: Binding(
+                get: { store.pendingClosePath != nil },
+                set: { if !$0 { store.cancelPendingClose() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("저장 후 닫기") { store.confirmPendingCloseSaving() }
+            Button("저장 안 함", role: .destructive) { store.confirmPendingCloseDiscarding() }
+            Button("취소", role: .cancel) { store.cancelPendingClose() }
+        } message: {
+            Text(pendingCloseMessage)
+        }
+    }
+
+    private var pendingCloseMessage: String {
+        guard let path = store.pendingClosePath else { return "" }
+        return "\((path as NSString).lastPathComponent)의 변경사항을 저장할까요?"
     }
 }

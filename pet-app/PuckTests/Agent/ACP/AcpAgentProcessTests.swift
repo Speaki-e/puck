@@ -164,6 +164,78 @@ final class AcpAgentCommandResolverTests: XCTestCase {
     }
 }
 
+/// What is still in the pipe when the child exits. Spawns a scripted `sh`
+/// rather than node: the point is the exit/read race, and a shell reaches it
+/// in milliseconds on any machine.
+final class AcpAgentProcessOutputDrainTests: XCTestCase {
+    private var scriptURL: URL!
+
+    override func tearDownWithError() throws {
+        if let scriptURL { try? FileManager.default.removeItem(at: scriptURL) }
+    }
+
+    private func agent(script: String) throws -> AcpAgentProcess {
+        scriptURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("acp-drain-\(UUID().uuidString).sh")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        return AcpAgentProcess(
+            command: AcpAgentCommand(executable: scriptURL, arguments: [], extraEnvironment: [:]),
+            projectPath: NSTemporaryDirectory(),
+            credentials: [:]
+        )
+    }
+
+    /// The reply and the exit arrive together, and the reply is bigger than
+    /// one pipeful -- so some of it is still unread when terminationHandler
+    /// fires. Detaching the reader there and stopping used to throw that tail
+    /// away, which failed the run's own `session/prompt` and reported a run
+    /// that had actually succeeded as "the ACP process exited".
+    func testTheReplyWrittenJustBeforeExitIsStillRead() async throws {
+        let agent = try agent(script: """
+        #!/bin/sh
+        read line
+        printf '{"jsonrpc":"2.0","id":1,"result":{"stopReason":"end_turn","pad":"'
+        head -c 400000 /dev/zero | tr '\\0' x
+        printf '"}}\\n'
+        exit 0
+        """)
+        try agent.start()
+        defer { agent.kill() }
+
+        let result = try await agent.connection.request(
+            method: AcpMethod.sessionPrompt,
+            params: .object(["sessionId": .string("s-1")])
+        )
+
+        XCTAssertEqual(result["stopReason"]?.stringValue, "end_turn")
+    }
+
+    /// The other half of the same drain: an agent that explains itself on
+    /// stderr on its way out still gets that explanation reported.
+    func testStderrWrittenJustBeforeExitIsStillReported() async throws {
+        let agent = try agent(script: """
+        #!/bin/sh
+        read line
+        printf 'fatal: the agent could not start\\n' >&2
+        exit 1
+        """)
+        let exited = expectation(description: "the process exits")
+        var reported = ""
+        agent.onExit = { _, tail in
+            reported = tail
+            exited.fulfill()
+        }
+        try agent.start()
+        defer { agent.kill() }
+
+        _ = try? await agent.connection.request(method: AcpMethod.initialize, params: .null)
+        await fulfillment(of: [exited], timeout: 5)
+
+        XCTAssertTrue(reported.contains("could not start"), "got: \(reported)")
+    }
+}
+
 /// Spawns the real thing. Skips rather than fails when node is missing -- a
 /// machine without node is a supported configuration (code_editor is simply
 /// unavailable there), so this must not turn into a red suite.

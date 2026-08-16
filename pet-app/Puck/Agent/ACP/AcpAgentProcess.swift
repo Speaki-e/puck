@@ -22,6 +22,14 @@ protocol AcpAgentTransport: AnyObject {
     var isRunning: Bool { get }
     func terminate()
     func kill()
+    /// The bounded tail of the child's stderr. Whatever explains a failure --
+    /// a login prompt, a stack trace -- is written here rather than sent over
+    /// the protocol, so a failure reported without it is usually unreadable.
+    func currentStderrTail() -> String
+}
+
+extension AcpAgentTransport {
+    func currentStderrTail() -> String { "" }
 }
 
 final class AcpAgentProcess: AcpAgentTransport {

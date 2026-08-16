@@ -52,6 +52,8 @@ final class AcpCodeEditorSession {
     private let projectPath: String
     private let onUpdate: (AcpSessionUpdate) -> Void
     private let resolvePermission: AcpPermissionResolver
+    /// The agent's stderr so far, read only when a failure has to be explained.
+    private let stderrTail: () -> String
 
     private let lock = NSLock()
     private var summary = ""
@@ -65,12 +67,14 @@ final class AcpCodeEditorSession {
         connection: AcpConnection,
         projectPath: String,
         onUpdate: @escaping (AcpSessionUpdate) -> Void = { _ in },
-        resolvePermission: @escaping AcpPermissionResolver = { _ in false }
+        resolvePermission: @escaping AcpPermissionResolver = { _ in false },
+        stderrTail: @escaping () -> String = { "" }
     ) {
         self.connection = connection
         self.projectPath = projectPath
         self.onUpdate = onUpdate
         self.resolvePermission = resolvePermission
+        self.stderrTail = stderrTail
 
         connection.onNotification = { [weak self] method, params in
             guard method == AcpMethod.sessionUpdate else { return }
@@ -163,7 +167,7 @@ final class AcpCodeEditorSession {
                 summary: "ACP 작업에 실패했습니다.",
                 changedFiles: [],
                 error: "acp_error",
-                detail: Self.detail(from: error)
+                detail: detail(from: error)
             )
         }
     }
@@ -224,11 +228,28 @@ final class AcpCodeEditorSession {
         return writesOutsideProject
     }
 
-    private static func detail(from error: Error) -> String {
+    private func detail(from error: Error) -> String {
         switch error {
-        case AcpError.agent(let code, let message): return "ACP error \(code): \(message)"
-        case AcpError.processExited(let detail): return detail.isEmpty ? "ACP 프로세스가 종료되었습니다." : detail
-        default: return String(describing: error)
+        case AcpError.agent(let code, let message):
+            // An ACP-level error is often a one-liner whose explanation the
+            // agent wrote to stderr instead ("-32000 Authentication required"
+            // next to the CLI's own "Not logged in"). Reported without it, the
+            // message names a symptom and nothing that leads to a cause.
+            return Self.appending(stderrTail(), to: "ACP error \(code): \(message)")
+        case AcpError.processExited(let detail):
+            // Already the stderr tail (AcpAgentProcess passes it in).
+            return detail.isEmpty ? "ACP 프로세스가 종료되었습니다." : detail
+        default:
+            return Self.appending(stderrTail(), to: String(describing: error))
         }
+    }
+
+    /// Appends the tail exactly as captured -- it is already bounded by
+    /// AcpAgentProcess, and this goes to the model and the transcript, so
+    /// nothing here may widen what a child process can put in front of them.
+    private static func appending(_ tail: String, to message: String) -> String {
+        let tail = tail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !tail.isEmpty, !message.contains(tail) else { return message }
+        return message + "\n" + tail
     }
 }

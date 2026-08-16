@@ -253,7 +253,8 @@ actor CodeEditorRunner {
             connection: process.connection,
             projectPath: projectPath,
             onUpdate: { [onUpdate] update in onUpdate(requestId, workspaceId, update) },
-            resolvePermission: resolvePermission
+            resolvePermission: resolvePermission,
+            stderrTail: { [weak process] in process?.currentStderrTail() ?? "" }
         )
         runs[requestId]?.session = session
         runs[requestId]?.process = process

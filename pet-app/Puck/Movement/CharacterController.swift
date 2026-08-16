@@ -6,6 +6,7 @@
 //  Drives update(dt) every frame; runs and transitions the current StateHandler.
 //
 
+import CoreGraphics
 import Foundation
 
 /// The minimal interface F5 (Audio/SFXPlayer) will implement. Kept here so the
@@ -46,6 +47,10 @@ final class CharacterController {
     var landingY: (CGPoint) -> CGFloat = { _ in .zero }
     /// Refreshed from F4 every frame by the bootstrap wiring.
     var windows: () -> [WindowInfo] = { [] }
+    /// See StateContext.unclimbableWindowIDs. A closure, not a stored set, for
+    /// the same reason `windows` is one: which window has focus changes while
+    /// the pet is walking, and so does the setting behind it.
+    var unclimbableWindows: () -> Set<CGWindowID> = { [] }
 
     /// The unprompted "가끔씩" voice line while the pet is standing around.
     /// Ticked only in Idle -- see IdleChatter. Its keys are filled in at
@@ -107,6 +112,7 @@ final class CharacterController {
             visualBounds: body.visualBounds,
             walkSpeed: walkSpeed,
             windows: windows(),
+            unclimbableWindowIDs: unclimbableWindows(),
             landingY: landingY,
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }
         )

@@ -34,6 +34,8 @@ final class TestStateWorld {
     var walkSpeed: CGFloat = MovementSolver.walkSpeed
     var landingY: CGFloat = 500
     var windows: [WindowInfo] = []
+    /// Settings' "포커스된 창 위로는 올라가지 않기", as WalkState sees it.
+    var unclimbableWindowIDs: Set<CGWindowID> = []
 
     init(position: CGPoint = .zero) {
         body = CharacterBody(avatar: avatar, position: position)
@@ -47,6 +49,7 @@ final class TestStateWorld {
             visualBounds: visualBounds,
             walkSpeed: walkSpeed,
             windows: windows,
+            unclimbableWindowIDs: unclimbableWindowIDs,
             landingY: { [landingY] _ in landingY },
             requestTransition: { [weak self] kind in self?.requestedTransitions.append(kind) }
         )

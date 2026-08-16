@@ -28,12 +28,13 @@ final class NearestClimbTargetTests: XCTestCase {
         WindowInfo(windowID: CGWindowID(abs(Int(frame.minX)) + 1), ownerPID: 1, ownerName: nil, title: nil, layer: 0, frame: frame)
     }
 
-    private func target(from x: CGFloat, windows: [WindowInfo]) -> CGPoint? {
+    private func target(from x: CGFloat, windows: [WindowInfo], excluding: Set<CGWindowID> = []) -> CGPoint? {
         WindowSupport.nearestClimbTarget(
             from: CGPoint(x: x, y: floor),
             in: windows,
             roamableTop: roamableTop,
-            avatarHeight: avatarHeight
+            avatarHeight: avatarHeight,
+            excluding: excluding
         )
     }
 
@@ -107,5 +108,71 @@ final class NearestClimbTargetTests: XCTestCase {
         let result = try XCTUnwrap(target(from: 400, windows: [window(x: 400)]))
 
         XCTAssertEqual(result.x, 700, accuracy: 5, "moves on to the far edge")
+    }
+
+    // MARK: - "포커스된 창 위로는 올라가지 않기" (Settings)
+
+    /// The toggle's whole promise. Before it had a reader, an excluded window
+    /// was climbed exactly like any other.
+    func test_anExcludedWindowIsNeverChosenToClimb() {
+        let focused = window(x: 400)
+
+        XCTAssertNil(target(from: 100, windows: [focused], excluding: [focused.windowID]))
+    }
+
+    /// Excluding one window doesn't stop the pet climbing anything else --
+    /// the setting is "not that window", not "no climbing".
+    func test_excludingOneWindowFallsThroughToTheNextClimbableOne() throws {
+        let focused = window(x: 200)
+        let other = window(x: 600)
+
+        let result = try XCTUnwrap(
+            target(from: 100, windows: [focused, other], excluding: [focused.windowID])
+        )
+
+        XCTAssertEqual(result.x, 600, accuracy: 5)
+    }
+
+    /// The incidental climb, not the deliberate one: a plain walk whose path
+    /// crosses the focused window's edge must walk past it rather than climb
+    /// it, or the setting would only hold for wanders that aimed at it.
+    func test_anExcludedWindowDoesNotBlockAWalkThatCrossesIt() {
+        let focused = window(x: 400)
+
+        XCTAssertNil(
+            WindowSupport.blockingWindow(
+                walkingFrom: CGPoint(x: 100, y: floor),
+                toward: CGPoint(x: 900, y: floor),
+                in: [focused],
+                roamableTop: roamableTop,
+                avatarHeight: avatarHeight,
+                excluding: [focused.windowID]
+            )
+        )
+    }
+
+    // MARK: - Which window counts as focused
+
+    private func window(id: CGWindowID, pid: pid_t, layer: Int = 0) -> WindowInfo {
+        WindowInfo(windowID: id, ownerPID: pid, ownerName: nil, title: nil, layer: layer, frame: .zero)
+    }
+
+    /// Front-to-back Z order, so the frontmost app's first window is the one
+    /// the user is looking at -- the same rule get_frontmost_window applies.
+    func test_focusedWindow_isTheFrontmostWindowOfTheFrontmostApp() {
+        let windows = [window(id: 1, pid: 10), window(id: 2, pid: 20), window(id: 3, pid: 20)]
+
+        XCTAssertEqual(WindowSupport.focusedWindow(ownedBy: 20, in: windows)?.windowID, 2)
+    }
+
+    func test_focusedWindow_ignoresNonZeroLayers() {
+        let windows = [window(id: 1, pid: 20, layer: 25), window(id: 2, pid: 20)]
+
+        XCTAssertEqual(WindowSupport.focusedWindow(ownedBy: 20, in: windows)?.windowID, 2)
+    }
+
+    func test_focusedWindow_nilWhenNothingIsFrontmost() {
+        XCTAssertNil(WindowSupport.focusedWindow(ownedBy: nil, in: [window(id: 1, pid: 10)]))
+        XCTAssertNil(WindowSupport.focusedWindow(ownedBy: 99, in: [window(id: 1, pid: 10)]))
     }
 }

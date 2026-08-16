@@ -38,18 +38,43 @@ enum WindowSupport {
         }
     }
 
+    /// The window the user is actually working in: the frontmost window of the
+    /// frontmost app. Same rule GetFrontmostWindowHandler applies -- `windows`
+    /// is in front-to-back Z order, so the first match is the one on top.
+    ///
+    /// Pure, and takes the pid rather than reading NSWorkspace itself, so the
+    /// "포커스된 창 위로는 올라가지 않기" decision is testable without a frontmost
+    /// app to point at.
+    static func focusedWindow(ownedBy pid: pid_t?, in windows: [WindowInfo]) -> WindowInfo? {
+        guard let pid else { return nil }
+        return windows.first { $0.ownerPID == pid && $0.layer == 0 }
+    }
+
     /// Windows the pet could actually climb from `position`: at the pet's
-    /// height, and with enough headroom above (`roamableTop`/`avatarHeight`)
-    /// that climbing wouldn't clip its head off the top of the screen.
+    /// height, with enough headroom above (`roamableTop`/`avatarHeight`) that
+    /// climbing wouldn't clip its head off the top of the screen, and not one
+    /// the caller has ruled out.
     /// Shared by `nearestClimbTarget` and `blockingWindow`, which used to
     /// duplicate this exact two-stage filter (found via review).
+    ///
+    /// `excluding` is how the Settings toggle reaches the movement code: a
+    /// window in it is walked past as if it weren't there rather than climbed.
+    /// Applied here, not at the call sites, so both the deliberate climb
+    /// (wander's `.climbNearestWindow`) and the incidental one (walking into
+    /// an edge) honour it -- a pet that avoids the focused window only when it
+    /// aims at it, and climbs it whenever a random walk crosses it, would make
+    /// the setting look broken rather than respected.
     private static func climbableWindows(
         at position: CGPoint,
         in windows: [WindowInfo],
         roamableTop: CGFloat,
-        avatarHeight: CGFloat
+        avatarHeight: CGFloat,
+        excluding: Set<CGWindowID>
     ) -> [WindowInfo] {
         windows
+            .filter { window in
+                !excluding.contains(window.windowID)
+            }
             .filter { window in
                 position.y >= window.frame.minY && position.y <= window.frame.maxY
             }
@@ -75,14 +100,18 @@ enum WindowSupport {
         from position: CGPoint,
         in windows: [WindowInfo],
         roamableTop: CGFloat = -.greatestFiniteMagnitude,
-        avatarHeight: CGFloat = 0
+        avatarHeight: CGFloat = 0,
+        excluding: Set<CGWindowID> = []
     ) -> CGPoint? {
         // How far past the edge to aim. Walking *to* the edge exactly leaves
         // the pet a rounding error short of it on some frames, and the climb
         // never triggers.
         let overshoot: CGFloat = 4
 
-        let edges = climbableWindows(at: position, in: windows, roamableTop: roamableTop, avatarHeight: avatarHeight)
+        let edges = climbableWindows(
+            at: position, in: windows,
+            roamableTop: roamableTop, avatarHeight: avatarHeight, excluding: excluding
+        )
             .flatMap { [$0.frame.minX, $0.frame.maxX] }
             // Already standing at this edge: pick a different one rather than
             // walking a zero-length path and re-deciding a moment later.
@@ -110,10 +139,14 @@ enum WindowSupport {
         toward target: CGPoint,
         in windows: [WindowInfo],
         roamableTop: CGFloat = -.greatestFiniteMagnitude,
-        avatarHeight: CGFloat = 0
+        avatarHeight: CGFloat = 0,
+        excluding: Set<CGWindowID> = []
     ) -> WindowInfo? {
         let goingRight = target.x > position.x
-        return climbableWindows(at: position, in: windows, roamableTop: roamableTop, avatarHeight: avatarHeight)
+        return climbableWindows(
+            at: position, in: windows,
+            roamableTop: roamableTop, avatarHeight: avatarHeight, excluding: excluding
+        )
             .filter { window in
                 let edge = goingRight ? window.frame.minX : window.frame.maxX
                 return goingRight ? (edge > position.x && edge <= target.x) : (edge < position.x && edge >= target.x)

@@ -47,6 +47,16 @@ struct StateContext {
     /// rebases them onto the overlay window before they get here).
     let windows: [WindowInfo]
 
+    /// Windows the pet must not climb, by CGWindowID. Fed by Settings'
+    /// "포커스된 창 위로는 올라가지 않기" toggle (F3), which resolves to the
+    /// focused window's id while it is on and to nothing while it is off.
+    /// They stay in `windows`: the pet still lands on them and still senses
+    /// them, it just doesn't scale their sides.
+    ///
+    /// Defaulted so every existing construction of this context (and every
+    /// test that builds one) keeps the previous "climb anything" behaviour.
+    var unclimbableWindowIDs: Set<CGWindowID> = []
+
     /// The surface the pet would land on if it fell straight down from `point`
     /// — a window top edge (F4) or the bottom of the screen. Injected as a
     /// closure so states stay independent of WindowListWatcher.

@@ -7,6 +7,7 @@
 //  climbable windows, and toy interest.
 //
 
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -29,11 +30,13 @@ extension AppDelegate {
             // Falls back to roaming when there's nothing to climb, rather
             // than standing still.
             walkState.target = characterBody.flatMap { body in
-                WindowSupport.nearestClimbTarget(
+                let windows = overlayLocalWindows(excluding: nil)
+                return WindowSupport.nearestClimbTarget(
                     from: body.position,
-                    in: overlayLocalWindows(excluding: nil),
+                    in: windows,
                     roamableTop: controller.roamableArea.minY,
-                    avatarHeight: avatarHitboxSize.height
+                    avatarHeight: avatarHitboxSize.height,
+                    excluding: unclimbableWindowIDs(in: windows)
                 )
             } ?? Self.randomRoamPoint(in: controller.roamableArea)
             controller.transition(to: .walk)
@@ -72,6 +75,22 @@ extension AppDelegate {
         case .stay:
             break
         }
+    }
+
+    /// Settings' "포커스된 창 위로는 올라가지 않기" toggle, resolved against the
+    /// window list the pet is currently walking through. Empty while the
+    /// toggle is off, so the pet climbs whatever it reaches.
+    ///
+    /// The reader the setting never had: `avoidClimbingFocusedWindow` was
+    /// written by the Settings panel and consulted by nothing, so the toggle
+    /// changed nothing at all. Same shape as `autoMuteOnFocus`'s reader in
+    /// AppDelegate+OverlayAvatar -- read fresh at the moment the decision is
+    /// made rather than cached, since the panel writes it while the pet runs.
+    func unclimbableWindowIDs(in windows: [WindowInfo]) -> Set<CGWindowID> {
+        guard settingsStore.avoidClimbingFocusedWindow else { return [] }
+        let focusedPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        guard let focused = WindowSupport.focusedWindow(ownedBy: focusedPID, in: windows) else { return [] }
+        return [focused.windowID]
     }
 
     /// How much of each side of the screen wander targets stay out of, as a

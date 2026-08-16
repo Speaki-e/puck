@@ -41,6 +41,24 @@ final class WalkStateWindowTests: XCTestCase {
         XCTAssertEqual(world.body.position.x, 300, accuracy: MovementSolver.arrivalRadius + 1)
     }
 
+    /// Settings' "포커스된 창 위로는 올라가지 않기". The pet keeps walking rather
+    /// than scaling the window the user is working in -- the toggle used to
+    /// be written by the Settings panel and read by nothing, so this window
+    /// got climbed exactly like any other.
+    func test_aWindowTheSettingRulesOut_isWalkedPastRatherThanClimbed() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 500))
+        let focused = window(x: 300, y: 200, width: 400, height: 300, id: 42)
+        world.windows = [focused]
+        world.unclimbableWindowIDs = [focused.windowID]
+        let state = WalkState()
+        state.target = CGPoint(x: 900, y: 500)
+
+        world.run(state, seconds: 10)
+
+        XCTAssertEqual(world.requestedTransitions, [.idle], "no climb may be requested")
+        XCTAssertEqual(world.body.position.x, 900, accuracy: MovementSolver.arrivalRadius)
+    }
+
     /// A window tall enough to leave no headroom above it (near-fullscreen)
     /// is skipped rather than climbed -- climbing it would clip the
     /// character's head off the top of the screen, the same geometry

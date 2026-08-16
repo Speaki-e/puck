@@ -54,7 +54,8 @@ final class WalkState: StateHandler {
         // side rather than through it (section 3: "Walk | 창 좌/우 모서리 접촉 | Climb").
         if let blocking = WindowSupport.blockingWindow(
             walkingFrom: context.body.position, toward: target, in: context.windows,
-            roamableTop: context.roamableArea.minY, avatarHeight: context.avatarHeight
+            roamableTop: context.roamableArea.minY, avatarHeight: context.avatarHeight,
+            excluding: context.unclimbableWindowIDs
         ) {
             let edgeX = target.x > context.body.position.x ? blocking.frame.minX : blocking.frame.maxX
             let step = MovementSolver.step(

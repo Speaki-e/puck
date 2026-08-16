@@ -183,6 +183,19 @@ extension AppDelegate {
             guard let self, let window = self.primaryWindow else { return [] }
             return self.overlayLocalWindows(excluding: window)
         }
+        // The other half of Settings' "포커스된 창 위로는 올라가지 않기": the
+        // wander destination is picked in AppDelegate+Wander, but a plain walk
+        // that happens to cross the focused window's edge climbs it too, and
+        // that decision is WalkState's. Resolved per frame against the same
+        // list the pet is walking through, so the id always matches.
+        // Straight off the watcher rather than through overlayLocalWindows:
+        // this runs every frame alongside `windows` above, and rebasing the
+        // whole list a second time buys nothing -- a CGWindowID is the same id
+        // in either coordinate space.
+        controller.unclimbableWindows = { [weak self] in
+            guard let self, let watcher = self.windowListWatcher else { return [] }
+            return self.unclimbableWindowIDs(in: watcher.windows)
+        }
         controller.landingY = { [weak self, weak controller] point in
             let floor = controller?.roamableArea.maxY ?? 0
             guard let self, let controller else { return floor }

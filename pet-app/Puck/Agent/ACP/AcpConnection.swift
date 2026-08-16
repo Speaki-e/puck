@@ -29,6 +29,9 @@ final class AcpConnection {
     private var nextRequestID = 1
     private var pending: [Int: CheckedContinuation<Result<JSONValue, Error>, Never>] = [:]
     private var buffer = Data()
+    /// Set once the agent is gone. Guarded by the same lock as `pending`, so a
+    /// request cannot be filed into a dictionary nobody will ever drain again.
+    private var closeError: Error?
 
     /// Notifications from the agent (`session/update` above all).
     var onNotification: ((_ method: String, _ params: JSONValue) -> Void)?
@@ -92,7 +95,20 @@ final class AcpConnection {
             return nextRequestID
         }
         let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<Result<JSONValue, Error>, Never>) in
-            lock.withLock { pending[id] = continuation }
+            let closed = lock.withLock { () -> Error? in
+                if let closeError { return closeError }
+                pending[id] = continuation
+                return nil
+            }
+            // The agent can die between `startAgent` and the first request --
+            // a node process that throws at import time is gone in tens of
+            // milliseconds. Registering after that put a continuation in a
+            // dictionary that had already been drained, so nothing could ever
+            // resume it and the caller waited forever.
+            if let closed {
+                continuation.resume(returning: .failure(closed))
+                return
+            }
             write(AcpOutgoing.request(id: id, method: method, params: params))
         }
         return try outcome.get()
@@ -112,11 +128,13 @@ final class AcpConnection {
         send(data)
     }
 
-    /// Fails every in-flight request. Called when the agent process dies --
-    /// without it, a `request` awaiting a reply that can never arrive would
-    /// hang until the tool's 600s timeout.
+    /// Fails every in-flight request and closes the connection for good: an
+    /// agent that has exited answers nothing, now or later, so every request
+    /// from here on fails immediately instead of waiting out the tool's
+    /// timeout. Called when the agent process dies.
     func failAllPending(with error: Error) {
         let continuations = lock.withLock { () -> [CheckedContinuation<Result<JSONValue, Error>, Never>] in
+            closeError = closeError ?? error
             let all = Array(pending.values)
             pending.removeAll()
             return all

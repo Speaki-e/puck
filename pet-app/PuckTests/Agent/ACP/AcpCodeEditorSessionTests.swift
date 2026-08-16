@@ -313,4 +313,42 @@ final class AcpCodeEditorSessionTests: XCTestCase {
         XCTAssertEqual(result.error, "acp_error")
         XCTAssertEqual(result.detail, "ENOENT: node not found")
     }
+
+    // MARK: - reportedDetail
+
+    /// `detail ?? summary` never chose the summary -- `detail` is set on every
+    /// failing path -- so the sentence written for the user ("… CLI를 찾을 수
+    /// 없습니다") never reached the model or the transcript, which saw only
+    /// `vendorCLINotFound(Puck.CodingAgentKind.claude)`.
+    func testAFailureReportsTheUserFacingSummaryBeforeTheTechnicalDetail() {
+        let result = CodeEditorResult(
+            ok: false,
+            summary: "claude CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요.",
+            changedFiles: [],
+            error: "agent_unavailable",
+            detail: "vendorCLINotFound(Puck.CodingAgentKind.claude)"
+        )
+
+        XCTAssertEqual(
+            result.reportedDetail,
+            "claude CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요.\nvendorCLINotFound(Puck.CodingAgentKind.claude)"
+        )
+    }
+
+    func testAFailureWithNoTechnicalDetailStillReportsItsSummary() {
+        let result = CodeEditorResult(
+            ok: false, summary: "코딩 에이전트를 시작하지 못했습니다.", changedFiles: [],
+            error: "agent_unavailable", detail: nil
+        )
+
+        XCTAssertEqual(result.reportedDetail, "코딩 에이전트를 시작하지 못했습니다.")
+    }
+
+    /// A success's summary is the answer itself and already travels as `data`;
+    /// repeating it in `detail` would show the whole reply twice.
+    func testASuccessReportsOnlyItsOwnDetail() {
+        let result = CodeEditorResult(ok: true, summary: "고쳤어요", changedFiles: [])
+
+        XCTAssertNil(result.reportedDetail)
+    }
 }

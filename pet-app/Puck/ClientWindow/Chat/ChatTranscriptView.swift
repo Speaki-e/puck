@@ -118,6 +118,25 @@ struct ChatTranscriptView: View {
     }
 }
 
+/// The one line a failed tool call shows without being expanded, or nil when
+/// there is nothing to report.
+///
+/// The first line of `detail` rather than all of it: a code_editor failure's
+/// detail leads with the sentence written for the user and continues with the
+/// vendor's own diagnostics (an error value, a stderr tail), which belong
+/// behind the disclosure triangle. Falls back to the protocol error code when
+/// there is no detail at all -- "execution_failed" is thin, but it is still
+/// more than a bare icon.
+func toolFailureLine(ok: Bool?, error: ToolErrorCode?, detail: String?) -> String? {
+    guard ok == false else { return nil }
+    let firstLine = detail?
+        .split(separator: "\n", omittingEmptySubsequences: true)
+        .first
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+    if let firstLine, !firstLine.isEmpty { return firstLine }
+    return error?.rawValue ?? "실패했어요."
+}
+
 // MARK: - Rows
 
 private struct MessageBubble: View {
@@ -152,7 +171,7 @@ private struct ToolCallRow: View {
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
                 }
-                if let detail = resultDetail {
+                if let detail = fullResultDetail {
                     Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -162,13 +181,27 @@ private struct ToolCallRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 4)
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .foregroundStyle(iconStyle)
-                Text(tool)
-                    .font(.system(.body, design: .monospaced))
-                if isPending {
-                    ProgressView().controlSize(.small)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .foregroundStyle(iconStyle)
+                    Text(tool)
+                        .font(.system(.body, design: .monospaced))
+                    if isPending {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                // Shown collapsed, not inside the disclosure body: a failed
+                // call used to be a red triangle next to the tool's name and
+                // nothing else, with the reason hidden behind a triangle the
+                // user had no reason to think held anything.
+                if let failure = toolFailureLine(ok: ok, error: resultError, detail: resultDetail) {
+                    Text(failure)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -184,11 +217,21 @@ private struct ToolCallRow: View {
         return nil
     }
 
-    private var resultDetail: String? {
-        if case .toolResult(_, _, _, let error, let detail) = result {
-            return [error?.rawValue, detail].compactMap { $0 }.joined(separator: " — ")
-        }
+    private var resultError: ToolErrorCode? {
+        if case .toolResult(_, _, _, let error, _) = result { return error }
         return nil
+    }
+
+    private var resultDetail: String? {
+        if case .toolResult(_, _, _, _, let detail) = result { return detail }
+        return nil
+    }
+
+    /// Everything the result carried, for the expanded view.
+    private var fullResultDetail: String? {
+        guard result != nil else { return nil }
+        let joined = [resultError?.rawValue, resultDetail].compactMap { $0 }.joined(separator: " — ")
+        return joined.isEmpty ? nil : joined
     }
 
     private var icon: String {

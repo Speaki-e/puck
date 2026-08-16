@@ -23,6 +23,25 @@ struct CodeEditorResult: Equatable {
     static func cancelled(changedFiles: [String] = []) -> CodeEditorResult {
         CodeEditorResult(ok: false, summary: "중단됨", changedFiles: changedFiles, error: "cancelled")
     }
+
+    /// What the tool_result should carry as its `detail`.
+    ///
+    /// On a failure the summary is the half written for a person ("claude CLI를
+    /// 찾을 수 없습니다…") and `detail` the half written for a machine
+    /// (`vendorCLINotFound(...)`, a stderr tail). Reporting only `detail` --
+    /// which is what `detail ?? summary` did, since `detail` is set on every
+    /// failing path -- meant the model and the transcript never saw the
+    /// sentence that explains what to do. Summary first so the first line is
+    /// the readable one: that line is all a collapsed tool row shows.
+    var reportedDetail: String? {
+        guard !ok else { return detail }
+        var lines: [String] = []
+        for part in [summary, detail] {
+            guard let part, !part.isEmpty, !lines.contains(part) else { continue }
+            lines.append(part)
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
 }
 
 /// How an approval request is answered. Returns nil to cancel.

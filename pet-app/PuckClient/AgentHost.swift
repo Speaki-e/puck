@@ -234,7 +234,7 @@ final class AgentHost {
             ok: result.ok,
             data: result.ok ? .string(result.summary) : nil,
             error: result.ok ? nil : (passThroughCodes.contains(result.error ?? "") ? result.error : "execution_failed"),
-            detail: result.detail ?? result.summary
+            detail: result.reportedDetail
         )
     }
 

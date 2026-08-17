@@ -66,16 +66,16 @@ final class UserInputSender {
 
     /// F13 (2026-07-29, protocol 3.4): request a new workspace via the
     /// sidebar's "add workspace". Confirmed later by a workspace_create
-    /// BridgeMessageRouter.onClientUpdate callback, which is the one that
-    /// actually assigns workspace_id.
+    /// arriving back over the socket, which is what actually assigns
+    /// workspace_id.
     @discardableResult
     func createWorkspace(name: String, projectPath: String?) -> UserInputDelivery {
         broadcast(.workspaceCreateRequest(name: name, projectPath: projectPath))
     }
 
     /// F13 (2026-07-29, protocol 3.4): request a new chat session via the
-    /// sidebar's "new chat". Confirmed later by a session_create
-    /// onClientUpdate callback (origin: .user).
+    /// sidebar's "new chat". Confirmed later by a session_create arriving
+    /// back over the socket (origin: .user).
     @discardableResult
     func createSession(workspaceId: String, title: String) -> UserInputDelivery {
         broadcast(.sessionCreateRequest(workspaceId: workspaceId, title: title))

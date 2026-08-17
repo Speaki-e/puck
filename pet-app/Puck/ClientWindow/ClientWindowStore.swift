@@ -4,9 +4,9 @@
 //
 //  F13 · owner: 박해영 (Haeyoung Park)
 //  Source of truth for the client window's sidebar: workspaces, each
-//  workspace's chat sessions, and which one is active. Wired to
-//  BridgeMessageRouter.onClientUpdate/onChatEvent for incoming state and
-//  UserInputSender for outgoing requests (plan/02_pet-app.md F13).
+//  workspace's chat sessions, and which one is active. Fed by PuckClient's
+//  BridgeSocketClient for incoming state and UserInputSender for outgoing
+//  requests (plan/02_pet-app.md F13).
 //
 
 import Foundation
@@ -99,9 +99,9 @@ final class ClientWindowStore: ObservableObject {
         sessionsByKey[SessionKey(workspaceId: workspaceId, sessionId: sessionId)]
     }
 
-    /// Feed for BridgeMessageRouter.onClientUpdate -- the four workspace ->
-    /// pet-app confirmation messages (protocol 3.4/3.5). Anything else is a
-    /// caller error (BridgeMessageRouter never routes other kinds here).
+    /// Feed for the workspace_create/session_create confirmations off the
+    /// socket (protocol 3.4/3.5). Anything else is a caller error --
+    /// PuckClient's AppDelegate never routes other kinds here.
     func handleClientUpdate(_ message: BridgeMessage) {
         switch message {
         case .workspaceCreate(let workspaceId, let name, let projectPath):
@@ -207,7 +207,7 @@ final class ClientWindowStore: ObservableObject {
         updateWorkspace(workspaceId) { $0.refreshEditorAvailability() }
     }
 
-    /// Feed for BridgeMessageRouter.onChatEvent. A session that doesn't exist
+    /// Feed for protocol 3.2 events off the socket. A session that doesn't exist
     /// yet (e.g. an event racing ahead of its session_create) is dropped
     /// rather than fabricated with guessed metadata.
     func handleChatEvent(_ event: BridgeEvent, workspaceId: String, sessionId: String) {

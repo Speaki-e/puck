@@ -197,9 +197,14 @@ final class AgentRunner {
                     emitCancelled()
                     return
                 }
-                let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                emit(.textChunk(text: reason))
-                emit(.agentDone(ok: false, summary: reason))
+                // The raw description -- which for GPTError.http carries the
+                // provider's whole response body -- goes to the log, and only
+                // there. Once. `agent_done(ok: false)` is the row that already
+                // renders a failure (DoneRow's ✗), so emitting a text_chunk
+                // too put the identical text in an assistant bubble directly
+                // above it.
+                AppLogger.shared.log(.error, "agent run failed: \(Self.rawFailureDescription(for: error))")
+                emit(.agentDone(ok: false, summary: Self.failureSummary(for: error)))
                 return
             }
 
@@ -241,6 +246,84 @@ final class AgentRunner {
     private func emitCancelled() {
         emit(.textChunk(text: Self.cancelledSummary))
         emit(.agentDone(ok: false, summary: Self.cancelledSummary))
+    }
+
+    // MARK: - Failure reporting
+
+    /// The one line a failed run leaves in the transcript.
+    ///
+    /// `GPTError.errorDescription` inlines the provider's response body on
+    /// purpose -- it is the debugging text, and it is what goes to the log --
+    /// but a bad key made that ~20 lines of OpenAI's JSON in the chat for what
+    /// is really "your key is wrong". This maps the statuses that mean
+    /// something the user can act on to a sentence saying what to do, and
+    /// leaves every other kind of failure its own words rather than collapsing
+    /// the lot into one generic apology.
+    ///
+    /// Provider-neutral, like `GPTError` itself: the same path serves
+    /// Anthropic, and whoever reads this already knows which provider is
+    /// selected.
+    static func failureSummary(for error: Error) -> String {
+        switch error {
+        case GPTError.notConfigured:
+            return "API 키가 없어요. \(settingsHint)"
+        case GPTError.http(let status, let body):
+            return httpFailureSummary(status: status, body: body)
+        default:
+            return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Everything the error knew, for the log.
+    static func rawFailureDescription(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    }
+
+    /// ⌘, opens 설정 in both apps (ClientMainMenu binds it), so naming the
+    /// shortcut is a real instruction and not decoration.
+    private static let settingsHint = "설정(⌘,)에서 키를 확인해 주세요."
+
+    private static func httpFailureSummary(status: Int, body: String) -> String {
+        switch status {
+        case 401, 403:
+            return "API 키가 올바르지 않아요. \(settingsHint)"
+        case 404:
+            // What a wrong model name returns; a missing endpoint would be our
+            // bug, and then the log is where to look anyway.
+            return "모델을 찾을 수 없어요. 설정(⌘,)에서 모델 이름을 확인해 주세요."
+        case 429:
+            return "요청이 너무 잦거나 사용 한도를 넘었어요. 잠시 후 다시 시도해 주세요."
+        case 500...599:
+            return "AI 서버가 응답하지 못했어요 (오류 \(status)). 잠시 후 다시 시도해 주세요."
+        default:
+            // Anything else keeps the provider's own reason -- a bare status
+            // does not say what to change -- but one sentence of it, not the
+            // envelope it arrived in.
+            guard let message = providerMessage(in: body) else { return "API 오류 \(status)가 났어요." }
+            return "API 오류 \(status): \(message)"
+        }
+    }
+
+    /// `{"error": {"message": ...}}` -- the shape both providers use. Returns
+    /// nil for a body that isn't that, rather than guessing: a truncated slice
+    /// of unknown JSON is the noise this exists to remove.
+    private static func providerMessage(in body: String) -> String? {
+        guard
+            let data = body.data(using: .utf8),
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let error = root["error"] as? [String: Any],
+            let message = error["message"] as? String
+        else {
+            return nil
+        }
+        let firstLine = message
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .first
+            .map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        guard !firstLine.isEmpty else { return nil }
+        // A DoneRow is one caption line; a provider that answers with a
+        // paragraph gets the head of it, and the log keeps the rest.
+        return firstLine.count <= 160 ? firstLine : String(firstLine.prefix(160)) + "…"
     }
 
     private func perform(_ call: GPTToolCall) async {

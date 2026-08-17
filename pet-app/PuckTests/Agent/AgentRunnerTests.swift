@@ -168,6 +168,123 @@ final class AgentRunnerTests: XCTestCase {
         XCTAssertEqual(fake.sendCount, 1, "no further turn may be requested after a stop")
     }
 
+    /// Fails the turn with whatever it was handed -- a model call that throws
+    /// is the only way into the failure path.
+    private final class ThrowingLLMClient: AgentLLMClient {
+        let error: Error
+
+        init(error: Error) { self.error = error }
+
+        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+            throw error
+        }
+    }
+
+    private func runFailing(with error: Error) async -> [BridgeEvent] {
+        let events = UncheckedBox([BridgeEvent]())
+        let runner = AgentRunner(
+            client: ThrowingLLMClient(error: error),
+            dispatcher: PetToolDispatcher(send: { _ in false }),
+            approve: { _, _ in false },
+            emit: { event in events.value.append(event) }
+        )
+        await runner.run(command: "안녕")
+        return events.value
+    }
+
+    /// The failure used to be emitted twice -- once as a text_chunk, once as
+    /// agent_done -- and the transcript showed the same text stacked in an
+    /// assistant bubble and the done row.
+    func test_failedRun_reportsTheReasonInExactlyOneRow() async {
+        let events = await runFailing(with: GPTError.http(status: 401, body: Self.unauthorizedBody))
+
+        let session = ChatSession(id: "default", workspaceId: "default", title: "t", origin: .user)
+        session.markWaitingForAgent()
+        for event in events { session.apply(event) }
+
+        XCTAssertFalse(session.isRunning)
+        XCTAssertEqual(session.timeline.count, 1, "a failure is one row, not a bubble and a done row saying the same thing")
+        guard case .done(_, let ok, let summary)? = session.timeline.last else {
+            return XCTFail("the transcript must end with a done row")
+        }
+        XCTAssertFalse(ok)
+        XCTAssertFalse(summary.isEmpty, "the done row is the only place the reason survives")
+    }
+
+    /// A bad key is ~20 lines of the provider's JSON, key prefix included.
+    /// None of it belongs in the chat.
+    func test_unauthorized_saysTheKeyIsWrongWithoutTheRawBody() async {
+        let events = await runFailing(with: GPTError.http(status: 401, body: Self.unauthorizedBody))
+
+        guard case .agentDone(_, let summary)? = events.last else {
+            return XCTFail("a failed run must still finish")
+        }
+        XCTAssertEqual(summary, "API 키가 올바르지 않아요. 설정(⌘,)에서 키를 확인해 주세요.")
+        XCTAssertFalse(summary.contains("invalid_request_error"))
+        XCTAssertFalse(summary.contains("cp_jUkL5"), "the body quotes the key back; it must not reach the transcript")
+        XCTAssertFalse(summary.contains("{"))
+    }
+
+    /// ...but it does have to reach the log, or a genuinely odd 401 becomes
+    /// undebuggable.
+    func test_rawFailureDescription_keepsTheBodyForTheLog() {
+        let raw = AgentRunner.rawFailureDescription(for: GPTError.http(status: 401, body: Self.unauthorizedBody))
+
+        XCTAssertTrue(raw.contains("invalid_request_error"))
+        XCTAssertTrue(raw.contains("401"))
+    }
+
+    func test_failureSummary_missingKeyPointsAtSettings() {
+        XCTAssertEqual(AgentRunner.failureSummary(for: GPTError.notConfigured), "API 키가 없어요. 설정(⌘,)에서 키를 확인해 주세요.")
+    }
+
+    /// Every other kind of failure keeps its own words -- collapsing them into
+    /// one friendly sentence would make "the model name is wrong" and "the
+    /// server is down" indistinguishable.
+    func test_failureSummary_distinguishesTheOtherKinds() {
+        let summaries = [
+            AgentRunner.failureSummary(for: GPTError.http(status: 404, body: "{}")),
+            AgentRunner.failureSummary(for: GPTError.http(status: 429, body: "{}")),
+            AgentRunner.failureSummary(for: GPTError.http(status: 503, body: "{}")),
+            AgentRunner.failureSummary(for: GPTError.malformedResponse("no choices[0].message")),
+        ]
+
+        XCTAssertEqual(Set(summaries).count, summaries.count, "each failure kind needs its own text")
+        XCTAssertTrue(summaries[0].contains("모델"))
+        XCTAssertTrue(summaries[2].contains("503"))
+        XCTAssertTrue(summaries[3].contains("no choices[0].message"), "a decoding failure names what failed to decode")
+    }
+
+    /// A status with no advice of our own still says what the provider said,
+    /// as one sentence rather than as the envelope it arrived in.
+    func test_failureSummary_unmappedStatusQuotesTheProvidersOwnMessage() {
+        let body = #"{"error": {"message": "Unsupported parameter: 'temperature'", "type": "invalid_request_error"}}"#
+
+        let summary = AgentRunner.failureSummary(for: GPTError.http(status: 400, body: body))
+
+        XCTAssertTrue(summary.contains("Unsupported parameter: 'temperature'"))
+        XCTAssertFalse(summary.contains("invalid_request_error"))
+    }
+
+    func test_failureSummary_unmappedStatusWithAnUnreadableBodyFallsBackToTheStatus() {
+        let summary = AgentRunner.failureSummary(for: GPTError.http(status: 418, body: "<html>nope</html>"))
+
+        XCTAssertEqual(summary, "API 오류 418가 났어요.")
+        XCTAssertFalse(summary.contains("html"))
+    }
+
+    /// What OpenAI answers a bad key with, key prefix and all.
+    private static let unauthorizedBody = """
+    {
+      "error": {
+        "message": "Incorrect API key provided: cp_jUkL5***KGGb. You can find your API key at https://platform.openai.com/account/api-keys.",
+        "type": "invalid_request_error",
+        "param": null,
+        "code": "invalid_api_key"
+      }
+    }
+    """
+
     func test_pathArgument_extractsAPresentNonEmptyPath() {
         let arguments = JSONValue.object(["path": .string("src/main.swift")])
 

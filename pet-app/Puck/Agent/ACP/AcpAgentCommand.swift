@@ -18,6 +18,14 @@ enum CodingAgentKind: String, Codable, CaseIterable {
     case claude
     case codex
 
+    /// Shown in Settings' coding-agent picker.
+    var displayName: String {
+        switch self {
+        case .claude: return "Claude Code"
+        case .codex: return "Codex"
+        }
+    }
+
     /// The vendored bundle in Puck's resources (scripts/vendor-acp.sh).
     var bundledScriptName: String {
         switch self {
@@ -67,6 +75,31 @@ enum AcpAgentCommandError: Error, Equatable {
     /// shims around a ~256MB per-platform native binary that this repo does
     /// not vendor (see scripts/vendor-acp.sh).
     case vendorCLINotFound(CodingAgentKind)
+}
+
+extension AcpAgentCommandError {
+    /// The sentence shown when the agent could not be started at all.
+    ///
+    /// `purpose` names what the user was trying to do -- the same three
+    /// failures read differently for a code edit and for a conversation --
+    /// while the two that name a missing install stay word for word identical
+    /// wherever they are reported, because the answer ("install it") does not
+    /// depend on why it was wanted.
+    func summary(purpose: String, kind: CodingAgentKind) -> String {
+        switch self {
+        case .nodeNotFound:
+            return "\(purpose)에는 Node.js가 필요합니다. 설치 후 다시 시도해 주세요."
+        case .vendorCLINotFound(let missing):
+            // Both agents need their vendor's own CLI installed; neither ships
+            // inside Puck.app (see scripts/vendor-acp.sh).
+            return "\(missing.vendorCLIName) CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요."
+        case .agentScriptMissing:
+            return "코딩 에이전트(\(kind.rawValue))가 앱에 포함되어 있지 않습니다."
+        }
+    }
+
+    /// What to say for an error that is not one of ours at all.
+    static let unknownStartFailureSummary = "코딩 에이전트를 시작하지 못했습니다."
 }
 
 struct AcpAgentCommand: Equatable {

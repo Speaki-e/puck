@@ -62,7 +62,11 @@ final class LiveAgentProcesses {
 /// it, and what it is waiting on is exactly what the deadline exists to escape
 /// (a stalled network call, an approval nobody will ever answer). Killing the
 /// agent is what actually unblocks it, and that happens at the call site.
-private func withDeadline<Value>(
+/// Internal rather than private: CodingAgentCLIClient bounds its own ACP turn
+/// the same way, for the same reason, and a second copy of a
+/// resume-exactly-once race is the kind of thing that only stays correct in
+/// one of its copies.
+func withDeadline<Value>(
     seconds: TimeInterval,
     work: @escaping () async -> Value
 ) async -> Value? {
@@ -284,17 +288,9 @@ actor CodeEditorRunner {
     }
 
     private static func unavailableSummary(for error: Error, kind: CodingAgentKind) -> String {
-        switch error as? AcpAgentCommandError {
-        case .nodeNotFound:
-            return "코드 편집에는 Node.js가 필요합니다. 설치 후 다시 시도해 주세요."
-        case .vendorCLINotFound(let missing):
-            // Both agents need their vendor's own CLI installed; neither ships
-            // inside Puck.app (see scripts/vendor-acp.sh).
-            return "\(missing.vendorCLIName) CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요."
-        case .agentScriptMissing:
-            return "코딩 에이전트(\(kind.rawValue))가 앱에 포함되어 있지 않습니다."
-        case .none:
-            return "코딩 에이전트를 시작하지 못했습니다."
+        guard let error = error as? AcpAgentCommandError else {
+            return AcpAgentCommandError.unknownStartFailureSummary
         }
+        return error.summary(purpose: "코드 편집", kind: kind)
     }
 }

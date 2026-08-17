@@ -2,13 +2,12 @@
 //  AcpCodeEditorSession.swift
 //  Puck
 //
-//  One code_editor run: initialize -> session/new -> session/prompt, streaming
-//  session/update along the way and answering session/request_permission.
-//  The protocol half of workspace/src/agent-host/acp-adapter.ts.
-//
-//  Takes an AcpConnection rather than making one, so the whole turn can be
-//  exercised against a scripted stream with no node process involved (see
-//  AcpCodeEditorSessionTests).
+//  One code_editor run. The protocol half -- initialize -> session/new ->
+//  session/prompt, streaming session/update and answering
+//  session/request_permission -- lives in AcpTurnSession, which a CLI-backed
+//  chat turn drives the same way. What is left here is what makes a run a
+//  *code_editor* run: watching for writes outside the project, and turning the
+//  turn's outcome into the CodeEditorResult a tool executor reports.
 //
 
 import Foundation
@@ -44,24 +43,14 @@ struct CodeEditorResult: Equatable {
     }
 }
 
-/// How an approval request is answered. Returns nil to cancel.
-typealias AcpPermissionResolver = (AcpPermissionRequest) async -> Bool
-
 final class AcpCodeEditorSession {
-    private let connection: AcpConnection
     private let projectPath: String
-    private let onUpdate: (AcpSessionUpdate) -> Void
-    private let resolvePermission: AcpPermissionResolver
-    /// The agent's stderr so far, read only when a failure has to be explained.
-    private let stderrTail: () -> String
+    private let turn: AcpTurnSession
 
     private let lock = NSLock()
-    private var summary = ""
     /// Write-shaped locations the agent reported outside the project. Detection
     /// only -- see AcpEventMapping.writesOutside.
     private var writesOutsideProject: Set<String> = []
-    private var sessionID: String?
-    private var isCancelled = false
 
     init(
         connection: AcpConnection,
@@ -70,26 +59,27 @@ final class AcpCodeEditorSession {
         resolvePermission: @escaping AcpPermissionResolver = { _ in false },
         stderrTail: @escaping () -> String = { "" }
     ) {
-        self.connection = connection
         self.projectPath = projectPath
-        self.onUpdate = onUpdate
-        self.resolvePermission = resolvePermission
-        self.stderrTail = stderrTail
-
-        connection.onNotification = { [weak self] method, params in
-            guard method == AcpMethod.sessionUpdate else { return }
-            self?.applyUpdate(AcpSessionUpdate(raw: params))
-        }
-        connection.onRequest = { [weak self] request in
+        // Declared before `turn` so the turn's update hook can call it, and
+        // assigned after, once `self` exists to weakly capture.
+        var noteWrites: ((AcpSessionUpdate) -> Void)?
+        self.turn = AcpTurnSession(
+            connection: connection,
+            cwd: projectPath,
+            onUpdate: { update in
+                noteWrites?(update)
+                onUpdate(update)
+            },
+            resolvePermission: resolvePermission,
+            stderrTail: stderrTail
+        )
+        noteWrites = { [weak self] update in
             guard let self else { return }
-            guard request.method == AcpMethod.sessionRequestPermission else {
-                // An agent request we don't implement is answered rather than
-                // ignored: an unanswered JSON-RPC request stalls the agent for
-                // the whole 600s tool timeout.
-                connection.respond(to: request.id, result: .object([:]))
-                return
-            }
-            Task { await self.answerPermission(request) }
+            let escaped = AcpEventMapping.writesOutside(root: projectPath, in: update)
+            guard !escaped.isEmpty else { return }
+            self.lock.lock()
+            for path in escaped { self.writesOutsideProject.insert(path) }
+            self.lock.unlock()
         }
     }
 
@@ -97,51 +87,18 @@ final class AcpCodeEditorSession {
     /// CodeEditorResult rather than thrown -- every caller is a tool executor
     /// that has to report *something* back to the model.
     func run(task: String) async -> CodeEditorResult {
-        do {
-            _ = try await connection.request(
-                method: AcpMethod.initialize,
-                params: .object([
-                    "protocolVersion": .number(Double(acpProtocolVersion)),
-                    "clientCapabilities": .object([:]),
-                ])
+        switch await turn.run(prompt: task) {
+        case .cancelled:
+            return .cancelled()
+        case .failed(let failure):
+            return CodeEditorResult(
+                ok: false,
+                summary: "ACP 작업에 실패했습니다.",
+                changedFiles: [],
+                error: "acp_error",
+                detail: failure.text
             )
-
-            let created = try await connection.request(
-                method: AcpMethod.sessionNew,
-                params: .object([
-                    "cwd": .string(projectPath),
-                    "mcpServers": .array([]),
-                ])
-            )
-            guard let sessionID = created["sessionId"]?.stringValue else {
-                return CodeEditorResult(
-                    ok: false,
-                    summary: "ACP 작업에 실패했습니다.",
-                    changedFiles: [],
-                    error: "acp_error",
-                    detail: "session/new did not return a sessionId"
-                )
-            }
-            lock.lock(); self.sessionID = sessionID; lock.unlock()
-
-            if currentlyCancelled() {
-                cancel()
-                return .cancelled()
-            }
-
-            let finished = try await connection.request(
-                method: AcpMethod.sessionPrompt,
-                params: .object([
-                    "sessionId": .string(sessionID),
-                    "prompt": .array([.object(["type": .string("text"), "text": .string(task)])]),
-                ])
-            )
-
-            if currentlyCancelled() { return .cancelled() }
-
-            let stopReason = finished["stopReason"]?.stringValue ?? AcpStopReason.endTurn.rawValue
-            if stopReason == AcpStopReason.cancelled.rawValue { return .cancelled() }
-            let text = currentSummary().trimmingCharacters(in: .whitespacesAndNewlines)
+        case .completed(let completion):
             let escaped = currentWritesOutsideProject()
             guard escaped.isEmpty else {
                 // Reported as a failure rather than a footnote on a success:
@@ -157,99 +114,22 @@ final class AcpCodeEditorSession {
             }
             return CodeEditorResult(
                 ok: true,
-                summary: text.isEmpty ? "ACP 작업 완료 (\(stopReason))" : text,
+                summary: completion.text.isEmpty
+                    ? "ACP 작업 완료 (\(completion.stopReason))"
+                    : completion.text,
                 changedFiles: []
-            )
-        } catch {
-            if currentlyCancelled() { return .cancelled() }
-            return CodeEditorResult(
-                ok: false,
-                summary: "ACP 작업에 실패했습니다.",
-                changedFiles: [],
-                error: "acp_error",
-                detail: detail(from: error)
             )
         }
     }
 
     /// Asks the agent to stop. Idempotent -- cancelling twice, or cancelling
-    /// before session/new has returned, both do the right thing (the run()
-    /// path re-checks after each await).
+    /// before session/new has returned, both do the right thing.
     func cancel() {
-        lock.lock()
-        isCancelled = true
-        let sessionID = self.sessionID
-        lock.unlock()
-        guard let sessionID else { return }
-        connection.notify(
-            method: AcpMethod.sessionCancel,
-            params: .object(["sessionId": .string(sessionID)])
-        )
-    }
-
-    // MARK: - Internals
-
-    private func applyUpdate(_ update: AcpSessionUpdate) {
-        lock.lock()
-        if !update.text.isEmpty { summary += update.text }
-        for path in AcpEventMapping.writesOutside(root: projectPath, in: update) {
-            writesOutsideProject.insert(path)
-        }
-        lock.unlock()
-        onUpdate(update)
-    }
-
-    private func answerPermission(_ request: AcpConnection.IncomingRequest) async {
-        let permission = AcpPermissionRequest(raw: request.params)
-        // A cancelled run must not put an approval prompt in front of the
-        // user for work that is already being abandoned.
-        let approved = currentlyCancelled() ? false : await resolvePermission(permission)
-        if approved, let option = permission.allowOption() {
-            connection.respond(to: request.id, result: AcpPermissionRequest.outcome(selecting: option.id))
-        } else if !approved, let option = permission.rejectOption() {
-            connection.respond(to: request.id, result: AcpPermissionRequest.outcome(selecting: option.id))
-        } else {
-            connection.respond(to: request.id, result: AcpPermissionRequest.cancelledOutcome())
-        }
-    }
-
-    private func currentlyCancelled() -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return isCancelled
-    }
-
-    private func currentSummary() -> String {
-        lock.lock(); defer { lock.unlock() }
-        return summary
+        turn.cancel()
     }
 
     private func currentWritesOutsideProject() -> Set<String> {
         lock.lock(); defer { lock.unlock() }
         return writesOutsideProject
-    }
-
-    private func detail(from error: Error) -> String {
-        switch error {
-        case AcpError.agent(let code, let message):
-            // An ACP-level error is often a one-liner whose explanation the
-            // agent wrote to stderr instead ("-32000 Authentication required"
-            // next to the CLI's own "Not logged in"). Reported without it, the
-            // message names a symptom and nothing that leads to a cause.
-            return Self.appending(stderrTail(), to: "ACP error \(code): \(message)")
-        case AcpError.processExited(let detail):
-            // Already the stderr tail (AcpAgentProcess passes it in).
-            return detail.isEmpty ? "ACP 프로세스가 종료되었습니다." : detail
-        default:
-            return Self.appending(stderrTail(), to: String(describing: error))
-        }
-    }
-
-    /// Appends the tail exactly as captured -- it is already bounded by
-    /// AcpAgentProcess, and this goes to the model and the transcript, so
-    /// nothing here may widen what a child process can put in front of them.
-    private static func appending(_ tail: String, to message: String) -> String {
-        let tail = tail.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !tail.isEmpty, !message.contains(tail) else { return message }
-        return message + "\n" + tail
     }
 }

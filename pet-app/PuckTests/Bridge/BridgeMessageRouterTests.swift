@@ -70,25 +70,6 @@ final class BridgeMessageRouterTests: XCTestCase {
         XCTAssertEqual(handler.ranOnMainThread, true)
     }
 
-    /// F13 (2026-07-29): the chat store needs the raw event + its
-    /// workspace_id/session_id, not just the derived pet EventReaction.
-    func test_onChatEvent_firesAlongsideOnEventReaction_withWorkspaceAndSessionIds() {
-        let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
-        var received: (event: BridgeEvent, workspaceId: String, sessionId: String)?
-        let chatEventReceived = expectation(description: "chat event delivered")
-        router.onChatEvent = { event, workspaceId, sessionId in
-            received = (event, workspaceId, sessionId)
-            chatEventReceived.fulfill()
-        }
-
-        router.handle(.event(.agentDone(ok: true, summary: "done"), workspaceId: "w1", sessionId: "s2"), reply: { _ in })
-
-        wait(for: [chatEventReceived], timeout: 2)
-        XCTAssertEqual(received?.event, .agentDone(ok: true, summary: "done"))
-        XCTAssertEqual(received?.workspaceId, "w1")
-        XCTAssertEqual(received?.sessionId, "s2")
-    }
-
     func test_reaction_matchesEventRouter() {
         let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
 
@@ -159,12 +140,13 @@ final class BridgeMessageRouterTests: XCTestCase {
     func test_messagesPetAppOnlySends_areIgnored() {
         let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
         router.onEventReaction = { _ in XCTFail("should not react to a message pet-app only sends") }
-        router.onClientUpdate = { _ in XCTFail("should not fire onClientUpdate for a message pet-app only sends") }
 
         router.handle(.userInput(UserInput(text: "hi", source: .text)), reply: { _ in XCTFail("should not reply") })
         router.handle(.toolResult(ToolResult(id: "t1", ok: true, data: nil, error: nil)), reply: { _ in XCTFail("should not reply") })
         router.handle(.workspaceCreateRequest(name: "x", projectPath: nil), reply: { _ in XCTFail("should not reply") })
         router.handle(.sessionCreateRequest(workspaceId: "w1", title: "x"), reply: { _ in XCTFail("should not reply") })
+        router.handle(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil), reply: { _ in XCTFail("should not reply") })
+        router.handle(.sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent), reply: { _ in XCTFail("should not reply") })
 
         // Give any (incorrect) async hop a chance to run before the test ends.
         let settled = expectation(description: "settled")
@@ -172,42 +154,4 @@ final class BridgeMessageRouterTests: XCTestCase {
         wait(for: [settled], timeout: 2)
     }
 
-    // MARK: - workspace/session/editor-view updates (2026-07-29, F13's data layer consumes these)
-
-    func test_onClientUpdate_firesOnMainThread_forWorkspaceCreate() {
-        let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
-        var received: BridgeMessage?
-        var receivedOnMainThread: Bool?
-        let updated = expectation(description: "client update delivered")
-        router.onClientUpdate = { message in
-            received = message
-            receivedOnMainThread = Thread.isMainThread
-            updated.fulfill()
-        }
-
-        backgroundQueue.async {
-            router.handle(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: "/tmp/cat-house"), reply: { _ in })
-        }
-
-        wait(for: [updated], timeout: 2)
-        XCTAssertEqual(received, .workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: "/tmp/cat-house"))
-        XCTAssertEqual(receivedOnMainThread, true)
-    }
-
-    /// Was three messages; the editor-view pair went with the WKWebView
-    /// editor (2026-08-15), leaving session_create as the only other one.
-    func test_onClientUpdate_firesFor_sessionCreate() {
-        let router = BridgeMessageRouter(toolExecutor: ToolExecutor())
-        var received: [BridgeMessage] = []
-        let delivered = expectation(description: "the client update was delivered")
-        router.onClientUpdate = { message in
-            received.append(message)
-            delivered.fulfill()
-        }
-
-        router.handle(.sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent), reply: { _ in })
-
-        wait(for: [delivered], timeout: 2)
-        XCTAssertEqual(received, [.sessionCreate(workspaceId: "w1", sessionId: "s2", title: "fix bug", origin: .agent)])
-    }
 }

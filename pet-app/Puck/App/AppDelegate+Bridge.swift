@@ -29,10 +29,9 @@ extension AppDelegate {
         } else {
             AppLogger.shared.log(.error, "WorkspaceRegistry unavailable: new workspaces cannot be created this run")
         }
-        // onClientUpdate/onChatEvent go unset here -- PuckClient's own
-        // ClientWindowStore consumes those now (2026-07-30), fed by its own
-        // BridgeSocketClient connection, not this in-process router. This
-        // router's job is back to just the pet's own reactions + relaying
+        // The chat timeline is PuckClient's, fed by its own BridgeSocketClient
+        // connection rather than this in-process router (2026-07-30). This
+        // router's job is just the pet's own reactions + relaying
         // (BridgeServer.relay handles the actual forwarding to whichever
         // gui-role connections are attached).
         bridgeMessageRouter = router

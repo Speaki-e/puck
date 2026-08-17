@@ -32,23 +32,6 @@ final class BridgeMessageRouter {
     /// Emitted for protocol 3.2 status events, already on the main thread.
     var onEventReaction: ((EventReaction) -> Void)?
 
-    /// Emitted for the workspace/session confirmations (protocol 3.4).
-    /// They used to arrive from workspace; WorkspaceCoordinator produces them
-    /// in-process now, and the editor-view pair that sat alongside them is
-    /// gone with the WKWebView editor it described. Already on the main
-    /// thread, like onEventReaction. F13's client-window store (task
-    /// #134) is the intended consumer; kept as the raw BridgeMessage rather
-    /// than a bespoke type since this router shouldn't need to know that
-    /// store's shape.
-    var onClientUpdate: ((BridgeMessage) -> Void)?
-
-    /// Emitted for every protocol 3.2 event, alongside onEventReaction --
-    /// F13's ClientWindowStore (2026-07-29) folds the raw event into the
-    /// right session's chat timeline (ChatSession.apply), which needs the
-    /// full event and its workspace_id/session_id, not just the derived pet
-    /// EventReaction onEventReaction carries.
-    var onChatEvent: ((BridgeEvent, _ workspaceId: String, _ sessionId: String) -> Void)?
-
     /// Answers workspace_create_request / session_create_request locally.
     /// Left optional so the many tests that only care about tool dispatch or
     /// event reactions can keep constructing a router with one argument.
@@ -98,12 +81,6 @@ final class BridgeMessageRouter {
                     self.lastCodeEditorPath = EventRouter.codeEditorPath(from: detail) ?? self.lastCodeEditorPath
                 }
                 self.onEventReaction?(reaction)
-                self.onChatEvent?(event, workspaceId, sessionId)
-            }
-
-        case .workspaceCreate, .sessionCreate:
-            dispatchToMain { [weak self] in
-                self?.onClientUpdate?(message)
             }
 
         case .workspaceCreateRequest, .sessionCreateRequest:
@@ -117,8 +94,12 @@ final class BridgeMessageRouter {
                 }
             }
 
-        case .toolResult, .userInput:
-            break // pet-app only ever sends these, never receives them
+        case .toolResult, .userInput, .workspaceCreate, .sessionCreate:
+            // pet-app only ever sends these. The confirmations are produced
+            // here (workspaceCoordinator, above) and consumed by PuckClient's
+            // own ClientWindowStore over its own socket connection, so one
+            // arriving inbound has no in-process reader.
+            break
 
         case .clientHello:
             break // intercepted by BridgeServer before reaching here (assigns the connection's role)

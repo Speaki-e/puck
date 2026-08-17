@@ -3,56 +3,53 @@
 //  PuckClient
 //
 //  F15 · owner: 박해영 (Haeyoung Park)
-//  The agent's provider choice and API key, moved here from Puck's own
-//  SettingsView -- the agent's settings belong to this app rather than
-//  설정은 전부 셰이디에이전트 설정으로 옮기고". The agent that actually reads
-//  the key (AgentHost, in this process) runs here, not in Puck -- Puck's
-//  panel only ever showed this field because PuckClient had no Settings
-//  surface of its own yet. Opened via the App menu's "설정…" (Cmd+,), same
-//  convention every other Mac app uses.
+//  Everything the agent needs configured: which provider it talks to, the
+//  API key for the providers that take one, the model where the model is ours
+//  to choose, and which coding CLI backs the CLI provider.
 //
-//  F15 (task 4): the provider picker lives right above the key field rather
-//  than in Puck's SettingsView next to the theme picker it otherwise
-//  mirrors the style of -- this is the one place a key is ever typed, so
-//  it's the one place "which provider does this key belong to" can be
-//  answered without the user needing to remember a setting that lives in a
-//  different app's window. It persists to the same .env the key already
-//  writes to (`AgentConfiguration.writableEnvFile`, `AGENT_PROVIDER`) rather
-//  than to UserDefaults: Puck and PuckClient are separate processes with no
-//  change notification between them, and the key field already solved that
-//  by being a file both of them re-read on every access -- splitting
-//  provider into a second mechanism would mean the two could disagree.
+//  It lives in this app rather than in Puck's own SettingsView because the
+//  agent that reads any of it (AgentHost) runs in this process. Puck's panel
+//  only ever showed the key field because PuckClient had no Settings surface
+//  of its own yet. Opened via the App menu's "설정…" (Cmd+,), same convention
+//  every other Mac app uses.
+//
+//  Everything here persists to the same `.env`
+//  (`AgentConfiguration.writableEnvFile`) rather than to UserDefaults: Puck
+//  and PuckClient are separate processes with no change notification between
+//  them, and the key field already solved that by writing a file both of them
+//  re-read on every access. A second mechanism would mean the two could
+//  disagree. Every control below therefore reads its value back out of
+//  `agentConfiguration` after writing, instead of trusting what it just wrote
+//  -- an environment variable or a nearer `.env` can outrank this file, and
+//  saying "saved" while something else keeps winning is exactly the confusion
+//  `keySource` exists to prevent.
 //
 
 import SwiftUI
 
 struct AgentSettingsView: View {
-    /// What's typed into the key field before it's saved, and the resolved
-    /// configuration the status line reports on.
+    /// What's typed into the key/model fields before they're saved, and the
+    /// resolved configuration every status line reports on.
     @State private var apiKeyDraft = ""
     @State private var apiKeyMessage: String?
+    @State private var modelDraft = ""
     @State private var agentConfiguration = AgentConfiguration.load()
 
     private func text(_ key: L10nKey) -> String { Strings.text(key) }
 
     /// Reuses Puck's own SettingsSection/SettingsStackedRow rather than
     /// hand-approximating their padding/typography, which drifted visibly
-    /// when it was tried.
-    /// The first version of this file rebuilt the layout by eye instead of
-    /// reusing the real components, and it drifted: the section title was
-    /// missing SettingsSection's `.secondary` tint (read as a heading, not a
-    /// muted label), the "OpenAI API 키" row label was dropped entirely, and
-    /// the outer spacing didn't match SettingsStackedRow's tighter
-    /// label-to-control rhythm. Sharing the component instead of the
-    /// constants means this can't drift again.
+    /// when it was tried: the section title lost SettingsSection's
+    /// `.secondary` tint, a row label was dropped entirely, and the outer
+    /// spacing didn't match SettingsStackedRow's tighter label-to-control
+    /// rhythm. Sharing the component instead of the constants means this
+    /// can't drift again.
     var body: some View {
         SettingsSection(title: text(.agentHeader)) {
             // Same segmented-Picker-over-CaseIterable-plus-displayName shape
             // as SettingsView's theme picker, and the same
-            // read-current-value/write-and-reload round trip the key field
-            // right below it already does -- `.onChange` here writes
-            // `AGENT_PROVIDER` instead of a UserDefaults key for the reason
-            // given in this file's header comment.
+            // read-current-value/write-and-reload round trip every field
+            // below it does.
             SettingsStackedRow(label: text(.providerLabel)) {
                 Picker("", selection: providerBinding) {
                     ForEach(AgentProvider.allCases, id: \.self) { provider in
@@ -63,54 +60,140 @@ struct AgentSettingsView: View {
                 .labelsHidden()
             }
 
-            SettingsStackedRow(label: String(format: text(.apiKeyLabelFormat), agentConfiguration.provider.displayName)) {
-                HStack {
-                    // SecureField, so a key isn't left legible on a screen
-                    // that gets shared or recorded.
-                    SecureField("sk-…", text: $apiKeyDraft)
-                        .textFieldStyle(.roundedBorder)
-                    Button(text(.apiKeySave)) { saveAPIKey(apiKeyDraft) }
-                        .controlSize(.small)
-                        .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    if agentConfiguration.isConfigured {
-                        Button(text(.apiKeyClear)) { saveAPIKey(nil) }
-                            .controlSize(.small)
-                    }
-                }
+            if agentConfiguration.provider.requiresAPIKey {
+                apiKeyRows
+            } else {
+                codingAgentRows
             }
 
-            Text(apiKeyStatus)
-                .font(.footnote)
-                .foregroundStyle(agentConfiguration.isConfigured ? .secondary : Color.orange)
-                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-
-            Text(String(format: text(.apiKeyExplanationFormat), agentConfiguration.provider.apiKeyEnvironmentVariable))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            if agentConfiguration.provider.supportsModelSelection {
+                modelRows
+            }
         }
         .padding(ClientTheme.Metrics.spacingLarge)
         .frame(width: 420)
     }
 
+    // MARK: - Rows
+
+    @ViewBuilder
+    private var apiKeyRows: some View {
+        SettingsStackedRow(label: String(format: text(.apiKeyLabelFormat), agentConfiguration.provider.displayName)) {
+            HStack {
+                // SecureField, so a key isn't left legible on a screen
+                // that gets shared or recorded.
+                SecureField("sk-…", text: $apiKeyDraft)
+                    .textFieldStyle(.roundedBorder)
+                Button(text(.apiKeySave)) { saveAPIKey(apiKeyDraft) }
+                    .controlSize(.small)
+                    .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if agentConfiguration.isConfigured {
+                    Button(text(.apiKeyClear)) { saveAPIKey(nil) }
+                        .controlSize(.small)
+                }
+            }
+        }
+
+        Text(apiKeyStatus)
+            .font(.footnote)
+            .foregroundStyle(agentConfiguration.isConfigured ? .secondary : Color.orange)
+            .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+
+        Text(String(
+            format: text(.apiKeyExplanationFormat),
+            agentConfiguration.provider.apiKeyEnvironmentVariable ?? ""
+        ))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+    }
+
+    /// Shown only for the CLI provider. The picker writes the *same*
+    /// `CODING_AGENT` the `code_editor` tool already reads, rather than a
+    /// parallel setting: the pet thinking with a CLI and editing with a
+    /// different one would be a distinction nobody asked for.
+    @ViewBuilder
+    private var codingAgentRows: some View {
+        SettingsStackedRow(label: text(.codingAgentLabel)) {
+            Picker("", selection: codingAgentBinding) {
+                ForEach(CodingAgentKind.allCases, id: \.self) { kind in
+                    Text(kind.displayName).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+
+        // Stated here rather than discovered when the pet fails to move: this
+        // provider genuinely cannot call the pet's tools, and the prompt the
+        // CLI receives says the same thing (CodingAgentCLIClient).
+        Text(text(.cliProviderExplanation))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+    }
+
+    /// Free text rather than a picker: a hardcoded list of model names goes
+    /// stale every time a provider ships one, and being unable to type the
+    /// model you have access to is worse than having to know its name. The
+    /// row's trailing value shows what is actually in effect, so the default
+    /// is visible without being typed.
+    @ViewBuilder
+    private var modelRows: some View {
+        SettingsStackedRow(label: text(.modelLabel), value: agentConfiguration.model) {
+            HStack {
+                TextField(agentConfiguration.provider.defaultModel, text: $modelDraft)
+                    .textFieldStyle(.roundedBorder)
+                Button(text(.apiKeySave)) { saveModel(modelDraft) }
+                    .controlSize(.small)
+                    .disabled(modelDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button(text(.modelReset)) { saveModel(nil) }
+                    .controlSize(.small)
+            }
+        }
+
+        Text(String(
+            format: text(.modelExplanationFormat),
+            agentConfiguration.provider.defaultModel,
+            agentConfiguration.provider.modelEnvironmentVariable ?? ""
+        ))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+    }
+
+    // MARK: - Bindings
+
     /// Reads/writes `AGENT_PROVIDER` in the same `.env` the key field itself
     /// writes to. A plain `@State` can't own this the way it owns
     /// `apiKeyDraft`: the value has to come back out of `agentConfiguration`
     /// (the single source of truth both apps re-read) rather than drift from
-    /// it, the same reason `saveAPIKey` re-loads after every write instead of
-    /// trusting what it just wrote.
+    /// it.
     private var providerBinding: Binding<AgentProvider> {
         Binding(
             get: { agentConfiguration.provider },
             set: { newProvider in
                 guard newProvider != agentConfiguration.provider else { return }
                 DotEnv.write(key: "AGENT_PROVIDER", value: newProvider.rawValue, to: AgentConfiguration.writableEnvFile)
-                // The draft is provider-specific (an OpenAI key typed before
-                // switching to Anthropic belongs to neither field once the
-                // switch happens), so it's cleared the same way saveAPIKey
-                // clears it after a successful save.
+                // Both drafts are provider-specific (an OpenAI key or model
+                // typed before switching to Anthropic belongs to neither field
+                // once the switch happens), so they're cleared the same way a
+                // successful save clears them.
                 apiKeyDraft = ""
+                modelDraft = ""
                 apiKeyMessage = nil
+                agentConfiguration = .load()
+            }
+        )
+    }
+
+    /// `CODING_AGENT`, the variable `code_editor` has always read.
+    private var codingAgentBinding: Binding<CodingAgentKind> {
+        Binding(
+            get: { agentConfiguration.codingAgent },
+            set: { newKind in
+                guard newKind != agentConfiguration.codingAgent else { return }
+                DotEnv.write(key: "CODING_AGENT", value: newKind.rawValue, to: AgentConfiguration.writableEnvFile)
                 agentConfiguration = .load()
             }
         )
@@ -128,9 +211,9 @@ struct AgentSettingsView: View {
     /// saving while Anthropic is selected can never clobber an OpenAI key
     /// sitting in the same file.
     private func saveAPIKey(_ key: String?) {
+        guard let keyVariable = agentConfiguration.provider.apiKeyEnvironmentVariable else { return }
         let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
         let target = AgentConfiguration.writableEnvFile
-        let keyVariable = agentConfiguration.provider.apiKeyEnvironmentVariable
         guard DotEnv.write(key: keyVariable, value: trimmed?.isEmpty == false ? trimmed : nil, to: target) else {
             apiKeyMessage = text(.apiKeySaveFailed)
             return
@@ -144,5 +227,22 @@ struct AgentSettingsView: View {
         apiKeyMessage = trimmed?.isEmpty == false
             ? String(format: text(.apiKeySavedFormat), target.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
             : nil
+    }
+
+    /// Same shape as `saveAPIKey`, against the provider-specific model
+    /// variable. nil clears the assignment, which is what the 기본값 button
+    /// does -- the resolved value then falls back to `AGENT_MODEL` or the
+    /// provider's default, and the row's trailing value shows which it landed
+    /// on.
+    private func saveModel(_ model: String?) {
+        guard let modelVariable = agentConfiguration.provider.modelEnvironmentVariable else { return }
+        let trimmed = model?.trimmingCharacters(in: .whitespacesAndNewlines)
+        DotEnv.write(
+            key: modelVariable,
+            value: trimmed?.isEmpty == false ? trimmed : nil,
+            to: AgentConfiguration.writableEnvFile
+        )
+        modelDraft = ""
+        agentConfiguration = .load()
     }
 }

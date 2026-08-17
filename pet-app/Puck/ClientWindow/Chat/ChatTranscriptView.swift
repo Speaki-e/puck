@@ -296,11 +296,19 @@ private struct DoneRow: View {
     let summary: String
 
     var body: some View {
-        Label(summary.isEmpty ? (ok ? "완료" : "실패") : summary,
-              systemImage: ok ? "checkmark.circle" : "xmark.circle")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
+        Label {
+            Text(summary.isEmpty ? (ok ? "완료" : "실패") : summary)
+        } icon: {
+            Image(systemName: ok ? "checkmark.circle" : "xmark.circle")
+                // Orange for a failure, the same signal a failed tool call
+                // uses. This row is the only place a failed run's reason
+                // appears now, so it has to be findable at caption size.
+                .foregroundStyle(ok ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
+        .frame(maxWidth: 520, alignment: .leading)
     }
 }
 

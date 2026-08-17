@@ -117,7 +117,7 @@ final class BridgeMessageRouter {
                 }
             }
 
-        case .toolResult, .userInput, .approvalResponse, .runCancel:
+        case .toolResult, .userInput:
             break // pet-app only ever sends these, never receives them
 
         case .clientHello:

@@ -176,16 +176,6 @@ enum BridgeMessage: Equatable {
     case sessionCreateRequest(workspaceId: String, title: String)
     /// workspace -> pet-app: confirms a session now exists.
     case sessionCreate(workspaceId: String, sessionId: String, title: String, origin: SessionOrigin)
-
-
-    // --- approval response / run cancel (2026-07-29, protocol 3.6) ---
-
-    /// pet-app -> workspace: resolve a pending awaitApproval by id. Unknown/already-resolved
-    /// ids are ignored (idempotent).
-    case approvalResponse(approvalId: String, approved: Bool)
-    /// pet-app -> workspace: abort the in-flight run() for a session -- the whole
-    /// conversation turn, a different level from toolCancel (which abandons one tool dispatch).
-    case runCancel(sessionId: String)
 }
 
 extension BridgeMessage: Codable {
@@ -200,8 +190,6 @@ extension BridgeMessage: Codable {
         case workspaceCreate = "workspace_create"
         case sessionCreateRequest = "session_create_request"
         case sessionCreate = "session_create"
-        case approvalResponse = "approval_response"
-        case runCancel = "run_cancel"
     }
 
     private enum EventKey: String, Codable {
@@ -222,10 +210,7 @@ extension BridgeMessage: Codable {
         case projectPath = "project_path"
         case title
         case origin
-        case url
-        case reason
         case approvalId = "approval_id"
-        case approved
         case role
     }
 
@@ -333,16 +318,6 @@ extension BridgeMessage: Codable {
                 title: try container.decode(String.self, forKey: .title),
                 origin: try container.decode(SessionOrigin.self, forKey: .origin)
             )
-
-
-        case .approvalResponse:
-            self = .approvalResponse(
-                approvalId: try container.decode(String.self, forKey: .approvalId),
-                approved: try container.decode(Bool.self, forKey: .approved)
-            )
-
-        case .runCancel:
-            self = .runCancel(sessionId: try container.decode(String.self, forKey: .sessionId))
         }
     }
 
@@ -435,16 +410,6 @@ extension BridgeMessage: Codable {
             try container.encode(sessionId, forKey: .sessionId)
             try container.encode(title, forKey: .title)
             try container.encode(origin, forKey: .origin)
-
-
-        case .approvalResponse(let approvalId, let approved):
-            try container.encode(TypeKey.approvalResponse, forKey: .type)
-            try container.encode(approvalId, forKey: .approvalId)
-            try container.encode(approved, forKey: .approved)
-
-        case .runCancel(let sessionId):
-            try container.encode(TypeKey.runCancel, forKey: .type)
-            try container.encode(sessionId, forKey: .sessionId)
         }
     }
 }

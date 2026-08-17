@@ -124,22 +124,6 @@ final class UserInputSenderTests: XCTestCase {
         XCTAssertEqual(transport.broadcasted, [.sessionCreateRequest(workspaceId: "w1", title: "new chat")])
     }
 
-    func test_respondToApproval_broadcastsApprovalResponse() {
-        let transport = StubTransport(hasConnectedClients: true)
-        let sender = UserInputSender { transport }
-
-        XCTAssertEqual(sender.respondToApproval(approvalId: "a1", approved: true), .sent)
-        XCTAssertEqual(transport.broadcasted, [.approvalResponse(approvalId: "a1", approved: true)])
-    }
-
-    func test_cancelRun_broadcastsRunCancel() {
-        let transport = StubTransport(hasConnectedClients: true)
-        let sender = UserInputSender { transport }
-
-        XCTAssertEqual(sender.cancelRun(sessionId: "s2"), .sent)
-        XCTAssertEqual(transport.broadcasted, [.runCancel(sessionId: "s2")])
-    }
-
     func test_createWorkspace_withNoConnectedClient_reportsDisconnected() {
         let transport = StubTransport(hasConnectedClients: false)
         let sender = UserInputSender { transport }

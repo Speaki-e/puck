@@ -61,13 +61,13 @@ struct AgentConfiguration {
     }
 
     /// Used when nothing names one, for `.openai`.
-    static let defaultModel = "gpt-4o"
+    static let defaultModel = "gpt-5.3-codex"
 
     /// Used when nothing names one, for `.anthropic`. `claude-sonnet-5` is
     /// Anthropic's "best combination of speed and intelligence" model per
     /// platform.claude.com/docs/en/about-claude/models/overview (checked
-    /// 2026-08-15) -- the same balanced-default role `gpt-4o` plays above,
-    /// rather than the priciest frontier model. Anthropic revs its lineup
+    /// 2026-08-15) -- the same balanced-default role the OpenAI default
+    /// plays above, rather than the priciest frontier model. Anthropic revs its lineup
     /// often; re-check that page when this stops being current.
     static let defaultAnthropicModel = "claude-sonnet-5"
 

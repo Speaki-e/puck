@@ -25,10 +25,11 @@
 //      as bridge.sock and the logs, and the only one of these that a shipped
 //      (non-Debug) build can read.
 //
-//  Same order decides `AGENT_PROVIDER` (`openai` or `anthropic`, default
-//  `openai`; an unrecognized value falls back to `openai` rather than
+//  Same order decides `AGENT_PROVIDER` (`openai`, `anthropic` or `cli`,
+//  default `openai`; an unrecognized value falls back to `openai` rather than
 //  crashing -- see `AgentProvider.resolved(fromRawValue:)`). The provider then
-//  decides which key is read: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`. Model
+//  decides which key is read: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, or
+//  none at all for `cli`, which uses the vendor CLI's own login. Model
 //  override is provider-specific too -- `OPENAI_MODEL` / `ANTHROPIC_MODEL` --
 //  with the provider-neutral `AGENT_MODEL` as a fallback for either one, so
 //  `OPENAI_MODEL` keeps winning for existing OpenAI users even if `AGENT_MODEL`
@@ -71,14 +72,28 @@ struct AgentConfiguration {
     /// often; re-check that page when this stops being current.
     static let defaultAnthropicModel = "claude-sonnet-5"
 
-    var isConfigured: Bool { !(apiKey ?? "").isEmpty }
+    /// Whether the agent can run at all. A provider that authenticates through
+    /// a CLI the user already logged into has no key to be missing, so it is
+    /// configured the moment it is selected -- gating it on `apiKey` would tell
+    /// someone who deliberately picked the no-key provider to go set a key.
+    var isConfigured: Bool {
+        guard provider.requiresAPIKey else { return true }
+        return !(apiKey ?? "").isEmpty
+    }
 
     static func load(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
     ) -> AgentConfiguration {
         let provider = provider(environment: environment, searchPaths: searchPaths)
-        let keyVariable = provider.apiKeyEnvironmentVariable
+        guard let keyVariable = provider.apiKeyEnvironmentVariable else {
+            return AgentConfiguration(
+                apiKey: nil,
+                model: model(provider: provider, environment: environment, searchPaths: searchPaths),
+                provider: provider,
+                keySource: nil
+            )
+        }
         if let fromEnvironment = environment[keyVariable]?.nilIfBlank {
             return AgentConfiguration(
                 apiKey: fromEnvironment,
@@ -195,7 +210,10 @@ struct AgentConfiguration {
     /// search path, so an existing `OPENAI_MODEL` keeps winning for OpenAI
     /// users even if `AGENT_MODEL` is also set somewhere.
     private static func model(provider: AgentProvider, environment: [String: String], searchPaths: [URL]) -> String {
-        let providerVariable = provider.modelEnvironmentVariable
+        // A provider whose model is not ours to choose (the CLI picks its own)
+        // resolves nothing at all: honouring AGENT_MODEL there would report a
+        // model name that nothing sends anywhere.
+        guard let providerVariable = provider.modelEnvironmentVariable else { return provider.defaultModel }
         if let fromEnvironment = environment[providerVariable]?.nilIfBlank { return fromEnvironment }
         if let fromEnvironment = environment["AGENT_MODEL"]?.nilIfBlank { return fromEnvironment }
         for directory in searchPaths {
@@ -261,33 +279,57 @@ struct AgentConfiguration {
 enum AgentProvider: String, CaseIterable {
     case openai
     case anthropic
+    /// The vendor coding-agent CLI the user has already logged into, driven
+    /// over ACP -- the same child process `code_editor` uses, asked to hold a
+    /// conversation instead of to edit a project. No API key: the CLI's own
+    /// login is the credential, which is the entire reason this exists.
+    ///
+    /// Which CLI is `CODING_AGENT`'s existing claude/codex choice, not a
+    /// second axis (see `AgentConfiguration.codingAgent`).
+    case cli
 
     /// Shown in Settings' provider picker.
     var displayName: String {
         switch self {
         case .openai: return "ChatGPT (OpenAI)"
         case .anthropic: return "Claude (Anthropic)"
+        case .cli: return "코딩 CLI (로그인)"
         }
     }
 
-    var apiKeyEnvironmentVariable: String {
+    /// nil when the provider has no API key to hold -- `.cli` authenticates
+    /// through the vendor CLI's own login.
+    var apiKeyEnvironmentVariable: String? {
         switch self {
         case .openai: return "OPENAI_API_KEY"
         case .anthropic: return "ANTHROPIC_API_KEY"
+        case .cli: return nil
         }
     }
 
-    var modelEnvironmentVariable: String {
+    var requiresAPIKey: Bool { apiKeyEnvironmentVariable != nil }
+
+    /// nil when the model is not ours to pick: the ACP protocol has no model
+    /// field, so a `.cli` turn runs on whatever the CLI itself is configured
+    /// for. Settings hides the model field rather than offering one that would
+    /// be written and then ignored.
+    var modelEnvironmentVariable: String? {
         switch self {
         case .openai: return "OPENAI_MODEL"
         case .anthropic: return "ANTHROPIC_MODEL"
+        case .cli: return nil
         }
     }
+
+    var supportsModelSelection: Bool { modelEnvironmentVariable != nil }
 
     var defaultModel: String {
         switch self {
         case .openai: return AgentConfiguration.defaultModel
         case .anthropic: return AgentConfiguration.defaultAnthropicModel
+        // Empty rather than a name: nothing sends a model for this provider,
+        // and inventing one here would put a lie in Settings' status line.
+        case .cli: return ""
         }
     }
 

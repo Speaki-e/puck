@@ -60,6 +60,11 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// name/env-var so the key field always names the provider it is
     /// actually editing, instead of always saying "OpenAI".
     case providerLabel, apiKeyLabelFormat, apiKeyExplanationFormat
+    /// The model name, for the providers where one is ours to choose, and the
+    /// coding-agent CLI, for the provider that runs one. Both were previously
+    /// reachable only through an environment variable.
+    case modelLabel, modelExplanationFormat, modelReset
+    case codingAgentLabel, cliProviderExplanation
     case installedFormat
     case installedMissingRecommendedFormat
     case failedToInstallFormat
@@ -140,6 +145,12 @@ enum Strings {
         .apiKeySaveFailed: "키 파일을 저장하지 못했어요.",
         .apiKeyExplanationFormat:
             "본인만 읽을 수 있는 .env 파일에 저장됩니다. 환경변수 %1$@나 프로젝트 폴더의 .env가 있으면 그쪽이 우선합니다.",
+        .modelLabel: "모델",
+        .modelReset: "기본값",
+        .modelExplanationFormat: "비워 두고 저장하면 기본값 %1$@을(를) 씁니다. 환경변수 %2$@가 있으면 그쪽이 우선합니다.",
+        .codingAgentLabel: "코딩 CLI",
+        .cliProviderExplanation:
+            "이미 로그인한 CLI를 그대로 씁니다. API 키가 필요 없는 대신 대화만 할 수 있어요 — 앱 실행, 화면 가리키기, 코드 편집 같은 펫 기능은 이 공급자에서는 동작하지 않습니다.",
         .installedFormat: "'%1$@' 설치 완료.",
         .installedMissingRecommendedFormat: "'%1$@' 설치 완료 — 권장 클립 누락(대기 이미지로 대체): %2$@",
         .failedToInstallFormat: "'%1$@' 설치 실패: %2$@",

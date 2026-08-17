@@ -121,6 +121,20 @@ struct ChatInputBar: View {
     @State private var text = ""
     @FocusState private var isFocused: Bool
 
+    /// One number for both controls, rather than two intrinsic heights that
+    /// happen to be close: the field's collapsed height is `minHeight` and the
+    /// button is a square of the same size, so they cannot drift apart. 32 is
+    /// the field's own single-line height at `.title3` (an 18pt line plus the
+    /// 7pt padding twice) and the standard macOS control height.
+    ///
+    /// The field grows to eight lines; the button deliberately keeps this
+    /// height and stays bottom-aligned instead of stretching. A stop/send
+    /// glyph centred in a 200pt-tall column would drift away from the caret
+    /// and from where it sat a moment earlier, and the button is a control the
+    /// pointer aims at, not a panel -- the pair only has to read as aligned at
+    /// the edge the user is typing on.
+    static let controlHeight: CGFloat = 32
+
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             TextField("Agent에게 메시지를 보내세요…", text: $text, axis: .vertical)
@@ -130,6 +144,7 @@ struct ChatInputBar: View {
                 .onSubmit(send)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
+                .frame(minHeight: Self.controlHeight)
                 // A field the pointer can find. Bare text on the window looked
                 // like a label until you happened to click it.
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
@@ -142,12 +157,18 @@ struct ChatInputBar: View {
                 Button(role: .cancel, action: onCancel) {
                     Label("중지", systemImage: "stop.circle.fill")
                         .labelStyle(.iconOnly)
+                        .frame(width: Self.controlHeight, height: Self.controlHeight)
+                        // The whole square is the target, not just the glyph --
+                        // .plain hit-tests the label's own bounds otherwise.
+                        .contentShape(.rect)
                 }
                 .help("중지")
             } else {
                 Button(action: send) {
                     Label("보내기", systemImage: "arrow.up.circle.fill")
                         .labelStyle(.iconOnly)
+                        .frame(width: Self.controlHeight, height: Self.controlHeight)
+                        .contentShape(.rect)
                 }
                 .disabled(trimmed.isEmpty)
                 .help("보내기")

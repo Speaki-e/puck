@@ -103,15 +103,21 @@ final class RoutingAgentLLMClient: AgentLLMClient {
     private let configuration: () -> AgentConfiguration
     private let openAIClient: any AgentLLMClient
     private let anthropicClient: any AgentLLMClient
+    /// The vendor coding-agent CLI, over ACP. Constructing it is as cheap as
+    /// the other two -- it holds closures, and spawns nothing until a turn
+    /// actually routes to it.
+    private let cliClient: any AgentLLMClient
 
     init(
         configuration: @escaping () -> AgentConfiguration,
         openAIClient: any AgentLLMClient,
-        anthropicClient: any AgentLLMClient
+        anthropicClient: any AgentLLMClient,
+        cliClient: any AgentLLMClient
     ) {
         self.configuration = configuration
         self.openAIClient = openAIClient
         self.anthropicClient = anthropicClient
+        self.cliClient = cliClient
     }
 
     func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
@@ -120,6 +126,8 @@ final class RoutingAgentLLMClient: AgentLLMClient {
             return try await openAIClient.send(messages: messages, tools: tools)
         case .anthropic:
             return try await anthropicClient.send(messages: messages, tools: tools)
+        case .cli:
+            return try await cliClient.send(messages: messages, tools: tools)
         }
     }
 }
@@ -127,11 +135,19 @@ final class RoutingAgentLLMClient: AgentLLMClient {
 /// `AgentHost` (both apps only ever construct one of these, at
 /// `AgentHost.init`) gets a client that re-decides the provider on every
 /// `send` -- see `RoutingAgentLLMClient`.
-func makeAgentLLMClient(_ configuration: @escaping () -> AgentConfiguration) -> any AgentLLMClient {
+///
+/// `workingDirectory` only matters to the CLI provider, which opens its ACP
+/// session there: the active workspace's project folder when it has one, so a
+/// CLI asked about "this file" can actually look at it.
+func makeAgentLLMClient(
+    _ configuration: @escaping () -> AgentConfiguration,
+    workingDirectory: @escaping () -> String = { NSHomeDirectory() }
+) -> any AgentLLMClient {
     RoutingAgentLLMClient(
         configuration: configuration,
         openAIClient: GPTClient(configuration: configuration),
-        anthropicClient: ClaudeClient(configuration: configuration)
+        anthropicClient: ClaudeClient(configuration: configuration),
+        cliClient: CodingAgentCLIClient(configuration: configuration, workingDirectory: workingDirectory)
     )
 }
 

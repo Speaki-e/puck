@@ -17,6 +17,7 @@ final class RoutingAgentLLMClientTests: XCTestCase {
     func test_send_routesToOpenAI_thenToAnthropic_afterProviderChanges_withoutRebuildingClient() async throws {
         let openAI = SpyAgentLLMClient(name: "openai")
         let anthropic = SpyAgentLLMClient(name: "anthropic")
+        let cli = SpyAgentLLMClient(name: "cli")
         var provider = AgentProvider.openai
 
         let router = RoutingAgentLLMClient(
@@ -24,7 +25,8 @@ final class RoutingAgentLLMClientTests: XCTestCase {
                 AgentConfiguration(apiKey: "key", model: "m", provider: provider, keySource: nil)
             },
             openAIClient: openAI,
-            anthropicClient: anthropic
+            anthropicClient: anthropic,
+            cliClient: cli
         )
 
         _ = try await router.send(messages: [.user("first")], tools: [])
@@ -38,6 +40,37 @@ final class RoutingAgentLLMClientTests: XCTestCase {
 
         XCTAssertEqual(openAI.receivedMessageCounts, [1], "the OpenAI client must not see the post-switch turn")
         XCTAssertEqual(anthropic.receivedMessageCounts, [1], "the switch must take effect on the very next send")
+    }
+
+    /// The CLI provider is reached the same way, and only when selected --
+    /// routing a turn there by accident would spawn a node process and a
+    /// ~256MB vendor binary for a request that should have been an HTTP call.
+    func test_send_routesToTheCliClient_onlyWhileTheCliProviderIsSelected() async throws {
+        let openAI = SpyAgentLLMClient(name: "openai")
+        let anthropic = SpyAgentLLMClient(name: "anthropic")
+        let cli = SpyAgentLLMClient(name: "cli")
+        var provider = AgentProvider.cli
+
+        let router = RoutingAgentLLMClient(
+            configuration: {
+                AgentConfiguration(apiKey: nil, model: "", provider: provider, keySource: nil)
+            },
+            openAIClient: openAI,
+            anthropicClient: anthropic,
+            cliClient: cli
+        )
+
+        let turn = try await router.send(messages: [.user("안녕")], tools: [])
+        XCTAssertEqual(turn.text, "cli")
+        XCTAssertEqual(cli.receivedMessageCounts, [1])
+        XCTAssertEqual(openAI.receivedMessageCounts, [])
+        XCTAssertEqual(anthropic.receivedMessageCounts, [])
+
+        provider = .openai
+        _ = try await router.send(messages: [.user("그 다음")], tools: [])
+
+        XCTAssertEqual(cli.receivedMessageCounts, [1], "no CLI process may be spawned for another provider's turn")
+        XCTAssertEqual(openAI.receivedMessageCounts, [1])
     }
 }
 

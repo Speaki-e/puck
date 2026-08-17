@@ -199,6 +199,93 @@ final class AgentConfigurationTests: XCTestCase {
 
         XCTAssertEqual(config.model, "claude-opus-5")
     }
+
+    // MARK: - The CLI provider
+
+    func test_readsTheCliProviderFromEnvironment() {
+        let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "cli"], searchPaths: [])
+
+        XCTAssertEqual(config.provider, .cli)
+    }
+
+    /// The whole point of this provider: the vendor CLI's own login is the
+    /// credential, so there is no key to be missing. Gating it on `apiKey`
+    /// would tell someone who deliberately picked the no-key provider to go
+    /// set a key, and AgentHost would refuse to run the turn.
+    func test_theCliProviderIsConfiguredWithNoKeyAnywhere() {
+        let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "cli"], searchPaths: [])
+
+        XCTAssertTrue(config.isConfigured)
+        XCTAssertNil(config.apiKey)
+        XCTAssertNil(config.keySource)
+        XCTAssertNil(config.provider.apiKeyEnvironmentVariable)
+        XCTAssertFalse(config.provider.requiresAPIKey)
+    }
+
+    /// A key sitting in the same .env for another provider must not be picked
+    /// up and reported as this one's source -- Settings' status line would
+    /// then name a file that has nothing to do with the selected provider.
+    func test_theCliProviderIgnoresKeysMeantForTheOthers() throws {
+        let directory = try directory(withEnv: "AGENT_PROVIDER=cli\nOPENAI_API_KEY=sk-oai\nANTHROPIC_API_KEY=sk-ant")
+
+        let config = AgentConfiguration.load(environment: [:], searchPaths: [directory])
+
+        XCTAssertEqual(config.provider, .cli)
+        XCTAssertNil(config.apiKey)
+        XCTAssertNil(config.keySource)
+    }
+
+    /// ACP carries no model field, so nothing would send one. Resolving
+    /// AGENT_MODEL here anyway would put a model name in Settings that no
+    /// request ever mentions.
+    func test_theCliProviderResolvesNoModel() {
+        let config = AgentConfiguration.load(
+            environment: ["AGENT_PROVIDER": "cli", "AGENT_MODEL": "gpt-5", "OPENAI_MODEL": "gpt-4.1"],
+            searchPaths: []
+        )
+
+        XCTAssertEqual(config.model, "")
+        XCTAssertFalse(config.provider.supportsModelSelection)
+        XCTAssertNil(config.provider.modelEnvironmentVariable)
+    }
+
+    /// What Settings writes has to be what `load` reads back, through the
+    /// real file rather than a hand-built dictionary: the picker and the
+    /// loader are in two different processes and the `.env` is the only thing
+    /// between them.
+    func test_writingProviderAndCodingAgentToADotEnvRoundTrips() throws {
+        let directory = try directory(withEnv: "# puck\n")
+        let file = directory.appendingPathComponent(".env")
+
+        XCTAssertTrue(DotEnv.write(key: "AGENT_PROVIDER", value: "cli", to: file))
+        XCTAssertTrue(DotEnv.write(key: "CODING_AGENT", value: "codex", to: file))
+
+        XCTAssertEqual(AgentConfiguration.load(environment: [:], searchPaths: [directory]).provider, .cli)
+        XCTAssertEqual(AgentConfiguration.codingAgent(environment: [:], searchPaths: [directory]), .codex)
+
+        // And switching back, which is a rewrite of an existing assignment
+        // rather than an append -- the case that eats a line when it's wrong.
+        XCTAssertTrue(DotEnv.write(key: "AGENT_PROVIDER", value: "anthropic", to: file))
+        XCTAssertEqual(AgentConfiguration.load(environment: [:], searchPaths: [directory]).provider, .anthropic)
+        XCTAssertEqual(AgentConfiguration.codingAgent(environment: [:], searchPaths: [directory]), .codex)
+        XCTAssertTrue(try String(contentsOf: file, encoding: .utf8).contains("# puck"))
+    }
+
+    /// The model field Settings now offers writes the provider-specific
+    /// variable, and clearing it falls back to the provider's default.
+    func test_writingAModelToADotEnvRoundTripsAndClears() throws {
+        let directory = try directory(withEnv: "AGENT_PROVIDER=openai\n")
+        let file = directory.appendingPathComponent(".env")
+
+        XCTAssertTrue(DotEnv.write(key: "OPENAI_MODEL", value: "gpt-4.1", to: file))
+        XCTAssertEqual(AgentConfiguration.load(environment: [:], searchPaths: [directory]).model, "gpt-4.1")
+
+        XCTAssertTrue(DotEnv.write(key: "OPENAI_MODEL", value: nil, to: file))
+        XCTAssertEqual(
+            AgentConfiguration.load(environment: [:], searchPaths: [directory]).model,
+            AgentConfiguration.defaultModel
+        )
+    }
 }
 
 /// F15 (task 4, revised task 8): `makeAgentLLMClient` is the single place
@@ -220,6 +307,11 @@ final class MakeAgentLLMClientTests: XCTestCase {
 
         let anthropic = makeAgentLLMClient({ AgentConfiguration.load(environment: ["AGENT_PROVIDER": "anthropic"], searchPaths: []) })
         XCTAssertTrue(anthropic is RoutingAgentLLMClient)
+
+        // Including the one that spawns a process rather than making an HTTP
+        // request -- constructing it must still spawn nothing.
+        let cli = makeAgentLLMClient({ AgentConfiguration.load(environment: ["AGENT_PROVIDER": "cli"], searchPaths: []) })
+        XCTAssertTrue(cli is RoutingAgentLLMClient)
     }
 
     /// No `AGENT_PROVIDER` at all resolves to `.openai` (AgentConfiguration's

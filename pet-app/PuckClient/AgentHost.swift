@@ -126,7 +126,17 @@ final class AgentHost {
             resolvePermission: { request in await askPermission?(request) ?? false }
         )
         self.runner = AgentRunner(
-            client: makeAgentLLMClient({ .load() }),
+            client: makeAgentLLMClient(
+                { .load() },
+                // Only the CLI provider reads this: its ACP session opens on
+                // the workspace's project so a CLI asked about "this file" has
+                // one to look at. Resolved per turn, not captured once -- the
+                // user switches workspaces between turns.
+                workingDirectory: { [weak self] in
+                    guard let self else { return NSHomeDirectory() }
+                    return self.resolveProjectPath(self.activeWorkspaceId) ?? NSHomeDirectory()
+                }
+            ),
             dispatcher: dispatcher,
             approve: { [weak self] _, approvalId in
                 await self?.awaitApproval(id: approvalId) ?? false
@@ -323,11 +333,15 @@ final class AgentHost {
             // provider reads, not always OpenAI's -- switching to Anthropic
             // in Settings and still being told to set OPENAI_API_KEY is the
             // exact confusion the provider picker exists to prevent.
+            // Only a provider that has a key can be missing one -- `.cli`
+            // authenticates through the CLI's own login and never reaches
+            // here, since `isConfigured` is already true for it.
+            let keyVariable = configuration.provider.apiKeyEnvironmentVariable ?? "API_KEY"
             let searched = AgentConfiguration.defaultSearchPaths
                 .map { $0.appendingPathComponent(".env").path }
                 .joined(separator: "\n")
             let message = """
-            \(configuration.provider.displayName) API 키가 없어요. 아래 중 한 곳의 .env에 \(configuration.provider.apiKeyEnvironmentVariable)=... 를 넣어주세요.
+            \(configuration.provider.displayName) API 키가 없어요. 아래 중 한 곳의 .env에 \(keyVariable)=... 를 넣어주세요.
             \(searched)
             """
             _ = broadcast(.event(.textChunk(text: message), workspaceId: workspaceId, sessionId: sessionId))

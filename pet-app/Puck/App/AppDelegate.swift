@@ -120,10 +120,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
 
     var bridgeServer: BridgeServer?
     var bridgeMessageRouter: BridgeMessageRouter?
-    /// Still used directly by voice/PTT (F7) -- the F13 client window that
-    /// used to also route through this moved out to PuckClient, its own
-    /// process, as of 2026-07-30.
-    lazy var userInputSender = UserInputSender { [weak self] in self?.bridgeServer }
 
     var hotkeyManager: GlobalHotkeyManager?
     var voiceInputController: VoiceInputController?

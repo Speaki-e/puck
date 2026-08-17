@@ -52,43 +52,33 @@ extension AppDelegate {
         hotkeyManager = manager
     }
 
-    /// Hands a command to whatever can act on it.
+    /// Hands a command to PuckClient, which hosts the agent that acts on it.
     ///
-    /// F15 (2026-07-31): that now includes PuckClient, because the agent
-    /// moved there. Mirroring to the gui used to be the text bubble's private
-    /// business -- one line in submitFromInputBubble, purely so the client
-    /// window could *display* what was typed. Every input goes there now, and
-    /// for the same reason a voice command previously reached nothing: the
-    /// only listener it had was a workspace process that does not exist.
+    /// One send, to the gui role: it is the only role there is, so the second
+    /// send this used to make (through UserInputSender, nominally addressed to
+    /// a workspace) resolved to the same connections and delivered every
+    /// quick-capture submission and voice command twice.
     private func sendUserInput(text: String, source: UserInput.Source, attachments: [Attachment] = []) {
         let message = BridgeMessage.userInput(
             UserInput(text: text, source: source, attachments: attachments.isEmpty ? nil : attachments)
         )
-        let reachedClient = bridgeServer?.send(message, to: .gui) == true
-        // Still offered to a workspace as well: if one ever attaches, the
-        // protocol 3.3 channel is still its way in, and delivering to both is
-        // harmless while only the client acts.
-        let reachedWorkspace = userInputSender.send(text: text, source: source, attachments: attachments.isEmpty ? nil : attachments) == .sent
+        guard bridgeServer?.send(message, to: .gui) != true else { return }
 
-        guard !reachedClient else { return }
         // Held rather than dropped -- PuckClient is launched alongside the
         // pet (CompanionAppLauncher) and is most likely still connecting.
         pendingClientMirror = message
-        if !reachedWorkspace {
-            // F6: tell the user why nothing happened. Re-opening the input
-            // bubble here (what this used to do) just looped — typing again
-            // reopened it again, and the input was never delivered.
-            showWorkspaceOfflineBubble()
-        }
+        // F6: tell the user why nothing happened. Re-opening the input
+        // bubble here (what this used to do) just looped — typing again
+        // reopened it again, and the input was never delivered.
+        showClientOfflineBubble()
     }
 
     /// Submitting from the quick-capture bubble should also bring up the
     /// client window showing what was typed. The bubble stays the lightweight
-    /// capture it is; what it submits goes to workspace as usual *and* is
-    /// mirrored to
-    /// PuckClient, which brings its window up showing the text. Closing
-    /// or quitting that window changes nothing here -- it's a separate
-    /// process, and the pet doesn't observe its presence.
+    /// capture it is; what it submits goes to PuckClient, which brings its
+    /// window up showing the text. Closing or quitting that window changes
+    /// nothing here -- it's a separate process, and the pet doesn't observe
+    /// its presence.
     private func submitFromInputBubble(_ text: String, attachments: [Attachment] = []) {
         // Brought up first so the window is on its way while the text is
         // delivered; sendUserInput queues it if the connection isn't up yet.
@@ -187,7 +177,7 @@ extension AppDelegate {
     /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선". What is missing is
     /// PuckClient now, not workspace -- it hosts the agent as of 2026-08-15 --
     /// so the wording names the chat window the user would actually open.
-    private func showWorkspaceOfflineBubble() {
+    private func showClientOfflineBubble() {
         showNoticeBubble("채팅 창이 꺼져 있어요", for: 2.5)
     }
 

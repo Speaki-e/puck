@@ -99,7 +99,7 @@ extension AppDelegate {
     /// 02_pet-app.md F3: agent_done(ok=true) shows its summary in a "말풍선"
     /// -- reuses TextInputBubbleView's read-only notice mode (its own doc
     /// comment already anticipated this exact use, found via spec
-    /// cross-check), same pattern as showWorkspaceOfflineBubble.
+    /// cross-check), same pattern as showClientOfflineBubble.
     private func showAgentSummaryBubble(_ summary: String) {
         // Longer than the 2.5s "workspace offline" notice -- a summary is
         // meant to actually be read, not just glanced at.

@@ -114,8 +114,7 @@ final class BridgeServer {
 
     /// Sends to just the connections playing `role`, and reports whether
     /// there were any. Used to mirror the quick-capture bubble's text into
-    /// PuckClient's chat view (2026-07-30) -- `broadcast` deliberately
-    /// no longer reaches gui connections.
+    /// PuckClient's chat view (2026-07-30).
     ///
     /// Same constraint as `currentConnections()`: never call this from
     /// `queue` (i.e. not from inside `onMessage`/`onGUIPresenceChanged`).

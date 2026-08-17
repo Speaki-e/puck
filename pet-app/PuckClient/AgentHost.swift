@@ -241,8 +241,8 @@ final class AgentHost {
         )
     }
 
-    /// The chat's 중지 button. Reaches the ACP agent through session/cancel
-    /// rather than a run_cancel on the socket, now that the agent is ours.
+    /// The chat's 중지 button. Reaches the ACP agent through session/cancel,
+    /// in-process, now that the agent is ours.
     func cancelActiveCodeEditor() {
         lock.lock()
         let requestId = activeCodeEditorRequestId
@@ -372,7 +372,6 @@ final class AgentHost {
         // it just carries on to the next tool call.
         activeRun.cancel()
         failPendingApprovals()
-        _ = broadcast(.runCancel(sessionId: activeSessionId))
         cancelActiveCodeEditor()
     }
 

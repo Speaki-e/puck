@@ -274,28 +274,16 @@ final class ClientWindowStore: ObservableObject {
         return true
     }
 
-    @discardableResult
-    func respondToPendingApproval(in session: ChatSession, approved: Bool) -> UserInputDelivery? {
-        guard let approvalId = session.pendingApproval?.approvalId else { return nil }
-        if let onApprovalResolved {
-            onApprovalResolved(approvalId, approved)
-            session.resolveApproval(approvalId: approvalId)
-            return .sent
-        }
-        let delivery = sender.respondToApproval(approvalId: approvalId, approved: approved)
-        // Only dequeued once the answer is actually on its way: an undelivered
-        // answer leaves the request waiting, and the user has to be able to
-        // press the button again rather than face the next one in line.
-        if delivery == .sent { session.resolveApproval(approvalId: approvalId) }
-        return delivery
+    /// Answers the oldest queued approval. The answer never leaves this
+    /// process -- the agent waiting on it is `onRunCancelled`'s AgentHost,
+    /// right here -- so the request is always dequeued.
+    func respondToPendingApproval(in session: ChatSession, approved: Bool) {
+        guard let approvalId = session.pendingApproval?.approvalId else { return }
+        onApprovalResolved?(approvalId, approved)
+        session.resolveApproval(approvalId: approvalId)
     }
 
-    @discardableResult
-    func cancelActiveRun() -> UserInputDelivery {
-        if let onRunCancelled {
-            onRunCancelled()
-            return .sent
-        }
-        return sender.cancelRun(sessionId: activeSessionId)
+    func cancelActiveRun() {
+        onRunCancelled?()
     }
 }

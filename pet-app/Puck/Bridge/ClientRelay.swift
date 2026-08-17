@@ -12,9 +12,8 @@
 
 enum ClientRelay {
     /// - Returns: the role a message should be relayed to, or nil for
-    ///   messages BridgeMessageRouter already handles locally (tool_dispatch/
-    ///   tool_cancel/tool_result never cross the gui/workspace boundary) or
-    ///   that are connection-lifecycle only (client_hello).
+    ///   messages BridgeMessageRouter already handles locally or that are
+    ///   connection-lifecycle only (client_hello).
     static func targetRole(for message: BridgeMessage) -> ClientRole? {
         switch message {
         // user_input now goes to gui, not workspace (2026-08-15). It carries
@@ -30,11 +29,9 @@ enum ClientRelay {
         // - workspace_create_request/session_create_request: answered from the
         //   in-process WorkspaceRegistry (BridgeMessageRouter). Relaying them
         //   as well would mint a competing workspace id for one click.
-        // - approval_response/run_cancel: PuckClient resolves both against its
-        //   own AgentHost without the socket (ClientWindowStore's
-        //   onApprovalResolved/onRunCancelled).
+        // - tool_dispatch/tool_cancel/tool_result: pet-app is one end of each
+        //   of those exchanges itself, so there is nobody to forward them to.
         case .workspaceCreateRequest, .sessionCreateRequest,
-             .approvalResponse, .runCancel,
              .clientHello, .toolDispatch, .toolCancel, .toolResult:
             return nil
         }

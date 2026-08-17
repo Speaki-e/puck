@@ -36,9 +36,6 @@ final class ClientRelayTests: XCTestCase {
         // relaying them as well would mint a competing workspace id per click.
         XCTAssertNil(ClientRelay.targetRole(for: .workspaceCreateRequest(name: "cat house", projectPath: nil)))
         XCTAssertNil(ClientRelay.targetRole(for: .sessionCreateRequest(workspaceId: "w1", title: "new chat")))
-        // Resolved against PuckClient's own AgentHost without the socket.
-        XCTAssertNil(ClientRelay.targetRole(for: .approvalResponse(approvalId: "a1", approved: true)))
-        XCTAssertNil(ClientRelay.targetRole(for: .runCancel(sessionId: "s1")))
         // Connection lifecycle and tool dispatch, as before.
         XCTAssertNil(ClientRelay.targetRole(for: .clientHello(role: .gui)))
         XCTAssertNil(ClientRelay.targetRole(for: .toolDispatch(ToolDispatch(id: "t1", tool: "launch_app", args: .object([:])))))

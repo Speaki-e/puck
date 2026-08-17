@@ -81,20 +81,6 @@ final class UserInputSender {
         broadcast(.sessionCreateRequest(workspaceId: workspaceId, title: title))
     }
 
-    /// F13 (2026-07-29, protocol 3.6): resolve a pending await_approval from
-    /// the chat view's allow/deny buttons.
-    @discardableResult
-    func respondToApproval(approvalId: String, approved: Bool) -> UserInputDelivery {
-        broadcast(.approvalResponse(approvalId: approvalId, approved: approved))
-    }
-
-    /// F13 (2026-07-29, protocol 3.6): the chat view's stop button -- aborts
-    /// the whole conversation turn, not a single tool (see ToolCancel for that).
-    @discardableResult
-    func cancelRun(sessionId: String) -> UserInputDelivery {
-        broadcast(.runCancel(sessionId: sessionId))
-    }
-
     private func broadcast(_ message: BridgeMessage) -> UserInputDelivery {
         guard let transport = transport(), transport.hasConnectedClients else {
             return .notDelivered

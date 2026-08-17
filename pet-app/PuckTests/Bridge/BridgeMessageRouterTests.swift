@@ -165,8 +165,6 @@ final class BridgeMessageRouterTests: XCTestCase {
         router.handle(.toolResult(ToolResult(id: "t1", ok: true, data: nil, error: nil)), reply: { _ in XCTFail("should not reply") })
         router.handle(.workspaceCreateRequest(name: "x", projectPath: nil), reply: { _ in XCTFail("should not reply") })
         router.handle(.sessionCreateRequest(workspaceId: "w1", title: "x"), reply: { _ in XCTFail("should not reply") })
-        router.handle(.approvalResponse(approvalId: "a1", approved: true), reply: { _ in XCTFail("should not reply") })
-        router.handle(.runCancel(sessionId: "s2"), reply: { _ in XCTFail("should not reply") })
 
         // Give any (incorrect) async hop a chance to run before the test ends.
         let settled = expectation(description: "settled")

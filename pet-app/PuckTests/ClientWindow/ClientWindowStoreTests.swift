@@ -308,38 +308,37 @@ final class ClientWindowStoreTests: XCTestCase {
     /// the UI can no longer produce an answer for leaves the agent blocked on
     /// it for the whole tool timeout.
     func test_respondToPendingApproval_answersEveryQueuedRequestInTurn() {
-        let (store, transport) = makeStore()
+        let (store, _) = makeStore()
+        var answered: [(String, Bool)] = []
+        store.onApprovalResolved = { approvalId, approved in answered.append((approvalId, approved)) }
         store.handleChatEvent(.awaitApproval(summary: "A", approvalId: "a1"), workspaceId: "default", sessionId: "default")
         store.handleChatEvent(.awaitApproval(summary: "B", approvalId: "a2"), workspaceId: "default", sessionId: "default")
         guard let session = store.session(workspaceId: "default", sessionId: "default") else {
             return XCTFail("the default session is seeded at init")
         }
 
-        XCTAssertEqual(store.respondToPendingApproval(in: session, approved: true), .sent)
-        XCTAssertEqual(store.respondToPendingApproval(in: session, approved: false), .sent)
+        store.respondToPendingApproval(in: session, approved: true)
+        store.respondToPendingApproval(in: session, approved: false)
 
-        let answered: [(String, Bool)] = transport.broadcasted.compactMap {
-            if case .approvalResponse(let approvalId, let approved) = $0 { return (approvalId, approved) }
-            return nil
-        }
         XCTAssertEqual(answered.map(\.0), ["a1", "a2"])
         XCTAssertEqual(answered.map(\.1), [true, false])
         XCTAssertTrue(session.pendingApprovals.isEmpty)
     }
 
-    /// An answer nobody received must not consume the request -- the user has
-    /// to be able to press the button again once the agent reconnects.
-    func test_respondToPendingApproval_undelivered_keepsTheRequestPending() {
-        let (store, transport) = makeStore()
-        store.handleChatEvent(.awaitApproval(summary: "A", approvalId: "a1"), workspaceId: "default", sessionId: "default")
+    /// Nothing queued is not an error, and must not answer the *next* request
+    /// to arrive -- the buttons are still on screen for a moment after the
+    /// last one is resolved.
+    func test_respondToPendingApproval_withNothingQueued_answersNothing() {
+        let (store, _) = makeStore()
+        var answered = 0
+        store.onApprovalResolved = { _, _ in answered += 1 }
         guard let session = store.session(workspaceId: "default", sessionId: "default") else {
             return XCTFail("the default session is seeded at init")
         }
-        transport.hasConnectedClients = false
 
-        XCTAssertEqual(store.respondToPendingApproval(in: session, approved: true), .notDelivered)
+        store.respondToPendingApproval(in: session, approved: true)
 
-        XCTAssertEqual(session.pendingApprovals.map(\.approvalId), ["a1"])
+        XCTAssertEqual(answered, 0)
     }
 
     func test_themeStyle_defaultsToDark_untilExternallySet() {

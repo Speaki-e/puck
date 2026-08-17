@@ -242,24 +242,12 @@ final class BridgeMessageCodableTests: XCTestCase {
         XCTAssertThrowsError(try decoder.decode(BridgeMessage.self, from: Data(json.utf8)))
     }
 
-    // MARK: - approval response / run cancel (pet-app -> workspace, 2026-07-29)
-
-    func test_encodesApprovalResponse_roundTrips() throws {
-        let original = BridgeMessage.approvalResponse(approvalId: "a1", approved: true)
-
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(BridgeMessage.self, from: data)
-
-        XCTAssertEqual(decoded, original)
-    }
-
-    func test_encodesRunCancel_roundTrips() throws {
-        let original = BridgeMessage.runCancel(sessionId: "s2")
-
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(BridgeMessage.self, from: data)
-
-        XCTAssertEqual(decoded, original)
+    /// Both were pet-app -> workspace only, and nothing consumed them once
+    /// workspace was deleted; an old client still sending one must be
+    /// rejected rather than silently accepted.
+    func test_rejectsTheDeletedApprovalResponseAndRunCancel() {
+        XCTAssertThrowsError(try decoder.decode(BridgeMessage.self, from: Data(#"{"type":"approval_response","approval_id":"a1","approved":true}"#.utf8)))
+        XCTAssertThrowsError(try decoder.decode(BridgeMessage.self, from: Data(#"{"type":"run_cancel","session_id":"s2"}"#.utf8)))
     }
 
     // MARK: - Error handling

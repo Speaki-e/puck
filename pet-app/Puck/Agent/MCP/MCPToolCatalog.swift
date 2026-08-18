@@ -25,7 +25,12 @@ enum MCPToolCatalog {
     /// code_editor would hand the task to, so exposing it hands the agent back
     /// to itself -- a second vendor process spawned inside the turn of the
     /// first, with the same tool available again at the bottom.
-    static let excludedToolNames: Set<String> = ["code_editor"]
+    ///
+    /// `open_task_session` goes with it: its description tells the model to
+    /// "call code_editor on the next turn", which on this provider is a tool
+    /// that isn't there. Offering a handoff whose second half is missing is
+    /// worse than not offering it -- the CLI does the editing itself here.
+    static let excludedToolNames: Set<String> = ["code_editor", "open_task_session"]
 
     /// The `tools/list` payload.
     static func definitions(for specs: [GPTToolSpec]) -> [JSONValue] {

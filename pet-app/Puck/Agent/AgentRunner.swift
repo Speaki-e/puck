@@ -349,23 +349,87 @@ final class AgentRunner {
             return
         }
 
-        emit(.toolCall(id: call.id, tool: call.name, args: arguments, detail: nil))
-        logger?.log(.agentToolCall(id: call.id, tool: call.name, args: arguments))
+        let result = await invokeTool(
+            name: call.name,
+            arguments: arguments,
+            argumentsText: call.argumentsJSON,
+            callId: call.id
+        )
+        messages.append(.tool(
+            callId: call.id,
+            content: Self.toolResultText(ok: result.ok, data: result.data, error: result.error, detail: result.detail)
+        ))
+    }
 
-        if ToolRegistry.tool(named: call.name)?.requiresApproval == true {
-            let summary = Self.approvalSummary(tool: call.name, arguments: call.argumentsJSON)
-            emit(.awaitApproval(summary: summary, approvalId: call.id))
-            guard await approve(summary, call.id) else {
+    /// Runs one tool the way a turn's own tool call is run: the approval gate,
+    /// the three execution routes, and the tool_call/tool_result events the
+    /// transcript and the pet react to. Returns the raw result and never
+    /// touches `messages`.
+    ///
+    /// Internal, and the reason `perform` is now a thin wrapper: the coding
+    /// CLI calls Puck's tools out of band, over the MCP server it is handed
+    /// (PuckMCPServer), and its calls have to behave identically to the
+    /// model's own -- same approval, same routes, same events. It keeps its
+    /// own conversation inside the CLI, so nothing here may append to this
+    /// one's `messages`; `perform` does that for the calls that belong to it.
+    ///
+    /// `argumentsText` is what the approval prompt shows. The model's own
+    /// call passes the JSON it emitted verbatim; a caller that has only a
+    /// parsed value can leave it out and get the re-encoded form.
+    func invokeTool(
+        name: String,
+        arguments: JSONValue,
+        argumentsText: String? = nil,
+        callId: String = UUID().uuidString
+    ) async -> DispatchedToolResult {
+        // Never crosses the socket and never shows up as a tool call, for the
+        // reason `perform` gives -- which is also why `perform` intercepts it
+        // before reaching here, to keep its own wording in the transcript.
+        if name == Self.openTaskSessionToolName, let openTaskSession {
+            guard
+                case .object(let args) = arguments,
+                case .string(let title)? = args["title"], !title.isEmpty
+            else {
+                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "title이 비어 있어요.")
+            }
+            let brief = if case .string(let value)? = args["brief"] { value } else { "" }
+            openTaskSession(title, brief)
+            return DispatchedToolResult(
+                ok: true,
+                data: .object(["message": .string("새 작업 세션 \"\(title)\"으로 옮겼습니다.")]),
+                error: nil,
+                detail: nil
+            )
+        }
+
+        emit(.toolCall(id: callId, tool: name, args: arguments, detail: nil))
+        logger?.log(.agentToolCall(id: callId, tool: name, args: arguments))
+
+        if ToolRegistry.tool(named: name)?.requiresApproval == true {
+            let summary = Self.approvalSummary(
+                tool: name,
+                arguments: argumentsText ?? arguments.jsonText ?? ""
+            )
+            emit(.awaitApproval(summary: summary, approvalId: callId))
+            guard await approve(summary, callId) else {
                 // Refusal is the model's to hear about, not an error to abort
                 // on -- it should say so and offer something else. The code
                 // never crosses the socket (docs/socket.md).
-                report(callId: call.id, ok: false, error: "denied_by_user", detail: nil, data: nil)
-                return
+                let denied = DispatchedToolResult(ok: false, data: nil, error: "denied_by_user", detail: nil)
+                reportEvents(callId: callId, result: denied)
+                return denied
             }
         }
 
-        let result: DispatchedToolResult
-        if call.name == Self.codeEditorToolName, let delegateCodeEditor {
+        let result = await route(name: name, arguments: arguments)
+        reportEvents(callId: callId, result: result)
+        return result
+    }
+
+    /// Which of the three execution paths a tool takes: a delegate the host
+    /// supplied, or PetToolDispatcher's tool_dispatch over bridge.sock.
+    private func route(name: String, arguments: JSONValue) async -> DispatchedToolResult {
+        if name == Self.codeEditorToolName, let delegateCodeEditor {
             // workspace's tool, so it never goes to PetToolDispatcher (which
             // would put a tool_dispatch pet-app can't execute on the socket).
             // project_path is deliberately dropped: workspace resolves the
@@ -373,53 +437,57 @@ final class AgentRunner {
             // the model sends, so passing it on would only invite the model
             // to think it decides.
             guard case .object(let args) = arguments, case .string(let task)? = args["task"], !task.isEmpty else {
-                report(callId: call.id, ok: false, error: "execution_failed", detail: "task가 비어 있어요.", data: nil)
-                return
+                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "task가 비어 있어요.")
             }
-            result = await delegateCodeEditor(task)
-        } else if call.name == Self.readFileToolName, let delegateReadFile {
+            return await delegateCodeEditor(task)
+        }
+        if name == Self.readFileToolName, let delegateReadFile {
             guard let path = Self.pathArgument(from: arguments) else {
-                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil)
-                return
+                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "path가 비어 있어요.")
             }
-            result = await delegateReadFile(path)
-        } else if call.name == Self.openInEditorToolName, let delegateOpenInEditor {
+            return await delegateReadFile(path)
+        }
+        if name == Self.openInEditorToolName, let delegateOpenInEditor {
             guard let path = Self.pathArgument(from: arguments) else {
-                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil)
-                return
+                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "path가 비어 있어요.")
             }
-            result = await delegateOpenInEditor(path)
-        } else if call.name == Self.listFilesToolName, let delegateListFiles {
+            return await delegateOpenInEditor(path)
+        }
+        if name == Self.listFilesToolName, let delegateListFiles {
             // No arguments to validate: which project is a property of the
             // run, not something the model picks.
-            result = await delegateListFiles()
-        } else {
-            result = await dispatcher.execute(tool: call.name, arguments: arguments)
+            return await delegateListFiles()
         }
-        report(callId: call.id, ok: result.ok, error: result.error, detail: result.detail, data: result.data)
+        return await dispatcher.execute(tool: name, arguments: arguments)
     }
 
-    /// One place for "tell the model, tell the UI, tell the pet" so a tool
-    /// result can never reach one of the three and not the others.
-    private func report(callId: String, ok: Bool, error: String?, detail: String?, data: JSONValue?) {
+    /// The UI and the log halves of a tool result -- everything `report` does
+    /// except appending to this conversation, which a call made through the
+    /// MCP server has no business doing.
+    private func reportEvents(callId: String, result: DispatchedToolResult) {
         // error is the model-facing vocabulary (may be "denied_by_user", which
         // never crosses the socket -- see ToolErrorCode's doc comment), so the
         // wire event only carries it when it's actually one of the closed
         // protocol codes.
-        emit(.toolResult(id: callId, ok: ok, data: data, error: error.flatMap(ToolErrorCode.init(rawValue:)), detail: detail))
+        emit(.toolResult(
+            id: callId,
+            ok: result.ok,
+            data: result.data,
+            error: result.error.flatMap(ToolErrorCode.init(rawValue:)),
+            detail: result.detail
+        ))
         // detail rides along in the error field when there is one: the code
         // alone ("execution_failed") is never enough to act on, and this line
         // is the only place the reason survives after the chat scrolls away.
-        let reason = [error, detail].compactMap { $0 }.joined(separator: " -- ")
-        logger?.log(.agentToolResult(id: callId, ok: ok, error: reason.isEmpty ? nil : reason))
-        messages.append(.tool(callId: callId, content: Self.toolResultText(ok: ok, data: data, error: error, detail: detail)))
+        let reason = [result.error, result.detail].compactMap { $0 }.joined(separator: " -- ")
+        logger?.log(.agentToolResult(id: callId, ok: result.ok, error: reason.isEmpty ? nil : reason))
     }
 
     /// What the model actually reads back. Errors keep their protocol code so
     /// the model can distinguish "not connected" from "you asked for a tool
     /// that doesn't exist" and say something useful about it
     /// (plan/04_ai-module.md 3.2).
-    private static func toolResultText(ok: Bool, data: JSONValue?, error: String?, detail: String?) -> String {
+    static func toolResultText(ok: Bool, data: JSONValue?, error: String?, detail: String?) -> String {
         if ok {
             guard let data, let encoded = data.jsonText else { return "ok" }
             return encoded

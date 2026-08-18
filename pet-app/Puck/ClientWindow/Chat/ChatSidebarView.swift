@@ -28,7 +28,9 @@ struct ChatSidebarView: View {
                             .tag(SessionSelection(workspaceId: workspace.id, sessionId: session.id))
                     }
                 } header: {
-                    WorkspaceHeader(workspace: workspace)
+                    WorkspaceHeader(workspace: workspace) {
+                        store.requestNewSession(title: ChatSession.placeholderTitle, in: workspace.id)
+                    }
                 }
             }
         }
@@ -78,8 +80,27 @@ struct SessionSelection: Hashable {
 
 private struct WorkspaceHeader: View {
     let workspace: ClientWorkspace
+    let onNewSession: () -> Void
 
     var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            name
+            Spacer(minLength: 4)
+            // In the header rather than one button in the bottom bar: the
+            // sidebar lists every workspace at once, so a single "새 대화"
+            // would have to mean "in whichever one is selected" -- and the
+            // one you want a chat in is not always the one you are looking
+            // at. Per header, the button names its own workspace.
+            Button(action: onNewSession) {
+                Image(systemName: "square.and.pencil")
+            }
+            .buttonStyle(.borderless)
+            .help("\(workspace.name)에 새 대화")
+            .accessibilityLabel("새 대화")
+        }
+    }
+
+    private var name: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(workspace.name)
             if let projectPath = workspace.projectPath {

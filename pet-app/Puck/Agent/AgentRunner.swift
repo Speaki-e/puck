@@ -58,7 +58,12 @@ typealias AgentFileListing = () async -> DispatchedToolResult
 
 /// Branches the casual conversation into its own task session; everything the
 /// run emits after this is addressed to the new one.
-typealias AgentTaskSessionOpener = (_ title: String, _ brief: String) -> Void
+///
+/// - Returns: the id of the session it opened. The runner needs it to move the
+///   conversation across: a task session is a continuation, and an agent that
+///   arrives in it having forgotten what it was asked to do is worse than one
+///   that never branched.
+typealias AgentTaskSessionOpener = (_ title: String, _ brief: String) -> String
 
 final class AgentRunner {
     private let client: any AgentLLMClient
@@ -87,9 +92,54 @@ final class AgentRunner {
     private let logger: ToolExecutionLogging?
     private let toolSpecs: [GPTToolSpec]
 
-    /// Conversation memory for the session. Per plan/04_ai-module.md 3.4 this
-    /// is in-memory only -- persistence is explicitly後순위.
-    private var messages: [GPTMessage] = []
+    /// Conversation memory, one stack per chat. Per plan/04_ai-module.md 3.4
+    /// this is in-memory only -- persistence is explicitly後순위.
+    ///
+    /// Was a single stack shared by every chat this app ever opened, because
+    /// there is one AgentRunner for the whole process and nothing ever cleared
+    /// it. A new chat therefore started with the previous one's conversation
+    /// already in it: asked about a project, the model repeated an earlier
+    /// chat's "No project folder is bound to it, so there are no files to read
+    /// or list" -- a line that had been true of a different workspace.
+    private var conversations: [String: [GPTMessage]] = [:]
+
+    /// Which chat the next `run` belongs to. Set by the host before each run,
+    /// like `workspaceContext`; the default keeps every existing call site and
+    /// test working as a single conversation.
+    var sessionId: String = "default"
+
+    /// A chat's stack, seeded on first read.
+    ///
+    /// Every write below names its chat rather than reading `sessionId` at the
+    /// time of the write. `sessionId` belongs to whichever run started most
+    /// recently, and a run that is being replaced keeps executing until it
+    /// notices -- reading it late is how a dying run's last answer would land
+    /// in the chat that replaced it.
+    private func conversation(_ key: String) -> [GPTMessage] {
+        conversations[key] ?? [.system(Self.systemPrompt)]
+    }
+
+    private func append(_ message: GPTMessage, to key: String) {
+        var stack = conversation(key)
+        stack.append(message)
+        conversations[key] = stack
+    }
+
+    /// Gives `to` the conversation `from` has, for the one case where a new
+    /// chat is a continuation rather than a beginning: the agent branching its
+    /// work into a task session (openTaskSession).
+    func carryConversation(from sourceSessionId: String, to sessionId: String) {
+        guard let source = conversations[sourceSessionId] else { return }
+        conversations[sessionId] = source
+        announcedWorkspaceContexts[sessionId] = announcedWorkspaceContexts[sourceSessionId]
+    }
+
+    /// Drops a deleted chat's conversation. The user threw it away; the model
+    /// should not still be holding it.
+    func forgetSession(_ sessionId: String) {
+        conversations.removeValue(forKey: sessionId)
+        announcedWorkspaceContexts.removeValue(forKey: sessionId)
+    }
 
     /// A model that keeps calling tools without concluding would otherwise
     /// loop until the API bill says stop. Ten is well past any sequence the
@@ -124,14 +174,14 @@ final class AgentRunner {
             + (delegateReadFile == nil ? [] : [Self.readFileSpec])
             + (delegateOpenInEditor == nil ? [] : [Self.openInEditorSpec])
             + (delegateListFiles == nil ? [] : [Self.listFilesSpec])
-        messages = [.system(Self.systemPrompt)]
     }
 
-    /// Drops everything but the system prompt -- a new chat session should not
-    /// inherit the last one's context.
+    /// Forgets every chat. Nothing in the app calls this -- chats are kept
+    /// apart by `sessionId` and dropped by `forgetSession` -- but it stays as
+    /// the way to hand the runner a clean slate.
     func reset() {
-        messages = [.system(Self.systemPrompt)]
-        announcedWorkspaceContext = nil
+        conversations.removeAll()
+        announcedWorkspaceContexts.removeAll()
     }
 
     /// Describes the workspace this run belongs to. Injected per run rather
@@ -162,9 +212,16 @@ final class AgentRunner {
     /// parameter so the many existing call sites and tests stay untouched.
     var workspaceContext: WorkspaceContext?
 
-    /// What was last announced to the model, so a ten-turn conversation in one
-    /// workspace does not accumulate ten identical system lines.
-    private var announcedWorkspaceContext: WorkspaceContext?
+    /// What was last announced to each chat, so a ten-turn conversation in one
+    /// workspace does not accumulate ten identical system lines -- and so a
+    /// chat opened later under a different workspace still hears about its
+    /// own, which a single shared value did not do.
+    private var announcedWorkspaceContexts: [String: WorkspaceContext] = [:]
+
+    private var announcedWorkspaceContext: WorkspaceContext? {
+        get { announcedWorkspaceContexts[sessionId] }
+        set { announcedWorkspaceContexts[sessionId] = newValue }
+    }
 
     /// What the transcript ends with when the user presses 중지. Not an error
     /// string: a stop the user asked for is an outcome, not a failure, so it
@@ -172,21 +229,24 @@ final class AgentRunner {
     static let cancelledSummary = "중지했어요."
 
     func run(command: String) async {
-        if let workspaceContext, workspaceContext != announcedWorkspaceContext {
-            messages.append(.system(workspaceContext.promptLine))
-            announcedWorkspaceContext = workspaceContext
+        // Captured once. Everything this run writes goes here even if a newer
+        // run has already pointed `sessionId` somewhere else.
+        var key = sessionId
+        if let workspaceContext, workspaceContext != announcedWorkspaceContexts[key] {
+            append(.system(workspaceContext.promptLine), to: key)
+            announcedWorkspaceContexts[key] = workspaceContext
         }
-        messages.append(.user(command))
+        append(.user(command), to: key)
         emit(.agentThinking)
 
         for _ in 0..<Self.maxTurns {
             if Task.isCancelled {
-                emitCancelled()
+                emitCancelled(from: key)
                 return
             }
             let turn: GPTTurn
             do {
-                turn = try await client.send(messages: messages, tools: toolSpecs)
+                turn = try await client.send(messages: conversation(key), tools: toolSpecs)
             } catch {
                 // Checked before the error is described: a cancelled
                 // `URLSession.data(for:)` surfaces as URLError(.cancelled)
@@ -194,12 +254,21 @@ final class AgentRunner {
                 // "요청이 취소되었습니다" would make the 중지 button look like a
                 // network failure.
                 if Task.isCancelled {
-                    emitCancelled()
+                    emitCancelled(from: key)
                     return
                 }
                 let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 emit(.textChunk(text: reason))
                 emit(.agentDone(ok: false, summary: reason))
+                return
+            }
+
+            // Re-checked here, not only at the top of the loop: `send` is where
+            // a run spends nearly all its time, so a replacement almost always
+            // arrives while one is in flight. Without this the answer to a
+            // command the user has already moved on from is emitted anyway.
+            if Task.isCancelled {
+                emitCancelled(from: key)
                 return
             }
 
@@ -210,21 +279,21 @@ final class AgentRunner {
             guard !turn.toolCalls.isEmpty else {
                 // No tools asked for: the model is answering, so the run ends
                 // here. Its own text is the summary.
-                messages.append(.assistant(text: turn.text, toolCalls: []))
+                append(.assistant(text: turn.text, toolCalls: []), to: key)
                 emit(.agentDone(ok: true, summary: turn.text ?? ""))
                 return
             }
 
-            messages.append(.assistant(text: turn.text, toolCalls: turn.toolCalls))
+            append(.assistant(text: turn.text, toolCalls: turn.toolCalls), to: key)
             for call in turn.toolCalls {
                 // Between calls, not only between turns: a turn can ask for
                 // several tools, and a stop pressed during the first one
                 // should not still run the rest.
                 if Task.isCancelled {
-                    emitCancelled()
+                    emitCancelled(from: key)
                     return
                 }
-                await perform(call)
+                if let opened = await perform(call, in: key) { key = opened }
             }
         }
 
@@ -238,12 +307,21 @@ final class AgentRunner {
     /// a spinner forever; `ok: false` because the turn did not finish what it
     /// was asked, and EventRouter deliberately gives a failed run no reaction
     /// (a "task_success" jump for a stop would be worse than none).
-    private func emitCancelled() {
+    /// Silent when the run being cancelled is no longer the chat's current one.
+    /// Events are addressed to whatever chat is active by the time they are
+    /// emitted, so a run superseded by a command in *another* chat would
+    /// otherwise announce "중지했어요" there -- in a conversation the user never
+    /// stopped. A stop pressed in the chat itself still says so.
+    private func emitCancelled(from key: String) {
+        guard key == sessionId else { return }
         emit(.textChunk(text: Self.cancelledSummary))
         emit(.agentDone(ok: false, summary: Self.cancelledSummary))
     }
 
-    private func perform(_ call: GPTToolCall) async {
+    /// - Returns: the task session this call opened, if it opened one -- the
+    ///   rest of the run belongs to it.
+    @discardableResult
+    private func perform(_ call: GPTToolCall, in key: String) async -> String? {
         let arguments = JSONValue.decodeObject(from: call.argumentsJSON)
 
         // The one tool that never crosses the socket and never shows up as a
@@ -257,13 +335,16 @@ final class AgentRunner {
                 case .object(let args) = arguments,
                 case .string(let title)? = args["title"], !title.isEmpty
             else {
-                messages.append(.tool(callId: call.id, content: "error: execution_failed -- title이 비어 있어요."))
-                return
+                append(.tool(callId: call.id, content: "error: execution_failed -- title이 비어 있어요."), to: key)
+                return nil
             }
             let brief = if case .string(let value)? = args["brief"] { value } else { "" }
-            openTaskSession(title, brief)
-            messages.append(.tool(callId: call.id, content: "ok -- 새 작업 세션 \"\(title)\"으로 옮겼습니다."))
-            return
+            let opened = openTaskSession(title, brief)
+            // The branch carries the conversation with it, so the agent lands
+            // in the session it just opened still knowing the task.
+            carryConversation(from: key, to: opened)
+            append(.tool(callId: call.id, content: "ok -- 새 작업 세션 \"\(title)\"으로 옮겼습니다."), to: opened)
+            return opened
         }
 
         emit(.toolCall(id: call.id, tool: call.name, args: arguments, detail: nil))
@@ -276,8 +357,8 @@ final class AgentRunner {
                 // Refusal is the model's to hear about, not an error to abort
                 // on -- it should say so and offer something else. The code
                 // never crosses the socket (docs/socket.md).
-                report(callId: call.id, ok: false, error: "denied_by_user", detail: nil, data: nil)
-                return
+                report(callId: call.id, ok: false, error: "denied_by_user", detail: nil, data: nil, in: key)
+                return nil
             }
         }
 
@@ -290,20 +371,20 @@ final class AgentRunner {
             // the model sends, so passing it on would only invite the model
             // to think it decides.
             guard case .object(let args) = arguments, case .string(let task)? = args["task"], !task.isEmpty else {
-                report(callId: call.id, ok: false, error: "execution_failed", detail: "task가 비어 있어요.", data: nil)
-                return
+                report(callId: call.id, ok: false, error: "execution_failed", detail: "task가 비어 있어요.", data: nil, in: key)
+                return nil
             }
             result = await delegateCodeEditor(task)
         } else if call.name == Self.readFileToolName, let delegateReadFile {
             guard let path = Self.pathArgument(from: arguments) else {
-                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil)
-                return
+                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil, in: key)
+                return nil
             }
             result = await delegateReadFile(path)
         } else if call.name == Self.openInEditorToolName, let delegateOpenInEditor {
             guard let path = Self.pathArgument(from: arguments) else {
-                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil)
-                return
+                report(callId: call.id, ok: false, error: "execution_failed", detail: "path가 비어 있어요.", data: nil, in: key)
+                return nil
             }
             result = await delegateOpenInEditor(path)
         } else if call.name == Self.listFilesToolName, let delegateListFiles {
@@ -313,12 +394,13 @@ final class AgentRunner {
         } else {
             result = await dispatcher.execute(tool: call.name, arguments: arguments)
         }
-        report(callId: call.id, ok: result.ok, error: result.error, detail: result.detail, data: result.data)
+        report(callId: call.id, ok: result.ok, error: result.error, detail: result.detail, data: result.data, in: key)
+        return nil
     }
 
     /// One place for "tell the model, tell the UI, tell the pet" so a tool
     /// result can never reach one of the three and not the others.
-    private func report(callId: String, ok: Bool, error: String?, detail: String?, data: JSONValue?) {
+    private func report(callId: String, ok: Bool, error: String?, detail: String?, data: JSONValue?, in key: String) {
         // error is the model-facing vocabulary (may be "denied_by_user", which
         // never crosses the socket -- see ToolErrorCode's doc comment), so the
         // wire event only carries it when it's actually one of the closed
@@ -329,7 +411,7 @@ final class AgentRunner {
         // is the only place the reason survives after the chat scrolls away.
         let reason = [error, detail].compactMap { $0 }.joined(separator: " -- ")
         logger?.log(.agentToolResult(id: callId, ok: ok, error: reason.isEmpty ? nil : reason))
-        messages.append(.tool(callId: callId, content: Self.toolResultText(ok: ok, data: data, error: error, detail: detail)))
+        append(.tool(callId: callId, content: Self.toolResultText(ok: ok, data: data, error: error, detail: detail)), to: key)
     }
 
     /// What the model actually reads back. Errors keep their protocol code so

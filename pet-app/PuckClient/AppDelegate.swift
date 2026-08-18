@@ -65,6 +65,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clientWindowStore.onApprovalResolved = { [weak self] approvalId, approved in
             self?.agentHost.resolveApproval(id: approvalId, approved: approved)
         }
+        clientWindowStore.onSessionDeleted = { [weak self] _, sessionId in
+            self?.agentHost.forgetSession(sessionId)
+        }
         clientWindowStore.onRunCancelled = { [weak self] in
             self?.agentHost.cancelPendingApprovals()
         }

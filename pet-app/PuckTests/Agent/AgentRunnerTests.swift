@@ -306,4 +306,164 @@ final class AgentRunnerTests: XCTestCase {
     func test_pathArgument_nilWhenArgumentsAreNotAnObject() {
         XCTAssertNil(AgentRunner.pathArgument(from: .string("not an object")))
     }
+
+    // MARK: - invokeTool (the entry the coding CLI's MCP server lands on)
+
+    /// Records what the runner was last asked to send, so a test can prove
+    /// what did -- and did not -- get into the conversation.
+    private final class RecordingLLMClient: AgentLLMClient {
+        private(set) var lastMessages: [GPTMessage] = []
+
+        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+            lastMessages = messages
+            return GPTTurn(text: "done", toolCalls: [])
+        }
+    }
+
+    private func makeRunner(
+        client: any AgentLLMClient = RecordingLLMClient(),
+        dispatched: UncheckedBox<[BridgeMessage]>? = nil,
+        approve: @escaping AgentApprovalGate = { _, _ in false },
+        emit: @escaping AgentEventSink = { _ in },
+        delegateReadFile: AgentFileDelegation? = nil
+    ) -> AgentRunner {
+        AgentRunner(
+            client: client,
+            dispatcher: PetToolDispatcher(send: { message in
+                dispatched?.value.append(message)
+                // False on purpose: the tool answers immediately with
+                // pet_app_disconnected instead of waiting out a reply nobody
+                // is going to send.
+                return false
+            }),
+            approve: approve,
+            emit: emit,
+            delegateReadFile: delegateReadFile
+        )
+    }
+
+    /// The pet reacts to tool_call/tool_result, and the transcript is built
+    /// from them. A call the CLI made through MCP has to produce the same pair
+    /// as one the model made directly, or the pet stands still while work
+    /// happens.
+    func test_invokeTool_emitsTheSameToolCallAndResultPairAModelsOwnCallDoes() async {
+        let events = UncheckedBox([BridgeEvent]())
+        let runner = makeRunner(emit: { events.value.append($0) })
+
+        _ = await runner.invokeTool(
+            name: "launch_app",
+            arguments: .object(["app_name": .string("Weather")]),
+            callId: "c-1"
+        )
+
+        XCTAssertTrue(events.value.contains(
+            .toolCall(id: "c-1", tool: "launch_app", args: .object(["app_name": .string("Weather")]), detail: nil)
+        ))
+        XCTAssertTrue(events.value.contains { event in
+            if case .toolResult(let id, _, _, _, _) = event { return id == "c-1" }
+            return false
+        })
+    }
+
+    /// The failure mode this must never have: an approval-requiring tool that
+    /// runs without the user ever being asked.
+    func test_invokeTool_asksBeforeRunningAnApprovalRequiringTool() async {
+        let events = UncheckedBox([BridgeEvent]())
+        let asked = UncheckedBox([String]())
+        let dispatched = UncheckedBox([BridgeMessage]())
+        let runner = makeRunner(
+            dispatched: dispatched,
+            approve: { summary, _ in
+                asked.value.append(summary)
+                return true
+            },
+            emit: { events.value.append($0) }
+        )
+
+        _ = await runner.invokeTool(
+            name: "run_shell",
+            arguments: .object(["command": .string("ls")]),
+            callId: "c-2"
+        )
+
+        XCTAssertEqual(asked.value.count, 1)
+        XCTAssertTrue(asked.value.first?.contains("셸 명령 실행") == true)
+        XCTAssertTrue(events.value.contains { event in
+            if case .awaitApproval(_, let approvalId) = event { return approvalId == "c-2" }
+            return false
+        }, "the user has to see the normal in-chat approval prompt")
+        XCTAssertEqual(dispatched.value.count, 1, "approved means it actually runs")
+    }
+
+    /// And the other one: silently denied, so the user sees nothing and the
+    /// model is told it was refused. The refusal has to be the user's, and it
+    /// has to reach the caller as denied_by_user.
+    func test_invokeTool_refusedApprovalNeverDispatchesAndSaysWhy() async {
+        let dispatched = UncheckedBox([BridgeMessage]())
+        let runner = makeRunner(dispatched: dispatched, approve: { _, _ in false })
+
+        let result = await runner.invokeTool(
+            name: "run_shell",
+            arguments: .object(["command": .string("rm -rf /")]),
+            callId: "c-3"
+        )
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.error, "denied_by_user")
+        XCTAssertTrue(dispatched.value.isEmpty, "a refused tool must never reach the socket")
+    }
+
+    func test_invokeTool_dispatchesAPetAppToolOverTheSocket() async {
+        let dispatched = UncheckedBox([BridgeMessage]())
+        let runner = makeRunner(dispatched: dispatched)
+
+        _ = await runner.invokeTool(name: "list_running_apps", arguments: .object([:]))
+
+        XCTAssertEqual(dispatched.value.count, 1)
+        if case .toolDispatch(let dispatch)? = dispatched.value.first {
+            XCTAssertEqual(dispatch.tool, "list_running_apps")
+        } else {
+            XCTFail("a pet-app tool has to go out as tool_dispatch")
+        }
+    }
+
+    /// The delegated route, not the socket: read_file is answered by the
+    /// client's own editor pane.
+    func test_invokeTool_takesTheDelegatedRouteForReadFile() async {
+        let dispatched = UncheckedBox([BridgeMessage]())
+        let read = UncheckedBox([String]())
+        let runner = makeRunner(
+            dispatched: dispatched,
+            delegateReadFile: { path in
+                read.value.append(path)
+                return DispatchedToolResult(ok: true, data: .string("contents"), error: nil, detail: nil)
+            }
+        )
+
+        let result = await runner.invokeTool(
+            name: "read_file",
+            arguments: .object(["path": .string("src/main.swift")])
+        )
+
+        XCTAssertTrue(result.ok)
+        XCTAssertEqual(read.value, ["src/main.swift"])
+        XCTAssertTrue(dispatched.value.isEmpty, "a delegated tool must not cross the socket")
+    }
+
+    /// The CLI keeps its own conversation inside the CLI. Splicing its tool
+    /// results into this one would leave a tool entry with no assistant call
+    /// in front of it, which the other two providers reject outright.
+    func test_invokeTool_neverAppendsToTheRunnersOwnConversation() async {
+        let client = RecordingLLMClient()
+        let runner = makeRunner(client: client, approve: { _, _ in true })
+
+        _ = await runner.invokeTool(name: "list_running_apps", arguments: .object([:]))
+        await runner.run(command: "안녕")
+
+        let toolEntries = client.lastMessages.filter { message in
+            if case .tool = message { return true }
+            return false
+        }
+        XCTAssertTrue(toolEntries.isEmpty)
+    }
 }

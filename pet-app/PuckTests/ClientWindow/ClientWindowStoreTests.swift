@@ -226,6 +226,60 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.sessions(in: "default").count, 2)
     }
 
+    /// Pressing "새 대화" has to land the user *in* the chat it just made.
+    /// The id is minted on the other side, so the switch cannot happen at
+    /// request time -- the request arms it and the matching sessionCreate
+    /// spends it.
+    func test_requestNewSession_thenItsConfirmation_opensTheNewChat() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+
+        store.requestNewSession(title: "새 대화", in: "w2")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertEqual(store.activeWorkspaceId, "w2")
+        XCTAssertEqual(store.activeSessionId, "s9")
+    }
+
+    /// Only the request this window made switches. A user-origin session
+    /// created from somewhere else arrives the same way, and yanking the view
+    /// to it would move the chat out from under whoever is typing here.
+    func test_sessionCreate_userOrigin_withNoRequestOfOurOwn_doesNotSwitch() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "elsewhere", origin: .user))
+
+        XCTAssertEqual(store.activeWorkspaceId, "default")
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
+    /// One press, one switch: the arming is spent by the session it asked for,
+    /// so a later unrelated session does not drag the view along behind it.
+    func test_requestNewSession_armsExactlyOneSwitch() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+
+        store.requestNewSession(title: "새 대화", in: "w2")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "새 대화", origin: .user))
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s10", title: "elsewhere", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "s9")
+    }
+
+    /// A request that never left has no session coming, so it must not leave
+    /// the switch armed for whatever session_create happens to arrive next.
+    func test_requestNewSession_undelivered_armsNothing() {
+        let (store, transport) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+        transport.hasConnectedClients = false
+
+        XCTAssertEqual(store.requestNewSession(title: "새 대화", in: "w2"), .notDelivered)
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
     func test_requestNewSession_delegatesToSender() {
         let (store, transport) = makeStore()
 

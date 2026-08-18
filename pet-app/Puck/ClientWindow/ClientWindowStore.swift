@@ -39,6 +39,9 @@ final class ClientWindowStore: ObservableObject {
     /// wherever no agent is attached, in which case the old socket path
     /// stands.
     var onUserCommand: ((_ text: String, _ workspaceId: String, _ sessionId: String) -> Void)?
+    /// A chat was deleted. The agent keeps that chat's conversation, and the
+    /// user throwing the chat away is them throwing that away too.
+    var onSessionDeleted: ((_ workspaceId: String, _ sessionId: String) -> Void)?
     /// Same reason: approval is resolved inside this process, not by a
     /// workspace on the far side of the socket.
     var onApprovalResolved: ((_ approvalId: String, _ approved: Bool) -> Void)?
@@ -149,6 +152,7 @@ final class ClientWindowStore: ObservableObject {
         if activeWorkspaceId == workspaceId, activeSessionId == sessionId {
             activeSessionId = Self.defaultSessionId
         }
+        onSessionDeleted?(workspaceId, sessionId)
         return true
     }
 

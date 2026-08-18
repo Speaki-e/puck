@@ -147,7 +147,7 @@ final class AgentHost {
                 return await self.runCodeEditor(task: task)
             },
             openTaskSession: { [weak self] title, brief in
-                self?.openTaskSession(title: title, brief: brief)
+                self?.openTaskSession(title: title, brief: brief) ?? ""
             },
             delegateReadFile: { [weak self] path in
                 guard let self else {
@@ -283,7 +283,8 @@ final class AgentHost {
     ///    is the whole point: a 10-minute code_editor delegation, its
     ///    progress, and its 중지 button all belong to the task session, and
     ///    the casual conversation stays usable while it runs.
-    private func openTaskSession(title: String, brief: String) {
+    @discardableResult
+    private func openTaskSession(title: String, brief: String) -> String {
         let sessionId = UUID().uuidString
         let sourceSessionId = activeSessionId
         _ = broadcast(.sessionCreate(
@@ -297,9 +298,11 @@ final class AgentHost {
         // was written in (see ClientWindowStore.moveTurnToTaskSession).
         onTaskSessionOpened?(activeWorkspaceId, sourceSessionId, sessionId, title, activeCommand)
         activeSessionId = sessionId
+        runner.sessionId = sessionId
         if !brief.isEmpty {
             _ = broadcast(.event(.textChunk(text: brief), workspaceId: activeWorkspaceId, sessionId: sessionId))
         }
+        return sessionId
     }
 
     /// Every event off the socket. Nothing here consumes them any more: the
@@ -309,6 +312,11 @@ final class AgentHost {
     /// are the only consumers left. Kept as a no-op rather than removed so the
     /// socket plumbing that calls it stays unchanged.
     func handle(_ event: BridgeEvent, sessionId: String) {}
+
+    /// A chat was deleted, so its conversation goes with it.
+    func forgetSession(_ sessionId: String) {
+        runner.forgetSession(sessionId)
+    }
 
     /// pet-app went away: nothing in flight can be answered any more. Tool
     /// dispatch still crosses the socket, so it still has to be failed; the
@@ -343,6 +351,10 @@ final class AgentHost {
         activeWorkspaceId = workspaceId
         activeSessionId = sessionId
         activeCommand = command
+        // Which chat's conversation this run continues. One runner serves every
+        // chat, so without this they would all share one context -- see
+        // AgentRunner.conversations.
+        runner.sessionId = sessionId
         // Before the run, not at init: which workspace is active changes
         // between turns, and the runner only re-announces it when it differs.
         runner.workspaceContext = describeWorkspace(workspaceId)

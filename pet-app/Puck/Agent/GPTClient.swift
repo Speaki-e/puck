@@ -139,15 +139,26 @@ final class RoutingAgentLLMClient: AgentLLMClient {
 /// `workingDirectory` only matters to the CLI provider, which opens its ACP
 /// session there: the active workspace's project folder when it has one, so a
 /// CLI asked about "this file" can actually look at it.
+///
+/// `invokeTool` only matters to the CLI provider too. It cannot answer with
+/// tool calls the way the other two do (ACP has no channel for it), so it
+/// hands Puck's tools to the CLI as an MCP server instead and runs each call
+/// through this -- which is `AgentRunner.invokeTool`, the same entry the other
+/// providers' tool calls reach. Left nil, the CLI turn is text-only.
 func makeAgentLLMClient(
     _ configuration: @escaping () -> AgentConfiguration,
-    workingDirectory: @escaping () -> String = { NSHomeDirectory() }
+    workingDirectory: @escaping () -> String = { NSHomeDirectory() },
+    invokeTool: AgentToolInvocation? = nil
 ) -> any AgentLLMClient {
     RoutingAgentLLMClient(
         configuration: configuration,
         openAIClient: GPTClient(configuration: configuration),
         anthropicClient: ClaudeClient(configuration: configuration),
-        cliClient: CodingAgentCLIClient(configuration: configuration, workingDirectory: workingDirectory)
+        cliClient: CodingAgentCLIClient(
+            configuration: configuration,
+            workingDirectory: workingDirectory,
+            invokeTool: invokeTool
+        )
     )
 }
 

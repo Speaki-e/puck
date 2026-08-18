@@ -3,8 +3,9 @@
 //  PuckTests
 //
 //  The CLI-backed conversation provider: one ACP turn in, one text-only
-//  GPTTurn out. Driven against a scripted NDJSON stream, so none of this
-//  spawns node or needs a vendor CLI installed.
+//  GPTTurn out, with Puck's own tools handed to the agent as an MCP server on
+//  the way. Driven against a scripted NDJSON stream, so none of this spawns
+//  node or needs a vendor CLI installed.
 //
 
 import XCTest
@@ -250,19 +251,57 @@ final class CodingAgentCLIClientTests: XCTestCase {
 
     // MARK: - Prompt construction
 
-    /// The whole point of the override: AgentRunner's system prompt tells the
-    /// model to call point_at and code_editor, and on this provider it cannot.
-    /// Whatever else changes, this text has to be in the prompt.
-    func test_prompt_carriesTheToolUnavailabilityOverride() {
-        let prompt = CodingAgentCLIClient.prompt(for: [.system("You are the brain of Puck."), .user("안녕")])
+    /// The whole point of the override: AgentRunner's system prompt names the
+    /// tools by their bare names, and on this provider they only exist under
+    /// `mcp__puck__`. Whatever else changes, this text has to be in the prompt.
+    func test_prompt_carriesTheToolAvailabilityOverrideWhenTheToolsAreReachable() {
+        let prompt = CodingAgentCLIClient.prompt(
+            for: [.system("You are the brain of Puck."), .user("안녕")],
+            toolsAreReachable: true
+        )
 
         XCTAssertTrue(prompt.contains(CodingAgentCLIClient.toolAvailabilityOverride))
+        XCTAssertFalse(prompt.contains(CodingAgentCLIClient.toolsUnavailableOverride))
+    }
+
+    /// The override has to name the tools the way the agent actually sees
+    /// them. A model told to call `point_at` when the tool is registered as
+    /// `mcp__puck__point_at` writes the action out in prose instead.
+    func test_toolAvailabilityOverride_namesTheToolsUnderTheirMcpPrefix() {
+        let override = CodingAgentCLIClient.toolAvailabilityOverride
+
+        XCTAssertTrue(override.contains("mcp__puck__point_at"))
+        XCTAssertTrue(override.contains("mcp__puck__run_shell"))
+    }
+
+    /// code_editor is the one tool deliberately withheld -- the CLI is the
+    /// coding agent it would delegate to -- so the prompt has to say what to
+    /// do instead rather than leaving the model to call a tool that isn't
+    /// listed.
+    func test_toolAvailabilityOverride_saysCodeEditorIsNotAvailableHere() {
+        XCTAssertTrue(CodingAgentCLIClient.toolAvailabilityOverride.contains("code_editor"))
+        XCTAssertFalse(CodingAgentCLIClient.toolAvailabilityOverride.contains("mcp__puck__code_editor"))
+    }
+
+    /// A server that could not be opened must not be advertised: the turn
+    /// still runs, and the prompt has to be the honest one.
+    func test_prompt_saysTheToolsAreUnavailableWhenTheyAre() {
+        let prompt = CodingAgentCLIClient.prompt(
+            for: [.system("You are the brain of Puck."), .user("안녕")],
+            toolsAreReachable: false
+        )
+
+        XCTAssertTrue(prompt.contains(CodingAgentCLIClient.toolsUnavailableOverride))
+        XCTAssertFalse(prompt.contains(CodingAgentCLIClient.toolAvailabilityOverride))
     }
 
     /// After the system prompt it contradicts, not before: the later
     /// instruction is the one a model follows.
     func test_prompt_putsTheOverrideAfterTheSystemPromptItCorrects() throws {
-        let prompt = CodingAgentCLIClient.prompt(for: [.system("Use point_at to show the user."), .user("안녕")])
+        let prompt = CodingAgentCLIClient.prompt(
+            for: [.system("Use point_at to show the user."), .user("안녕")],
+            toolsAreReachable: true
+        )
 
         let system = try XCTUnwrap(prompt.range(of: "Use point_at to show the user."))
         let override = try XCTUnwrap(prompt.range(of: CodingAgentCLIClient.toolAvailabilityOverride))
@@ -274,7 +313,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
             .system("You are the brain of Puck."),
             .system("Current workspace: puck, bound to the project at /tmp/puck."),
             .user("여기 뭐 있어?"),
-        ])
+        ], toolsAreReachable: true)
 
         XCTAssertTrue(prompt.contains("You are the brain of Puck."))
         XCTAssertTrue(prompt.contains("bound to the project at /tmp/puck"))
@@ -288,7 +327,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
             .user("첫 질문"),
             .assistant(text: "첫 답변", toolCalls: []),
             .user("둘째 질문"),
-        ])
+        ], toolsAreReachable: true)
 
         let first = prompt.range(of: "User: 첫 질문")
         let answer = prompt.range(of: "Assistant: 첫 답변")
@@ -313,7 +352,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
             ]),
             .tool(callId: "1", content: "{\"pid\":42}"),
             .user("켜졌어?"),
-        ])
+        ], toolsAreReachable: true)
 
         XCTAssertTrue(prompt.contains("launch_app"))
         XCTAssertTrue(prompt.contains("{\"app_name\":\"Weather\"}"))
@@ -337,6 +376,237 @@ final class CodingAgentCLIClientTests: XCTestCase {
         let sent = agent.params(forMethod: "session/prompt")?["prompt"]?.arrayValue?.first?["text"]?.stringValue
         XCTAssertNotNil(sent)
         XCTAssertTrue(sent!.contains("User: 고유한질문"))
-        XCTAssertTrue(sent!.contains(CodingAgentCLIClient.toolAvailabilityOverride))
+        // No invokeTool was supplied, so no MCP server was started and the
+        // prompt must say the tools are unreachable rather than name them.
+        XCTAssertTrue(sent!.contains(CodingAgentCLIClient.toolsUnavailableOverride))
+    }
+
+    // MARK: - The MCP server the agent is handed
+
+    private func toolSpecs() -> [GPTToolSpec] {
+        [
+            GPTToolSpec(
+                name: "run_shell",
+                description: "Run a shell command.",
+                parameters: ToolRegistry.tool(named: "run_shell")?.parameters ?? []
+            ),
+            GPTToolSpec(
+                name: "code_editor",
+                description: "Delegate a coding task.",
+                parameters: ToolRegistry.tool(named: "code_editor")?.parameters ?? []
+            ),
+        ]
+    }
+
+    /// The gap this closes: `session/new` used to send an empty mcpServers
+    /// array, which is why the CLI had no way to reach Puck's tools at all.
+    func test_send_handsTheAgentAnHttpMcpServerOnSessionNew() async throws {
+        let agent = ScriptedAgent()
+        agent.stubHandshake()
+        agent.replies["session/prompt"] = { [weak agent] _ in
+            agent?.push(agentTextChunk("네."))
+            return .object(["stopReason": .string("end_turn")])
+        }
+        let client = CodingAgentCLIClient(
+            configuration: { cliConfiguration() },
+            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            startAgent: { _, _ in FakeTransport(connection: agent.connection) }
+        )
+
+        _ = try await client.send(messages: [.user("hi")], tools: toolSpecs())
+
+        let servers = try XCTUnwrap(agent.params(forMethod: "session/new")?["mcpServers"]?.arrayValue)
+        XCTAssertEqual(servers.count, 1)
+        XCTAssertEqual(servers.first?["type"]?.stringValue, "http")
+        XCTAssertEqual(servers.first?["name"]?.stringValue, "puck")
+        XCTAssertTrue(try XCTUnwrap(servers.first?["url"]?.stringValue).hasPrefix("http://127.0.0.1:"))
+        let header = try XCTUnwrap(servers.first?["headers"]?.arrayValue?.first)
+        XCTAssertEqual(header["name"]?.stringValue, "Authorization")
+    }
+
+    /// The address is only worth sending if something answers it. This calls
+    /// the server the way the CLI would, from inside the turn.
+    func test_send_theAdvertisedServerAnswersToolsListWhileTheTurnRuns() async throws {
+        let agent = ScriptedAgent()
+        agent.stubHandshake()
+        let listed = UncheckedBox<[String]>([])
+        agent.replies["session/prompt"] = { [weak agent] _ in
+            let descriptor = agent?.params(forMethod: "session/new")?["mcpServers"]?.arrayValue?.first
+            if let descriptor {
+                let names = (try? Self.toolNames(from: descriptor)) ?? []
+                listed.value = names
+            }
+            agent?.push(agentTextChunk("네."))
+            return .object(["stopReason": .string("end_turn")])
+        }
+        let client = CodingAgentCLIClient(
+            configuration: { cliConfiguration() },
+            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            startAgent: { _, _ in FakeTransport(connection: agent.connection) }
+        )
+
+        _ = try await client.send(messages: [.user("hi")], tools: toolSpecs())
+
+        XCTAssertEqual(listed.value, ["run_shell"], "code_editor is withheld; everything else is offered")
+    }
+
+    /// Synchronous on purpose: it is called from inside ScriptedAgent's reply
+    /// closure, which is where the turn actually is.
+    private static func toolNames(from descriptor: JSONValue) throws -> [String] {
+        guard
+            let url = descriptor["url"]?.stringValue.flatMap(URL.init(string:)),
+            let header = descriptor["headers"]?.arrayValue?.first,
+            let headerName = header["name"]?.stringValue,
+            let headerValue = header["value"]?.stringValue
+        else { return [] }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(headerValue, forHTTPHeaderField: headerName)
+        request.httpBody = try JSONEncoder().encode(JSONValue.object([
+            "jsonrpc": .string("2.0"),
+            "id": .number(1),
+            "method": .string("tools/list"),
+            "params": .object([:]),
+        ]))
+        request.timeoutInterval = 5
+
+        let semaphore = DispatchSemaphore(value: 0)
+        let body = UncheckedBox<Data?>(nil)
+        URLSession(configuration: .ephemeral).dataTask(with: request) { data, _, _ in
+            body.value = data
+            semaphore.signal()
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 5)
+
+        guard
+            let data = body.value,
+            let decoded = try? JSONDecoder().decode(JSONValue.self, from: data)
+        else { return [] }
+        return (decoded["result"]?["tools"]?.arrayValue ?? []).compactMap { $0["name"]?.stringValue }
+    }
+
+    /// The listener's lifetime is the turn's. A port left open between turns
+    /// is a local service nobody knows is running.
+    func test_send_closesTheMcpPortWhenTheTurnEnds() async throws {
+        let agent = ScriptedAgent()
+        agent.stubHandshake()
+        agent.replies["session/prompt"] = { [weak agent] _ in
+            agent?.push(agentTextChunk("끝."))
+            return .object(["stopReason": .string("end_turn")])
+        }
+        let client = CodingAgentCLIClient(
+            configuration: { cliConfiguration() },
+            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            startAgent: { _, _ in FakeTransport(connection: agent.connection) }
+        )
+
+        _ = try await client.send(messages: [.user("hi")], tools: toolSpecs())
+
+        let descriptor = try XCTUnwrap(agent.params(forMethod: "session/new")?["mcpServers"]?.arrayValue?.first)
+        var request = URLRequest(url: try XCTUnwrap(URL(string: try XCTUnwrap(descriptor["url"]?.stringValue))))
+        request.httpMethod = "POST"
+        request.httpBody = Data("{}".utf8)
+        request.timeoutInterval = 3
+        do {
+            _ = try await URLSession(configuration: .ephemeral).data(for: request)
+            XCTFail("the MCP port must not outlive the turn")
+        } catch {
+            // Connection refused.
+        }
+    }
+
+    /// A turn that failed still has to close it -- this is the path a wedged
+    /// or unauthenticated CLI takes.
+    func test_send_closesTheMcpPortWhenTheTurnFails() async throws {
+        let agent = ScriptedAgent()
+        agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
+        agent.replies["session/new"] = { _ in .object(["sessionId": .string("s-1")]) }
+        agent.errorReplies["session/prompt"] = (code: -32000, message: "Authentication required")
+        let client = CodingAgentCLIClient(
+            configuration: { cliConfiguration() },
+            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            startAgent: { _, _ in FakeTransport(connection: agent.connection) }
+        )
+
+        do {
+            _ = try await client.send(messages: [.user("hi")], tools: toolSpecs())
+            XCTFail("the turn was supposed to fail")
+        } catch {
+            // Expected.
+        }
+
+        let descriptor = try XCTUnwrap(agent.params(forMethod: "session/new")?["mcpServers"]?.arrayValue?.first)
+        var request = URLRequest(url: try XCTUnwrap(URL(string: try XCTUnwrap(descriptor["url"]?.stringValue))))
+        request.httpMethod = "POST"
+        request.httpBody = Data("{}".utf8)
+        request.timeoutInterval = 3
+        do {
+            _ = try await URLSession(configuration: .ephemeral).data(for: request)
+            XCTFail("a failed turn must still close its port")
+        } catch {
+            // Connection refused.
+        }
+    }
+
+    /// No host to run tools means no server to advertise -- and the prompt
+    /// (asserted elsewhere) says so rather than naming tools that aren't there.
+    func test_send_advertisesNoMcpServerWhenThereIsNoHostToRunTools() async throws {
+        let agent = ScriptedAgent()
+        agent.stubHandshake()
+        agent.replies["session/prompt"] = { [weak agent] _ in
+            agent?.push(agentTextChunk("네."))
+            return .object(["stopReason": .string("end_turn")])
+        }
+        let client = CodingAgentCLIClient(
+            configuration: { cliConfiguration() },
+            startAgent: { _, _ in FakeTransport(connection: agent.connection) }
+        )
+
+        _ = try await client.send(messages: [.user("hi")], tools: toolSpecs())
+
+        XCTAssertEqual(agent.params(forMethod: "session/new")?["mcpServers"]?.arrayValue, [])
+    }
+
+    // MARK: - Permission
+
+    /// Refusing this would deny the tool before it ever reached the host: the
+    /// user would see no prompt at all and the model would be told it was
+    /// refused. The real gate is one step further in, inside
+    /// AgentRunner.invokeTool.
+    func test_resolvePermission_allowsPucksOwnMcpTools() async {
+        let request = AcpPermissionRequest(raw: .object([
+            "toolCall": .object([
+                "title": .string("mcp__puck__run_shell"),
+                "rawInput": .object(["command": .string("ls")]),
+            ]),
+            "options": .array([
+                .object(["optionId": .string("a"), "name": .string("Allow"), "kind": .string("allow_once")]),
+                .object(["optionId": .string("r"), "name": .string("Reject"), "kind": .string("reject_once")]),
+            ]),
+        ]))
+
+        let allowed = await CodingAgentCLIClient.resolvePermission(request)
+
+        XCTAssertTrue(allowed)
+    }
+
+    /// The CLI's own tools keep the conservative refusal a chat turn has
+    /// always given them -- nothing here approves a coding agent's shell.
+    func test_resolvePermission_stillRefusesTheCLIsOwnTools() async {
+        let request = AcpPermissionRequest(raw: .object([
+            "toolCall": .object([
+                "title": .string("Bash"),
+                "rawInput": .object(["command": .string("rm -rf /")]),
+            ]),
+            "options": .array([
+                .object(["optionId": .string("a"), "name": .string("Allow"), "kind": .string("allow_once")]),
+            ]),
+        ]))
+
+        let allowed = await CodingAgentCLIClient.resolvePermission(request)
+
+        XCTAssertFalse(allowed)
     }
 }

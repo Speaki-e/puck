@@ -169,6 +169,15 @@ struct AcpPermissionRequest: Equatable {
             ?? options.first { $0.kind?.hasPrefix("reject") == true }
     }
 
+    /// Whether the permission is for a tool served by the named MCP server.
+    /// A CLI namespaces one as `mcp__<server>__<tool>`, and which field of the
+    /// request carries that name differs by version, so this looks for it
+    /// anywhere in the request rather than betting on a field that may move.
+    func namesMCPServer(_ server: String) -> Bool {
+        guard let text = raw.jsonText else { return false }
+        return text.contains("mcp__\(server)__")
+    }
+
     static func outcome(selecting optionId: String) -> JSONValue {
         .object(["outcome": .object([
             "outcome": .string("selected"),

@@ -8,16 +8,24 @@
 //  key at all, so the pet answers ordinary conversation on a machine that only
 //  ever logged into a CLI.
 //
-//  ## It has no tools, and says so
+//  ## How it gets Puck's tools
 //
-//  `AgentLLMClient.send` hands over Puck's tool specs, but ACP has no
-//  tool-call channel back to the host: the CLI runs its own tools inside its
-//  own process and returns prose. So every turn from here is text-only, and
-//  the prompt this builds *tells the model that*, overriding the tool
-//  instructions in AgentRunner's system prompt. A model left believing it can
-//  call `point_at` would narrate having pointed at something while the pet
-//  stood still, which is the one failure mode worth spending a paragraph of
-//  prompt on.
+//  ACP has no tool-call channel back to the host -- the CLI runs its own tools
+//  in its own process and returns prose -- so a turn from here never comes
+//  back carrying tool calls for AgentRunner to execute. It does not have to:
+//  `session/new` takes an `mcpServers` array, and Puck puts its own tools
+//  there as a loopback MCP server (PuckMCPServer) that lives exactly as long
+//  as the turn. The CLI sees them as `mcp__puck__*` and calls them itself;
+//  each call lands on `AgentRunner.invokeTool`, so approval, dispatch and the
+//  pet's reaction are the same as under any other provider.
+//
+//  The prompt still overrides AgentRunner's tool instructions, but now to say
+//  what is true: the tools are there under their MCP names, and `code_editor`
+//  is the one that is not (on this provider the CLI *is* the coding agent it
+//  would delegate to). If the server cannot be opened at all, the turn runs
+//  without it and the prompt says *that* instead -- a model left believing it
+//  can call `point_at` would narrate having pointed at something while the pet
+//  stood still, which is the failure mode worth spending prompt on.
 //
 //  ## One process per turn
 //
@@ -70,6 +78,11 @@ final class CodingAgentCLIClient: AgentLLMClient {
     /// falling back to the home directory for a chat-only workspace.
     private let workingDirectory: () -> String
     private let timeoutSeconds: TimeInterval
+    /// Runs one of Puck's tools for the CLI. nil means there is no host to run
+    /// them (the standalone tests), and then no MCP server is started and the
+    /// prompt says the tools are unavailable rather than advertising an
+    /// address nothing answers.
+    private let invokeTool: AgentToolInvocation?
 
     /// Long enough for a real answer on a cold CLI start (the vendor binary is
     /// ~256MB and the first turn pays for loading it), short enough that a
@@ -80,12 +93,14 @@ final class CodingAgentCLIClient: AgentLLMClient {
         configuration: @escaping () -> AgentConfiguration,
         workingDirectory: @escaping () -> String = { NSHomeDirectory() },
         timeoutSeconds: TimeInterval = CodingAgentCLIClient.defaultTimeoutSeconds,
+        invokeTool: AgentToolInvocation? = nil,
         startAgent: @escaping (_ kind: CodingAgentKind, _ cwd: String) throws -> AcpAgentTransport
             = CodingAgentCLIClient.spawn
     ) {
         self.configuration = configuration
         self.workingDirectory = workingDirectory
         self.timeoutSeconds = timeoutSeconds
+        self.invokeTool = invokeTool
         self.startAgent = startAgent
     }
 
@@ -111,6 +126,31 @@ final class CodingAgentCLIClient: AgentLLMClient {
         let kind = configuration().codingAgent
         let cwd = workingDirectory()
 
+        // Before the agent, because `session/new` has to carry the server's
+        // address and the prompt has to say whether it came up. Torn down on
+        // every exit path below -- success, failure, timeout, cancel -- so no
+        // port is ever left open between turns.
+        var mcpServer: PuckMCPServer?
+        defer { mcpServer?.stop() }
+        var mcpServers: [JSONValue] = []
+        if let invokeTool {
+            let server = PuckMCPServer(toolSpecs: tools, invoke: invokeTool)
+            do {
+                mcpServers = [try await server.start()]
+                mcpServer = server
+            } catch {
+                // Not fatal: a turn that can only talk is worth more than no
+                // turn at all, and the prompt below will say so rather than
+                // letting the model discover it by having a call refused.
+                server.stop()
+                AppLogger.shared.log(
+                    .error,
+                    "MCP 서버를 열지 못해 도구 없이 대화합니다: \(AgentRunner.rawFailureDescription(for: error))"
+                )
+            }
+        }
+        let toolsAreReachable = mcpServer != nil
+
         let process: AcpAgentTransport
         do {
             process = try startAgent(kind, cwd)
@@ -127,12 +167,19 @@ final class CodingAgentCLIClient: AgentLLMClient {
         let session = AcpTurnSession(
             connection: process.connection,
             cwd: cwd,
+            mcpServers: mcpServers,
+            resolvePermission: Self.resolvePermission,
             stderrTail: { [weak process] in process?.currentStderrTail() ?? "" }
         )
-        let prompt = Self.prompt(for: messages)
+        let prompt = Self.prompt(for: messages, toolsAreReachable: toolsAreReachable)
 
+        let server = mcpServer
         guard let outcome = await withDeadline(
             seconds: timeoutSeconds,
+            // A tool call in flight is Puck working, not the CLI stalling --
+            // and it may be sitting on an approval prompt the user has not
+            // read yet. See withDeadline(seconds:suspendedWhile:work:).
+            suspendedWhile: { server?.isServingToolCall ?? false },
             work: { await session.run(prompt: prompt) }
         ) else {
             session.cancel()
@@ -150,12 +197,28 @@ final class CodingAgentCLIClient: AgentLLMClient {
             guard !completion.text.isEmpty else {
                 throw CodingAgentCLIError.emptyReply(stopReason: completion.stopReason)
             }
-            // Text only. The host's tools were offered and are not usable
-            // here; `prompt` says so rather than leaving the model to discover
-            // it by having a call ignored.
-            _ = tools
+            // Still no tool calls to hand back: whatever the CLI needed it
+            // already called, over MCP, and AgentRunner already emitted the
+            // events and appended nothing to this conversation.
             return GPTTurn(text: completion.text, toolCalls: [])
         }
+    }
+
+    /// Answers the CLI's own `session/request_permission`.
+    ///
+    /// Allowed for Puck's MCP tools, refused for everything else. Both halves
+    /// matter. Refusing a `mcp__puck__*` permission would deny the tool before
+    /// it ever reached the host -- the user would see nothing at all and the
+    /// model would be told it was refused -- which is why the default resolver
+    /// (`false`) cannot be left in place once tools are attached. And allowing
+    /// it here is not the same as skipping approval: the real gate is inside
+    /// `AgentRunner.invokeTool`, which the call is about to reach, so an
+    /// approval-requiring tool still puts the normal 승인 prompt in the chat and
+    /// still cannot run until the user answers it. Everything else -- the
+    /// CLI's own shell, its file writes -- keeps the conservative refusal a
+    /// chat turn has always given it.
+    static func resolvePermission(_ request: AcpPermissionRequest) async -> Bool {
+        request.namesMCPServer(MCPToolCatalog.serverName)
     }
 
     /// SIGTERM, a moment, then SIGKILL -- `terminate()` alone is a request,
@@ -178,7 +241,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
     /// workspace line), then the tool-availability override that corrects
     /// them, then the transcript. The override comes after the prompt it
     /// contradicts on purpose: the later instruction is the one models follow.
-    static func prompt(for messages: [GPTMessage]) -> String {
+    static func prompt(for messages: [GPTMessage], toolsAreReachable: Bool) -> String {
         var systemLines: [String] = []
         var transcript: [String] = []
 
@@ -202,26 +265,49 @@ final class CodingAgentCLIClient: AgentLLMClient {
         }
 
         var parts = systemLines
-        parts.append(toolAvailabilityOverride)
+        parts.append(toolsAreReachable ? toolAvailabilityOverride : toolsUnavailableOverride)
         parts.append("Conversation so far:\n" + transcript.joined(separator: "\n"))
         parts.append("Reply to the last User message. Output only your reply.")
         return parts.joined(separator: "\n\n")
     }
 
-    /// Corrects the host system prompt for this provider. Internal so a test
-    /// can assert it is actually in the prompt -- the honesty of this path
-    /// rests entirely on it being there.
+    /// Corrects the host system prompt for this provider when the MCP server
+    /// is up. Internal so a test can assert it is actually in the prompt --
+    /// the honesty of this path rests entirely on it being there.
     static let toolAvailabilityOverride = """
     IMPORTANT -- TOOL AVAILABILITY ON THIS CONNECTION:
-    You are running through a coding-agent CLI, and the host application's tools are NOT connected \
-    to you on this turn. You cannot launch apps, point the pet at anything, click, run shell \
-    commands on the user's behalf, read or open files in the editor pane, open a task session, or \
-    hand work to code_editor. Any such tool named above is unavailable right now; ignore those \
-    instructions.
+    You are running through a coding-agent CLI, and the host application's tools ARE connected to \
+    you, as an MCP server named `puck`. They reach you under prefixed names: `mcp__puck__launch_app`, \
+    `mcp__puck__find_ui_element`, `mcp__puck__point_at`, `mcp__puck__click_element`, \
+    `mcp__puck__run_shell`, `mcp__puck__run_applescript`, `mcp__puck__read_file`, \
+    `mcp__puck__open_in_editor`, `mcp__puck__list_files`, and so on. Wherever an instruction above \
+    names a tool by its bare name, it means the `mcp__puck__` tool of that name -- call it.
+    Prefer those over your own equivalents: they act on the machine the user is actually looking at, \
+    the pet physically performs them, and the ones that need the user's permission ask through the \
+    app's own approval prompt. `mcp__puck__run_shell` and `mcp__puck__run_applescript` will pause \
+    until the user approves them, and come back with `denied_by_user` if the user says no -- when \
+    that happens, say so and offer something else rather than retrying or working around it.
+    The one exception is `code_editor`: it is NOT available here, because on this connection you \
+    are the coding agent it would have handed the task to. So when the user asks for code to be \
+    written or changed, do it yourself with your own editing tools and say what you changed. Ignore \
+    any instruction above telling you to delegate to code_editor or that you never edit files.
+    Never say or imply that you launched, opened, pointed at, clicked, or ran something unless an \
+    `mcp__puck__` tool actually returned a successful result for it.
+    """
+
+    /// The same correction for a turn whose MCP server could not be opened.
+    /// Rare, and the reason the honest version has to exist: telling the model
+    /// the tools are there when nothing is listening would have it narrate
+    /// actions that never happened.
+    static let toolsUnavailableOverride = """
+    IMPORTANT -- TOOL AVAILABILITY ON THIS CONNECTION:
+    You are running through a coding-agent CLI, and the host application's tools could NOT be \
+    connected to you on this turn. You cannot launch apps, point the pet at anything, click, run \
+    shell commands on the user's behalf, read or open files in the editor pane, open a task \
+    session, or hand work to code_editor. Any such tool named above is unavailable right now; \
+    ignore those instructions.
     So: answer in words only. Never say or imply that you launched, opened, pointed at, clicked, \
     edited, or ran anything -- you did not. If the user asks for an action that needs those tools, \
-    say plainly that this provider can only talk, and that they can switch the AI 공급자 setting \
-    to OpenAI or Anthropic to let the pet act. Everything else -- questions, explanations, \
-    ordinary conversation -- answer normally.
+    say plainly that it could not be connected this time and that trying again may work.
     """
 }

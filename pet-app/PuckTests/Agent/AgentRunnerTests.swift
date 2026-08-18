@@ -171,6 +171,30 @@ final class AgentRunnerTests: XCTestCase {
         XCTAssertEqual(client.lastUserTexts, ["두 번째 대화의 질문"])
     }
 
+    /// Nothing trimmed the stack before, so a long chat grew every turn until
+    /// it hit the model's context limit.
+    func test_aLongChat_isTrimmedToACap() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.sessionId = "chat-1"
+
+        for i in 0..<80 { await runner.run(command: "질문 \(i)") }
+
+        XCTAssertLessThan(client.lastMessages.count, 80)
+        XCTAssertEqual(client.lastUserTexts.last, "질문 79")
+    }
+
+    /// Trimming keeps the system lines whatever their age: they are few, and
+    /// dropping one silently un-tells the model something it was told once.
+    func test_trimming_keepsTheWorkspaceLine() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.sessionId = "chat-1"
+        runner.workspaceContext = AgentRunner.WorkspaceContext(name: "puck", projectPath: "/tmp/puck")
+
+        for i in 0..<80 { await runner.run(command: "질문 \(i)") }
+
+        XCTAssertTrue(client.lastSystemTexts.contains { $0.contains("/tmp/puck") }, "got \(client.lastSystemTexts)")
+    }
+
     func test_agentRunner_acceptsAnyAgentLLMClient() async throws {
         let fake = FakeLLMClient()
         fake.turns = [GPTTurn(text: "안녕하세요", toolCalls: [])]

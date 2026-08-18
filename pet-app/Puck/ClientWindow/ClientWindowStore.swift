@@ -234,6 +234,13 @@ final class ClientWindowStore: ObservableObject {
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
         let target = session(workspaceId: activeWorkspaceId, sessionId: activeSessionId)
+        // The user's own text never comes back over the socket, so this echo is
+        // the only thing that puts it in the transcript -- and ChatInputBar
+        // clears its field the instant it sends, so without it the message is
+        // gone for good. Unconditional, unlike markWaitingForAgent below: a
+        // message that did not leave still has to be visible to the person who
+        // typed it, and the echo has no answer to wait for.
+        target?.appendUserMessage(text)
         if let onUserCommand {
             onUserCommand(text, activeWorkspaceId, activeSessionId)
             target?.markWaitingForAgent()
@@ -257,8 +264,8 @@ final class ClientWindowStore: ObservableObject {
     /// bubble, mirrored over the socket as user_input) in this window's chat,
     /// and switches to the session it was sent to -- submitting from the
     /// quick-capture bubble should bring this window up showing what was
-    /// typed. Messages sent from this window's own input bar are echoed
-    /// by ChatView instead; those never come back over the socket.
+    /// typed. Messages sent from this window's own input bar are echoed by
+    /// sendMessage instead; those never come back over the socket.
     ///
     /// - Returns: whether it landed in an existing session (an unknown
     ///   workspace/session is dropped rather than fabricated, same rule as

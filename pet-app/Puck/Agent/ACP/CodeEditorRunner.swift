@@ -70,12 +70,37 @@ func withDeadline<Value>(
     seconds: TimeInterval,
     work: @escaping () async -> Value
 ) async -> Value? {
+    await withDeadline(seconds: seconds, suspendedWhile: { false }, work: work)
+}
+
+/// The same deadline, but one that does not run while `suspendedWhile` holds.
+///
+/// A CLI chat turn calls Puck's tools through an MCP server, and a tool can
+/// sit on an approval prompt for as long as the user takes to read it. Charged
+/// against the turn's own deadline, a slow reader would see the chat give up
+/// on the CLI at the moment they pressed 허용. Time spent serving the agent is
+/// not time spent waiting on it, so it is not counted.
+func withDeadline<Value>(
+    seconds: TimeInterval,
+    suspendedWhile isSuspended: @escaping () -> Bool,
+    work: @escaping () async -> Value
+) async -> Value? {
     let outcome = FirstOutcome<Value?>()
     return await withCheckedContinuation { (continuation: CheckedContinuation<Value?, Never>) in
         outcome.arm(continuation)
         Task { outcome.resolve(await work()) }
         Task {
-            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            // Ticked rather than slept in one go, because the budget only
+            // advances while nothing is suspending it. The tick also ends the
+            // timer task once `work` has answered, so a 180s deadline does not
+            // leave a task alive for 180s after every turn.
+            let tick: TimeInterval = 0.05
+            var spent: TimeInterval = 0
+            while spent < seconds {
+                try? await Task.sleep(nanoseconds: UInt64(tick * 1_000_000_000))
+                if outcome.isResolved { return }
+                if !isSuspended() { spent += tick }
+            }
             outcome.resolve(nil)
         }
     }
@@ -85,6 +110,7 @@ func withDeadline<Value>(
 private final class FirstOutcome<Value> {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value, Never>?
+    private var resolved = false
 
     /// Called before either racer starts, so there is no window in which a
     /// result arrives with nothing to hand it to.
@@ -92,10 +118,16 @@ private final class FirstOutcome<Value> {
         lock.lock(); self.continuation = continuation; lock.unlock()
     }
 
+    var isResolved: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return resolved
+    }
+
     func resolve(_ value: Value) {
         lock.lock()
         let waiting = continuation
         continuation = nil
+        resolved = true
         lock.unlock()
         waiting?.resume(returning: value)
     }

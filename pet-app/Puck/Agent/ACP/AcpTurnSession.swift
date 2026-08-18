@@ -57,6 +57,11 @@ final class AcpTurnSession {
     private let connection: AcpConnection
     /// What `session/new` opens the agent on.
     private let cwd: String
+    /// `session/new`'s `mcpServers`, passed through untouched. Empty for a
+    /// code_editor run; the CLI-backed chat turn puts its own in-process MCP
+    /// server here, which is how the agent reaches Puck's tools at all
+    /// (PuckMCPServer).
+    private let mcpServers: [JSONValue]
     private let onUpdate: (AcpSessionUpdate) -> Void
     private let resolvePermission: AcpPermissionResolver
     /// The agent's stderr so far, read only when a failure has to be explained.
@@ -70,12 +75,14 @@ final class AcpTurnSession {
     init(
         connection: AcpConnection,
         cwd: String,
+        mcpServers: [JSONValue] = [],
         onUpdate: @escaping (AcpSessionUpdate) -> Void = { _ in },
         resolvePermission: @escaping AcpPermissionResolver = { _ in false },
         stderrTail: @escaping () -> String = { "" }
     ) {
         self.connection = connection
         self.cwd = cwd
+        self.mcpServers = mcpServers
         self.onUpdate = onUpdate
         self.resolvePermission = resolvePermission
         self.stderrTail = stderrTail
@@ -113,7 +120,7 @@ final class AcpTurnSession {
                 method: AcpMethod.sessionNew,
                 params: .object([
                     "cwd": .string(cwd),
-                    "mcpServers": .array([]),
+                    "mcpServers": .array(mcpServers),
                 ])
             )
             guard let sessionID = created["sessionId"]?.stringValue else {

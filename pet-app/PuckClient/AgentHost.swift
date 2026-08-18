@@ -135,6 +135,18 @@ final class AgentHost {
                 workingDirectory: { [weak self] in
                     guard let self else { return NSHomeDirectory() }
                     return self.resolveProjectPath(self.activeWorkspaceId) ?? NSHomeDirectory()
+                },
+                // Only the CLI provider reads this too: it hands Puck's tools
+                // to the CLI as an MCP server and calls back in here for each
+                // one, so a tool the CLI invokes takes the same approval gate,
+                // the same execution routes and emits the same events as one
+                // the model asked for directly. `runner` is assigned by the
+                // time any turn can run.
+                invokeTool: { [weak self] name, arguments in
+                    guard let self else {
+                        return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
+                    }
+                    return await self.runner.invokeTool(name: name, arguments: arguments)
                 }
             ),
             dispatcher: dispatcher,

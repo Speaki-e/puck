@@ -18,6 +18,10 @@ struct ChatSidebarView: View {
     /// Presented by the "새 워크스페이스" button; the folder picker itself is
     /// AppKit's, since SwiftUI has no directory-choosing equivalent.
     @State private var isAddingWorkspace = false
+    /// The chat whose "삭제" was picked, held until the confirmation is
+    /// answered. Deleting a chat throws away everything said in it and there
+    /// is no undo, so the menu item asks rather than acts.
+    @State private var pendingDeletion: SessionSelection?
 
     var body: some View {
         List(selection: selection) {
@@ -26,6 +30,17 @@ struct ChatSidebarView: View {
                     ForEach(store.sessions(in: workspace.id)) { session in
                         ChatSessionRow(session: session)
                             .tag(SessionSelection(workspaceId: workspace.id, sessionId: session.id))
+                            .contextMenu {
+                                // Right-click on the row rather than a visible
+                                // button: destructive, rarely wanted, and a
+                                // trash icon on every row is a mis-click
+                                // waiting to happen in a list you navigate by
+                                // clicking.
+                                Button("삭제", role: .destructive) {
+                                    pendingDeletion = SessionSelection(workspaceId: workspace.id, sessionId: session.id)
+                                }
+                                .disabled(!store.canDeleteSession(workspaceId: workspace.id, sessionId: session.id))
+                            }
                     }
                 } header: {
                     WorkspaceHeader(workspace: workspace) {
@@ -55,6 +70,18 @@ struct ChatSidebarView: View {
         }
         .sheet(isPresented: $isAddingWorkspace) {
             NewWorkspaceSheet(store: store)
+        }
+        .confirmationDialog(
+            "이 대화를 삭제할까요?",
+            isPresented: .init(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+            presenting: pendingDeletion
+        ) { target in
+            Button("삭제", role: .destructive) {
+                store.deleteSession(workspaceId: target.workspaceId, sessionId: target.sessionId)
+            }
+            Button("취소", role: .cancel) {}
+        } message: { _ in
+            Text("주고받은 내용이 모두 사라지고, 되돌릴 수 없어요.")
         }
     }
 

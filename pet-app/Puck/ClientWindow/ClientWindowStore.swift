@@ -118,6 +118,40 @@ final class ClientWindowStore: ObservableObject {
         sessionOrder.removeAll { $0 == key }
     }
 
+    /// Whether the sidebar's "삭제" should be offered for this chat.
+    ///
+    /// Two chats it is never offered for. The workspace's casual session:
+    /// protocol 3.4 keeps `session_id: "default"` present under every
+    /// workspace, and deleteSession falls back to it, so it has to survive. And
+    /// one the agent is still working in: the stop button lives inside that
+    /// chat, so deleting it would leave a run going with nothing left on screen
+    /// to stop it.
+    func canDeleteSession(workspaceId: String, sessionId: String) -> Bool {
+        guard sessionId != Self.defaultSessionId else { return false }
+        return session(workspaceId: workspaceId, sessionId: sessionId)?.isRunning == false
+    }
+
+    /// Deletes a chat and everything said in it.
+    ///
+    /// Local-only, like the close in moveTurnToTaskSession: protocol 3.4 has no
+    /// "session deleted" message to send, and replayForNewClient replays
+    /// workspaces but never sessions, so nothing brings this one back. pet-app's
+    /// SessionRegistry keeps its record, which is harmless -- handleChatEvent
+    /// already drops events for a session this store does not know.
+    ///
+    /// - Returns: whether it was deleted.
+    @discardableResult
+    func deleteSession(workspaceId: String, sessionId: String) -> Bool {
+        guard canDeleteSession(workspaceId: workspaceId, sessionId: sessionId) else { return false }
+        removeSession(SessionKey(workspaceId: workspaceId, sessionId: sessionId))
+        // Deleting the chat on screen has to leave the user somewhere, and the
+        // casual session is the one that is guaranteed to still be there.
+        if activeWorkspaceId == workspaceId, activeSessionId == sessionId {
+            activeSessionId = Self.defaultSessionId
+        }
+        return true
+    }
+
     /// Sessions under `workspaceId`, oldest first.
     func sessions(in workspaceId: String) -> [ChatSession] {
         sessionOrder.compactMap { $0.workspaceId == workspaceId ? sessionsByKey[$0] : nil }

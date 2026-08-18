@@ -208,6 +208,72 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(transport.broadcasted, [.workspaceCreateRequest(name: "cat house", projectPath: "/tmp/cat-house")])
     }
 
+    // MARK: - Deleting a chat
+    //
+    // Local-only, like the close in moveTurnToTaskSession: protocol 3.4 has no
+    // "session deleted" message, and replayForNewClient replays workspaces but
+    // never sessions, so a deleted chat does not come back on reconnect.
+
+    func test_deleteSession_removesItFromItsWorkspace() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertTrue(store.deleteSession(workspaceId: "default", sessionId: "s9"))
+
+        XCTAssertEqual(store.sessions(in: "default").map(\.id), ["default"])
+        XCTAssertNil(store.session(workspaceId: "default", sessionId: "s9"))
+    }
+
+    /// Deleting the chat you are looking at has to leave you somewhere: the
+    /// workspace's casual session is the one place guaranteed to still exist.
+    func test_deleteSession_whileItIsOpen_fallsBackToTheCasualSession() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+        store.activeSessionId = "s9"
+
+        store.deleteSession(workspaceId: "default", sessionId: "s9")
+
+        XCTAssertEqual(store.activeWorkspaceId, "default")
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
+    /// Protocol 3.4 keeps `session_id: "default"` present under every
+    /// workspace, and the fallback above needs somewhere to land -- so the
+    /// casual session is the one chat that cannot be deleted.
+    func test_deleteSession_refusesTheCasualSession() {
+        let (store, _) = makeStore()
+
+        XCTAssertFalse(store.canDeleteSession(workspaceId: "default", sessionId: "default"))
+        XCTAssertFalse(store.deleteSession(workspaceId: "default", sessionId: "default"))
+        XCTAssertEqual(store.sessions(in: "default").count, 1)
+    }
+
+    /// The stop button lives inside the chat. Deleting one mid-run would leave
+    /// the agent working with nothing left on screen to stop it.
+    func test_deleteSession_refusesWhileTheAgentIsStillWorking() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+        store.session(workspaceId: "default", sessionId: "s9")?.markWaitingForAgent()
+
+        XCTAssertFalse(store.canDeleteSession(workspaceId: "default", sessionId: "s9"))
+        XCTAssertFalse(store.deleteSession(workspaceId: "default", sessionId: "s9"))
+        XCTAssertNotNil(store.session(workspaceId: "default", sessionId: "s9"))
+    }
+
+    /// Same reason the insert announces: the sidebar reads the session list
+    /// through `sessions(in:)`, which is not `@Published`.
+    func test_deleteSession_announcesTheChange() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+        var announcements = 0
+        let subscription = store.objectWillChange.sink { _ in announcements += 1 }
+        defer { subscription.cancel() }
+
+        store.deleteSession(workspaceId: "default", sessionId: "s9")
+
+        XCTAssertGreaterThan(announcements, 0)
+    }
+
     /// `sessionsByKey`/`sessionOrder` are not `@Published`, so an insert that
     /// does not announce itself leaves the sidebar drawing from a stale
     /// snapshot -- in the running app that showed as a workspace whose chats

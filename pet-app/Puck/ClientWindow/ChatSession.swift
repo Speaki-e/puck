@@ -141,21 +141,29 @@ final class ChatSession: ObservableObject, Identifiable {
     /// The opening question and the answer to it -- the material a title is
     /// read off. Nil until both halves exist: a chat with nothing said in it,
     /// or one whose run produced only tool calls, has no topic to name yet.
+    ///
+    /// The *last* thing the agent said before the next question, not the
+    /// first. A run that uses tools usually opens with a placeholder ("확인해
+    /// 볼게요") and says what it actually found at the end -- naming the chat
+    /// off the opener would title every one of them after the throat-clearing.
     var firstExchange: (user: String, reply: String)? {
         var user: String?
+        var reply: String?
         for entry in timeline {
             switch entry {
-            case .userMessage(_, let text) where user == nil:
+            case .userMessage(_, let text):
+                // The second question begins a turn this title is not about.
+                if user != nil { return reply.map { (user!, $0) } }
                 user = text
             case .assistantText(_, let text):
-                if let user, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    return (user, text)
-                }
+                guard user != nil, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                reply = text
             default:
                 continue
             }
         }
-        return nil
+        guard let user, let reply else { return nil }
+        return (user, reply)
     }
 
     /// Renames the chat after what the model read the exchange to be about.

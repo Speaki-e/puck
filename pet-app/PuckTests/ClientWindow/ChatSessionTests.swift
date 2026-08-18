@@ -100,6 +100,32 @@ final class ChatSessionTests: XCTestCase {
         XCTAssertNil(session.firstExchange)
     }
 
+    /// A tool-using run opens with a placeholder and says what it found at
+    /// the end. Naming the chat off the opener titles every one of them after
+    /// the throat-clearing.
+    func test_firstExchange_takesTheAgentsLastWordNotItsFirst() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("로그인이 안 돼")
+        session.apply(.textChunk(text: "확인해 볼게요"))
+        session.apply(.toolCall(id: "t1", tool: "read_file", args: nil, detail: nil))
+        session.apply(.toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil))
+        session.apply(.textChunk(text: "세션 만료 처리에서 토큰을 지우고 있었어요"))
+
+        XCTAssertEqual(session.firstExchange?.reply, "세션 만료 처리에서 토큰을 지우고 있었어요")
+    }
+
+    /// The second question starts a turn the title is not about.
+    func test_firstExchange_stopsAtTheSecondQuestion() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("첫 질문")
+        session.apply(.textChunk(text: "첫 답"))
+        session.appendUserMessage("둘째 질문")
+        session.apply(.textChunk(text: "둘째 답"))
+
+        XCTAssertEqual(session.firstExchange?.user, "첫 질문")
+        XCTAssertEqual(session.firstExchange?.reply, "첫 답")
+    }
+
     func test_applyTopicTitle_renamesAnAutoNamedChat() {
         let session = makeUnnamedSession()
         session.appendUserMessage("로그인이 안 돼")

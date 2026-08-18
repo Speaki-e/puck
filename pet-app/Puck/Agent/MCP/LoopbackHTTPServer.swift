@@ -1,0 +1,405 @@
+//
+//  LoopbackHTTPServer.swift
+//  Puck
+//
+//  A single-purpose HTTP/1.1 listener for the MCP server the CLI provider
+//  hands its coding agent. Network.framework, no dependency: what is needed is
+//  one POST endpoint, and an HTTP stack for that is a package to keep updated.
+//
+//  ## This is a server on a user's machine, so:
+//
+//  - It binds to 127.0.0.1 only, over the loopback interface only. Nothing off
+//    the machine can reach it even on a shared network.
+//  - The port is the OS's choice, per instance. A fixed port would be a known
+//    address for anything else on the machine to try.
+//  - Every request must carry `Authorization: Bearer <token>` with the token
+//    generated for *this* instance, compared in constant time. Reaching the
+//    port is not access: a request without it gets 401 and nothing else, and
+//    the body is never even parsed.
+//  - The listener lives exactly as long as the turn that started it. `stop()`
+//    is idempotent and the turn calls it on every exit path.
+//
+
+import Foundation
+import Network
+import Security
+
+final class LoopbackHTTPServer {
+    /// Where the server ended up, and what it takes to talk to it.
+    struct Endpoint: Equatable {
+        let port: UInt16
+        let token: String
+
+        var url: String { "http://127.0.0.1:\(port)/mcp" }
+        var authorizationHeaderValue: String { "Bearer \(token)" }
+    }
+
+    enum StartFailure: LocalizedError, Equatable {
+        case listenerFailed(String)
+        case noPort
+
+        var errorDescription: String? {
+            switch self {
+            case .listenerFailed(let detail): return "로컬 서버를 열지 못했습니다: \(detail)"
+            case .noPort: return "로컬 서버가 포트를 얻지 못했습니다."
+            }
+        }
+    }
+
+    /// Answers one request body. nil means "accepted, nothing to say", which
+    /// becomes a 202 with no content.
+    typealias Handler = (Data) async -> Data?
+
+    /// Bodies larger than this are refused unread. Nothing legitimate here is
+    /// close to it -- a tools/call is a few hundred bytes -- and an unbounded
+    /// read on a socket anything local can connect to is a memory bomb.
+    static let maximumBodyBytes = 1 << 20
+
+    private let handler: Handler
+    private let queue = DispatchQueue(label: "com.speaki-e.puck.mcp.http")
+    private let lock = NSLock()
+    private var listener: NWListener?
+    /// Held for as long as the socket is open. The session owns the escaping
+    /// read/write closures, and nothing else refers to it -- dropped here it
+    /// would be deallocated the moment `accept` returned, and every request on
+    /// that socket would go unanswered.
+    private var sessions: [ObjectIdentifier: HTTPConnection] = [:]
+    private var isStopped = false
+    private var endpoint: Endpoint?
+
+    init(handler: @escaping Handler) {
+        self.handler = handler
+    }
+
+    // MARK: - Lifecycle
+
+    /// Opens the listener and returns once it is actually accepting. Throws
+    /// rather than returning a half-open server: the caller has to put a
+    /// reachable URL into `session/new`, and a URL for a port nothing is
+    /// listening on would fail later, inside the agent, as an MCP error nobody
+    /// can read.
+    func start() async throws -> Endpoint {
+        let parameters = NWParameters.tcp
+        parameters.allowLocalEndpointReuse = true
+        // Both, deliberately: the required endpoint decides what the socket is
+        // bound to (127.0.0.1, never 0.0.0.0), the interface type decides what
+        // it will accept.
+        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: .any)
+        parameters.requiredInterfaceType = .loopback
+
+        let listener: NWListener
+        do {
+            listener = try NWListener(using: parameters)
+        } catch {
+            throw StartFailure.listenerFailed(String(describing: error))
+        }
+
+        lock.lock()
+        if isStopped {
+            lock.unlock()
+            listener.cancel()
+            throw StartFailure.listenerFailed("stopped before start")
+        }
+        self.listener = listener
+        lock.unlock()
+
+        listener.newConnectionHandler = { [weak self] connection in
+            self?.accept(connection)
+        }
+
+        let ready = ResumeOnce<Result<Void, Error>>()
+        let outcome: Result<Void, Error> = await withCheckedContinuation { continuation in
+            ready.arm(continuation)
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    ready.resolve(.success(()))
+                case .failed(let error):
+                    ready.resolve(.failure(StartFailure.listenerFailed(String(describing: error))))
+                case .cancelled:
+                    ready.resolve(.failure(StartFailure.listenerFailed("cancelled")))
+                default:
+                    break
+                }
+            }
+            listener.start(queue: queue)
+        }
+        try outcome.get()
+
+        guard let port = listener.port?.rawValue, port != 0 else {
+            stop()
+            throw StartFailure.noPort
+        }
+        let endpoint = Endpoint(port: port, token: Self.makeToken())
+        lock.lock(); self.endpoint = endpoint; lock.unlock()
+        return endpoint
+    }
+
+    /// Closes the listener and every connection still open on it. Idempotent:
+    /// the turn's success, failure, timeout and cancel paths all call it, and
+    /// two of them can run.
+    func stop() {
+        lock.lock()
+        if isStopped { lock.unlock(); return }
+        isStopped = true
+        let listener = self.listener
+        let sessions = Array(self.sessions.values)
+        self.listener = nil
+        self.sessions.removeAll()
+        lock.unlock()
+
+        listener?.stateUpdateHandler = nil
+        listener?.newConnectionHandler = nil
+        listener?.cancel()
+        for session in sessions { session.close() }
+    }
+
+    deinit { stop() }
+
+    // MARK: - Connections
+
+    private func accept(_ connection: NWConnection) {
+        lock.lock()
+        if isStopped {
+            lock.unlock()
+            connection.cancel()
+            return
+        }
+        let token = endpoint?.token ?? ""
+        let session = HTTPConnection(
+            connection: connection,
+            token: token,
+            handler: handler,
+            onClose: { [weak self] in self?.forget(connection) }
+        )
+        sessions[ObjectIdentifier(connection)] = session
+        lock.unlock()
+
+        session.start(on: queue)
+    }
+
+    private func forget(_ connection: NWConnection) {
+        lock.lock()
+        sessions.removeValue(forKey: ObjectIdentifier(connection))
+        lock.unlock()
+    }
+
+    // MARK: - Token
+
+    /// 256 bits from the system CSPRNG, hex-encoded. Per instance, never
+    /// stored: it exists for the lifetime of one turn's listener.
+    static func makeToken() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        if SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) != errSecSuccess {
+            for index in bytes.indices { bytes[index] = UInt8.random(in: .min ... .max) }
+        }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Compares without leaking where two tokens first differ. Length is
+    /// compared up front, which is unavoidable and not secret.
+    static func constantTimeEquals(_ lhs: String, _ rhs: String) -> Bool {
+        let left = Array(lhs.utf8)
+        let right = Array(rhs.utf8)
+        guard left.count == right.count, !left.isEmpty else { return false }
+        var difference: UInt8 = 0
+        for index in left.indices { difference |= left[index] ^ right[index] }
+        return difference == 0
+    }
+}
+
+/// Resumes a continuation exactly once, whichever state update gets there
+/// first. NWListener reports `.failed` after `.ready` on a listener that dies,
+/// and resuming twice traps.
+private final class ResumeOnce<Value> {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Never>?
+    private var isDone = false
+
+    func arm(_ continuation: CheckedContinuation<Value, Never>) {
+        lock.lock(); self.continuation = continuation; lock.unlock()
+    }
+
+    func resolve(_ value: Value) {
+        lock.lock()
+        let waiting = isDone ? nil : continuation
+        isDone = true
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(returning: value)
+    }
+}
+
+/// One accepted connection: reads requests, authenticates them, and writes
+/// answers. Persistent by default -- an MCP client sends initialize,
+/// tools/list and every tool call down the same socket.
+private final class HTTPConnection {
+    private let connection: NWConnection
+    private let token: String
+    private let handler: LoopbackHTTPServer.Handler
+    private let onClose: () -> Void
+
+    private var buffer = Data()
+    private var isClosed = false
+
+    init(
+        connection: NWConnection,
+        token: String,
+        handler: @escaping LoopbackHTTPServer.Handler,
+        onClose: @escaping () -> Void
+    ) {
+        self.connection = connection
+        self.token = token
+        self.handler = handler
+        self.onClose = onClose
+    }
+
+    func start(on queue: DispatchQueue) {
+        connection.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .failed, .cancelled:
+                self?.close()
+            default:
+                break
+            }
+        }
+        connection.start(queue: queue)
+        receive()
+    }
+
+    private func receive() {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
+            guard let self, !self.isClosed else { return }
+            if let data, !data.isEmpty {
+                self.buffer.append(data)
+                if self.buffer.count > LoopbackHTTPServer.maximumBodyBytes {
+                    self.respond(status: 413, headers: [:], body: Data(), thenClose: true)
+                    return
+                }
+                self.consume()
+                return
+            }
+            if isComplete || error != nil {
+                self.close()
+                return
+            }
+            self.receive()
+        }
+    }
+
+    /// Parses whatever whole request is in the buffer. A chunk that ends
+    /// mid-header or mid-body is normal on a socket, so anything short just
+    /// goes back to reading.
+    private func consume() {
+        let separator = Data("\r\n\r\n".utf8)
+        guard let headEnd = buffer.range(of: separator) else {
+            receive()
+            return
+        }
+        let head = String(decoding: buffer[buffer.startIndex..<headEnd.lowerBound], as: UTF8.self)
+        let lines = head.components(separatedBy: "\r\n")
+        guard let requestLine = lines.first else {
+            respond(status: 400, headers: [:], body: Data(), thenClose: true)
+            return
+        }
+        let method = requestLine.split(separator: " ").first.map(String.init) ?? ""
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let name = line[line.startIndex..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            headers[name] = value
+        }
+
+        let contentLength = headers["content-length"].flatMap(Int.init) ?? 0
+        guard contentLength <= LoopbackHTTPServer.maximumBodyBytes else {
+            respond(status: 413, headers: [:], body: Data(), thenClose: true)
+            return
+        }
+        let bodyStart = headEnd.upperBound
+        guard buffer.distance(from: bodyStart, to: buffer.endIndex) >= contentLength else {
+            receive()
+            return
+        }
+        let bodyEnd = buffer.index(bodyStart, offsetBy: contentLength)
+        let body = Data(buffer[bodyStart..<bodyEnd])
+        buffer = Data(buffer[bodyEnd...])
+
+        let wantsClose = headers["connection"]?.lowercased() == "close"
+
+        // Authentication before anything else is looked at, including the
+        // method: reaching the port must buy nothing.
+        let presented = headers["authorization"] ?? ""
+        guard LoopbackHTTPServer.constantTimeEquals(presented, "Bearer \(token)") else {
+            respond(
+                status: 401,
+                headers: ["WWW-Authenticate": "Bearer"],
+                body: Data(),
+                thenClose: true
+            )
+            return
+        }
+
+        guard method == "POST" else {
+            // GET is the client asking to open a server-initiated SSE stream
+            // and DELETE is it ending a session; this server has neither, and
+            // the MCP spec has the client carry on when they are refused.
+            respond(status: 405, headers: ["Allow": "POST"], body: Data(), thenClose: wantsClose)
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+            guard let answer = await self.handler(body) else {
+                self.respond(status: 202, headers: [:], body: Data(), thenClose: wantsClose)
+                return
+            }
+            self.respond(
+                status: 200,
+                headers: ["Content-Type": "application/json"],
+                body: answer,
+                thenClose: wantsClose
+            )
+        }
+    }
+
+    private func respond(status: Int, headers: [String: String], body: Data, thenClose: Bool) {
+        var head = "HTTP/1.1 \(status) \(Self.reason(for: status))\r\n"
+        head += "Content-Length: \(body.count)\r\n"
+        for (name, value) in headers { head += "\(name): \(value)\r\n" }
+        head += thenClose ? "Connection: close\r\n" : "Connection: keep-alive\r\n"
+        head += "\r\n"
+
+        var payload = Data(head.utf8)
+        payload.append(body)
+        connection.send(content: payload, completion: .contentProcessed { [weak self] _ in
+            guard let self, !self.isClosed else { return }
+            if thenClose {
+                self.close()
+            } else {
+                // Whatever arrived behind this request is already buffered.
+                self.consume()
+            }
+        })
+    }
+
+    func close() {
+        guard !isClosed else { return }
+        isClosed = true
+        connection.stateUpdateHandler = nil
+        connection.cancel()
+        onClose()
+    }
+
+    private static func reason(for status: Int) -> String {
+        switch status {
+        case 200: return "OK"
+        case 202: return "Accepted"
+        case 400: return "Bad Request"
+        case 401: return "Unauthorized"
+        case 405: return "Method Not Allowed"
+        case 413: return "Payload Too Large"
+        default: return "Error"
+        }
+    }
+}

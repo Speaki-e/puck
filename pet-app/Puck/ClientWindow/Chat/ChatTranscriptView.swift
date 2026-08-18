@@ -308,21 +308,13 @@ private struct DoneRow: View {
 /// EmptyTranscript, which the native rewrite dropped -- a new chat opened onto
 /// a blank rectangle with no indication it was ready for input.
 private struct EmptyTranscript: View {
-    @Environment(\.clientPalette) private var palette
-
     var body: some View {
-        VStack(spacing: 12) {
-            Text("🎃")
-                .font(.system(size: 34))
-                .frame(width: 72, height: 72)
-                .background(palette.accent.opacity(0.12), in: .circle)
-            VStack(spacing: 4) {
-                Text("무엇을 도와드릴까요?")
-                    .font(.title3.weight(.semibold))
-                Text("코드든 잡담이든, 편하게 말 걸어보세요.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+        VStack(spacing: 4) {
+            Text("무엇을 도와드릴까요?")
+                .font(.title3.weight(.semibold))
+            Text("코드든 잡담이든, 편하게 말 걸어보세요.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

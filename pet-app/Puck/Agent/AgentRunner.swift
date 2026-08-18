@@ -134,6 +134,32 @@ final class AgentRunner {
         announcedWorkspaceContexts[sessionId] = announcedWorkspaceContexts[sourceSessionId]
     }
 
+    /// How many non-system messages a chat keeps. Nothing trimmed the stack
+    /// before, so a long chat grew every turn until it hit the model's context
+    /// limit -- which surfaces to the user as an unexplained API error partway
+    /// through a conversation that had been working.
+    private static let maxMessages = 60
+
+    /// Drops the oldest turns once a chat is over the cap.
+    ///
+    /// System lines are kept whatever their age -- there are a handful of them
+    /// (the prompt, and one per workspace the chat has seen) and losing one
+    /// would silently un-tell the model something it was told once. The head of
+    /// what is kept is never a tool result: the API rejects one whose
+    /// assistant tool_calls message has been trimmed away above it.
+    private func trimConversation(_ key: String) {
+        let stack = conversation(key)
+        var systems: [GPTMessage] = []
+        var rest: [GPTMessage] = []
+        for message in stack {
+            if case .system = message { systems.append(message) } else { rest.append(message) }
+        }
+        guard rest.count > Self.maxMessages else { return }
+        var kept = Array(rest.suffix(Self.maxMessages))
+        while let first = kept.first, case .tool = first { kept.removeFirst() }
+        conversations[key] = systems + kept
+    }
+
     /// Drops a deleted chat's conversation. The user threw it away; the model
     /// should not still be holding it.
     func forgetSession(_ sessionId: String) {
@@ -237,6 +263,7 @@ final class AgentRunner {
             announcedWorkspaceContexts[key] = workspaceContext
         }
         append(.user(command), to: key)
+        trimConversation(key)
         emit(.agentThinking)
 
         for _ in 0..<Self.maxTurns {

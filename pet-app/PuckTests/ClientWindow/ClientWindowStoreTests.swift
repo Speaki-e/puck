@@ -346,6 +346,21 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.activeSessionId, "default")
     }
 
+    /// The chat a task session was branched out of is closed, so the agent's
+    /// memory of it has to go too -- the branch was handed a copy.
+    func test_moveTurnToTaskSession_announcesTheClosedChatAsDeleted() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "source", title: "출처", origin: .user))
+        var forgotten: [String] = []
+        store.onSessionDeleted = { _, sessionId in forgotten.append(sessionId) }
+
+        store.moveTurnToTaskSession(
+            workspaceId: "default", from: "source", to: "task", title: "작업", userMessage: "고쳐줘"
+        )
+
+        XCTAssertEqual(forgotten, ["source"])
+    }
+
     func test_requestNewSession_delegatesToSender() {
         let (store, transport) = makeStore()
 

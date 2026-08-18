@@ -243,6 +243,9 @@ final class ClientWindowStore: ObservableObject {
 
         guard sourceSessionId != Self.defaultSessionId, sourceSessionId != sessionId else { return }
         removeSession(SessionKey(workspaceId: workspaceId, sessionId: sourceSessionId))
+        // The chat is gone, so the agent's memory of it should be too. The
+        // task session was handed a copy on the way out, so nothing is lost.
+        onSessionDeleted?(workspaceId, sourceSessionId)
     }
 
     private func updateWorkspace(_ workspaceId: String, _ mutate: (inout ClientWorkspace) -> Void) {

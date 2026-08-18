@@ -195,11 +195,10 @@ final class ClientWindowStore: ObservableObject {
                 // leave them to notice a new sidebar entry on their own.
                 activeWorkspaceId = workspaceId
                 activeSessionId = sessionId
-            } else if pendingSessionWorkspaceId == workspaceId {
-                // This is the chat our own "새 대화" button asked for. Spend
-                // the arming as we go, so exactly one session follows one
-                // press.
-                pendingSessionWorkspaceId = nil
+            } else if let waiting = pendingSessionRequests[workspaceId], waiting > 0 {
+                // This is a chat our own "새 대화" button asked for. Spend one
+                // press as we go, so one session follows one press.
+                pendingSessionRequests[workspaceId] = waiting - 1
                 activeWorkspaceId = workspaceId
                 activeSessionId = sessionId
             }
@@ -277,14 +276,18 @@ final class ClientWindowStore: ObservableObject {
         sender.createWorkspace(name: name, projectPath: projectPath)
     }
 
-    /// The workspace whose "새 대화" this window asked for and has not seen come
-    /// back yet. The session id is minted on the other side, so the button
-    /// cannot switch to its chat at press time -- it arms this, and the
-    /// matching session_create spends it. Scoped to our own request on
-    /// purpose: a user-origin session created from anywhere else arrives
-    /// identically, and following that one would move the chat out from under
-    /// whoever is typing here.
-    private var pendingSessionWorkspaceId: String?
+    /// How many "새 대화" presses each workspace is still waiting on. The
+    /// session id is minted on the other side, so the button cannot switch to
+    /// its chat at press time -- a press arms this, and the matching
+    /// session_create spends one. Scoped to our own requests on purpose: a
+    /// user-origin session created from anywhere else arrives identically, and
+    /// following that one would move the chat out from under whoever is typing
+    /// here.
+    ///
+    /// A count rather than a flag: pressing twice quickly makes two chats, and
+    /// with a flag only the first arrival switched, leaving the user in the
+    /// older of the two chats they just asked for.
+    private var pendingSessionRequests: [String: Int] = [:]
 
     @discardableResult
     func requestNewSession(title: String, in workspaceId: String) -> UserInputDelivery {
@@ -292,7 +295,7 @@ final class ClientWindowStore: ObservableObject {
         // Only on `.sent`: a request that never left has no session coming,
         // and leaving this armed would hand the next unrelated session_create
         // a switch it never asked for.
-        if delivery == .sent { pendingSessionWorkspaceId = workspaceId }
+        if delivery == .sent { pendingSessionRequests[workspaceId, default: 0] += 1 }
         return delivery
     }
 
@@ -342,6 +345,17 @@ final class ClientWindowStore: ObservableObject {
     /// - Returns: whether it landed in an existing session (an unknown
     ///   workspace/session is dropped rather than fabricated, same rule as
     ///   handleChatEvent).
+    /// The sidebar's own selection. Goes through the store rather than setting
+    /// the two ids directly so that picking a chat by hand also puts down any
+    /// "새 대화" still armed -- a request whose confirmation never arrived would
+    /// otherwise stay armed indefinitely and jump the user away from the chat
+    /// they chose the next time any user-origin session turned up.
+    func selectSession(workspaceId: String, sessionId: String) {
+        pendingSessionRequests.removeValue(forKey: workspaceId)
+        activeWorkspaceId = workspaceId
+        activeSessionId = sessionId
+    }
+
     @discardableResult
     func showUserMessage(_ text: String, workspaceId: String?, sessionId: String?) -> Bool {
         let workspaceId = workspaceId ?? Self.defaultWorkspaceId

@@ -93,8 +93,7 @@ struct ChatSidebarView: View {
             get: { SessionSelection(workspaceId: store.activeWorkspaceId, sessionId: store.activeSessionId) },
             set: { newValue in
                 guard let newValue else { return }
-                store.activeWorkspaceId = newValue.workspaceId
-                store.activeSessionId = newValue.sessionId
+                store.selectSession(workspaceId: newValue.workspaceId, sessionId: newValue.sessionId)
             }
         )
     }

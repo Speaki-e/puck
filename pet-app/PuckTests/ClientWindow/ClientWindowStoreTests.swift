@@ -346,6 +346,34 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.activeSessionId, "default")
     }
 
+    /// Two quick presses make two chats, and the user should land in the
+    /// second -- with a single flag only the first arrival switched, leaving
+    /// them in the older of the two they had just asked for.
+    func test_twoPresses_landOnTheSecondChat() {
+        let (store, _) = makeStore()
+
+        store.requestNewSession(title: "새 대화", in: "default")
+        store.requestNewSession(title: "새 대화", in: "default")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s1", title: "새 대화", origin: .user))
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s2", title: "새 대화", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "s2")
+    }
+
+    /// Picking a chat by hand puts down anything still armed. A request whose
+    /// confirmation never arrived would otherwise stay armed indefinitely and
+    /// jump the user out of the chat they chose.
+    func test_choosingAChatByHand_disarmsAStaleRequest() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "existing", title: "이전 대화", origin: .user))
+
+        store.requestNewSession(title: "새 대화", in: "default")   // confirmation never arrives
+        store.selectSession(workspaceId: "default", sessionId: "existing")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "elsewhere", title: "남의 대화", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "existing")
+    }
+
     /// The chat a task session was branched out of is closed, so the agent's
     /// memory of it has to go too -- the branch was handed a copy.
     func test_moveTurnToTaskSession_announcesTheClosedChatAsDeleted() {

@@ -226,7 +226,9 @@ final class AgentRunner {
 
         var promptLine: String {
             guard let projectPath else {
-                return "Current workspace: \(name). No project folder is bound to it, so there are no files to read or list."
+                return "Current workspace: \(name). No project folder is bound to it, so the file tools have nothing to read. "
+                    + "If the user asks about code or files, say that this workspace has no project folder, and that they can switch "
+                    + "to one that has a project in the sidebar or make one with 새 워크스페이스 -- never ask them to paste files to you."
             }
             return "Current workspace: \(name), bound to the project at \(projectPath). "
                 + "\"this project\" / \"this directory\" / \"여기\" mean that folder. "

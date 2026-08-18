@@ -239,6 +239,48 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.isRunning, true)
     }
 
+    /// The transcript is the only place a sent message survives: ChatInputBar
+    /// clears its field the moment it sends, so a send that is not echoed here
+    /// erases what the user typed outright. Asserted on the store for the same
+    /// reason the running state is -- it is the one funnel every send goes
+    /// through, and the chat view that used to echo got rewritten away.
+    func test_sendMessage_echoesWhatTheUserTypedIntoTheTranscript() {
+        let (store, _) = makeStore()
+
+        store.sendMessage("사파리 켜줘", source: .text)
+
+        let timeline = store.session(workspaceId: "default", sessionId: "default")?.timeline ?? []
+        XCTAssertEqual(timeline.count, 1)
+        guard case .userMessage(_, let text) = timeline.first else {
+            return XCTFail("expected userMessage, got \(String(describing: timeline.first))")
+        }
+        XCTAssertEqual(text, "사파리 켜줘")
+    }
+
+    /// Same, on the in-process agent path the shipping app actually takes --
+    /// its early `.sent` return must not skip the echo.
+    func test_sendMessage_toTheLocalAgent_echoesWhatTheUserTyped() {
+        let (store, _) = makeStore()
+        store.onUserCommand = { _, _, _ in }
+
+        store.sendMessage("사파리 켜줘", source: .text)
+
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.timeline.count, 1)
+    }
+
+    /// An undelivered message still echoes. Unlike the running state -- which
+    /// is withheld because no answer is coming -- the echo has nothing to wait
+    /// for, and the composer has already cleared: dropping it too would lose
+    /// the text with nothing on screen to show it ever existed.
+    func test_sendMessage_undelivered_stillEchoesWhatTheUserTyped() {
+        let (store, transport) = makeStore()
+        transport.hasConnectedClients = false
+
+        XCTAssertEqual(store.sendMessage("사파리 켜줘", source: .text), .notDelivered)
+
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.timeline.count, 1)
+    }
+
     /// Same, on the in-process agent path -- which is the one the shipping app
     /// actually takes, and the one whose deliberate `.sent` shortcut must not
     /// be mistaken for "nothing was delivered".

@@ -18,7 +18,7 @@ import Foundation
 enum ChatTimelineEntry: Equatable {
     /// The user's own sent message -- BridgeEvent never carries this (it's
     /// workspace -> pet-app only), so ChatSession.appendUserMessage mints it
-    /// locally the moment the chat view sends, rather than folding it from
+    /// locally the moment the store sends, rather than folding it from
     /// an event like every other case here.
     case userMessage(id: UUID, text: String)
     case assistantText(id: UUID, text: String)
@@ -127,8 +127,9 @@ final class ChatSession: ObservableObject, Identifiable {
         self.origin = origin
     }
 
-    /// Local echo of the user's own send -- called by ChatView, not folded
-    /// from a BridgeEvent (protocol never sends the user's own text back).
+    /// Local echo of the user's own send -- called by ClientWindowStore, not
+    /// folded from a BridgeEvent (protocol never sends the user's own text
+    /// back).
     func appendUserMessage(_ text: String) {
         timeline.append(.userMessage(id: UUID(), text: text))
     }

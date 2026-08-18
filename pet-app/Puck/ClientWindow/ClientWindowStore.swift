@@ -85,9 +85,37 @@ final class ClientWindowStore: ObservableObject {
     }
 
     private func seedDefaultSession(forWorkspace workspaceId: String) {
-        let key = SessionKey(workspaceId: workspaceId, sessionId: Self.defaultSessionId)
-        sessionsByKey[key] = ChatSession(id: Self.defaultSessionId, workspaceId: workspaceId, title: Self.casualSessionTitle, origin: .user)
+        insertSession(ChatSession(id: Self.defaultSessionId, workspaceId: workspaceId, title: Self.casualSessionTitle, origin: .user))
+    }
+
+    /// The one way a session joins the list. `sessionsByKey`/`sessionOrder`
+    /// are not `@Published` (the sidebar reads them through `sessions(in:)`),
+    /// so an insert has to announce itself the way the removal in
+    /// moveTurnToTaskSession does -- a sidebar drawn from a stale snapshot
+    /// drops rows that exist and leaves the selection under the wrong header.
+    /// Funnelled rather than repeated at each call site: the announcement is
+    /// exactly the kind of thing a fourth insert added later would forget.
+    ///
+    /// Ignores a key already present, which is the idempotence every caller
+    /// wanted anyway: pet-app replays its registry on connect, and F15's agent
+    /// announces its task session on the socket *and* opens it locally, so the
+    /// same session legitimately arrives twice. Re-creating would wipe the
+    /// messages already in it and duplicate the sidebar row.
+    private func insertSession(_ session: ChatSession) {
+        let key = SessionKey(workspaceId: session.workspaceId, sessionId: session.id)
+        guard sessionsByKey[key] == nil else { return }
+        objectWillChange.send()
+        sessionsByKey[key] = session
         sessionOrder.append(key)
+    }
+
+    /// The one way a session leaves the list -- the mirror of insertSession,
+    /// and it announces for the same reason.
+    private func removeSession(_ key: SessionKey) {
+        guard sessionsByKey[key] != nil else { return }
+        objectWillChange.send()
+        sessionsByKey.removeValue(forKey: key)
+        sessionOrder.removeAll { $0 == key }
     }
 
     /// Sessions under `workspaceId`, oldest first.
@@ -122,17 +150,7 @@ final class ClientWindowStore: ObservableObject {
             }
 
         case .sessionCreate(let workspaceId, let sessionId, let title, let origin):
-            let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)
-            // Idempotent: F15's own agent announces its task session on the
-            // socket *and* moves the turn into it locally (moveTurnToTaskSession),
-            // and pet-app relays the announcement back to this very app -- so
-            // the same session_create legitimately arrives twice. Re-creating
-            // would wipe the messages already moved in and duplicate the
-            // sidebar row.
-            if sessionsByKey[key] == nil {
-                sessionsByKey[key] = ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: origin)
-                sessionOrder.append(key)
-            }
+            insertSession(ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: origin))
             if origin == .agent {
                 // The agent branching a casual chat into a task
                 // session should bring the user along automatically, not
@@ -170,10 +188,7 @@ final class ClientWindowStore: ObservableObject {
         userMessage: String
     ) {
         let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)
-        if sessionsByKey[key] == nil {
-            sessionsByKey[key] = ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: .agent)
-            sessionOrder.append(key)
-        }
+        insertSession(ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: .agent))
         if !userMessage.isEmpty {
             sessionsByKey[key]?.appendUserMessage(userMessage)
         }
@@ -182,12 +197,7 @@ final class ClientWindowStore: ObservableObject {
         activeSessionId = sessionId
 
         guard sourceSessionId != Self.defaultSessionId, sourceSessionId != sessionId else { return }
-        // sessionOrder/sessionsByKey aren't @Published (the sidebar reads them
-        // through sessions(in:)), so the removal has to announce itself.
-        objectWillChange.send()
-        let sourceKey = SessionKey(workspaceId: workspaceId, sessionId: sourceSessionId)
-        sessionsByKey.removeValue(forKey: sourceKey)
-        sessionOrder.removeAll { $0 == sourceKey }
+        removeSession(SessionKey(workspaceId: workspaceId, sessionId: sourceSessionId))
     }
 
     private func updateWorkspace(_ workspaceId: String, _ mutate: (inout ClientWorkspace) -> Void) {

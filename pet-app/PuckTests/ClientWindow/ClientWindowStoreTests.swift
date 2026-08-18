@@ -8,6 +8,7 @@
 //  to the right session (plan/02_pet-app.md F13, plan/01_protocol.md 3.4/3.5).
 //
 
+import Combine
 import XCTest
 @testable import Puck
 
@@ -205,6 +206,24 @@ final class ClientWindowStoreTests: XCTestCase {
         store.requestNewWorkspace(name: "cat house", projectPath: "/tmp/cat-house")
 
         XCTAssertEqual(transport.broadcasted, [.workspaceCreateRequest(name: "cat house", projectPath: "/tmp/cat-house")])
+    }
+
+    /// `sessionsByKey`/`sessionOrder` are not `@Published`, so an insert that
+    /// does not announce itself leaves the sidebar drawing from a stale
+    /// snapshot -- in the running app that showed as a workspace whose chats
+    /// had vanished, with the selection highlight sitting under the wrong
+    /// header. The removal in moveTurnToTaskSession already announces; every
+    /// insert has to as well.
+    func test_sessionCreate_announcesTheChange_soTheSidebarRedraws() {
+        let (store, _) = makeStore()
+        var announcements = 0
+        let subscription = store.objectWillChange.sink { _ in announcements += 1 }
+        defer { subscription.cancel() }
+
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertGreaterThan(announcements, 0)
+        XCTAssertEqual(store.sessions(in: "default").count, 2)
     }
 
     func test_requestNewSession_delegatesToSender() {

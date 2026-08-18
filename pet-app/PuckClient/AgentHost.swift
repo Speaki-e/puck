@@ -63,6 +63,11 @@ final class AgentHost {
     /// every file a code_editor run touches: asking to be shown code should
     /// put it on screen, and watching one get written should follow along.
     var onRevealInEditor: ((_ workspaceId: String, _ path: String) -> Void)?
+    /// Fired once a run has fully finished, with the chat it belonged to.
+    /// Naming a chat needs the agent's answer as well as the question, so it
+    /// cannot happen when the message is sent -- this is the first moment both
+    /// halves exist.
+    var onRunFinished: ((_ workspaceId: String, _ sessionId: String) -> Void)?
 
     /// Set by AppDelegate: the local side of open_task_session, which has no
     /// socket message behind it (protocol 3.4 can create a session but not
@@ -350,6 +355,10 @@ final class AgentHost {
             // answer that can never arrive (the window closed, the transcript
             // moved on), and a continuation left suspended is a leak.
             self.failPendingApprovals()
+            // Addressed to the chat the run started in, not the active one: a
+            // run can move itself into a task session, and the user can click
+            // away to another chat while it works.
+            await MainActor.run { self.onRunFinished?(workspaceId, sessionId) }
         }
     }
 

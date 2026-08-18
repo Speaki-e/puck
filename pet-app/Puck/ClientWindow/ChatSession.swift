@@ -120,11 +120,53 @@ final class ChatSession: ObservableObject, Identifiable {
         return nil
     }
 
+    /// Whether the name is one this app picked for itself, and may therefore
+    /// replace. False for a task session the agent named through
+    /// open_task_session and for the casual "일상 대화" -- renaming either out
+    /// from under its owner is not a refinement, it is a loss.
+    let isAutoTitled: Bool
+
+    /// Set once the model has named this chat after the first exchange, so a
+    /// second run does not pay for a second title.
+    private(set) var hasTopicTitle = false
+
     init(id: String, workspaceId: String, title: String, origin: SessionOrigin) {
         self.id = id
         self.workspaceId = workspaceId
         self.title = title
         self.origin = origin
+        self.isAutoTitled = title == Self.placeholderTitle
+    }
+
+    /// The opening question and the answer to it -- the material a title is
+    /// read off. Nil until both halves exist: a chat with nothing said in it,
+    /// or one whose run produced only tool calls, has no topic to name yet.
+    var firstExchange: (user: String, reply: String)? {
+        var user: String?
+        for entry in timeline {
+            switch entry {
+            case .userMessage(_, let text) where user == nil:
+                user = text
+            case .assistantText(_, let text):
+                if let user, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return (user, text)
+                }
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    /// Renames the chat after what the model read the exchange to be about.
+    /// Ignored for a chat this app did not name, and ignored twice over --
+    /// the first topic stands, later runs do not re-title.
+    func applyTopicTitle(_ topic: String) {
+        guard isAutoTitled, !hasTopicTitle else { return }
+        let trimmed = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        hasTopicTitle = true
+        title = Self.title(fromFirstMessage: trimmed)
     }
 
     /// The name a chat carries until something is said in it. Matched on

@@ -550,6 +550,29 @@ final class CodingAgentCLIClientTests: XCTestCase {
         }
     }
 
+    /// The MCP server now starts before the agent does, so the fast-fail for
+    /// a CLI that is not installed has to survive it: still immediate, still
+    /// the same sentence, and with nothing left listening.
+    func test_send_stillFailsFastForAMissingCLI_andLeavesNoPortOpen() async {
+        let client = CodingAgentCLIClient(
+            configuration: { cliConfiguration() },
+            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            startAgent: { _, _ in throw AcpAgentCommandError.vendorCLINotFound(.codex) }
+        )
+
+        let before = Date()
+        do {
+            _ = try await client.send(messages: [.user("hi")], tools: toolSpecs())
+            XCTFail("a missing CLI must fail the turn")
+        } catch {
+            XCTAssertEqual(
+                (error as? LocalizedError)?.errorDescription,
+                "codex CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요."
+            )
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(before), 5, "it must fail, not hang")
+    }
+
     /// No host to run tools means no server to advertise -- and the prompt
     /// (asserted elsewhere) says so rather than naming tools that aren't there.
     func test_send_advertisesNoMcpServerWhenThereIsNoHostToRunTools() async throws {

@@ -127,12 +127,48 @@ final class ChatSession: ObservableObject, Identifiable {
         self.origin = origin
     }
 
+    /// The name a chat carries until something is said in it. Matched on
+    /// rather than a separate "has been named" flag: the placeholder *is* the
+    /// state, and a flag could disagree with the title shown in the sidebar.
+    static let placeholderTitle = "새 대화"
+
     /// Local echo of the user's own send -- called by ClientWindowStore, not
     /// folded from a BridgeEvent (protocol never sends the user's own text
     /// back).
+    ///
+    /// Also where a chat gets its name: a sidebar of rows all called "새 대화"
+    /// is one you cannot navigate. Only while the title is still the
+    /// placeholder, which leaves alone both the casual session ("일상 대화",
+    /// the always-present entry point under every workspace) and a task
+    /// session the agent already named through open_task_session -- the latter
+    /// matters because moveTurnToTaskSession feeds it the message that started
+    /// it, which would otherwise overwrite the agent's title immediately.
     func appendUserMessage(_ text: String) {
+        if title == Self.placeholderTitle {
+            title = Self.title(fromFirstMessage: text)
+        }
         timeline.append(.userMessage(id: UUID(), text: text))
     }
+
+    /// What the chat turned out to be about, taken from the first thing said
+    /// in it. Deliberately not a model call: naming is wanted the instant the
+    /// message is sent, and a summary that costs a round trip would land after
+    /// the answer it was meant to label -- for a one-line sidebar row the
+    /// opening line is as good a topic as a paraphrase of it.
+    ///
+    /// First line only, whitespace collapsed: a pasted stack trace or a
+    /// numbered list of repro steps is a paragraph, and a row is one line.
+    static func title(fromFirstMessage text: String) -> String {
+        let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let collapsed = firstLine.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !collapsed.isEmpty else { return placeholderTitle }
+        guard collapsed.count > Self.titleLimit else { return collapsed }
+        return collapsed.prefix(Self.titleLimit).trimmingCharacters(in: .whitespaces) + "…"
+    }
+
+    /// Chosen against the sidebar's own width (180-280pt): long enough to tell
+    /// two chats apart, short enough that the row truncates rarely.
+    private static let titleLimit = 28
 
     /// The send landed, so the agent owes an answer -- shown as the "생각 중"
     /// row until the first text_chunk replaces it -- the user should see that

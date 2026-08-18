@@ -42,7 +42,11 @@ final class MCPToolCatalogTests: XCTestCase {
         XCTAssertEqual(definitions.first?["description"]?.stringValue, "Walk the pet to a point.")
     }
 
-    func test_definitions_dropCodeEditorAndNothingElse() {
+    /// Both exclusions are handoffs to a coding agent that isn't there on this
+    /// provider -- open_task_session's own description tells the model to call
+    /// code_editor next. Everything else must survive, so a tool added to the
+    /// registry reaches the CLI without anyone remembering to list it here.
+    func test_definitions_dropTheCodingHandoffsAndNothingElse() {
         let specs = ToolRegistry.all.map {
             GPTToolSpec(name: $0.name, description: $0.name, parameters: $0.parameters)
         }
@@ -50,8 +54,9 @@ final class MCPToolCatalogTests: XCTestCase {
         let names = MCPToolCatalog.definitions(for: specs).compactMap { $0["name"]?.stringValue }
 
         XCTAssertFalse(names.contains("code_editor"))
-        XCTAssertEqual(names.count, ToolRegistry.all.count - 1)
-        for tool in ToolRegistry.all where tool.name != "code_editor" {
+        XCTAssertFalse(names.contains("open_task_session"))
+        XCTAssertEqual(names.count, ToolRegistry.all.count - MCPToolCatalog.excludedToolNames.count)
+        for tool in ToolRegistry.all where !MCPToolCatalog.excludedToolNames.contains(tool.name) {
             XCTAssertTrue(names.contains(tool.name), "\(tool.name) must be reachable from the CLI")
         }
     }

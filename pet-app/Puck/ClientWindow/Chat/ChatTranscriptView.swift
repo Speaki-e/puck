@@ -106,7 +106,16 @@ struct ChatTranscriptView: View {
             )
 
         case .done(_, let ok, let summary):
-            DoneRow(ok: ok, summary: summary)
+            // Only failures get a row. A successful run's summary *is* the
+            // answer the model just gave, which is already the bubble directly
+            // above -- rendering both printed every reply twice. The answer is
+            // its own completion signal; a failure has nothing above it to
+            // read, so that one still needs saying.
+            if ok {
+                EmptyView()
+            } else {
+                DoneRow(ok: ok, summary: summary)
+            }
         }
     }
 

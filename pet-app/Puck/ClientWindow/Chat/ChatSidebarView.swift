@@ -43,9 +43,7 @@ struct ChatSidebarView: View {
                             }
                     }
                 } header: {
-                    WorkspaceHeader(workspace: workspace) {
-                        store.requestNewSession(title: ChatSession.placeholderTitle, in: workspace.id)
-                    }
+                    WorkspaceHeader(workspace: workspace)
                 }
             }
         }
@@ -106,34 +104,15 @@ struct SessionSelection: Hashable {
 
 private struct WorkspaceHeader: View {
     let workspace: ClientWorkspace
-    let onNewSession: () -> Void
 
+    // No new-chat button here. It lived in this header so it could name its
+    // own workspace, but a section header styles its contents as small
+    // secondary text, so it read as a stray glyph in the corner. The toolbar's
+    // 새 대화 (⌘N) acts on the workspace being looked at, which is what the
+    // action means nearly every time; switching first is the cost, and it is
+    // smaller than a control nobody finds.
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            name
-            Spacer(minLength: 4)
-            // In the header rather than one button in the bottom bar: the
-            // sidebar lists every workspace at once, so a single "새 대화"
-            // would have to mean "in whichever one is selected" -- and the
-            // one you want a chat in is not always the one you are looking
-            // at. Per header, the button names its own workspace.
-            // A section header styles its contents as small secondary text,
-            // which shrank this to a low-contrast glyph in the corner. The
-            // size, weight and tint are set explicitly so the header's own
-            // styling can't take them back, and the 22pt square gives it a
-            // target you can actually hit -- a bare Image is only hittable on
-            // the drawn pixels of the glyph.
-            Button(action: onNewSession) {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 22, height: 22)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.borderless)
-            .tint(.accentColor)
-            .help("\(workspace.name)에 새 대화")
-            .accessibilityLabel("새 대화")
-        }
+        name
     }
 
     private var name: some View {

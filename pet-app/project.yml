@@ -72,6 +72,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.Puck
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: Puck/Resources/Puck.entitlements
     # Puck/ClientWindow/Editor is sourced by this target too (the whole
     # `Puck` folder is), so it needs the same editor-pane package dependency
@@ -169,6 +170,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckClient
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIconClient
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: PuckClient/Resources/PuckClient.entitlements
     dependencies:
       - package: CodeEditSourceEditor

@@ -24,6 +24,177 @@ final class AgentRunnerTests: XCTestCase {
         }
     }
 
+    /// Records what the model was actually shown, which is the only way to
+    /// see one chat's context leaking into another.
+    private final class RecordingLLMClient: AgentLLMClient {
+        private(set) var lastMessages: [GPTMessage] = []
+        /// Sleeps inside `send`, so a test can replace the run while it is
+        /// where a real run spends nearly all its time.
+        var stallNanoseconds: UInt64 = 0
+
+        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+            lastMessages = messages
+            if stallNanoseconds > 0 { try? await Task.sleep(nanoseconds: stallNanoseconds) }
+            return GPTTurn(text: "ok", toolCalls: [])
+        }
+
+        var lastUserTexts: [String] {
+            lastMessages.compactMap { if case .user(let t) = $0 { return t } else { return nil } }
+        }
+
+        var lastSystemTexts: [String] {
+            lastMessages.compactMap { if case .system(let t) = $0 { return t } else { return nil } }
+        }
+    }
+
+    private func makeRecordingRunner() -> (AgentRunner, RecordingLLMClient) {
+        let client = RecordingLLMClient()
+        let runner = AgentRunner(
+            client: client,
+            dispatcher: PetToolDispatcher(send: { _ in false }),
+            approve: { _, _ in false },
+            emit: { _ in }
+        )
+        return (runner, client)
+    }
+
+    // MARK: - One conversation per chat
+
+    /// The bug this exists for: every chat in the app shared one message
+    /// stack, so a new chat opened with the previous one's conversation
+    /// already in it -- including another workspace's "no project folder is
+    /// bound to it, so there are no files to read or list", which the model
+    /// then repeated at a chat whose workspace did have one.
+    func test_aSecondChat_doesNotSeeTheFirstOnesMessages() async {
+        let (runner, client) = makeRecordingRunner()
+
+        runner.sessionId = "chat-1"
+        await runner.run(command: "첫 대화의 질문")
+
+        runner.sessionId = "chat-2"
+        await runner.run(command: "두 번째 대화의 질문")
+
+        XCTAssertEqual(client.lastUserTexts, ["두 번째 대화의 질문"])
+    }
+
+    /// The other half: going back to a chat has to bring its own history with
+    /// it, or the model contradicts the transcript the user is looking at.
+    func test_returningToAChat_stillHasItsOwnHistory() async {
+        let (runner, client) = makeRecordingRunner()
+
+        runner.sessionId = "chat-1"
+        await runner.run(command: "첫 질문")
+        runner.sessionId = "chat-2"
+        await runner.run(command: "다른 대화")
+        runner.sessionId = "chat-1"
+        await runner.run(command: "이어서")
+
+        XCTAssertEqual(client.lastUserTexts, ["첫 질문", "이어서"])
+    }
+
+    /// The workspace line is per chat too -- it was announced once per runner,
+    /// so a chat opened later under a different workspace never heard about
+    /// its own.
+    func test_eachChatHearsItsOwnWorkspaceLine() async {
+        let (runner, client) = makeRecordingRunner()
+
+        runner.sessionId = "chat-1"
+        runner.workspaceContext = AgentRunner.WorkspaceContext(name: "기본 워크스페이스", projectPath: nil)
+        await runner.run(command: "안녕")
+
+        runner.sessionId = "chat-2"
+        runner.workspaceContext = AgentRunner.WorkspaceContext(name: "치ㅑ", projectPath: "/tmp/cli")
+        await runner.run(command: "이 프로젝트 분석해줘")
+
+        let systems = client.lastSystemTexts
+        XCTAssertTrue(systems.contains { $0.contains("/tmp/cli") }, "got \(systems)")
+        XCTAssertFalse(
+            systems.contains { $0.contains("No project folder is bound") },
+            "the other workspace's line must not be in this chat: \(systems)"
+        )
+    }
+
+    /// Announced once per chat, not once per turn.
+    func test_theWorkspaceLine_isNotRepeatedEveryTurn() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.sessionId = "chat-1"
+        runner.workspaceContext = AgentRunner.WorkspaceContext(name: "puck", projectPath: "/tmp/puck")
+
+        await runner.run(command: "하나")
+        await runner.run(command: "둘")
+
+        XCTAssertEqual(client.lastSystemTexts.filter { $0.contains("/tmp/puck") }.count, 1)
+    }
+
+    /// A task session is a branch of the conversation that opened it, not a
+    /// fresh one -- the agent has to remember what it was asked to do.
+    func test_carryConversation_movesTheHistoryIntoTheTaskSession() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.sessionId = "casual"
+        await runner.run(command: "이 버그 고쳐줘")
+
+        runner.carryConversation(from: "casual", to: "task")
+        runner.sessionId = "task"
+        await runner.run(command: "계속")
+
+        XCTAssertEqual(client.lastUserTexts, ["이 버그 고쳐줘", "계속"])
+    }
+
+    /// Deleting a chat has to take its conversation with it; otherwise the
+    /// model keeps what the user just threw away.
+    func test_forgetSession_dropsThatChatsConversation() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.sessionId = "chat-1"
+        await runner.run(command: "지워질 이야기")
+
+        runner.forgetSession("chat-1")
+        await runner.run(command: "새 이야기")
+
+        XCTAssertEqual(client.lastUserTexts, ["새 이야기"])
+    }
+
+    /// A run keeps executing after it is cancelled until it next checks, and
+    /// `sessionId` by then belongs to whichever chat replaced it. The dying
+    /// run's answer must not land there.
+    func test_aCancelledRun_doesNotWriteIntoTheChatThatReplacedIt() async {
+        let (runner, client) = makeRecordingRunner()
+        client.stallNanoseconds = 200_000_000
+
+        runner.sessionId = "chat-1"
+        let first = Task { await runner.run(command: "느린 질문") }
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        first.cancel()
+        runner.sessionId = "chat-2"
+        await runner.run(command: "두 번째 대화의 질문")
+        await first.value
+
+        XCTAssertEqual(client.lastUserTexts, ["두 번째 대화의 질문"])
+    }
+
+    /// Nothing trimmed the stack before, so a long chat grew every turn until
+    /// it hit the model's context limit.
+    func test_aLongChat_isTrimmedToACap() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.sessionId = "chat-1"
+
+        for i in 0..<80 { await runner.run(command: "질문 \(i)") }
+
+        XCTAssertLessThan(client.lastMessages.count, 80)
+        XCTAssertEqual(client.lastUserTexts.last, "질문 79")
+    }
+
+    /// Trimming keeps the system lines whatever their age: they are few, and
+    /// dropping one silently un-tells the model something it was told once.
+    func test_trimming_keepsTheWorkspaceLine() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.sessionId = "chat-1"
+        runner.workspaceContext = AgentRunner.WorkspaceContext(name: "puck", projectPath: "/tmp/puck")
+
+        for i in 0..<80 { await runner.run(command: "질문 \(i)") }
+
+        XCTAssertTrue(client.lastSystemTexts.contains { $0.contains("/tmp/puck") }, "got \(client.lastSystemTexts)")
+    }
+
     func test_agentRunner_acceptsAnyAgentLLMClient() async throws {
         let fake = FakeLLMClient()
         fake.turns = [GPTTurn(text: "안녕하세요", toolCalls: [])]
@@ -308,17 +479,6 @@ final class AgentRunnerTests: XCTestCase {
     }
 
     // MARK: - invokeTool (the entry the coding CLI's MCP server lands on)
-
-    /// Records what the runner was last asked to send, so a test can prove
-    /// what did -- and did not -- get into the conversation.
-    private final class RecordingLLMClient: AgentLLMClient {
-        private(set) var lastMessages: [GPTMessage] = []
-
-        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
-            lastMessages = messages
-            return GPTTurn(text: "done", toolCalls: [])
-        }
-    }
 
     private func makeRunner(
         client: any AgentLLMClient = RecordingLLMClient(),

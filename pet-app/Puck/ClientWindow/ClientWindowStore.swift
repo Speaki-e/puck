@@ -39,6 +39,9 @@ final class ClientWindowStore: ObservableObject {
     /// wherever no agent is attached, in which case the old socket path
     /// stands.
     var onUserCommand: ((_ text: String, _ workspaceId: String, _ sessionId: String) -> Void)?
+    /// A chat was deleted. The agent keeps that chat's conversation, and the
+    /// user throwing the chat away is them throwing that away too.
+    var onSessionDeleted: ((_ workspaceId: String, _ sessionId: String) -> Void)?
     /// Same reason: approval is resolved inside this process, not by a
     /// workspace on the far side of the socket.
     var onApprovalResolved: ((_ approvalId: String, _ approved: Bool) -> Void)?
@@ -85,9 +88,72 @@ final class ClientWindowStore: ObservableObject {
     }
 
     private func seedDefaultSession(forWorkspace workspaceId: String) {
-        let key = SessionKey(workspaceId: workspaceId, sessionId: Self.defaultSessionId)
-        sessionsByKey[key] = ChatSession(id: Self.defaultSessionId, workspaceId: workspaceId, title: Self.casualSessionTitle, origin: .user)
+        insertSession(ChatSession(id: Self.defaultSessionId, workspaceId: workspaceId, title: Self.casualSessionTitle, origin: .user))
+    }
+
+    /// The one way a session joins the list. `sessionsByKey`/`sessionOrder`
+    /// are not `@Published` (the sidebar reads them through `sessions(in:)`),
+    /// so an insert has to announce itself the way the removal in
+    /// moveTurnToTaskSession does -- a sidebar drawn from a stale snapshot
+    /// drops rows that exist and leaves the selection under the wrong header.
+    /// Funnelled rather than repeated at each call site: the announcement is
+    /// exactly the kind of thing a fourth insert added later would forget.
+    ///
+    /// Ignores a key already present, which is the idempotence every caller
+    /// wanted anyway: pet-app replays its registry on connect, and F15's agent
+    /// announces its task session on the socket *and* opens it locally, so the
+    /// same session legitimately arrives twice. Re-creating would wipe the
+    /// messages already in it and duplicate the sidebar row.
+    private func insertSession(_ session: ChatSession) {
+        let key = SessionKey(workspaceId: session.workspaceId, sessionId: session.id)
+        guard sessionsByKey[key] == nil else { return }
+        objectWillChange.send()
+        sessionsByKey[key] = session
         sessionOrder.append(key)
+    }
+
+    /// The one way a session leaves the list -- the mirror of insertSession,
+    /// and it announces for the same reason.
+    private func removeSession(_ key: SessionKey) {
+        guard sessionsByKey[key] != nil else { return }
+        objectWillChange.send()
+        sessionsByKey.removeValue(forKey: key)
+        sessionOrder.removeAll { $0 == key }
+    }
+
+    /// Whether the sidebar's "삭제" should be offered for this chat.
+    ///
+    /// Two chats it is never offered for. The workspace's casual session:
+    /// protocol 3.4 keeps `session_id: "default"` present under every
+    /// workspace, and deleteSession falls back to it, so it has to survive. And
+    /// one the agent is still working in: the stop button lives inside that
+    /// chat, so deleting it would leave a run going with nothing left on screen
+    /// to stop it.
+    func canDeleteSession(workspaceId: String, sessionId: String) -> Bool {
+        guard sessionId != Self.defaultSessionId else { return false }
+        return session(workspaceId: workspaceId, sessionId: sessionId)?.isRunning == false
+    }
+
+    /// Deletes a chat and everything said in it.
+    ///
+    /// Local-only, like the close in moveTurnToTaskSession: protocol 3.4 has no
+    /// "session deleted" message to send, and replayForNewClient replays
+    /// workspaces but never sessions, so nothing brings this one back. pet-app's
+    /// SessionRegistry keeps its record, which is harmless -- handleChatEvent
+    /// already drops events for a session this store does not know.
+    ///
+    /// - Returns: whether it was deleted.
+    @discardableResult
+    func deleteSession(workspaceId: String, sessionId: String) -> Bool {
+        guard canDeleteSession(workspaceId: workspaceId, sessionId: sessionId) else { return false }
+        removeSession(SessionKey(workspaceId: workspaceId, sessionId: sessionId))
+        // Deleting the chat on screen has to leave the user somewhere, and the
+        // casual session is the one that is guaranteed to still be there.
+        if activeWorkspaceId == workspaceId, activeSessionId == sessionId {
+            activeSessionId = Self.defaultSessionId
+        }
+        onSessionDeleted?(workspaceId, sessionId)
+        return true
     }
 
     /// Sessions under `workspaceId`, oldest first.
@@ -122,21 +188,17 @@ final class ClientWindowStore: ObservableObject {
             }
 
         case .sessionCreate(let workspaceId, let sessionId, let title, let origin):
-            let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)
-            // Idempotent: F15's own agent announces its task session on the
-            // socket *and* moves the turn into it locally (moveTurnToTaskSession),
-            // and pet-app relays the announcement back to this very app -- so
-            // the same session_create legitimately arrives twice. Re-creating
-            // would wipe the messages already moved in and duplicate the
-            // sidebar row.
-            if sessionsByKey[key] == nil {
-                sessionsByKey[key] = ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: origin)
-                sessionOrder.append(key)
-            }
+            insertSession(ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: origin))
             if origin == .agent {
                 // The agent branching a casual chat into a task
                 // session should bring the user along automatically, not
                 // leave them to notice a new sidebar entry on their own.
+                activeWorkspaceId = workspaceId
+                activeSessionId = sessionId
+            } else if let waiting = pendingSessionRequests[workspaceId], waiting > 0 {
+                // This is a chat our own "새 대화" button asked for. Spend one
+                // press as we go, so one session follows one press.
+                pendingSessionRequests[workspaceId] = waiting - 1
                 activeWorkspaceId = workspaceId
                 activeSessionId = sessionId
             }
@@ -170,10 +232,7 @@ final class ClientWindowStore: ObservableObject {
         userMessage: String
     ) {
         let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)
-        if sessionsByKey[key] == nil {
-            sessionsByKey[key] = ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: .agent)
-            sessionOrder.append(key)
-        }
+        insertSession(ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: .agent))
         if !userMessage.isEmpty {
             sessionsByKey[key]?.appendUserMessage(userMessage)
         }
@@ -182,12 +241,10 @@ final class ClientWindowStore: ObservableObject {
         activeSessionId = sessionId
 
         guard sourceSessionId != Self.defaultSessionId, sourceSessionId != sessionId else { return }
-        // sessionOrder/sessionsByKey aren't @Published (the sidebar reads them
-        // through sessions(in:)), so the removal has to announce itself.
-        objectWillChange.send()
-        let sourceKey = SessionKey(workspaceId: workspaceId, sessionId: sourceSessionId)
-        sessionsByKey.removeValue(forKey: sourceKey)
-        sessionOrder.removeAll { $0 == sourceKey }
+        removeSession(SessionKey(workspaceId: workspaceId, sessionId: sourceSessionId))
+        // The chat is gone, so the agent's memory of it should be too. The
+        // task session was handed a copy on the way out, so nothing is lost.
+        onSessionDeleted?(workspaceId, sourceSessionId)
     }
 
     private func updateWorkspace(_ workspaceId: String, _ mutate: (inout ClientWorkspace) -> Void) {
@@ -219,9 +276,27 @@ final class ClientWindowStore: ObservableObject {
         sender.createWorkspace(name: name, projectPath: projectPath)
     }
 
+    /// How many "새 대화" presses each workspace is still waiting on. The
+    /// session id is minted on the other side, so the button cannot switch to
+    /// its chat at press time -- a press arms this, and the matching
+    /// session_create spends one. Scoped to our own requests on purpose: a
+    /// user-origin session created from anywhere else arrives identically, and
+    /// following that one would move the chat out from under whoever is typing
+    /// here.
+    ///
+    /// A count rather than a flag: pressing twice quickly makes two chats, and
+    /// with a flag only the first arrival switched, leaving the user in the
+    /// older of the two chats they just asked for.
+    private var pendingSessionRequests: [String: Int] = [:]
+
     @discardableResult
     func requestNewSession(title: String, in workspaceId: String) -> UserInputDelivery {
-        sender.createSession(workspaceId: workspaceId, title: title)
+        let delivery = sender.createSession(workspaceId: workspaceId, title: title)
+        // Only on `.sent`: a request that never left has no session coming,
+        // and leaving this armed would hand the next unrelated session_create
+        // a switch it never asked for.
+        if delivery == .sent { pendingSessionRequests[workspaceId, default: 0] += 1 }
+        return delivery
     }
 
     /// Routes through whichever workspace/session is currently active.
@@ -234,6 +309,13 @@ final class ClientWindowStore: ObservableObject {
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
         let target = session(workspaceId: activeWorkspaceId, sessionId: activeSessionId)
+        // The user's own text never comes back over the socket, so this echo is
+        // the only thing that puts it in the transcript -- and ChatInputBar
+        // clears its field the instant it sends, so without it the message is
+        // gone for good. Unconditional, unlike markWaitingForAgent below: a
+        // message that did not leave still has to be visible to the person who
+        // typed it, and the echo has no answer to wait for.
+        target?.appendUserMessage(text)
         if let onUserCommand {
             onUserCommand(text, activeWorkspaceId, activeSessionId)
             target?.markWaitingForAgent()
@@ -257,12 +339,23 @@ final class ClientWindowStore: ObservableObject {
     /// bubble, mirrored over the socket as user_input) in this window's chat,
     /// and switches to the session it was sent to -- submitting from the
     /// quick-capture bubble should bring this window up showing what was
-    /// typed. Messages sent from this window's own input bar are echoed
-    /// by ChatView instead; those never come back over the socket.
+    /// typed. Messages sent from this window's own input bar are echoed by
+    /// sendMessage instead; those never come back over the socket.
     ///
     /// - Returns: whether it landed in an existing session (an unknown
     ///   workspace/session is dropped rather than fabricated, same rule as
     ///   handleChatEvent).
+    /// The sidebar's own selection. Goes through the store rather than setting
+    /// the two ids directly so that picking a chat by hand also puts down any
+    /// "새 대화" still armed -- a request whose confirmation never arrived would
+    /// otherwise stay armed indefinitely and jump the user away from the chat
+    /// they chose the next time any user-origin session turned up.
+    func selectSession(workspaceId: String, sessionId: String) {
+        pendingSessionRequests.removeValue(forKey: workspaceId)
+        activeWorkspaceId = workspaceId
+        activeSessionId = sessionId
+    }
+
     @discardableResult
     func showUserMessage(_ text: String, workspaceId: String?, sessionId: String?) -> Bool {
         let workspaceId = workspaceId ?? Self.defaultWorkspaceId

@@ -5,3 +5,6 @@ tmp-screenshots/
 # AI-generated planning/analysis/design docs -- not committed automatically
 docs/superpowers/
 .superpowers/
+
+# graphify knowledge graph output
+graphify-out/

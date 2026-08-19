@@ -16,6 +16,167 @@ final class ChatSessionTests: XCTestCase {
         ChatSession(id: "s2", workspaceId: "w1", title: "Fix the bug", origin: .agent)
     }
 
+    private func makeUnnamedSession() -> ChatSession {
+        ChatSession(id: "s3", workspaceId: "w1", title: ChatSession.placeholderTitle, origin: .user)
+    }
+
+    // MARK: - Naming a chat after what it is about
+    //
+    // A sidebar of chats all called "새 대화" is a sidebar you cannot navigate.
+    // The first thing said in one is what it turned out to be about, so that is
+    // what names it -- no model call, nothing to wait for, and it is already on
+    // screen by the time the agent starts answering.
+
+    func test_theFirstUserMessage_namesAnUnnamedChat() {
+        let session = makeUnnamedSession()
+
+        session.appendUserMessage("사파리 켜줘")
+
+        XCTAssertEqual(session.title, "사파리 켜줘")
+    }
+
+    /// A sidebar row is one line wide. A whole paragraph pasted into the
+    /// composer has to become a name, not overflow one.
+    func test_aLongFirstMessage_isTruncatedIntoATitle() {
+        let session = makeUnnamedSession()
+
+        session.appendUserMessage(String(repeating: "가", count: 80))
+
+        XCTAssertLessThan(session.title.count, 40)
+        XCTAssertTrue(session.title.hasSuffix("…"), "got \(session.title)")
+    }
+
+    func test_aMultiLineFirstMessage_isNamedAfterItsFirstLine() {
+        let session = makeUnnamedSession()
+
+        session.appendUserMessage("로그인 버그\n재현 순서는 아래와 같아요\n1. 앱을 켠다")
+
+        XCTAssertEqual(session.title, "로그인 버그")
+    }
+
+    /// Renaming stops once the chat has a name: the second message is not what
+    /// the chat is about any more than the fifth is.
+    func test_laterMessages_doNotRenameTheChat() {
+        let session = makeUnnamedSession()
+
+        session.appendUserMessage("사파리 켜줘")
+        session.appendUserMessage("아니 크롬으로")
+
+        XCTAssertEqual(session.title, "사파리 켜줘")
+    }
+
+    /// A task session arrives already named by the agent that opened it
+    /// (open_task_session takes a title), and moveTurnToTaskSession then feeds
+    /// it the message that started it -- which must not overwrite that name.
+    func test_aChatThatAlreadyHasAName_keepsIt() {
+        let session = makeSession()
+
+        session.appendUserMessage("사파리 켜줘")
+
+        XCTAssertEqual(session.title, "Fix the bug")
+    }
+
+    // MARK: - The topic title, read off the first exchange
+
+    func test_firstExchange_isNilUntilBothHalvesExist() {
+        let session = makeUnnamedSession()
+        XCTAssertNil(session.firstExchange)
+
+        session.appendUserMessage("로그인이 안 돼")
+        XCTAssertNil(session.firstExchange, "a question with no answer is not an exchange")
+
+        session.apply(.textChunk(text: "재현 순서를 알려주세요"))
+        XCTAssertEqual(session.firstExchange?.user, "로그인이 안 돼")
+        XCTAssertEqual(session.firstExchange?.reply, "재현 순서를 알려주세요")
+    }
+
+    /// A run that only called tools has no prose to read a topic off.
+    func test_firstExchange_ignoresARunThatOnlySaidNothing() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("파일 열어줘")
+        session.apply(.toolCall(id: "t1", tool: "open_in_editor", args: nil, detail: nil))
+        session.apply(.toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil))
+
+        XCTAssertNil(session.firstExchange)
+    }
+
+    /// A tool-using run opens with a placeholder and says what it found at
+    /// the end. Naming the chat off the opener titles every one of them after
+    /// the throat-clearing.
+    func test_firstExchange_takesTheAgentsLastWordNotItsFirst() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("로그인이 안 돼")
+        session.apply(.textChunk(text: "확인해 볼게요"))
+        session.apply(.toolCall(id: "t1", tool: "read_file", args: nil, detail: nil))
+        session.apply(.toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil))
+        session.apply(.textChunk(text: "세션 만료 처리에서 토큰을 지우고 있었어요"))
+
+        XCTAssertEqual(session.firstExchange?.reply, "세션 만료 처리에서 토큰을 지우고 있었어요")
+    }
+
+    /// The second question starts a turn the title is not about.
+    func test_firstExchange_stopsAtTheSecondQuestion() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("첫 질문")
+        session.apply(.textChunk(text: "첫 답"))
+        session.appendUserMessage("둘째 질문")
+        session.apply(.textChunk(text: "둘째 답"))
+
+        XCTAssertEqual(session.firstExchange?.user, "첫 질문")
+        XCTAssertEqual(session.firstExchange?.reply, "첫 답")
+    }
+
+    func test_applyTopicTitle_renamesAnAutoNamedChat() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("로그인이 안 돼")
+
+        session.applyTopicTitle("로그인 실패 원인")
+
+        XCTAssertEqual(session.title, "로그인 실패 원인")
+        XCTAssertTrue(session.hasTopicTitle)
+    }
+
+    /// The agent named its own task session; the model naming chats must not
+    /// reach in and rename it.
+    func test_applyTopicTitle_leavesAChatItDidNotName() {
+        let session = makeSession()
+
+        session.applyTopicTitle("무언가 다른 제목")
+
+        XCTAssertEqual(session.title, "Fix the bug")
+    }
+
+    /// One title per chat: later runs are the same conversation, not a new one
+    /// to pay for.
+    func test_applyTopicTitle_onlyTakesTheFirstOne() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("로그인이 안 돼")
+
+        session.applyTopicTitle("로그인 실패 원인")
+        session.applyTopicTitle("전혀 다른 주제")
+
+        XCTAssertEqual(session.title, "로그인 실패 원인")
+    }
+
+    func test_applyTopicTitle_ignoresAnEmptyTopic() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("로그인이 안 돼")
+
+        session.applyTopicTitle("   ")
+
+        XCTAssertEqual(session.title, "로그인이 안 돼", "the first-message name has to survive a failed rename")
+        XCTAssertFalse(session.hasTopicTitle)
+    }
+
+    func test_applyTopicTitle_truncatesALongTopic() {
+        let session = makeUnnamedSession()
+        session.appendUserMessage("짧은 질문")
+
+        session.applyTopicTitle(String(repeating: "가", count: 80))
+
+        XCTAssertTrue(session.title.hasSuffix("…"), "got \(session.title)")
+    }
+
     func test_initialState_isEmptyAndNotRunning() {
         let session = makeSession()
         XCTAssertEqual(session.timeline, [])

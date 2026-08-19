@@ -59,6 +59,20 @@ struct ChatPaneView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        // Leading, and the first thing in the window's toolbar: the only other
+        // way to start a chat is the icon in a sidebar section header, which
+        // is per-workspace and therefore small and easy to miss. This one acts
+        // on the workspace already being looked at, which is what "새 대화"
+        // means nearly every time, and ⌘N is where every Mac app puts it.
+        ToolbarItem(placement: .navigation) {
+            Button {
+                store.requestNewSession(title: ChatSession.placeholderTitle, in: store.activeWorkspaceId)
+            } label: {
+                Label("새 대화", systemImage: "square.and.pencil")
+            }
+            .help("\(activeWorkspace?.name ?? "이 워크스페이스")에 새 대화")
+            .keyboardShortcut("n", modifiers: .command)
+        }
         ToolbarItem {
             Button {
                 editor = editor.toggled

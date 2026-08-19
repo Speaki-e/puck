@@ -117,10 +117,20 @@ private struct WorkspaceHeader: View {
             // would have to mean "in whichever one is selected" -- and the
             // one you want a chat in is not always the one you are looking
             // at. Per header, the button names its own workspace.
+            // A section header styles its contents as small secondary text,
+            // which shrank this to a low-contrast glyph in the corner. The
+            // size, weight and tint are set explicitly so the header's own
+            // styling can't take them back, and the 22pt square gives it a
+            // target you can actually hit -- a bare Image is only hittable on
+            // the drawn pixels of the glyph.
             Button(action: onNewSession) {
                 Image(systemName: "square.and.pencil")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 22, height: 22)
+                    .contentShape(.rect)
             }
             .buttonStyle(.borderless)
+            .tint(.accentColor)
             .help("\(workspace.name)에 새 대화")
             .accessibilityLabel("새 대화")
         }

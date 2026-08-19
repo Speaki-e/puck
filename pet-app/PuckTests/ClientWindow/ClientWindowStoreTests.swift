@@ -8,6 +8,7 @@
 //  to the right session (plan/02_pet-app.md F13, plan/01_protocol.md 3.4/3.5).
 //
 
+import Combine
 import XCTest
 @testable import Puck
 
@@ -207,6 +208,187 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(transport.broadcasted, [.workspaceCreateRequest(name: "cat house", projectPath: "/tmp/cat-house")])
     }
 
+    // MARK: - Deleting a chat
+    //
+    // Local-only, like the close in moveTurnToTaskSession: protocol 3.4 has no
+    // "session deleted" message, and replayForNewClient replays workspaces but
+    // never sessions, so a deleted chat does not come back on reconnect.
+
+    func test_deleteSession_removesItFromItsWorkspace() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertTrue(store.deleteSession(workspaceId: "default", sessionId: "s9"))
+
+        XCTAssertEqual(store.sessions(in: "default").map(\.id), ["default"])
+        XCTAssertNil(store.session(workspaceId: "default", sessionId: "s9"))
+    }
+
+    /// Deleting the chat you are looking at has to leave you somewhere: the
+    /// workspace's casual session is the one place guaranteed to still exist.
+    func test_deleteSession_whileItIsOpen_fallsBackToTheCasualSession() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+        store.activeSessionId = "s9"
+
+        store.deleteSession(workspaceId: "default", sessionId: "s9")
+
+        XCTAssertEqual(store.activeWorkspaceId, "default")
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
+    /// Protocol 3.4 keeps `session_id: "default"` present under every
+    /// workspace, and the fallback above needs somewhere to land -- so the
+    /// casual session is the one chat that cannot be deleted.
+    func test_deleteSession_refusesTheCasualSession() {
+        let (store, _) = makeStore()
+
+        XCTAssertFalse(store.canDeleteSession(workspaceId: "default", sessionId: "default"))
+        XCTAssertFalse(store.deleteSession(workspaceId: "default", sessionId: "default"))
+        XCTAssertEqual(store.sessions(in: "default").count, 1)
+    }
+
+    /// The stop button lives inside the chat. Deleting one mid-run would leave
+    /// the agent working with nothing left on screen to stop it.
+    func test_deleteSession_refusesWhileTheAgentIsStillWorking() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+        store.session(workspaceId: "default", sessionId: "s9")?.markWaitingForAgent()
+
+        XCTAssertFalse(store.canDeleteSession(workspaceId: "default", sessionId: "s9"))
+        XCTAssertFalse(store.deleteSession(workspaceId: "default", sessionId: "s9"))
+        XCTAssertNotNil(store.session(workspaceId: "default", sessionId: "s9"))
+    }
+
+    /// Same reason the insert announces: the sidebar reads the session list
+    /// through `sessions(in:)`, which is not `@Published`.
+    func test_deleteSession_announcesTheChange() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+        var announcements = 0
+        let subscription = store.objectWillChange.sink { _ in announcements += 1 }
+        defer { subscription.cancel() }
+
+        store.deleteSession(workspaceId: "default", sessionId: "s9")
+
+        XCTAssertGreaterThan(announcements, 0)
+    }
+
+    /// `sessionsByKey`/`sessionOrder` are not `@Published`, so an insert that
+    /// does not announce itself leaves the sidebar drawing from a stale
+    /// snapshot -- in the running app that showed as a workspace whose chats
+    /// had vanished, with the selection highlight sitting under the wrong
+    /// header. The removal in moveTurnToTaskSession already announces; every
+    /// insert has to as well.
+    func test_sessionCreate_announcesTheChange_soTheSidebarRedraws() {
+        let (store, _) = makeStore()
+        var announcements = 0
+        let subscription = store.objectWillChange.sink { _ in announcements += 1 }
+        defer { subscription.cancel() }
+
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertGreaterThan(announcements, 0)
+        XCTAssertEqual(store.sessions(in: "default").count, 2)
+    }
+
+    /// Pressing "새 대화" has to land the user *in* the chat it just made.
+    /// The id is minted on the other side, so the switch cannot happen at
+    /// request time -- the request arms it and the matching sessionCreate
+    /// spends it.
+    func test_requestNewSession_thenItsConfirmation_opensTheNewChat() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+
+        store.requestNewSession(title: "새 대화", in: "w2")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertEqual(store.activeWorkspaceId, "w2")
+        XCTAssertEqual(store.activeSessionId, "s9")
+    }
+
+    /// Only the request this window made switches. A user-origin session
+    /// created from somewhere else arrives the same way, and yanking the view
+    /// to it would move the chat out from under whoever is typing here.
+    func test_sessionCreate_userOrigin_withNoRequestOfOurOwn_doesNotSwitch() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "elsewhere", origin: .user))
+
+        XCTAssertEqual(store.activeWorkspaceId, "default")
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
+    /// One press, one switch: the arming is spent by the session it asked for,
+    /// so a later unrelated session does not drag the view along behind it.
+    func test_requestNewSession_armsExactlyOneSwitch() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+
+        store.requestNewSession(title: "새 대화", in: "w2")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "새 대화", origin: .user))
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s10", title: "elsewhere", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "s9")
+    }
+
+    /// A request that never left has no session coming, so it must not leave
+    /// the switch armed for whatever session_create happens to arrive next.
+    func test_requestNewSession_undelivered_armsNothing() {
+        let (store, transport) = makeStore()
+        store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
+        transport.hasConnectedClients = false
+
+        XCTAssertEqual(store.requestNewSession(title: "새 대화", in: "w2"), .notDelivered)
+        store.handleClientUpdate(.sessionCreate(workspaceId: "w2", sessionId: "s9", title: "새 대화", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "default")
+    }
+
+    /// Two quick presses make two chats, and the user should land in the
+    /// second -- with a single flag only the first arrival switched, leaving
+    /// them in the older of the two they had just asked for.
+    func test_twoPresses_landOnTheSecondChat() {
+        let (store, _) = makeStore()
+
+        store.requestNewSession(title: "새 대화", in: "default")
+        store.requestNewSession(title: "새 대화", in: "default")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s1", title: "새 대화", origin: .user))
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "s2", title: "새 대화", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "s2")
+    }
+
+    /// Picking a chat by hand puts down anything still armed. A request whose
+    /// confirmation never arrived would otherwise stay armed indefinitely and
+    /// jump the user out of the chat they chose.
+    func test_choosingAChatByHand_disarmsAStaleRequest() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "existing", title: "이전 대화", origin: .user))
+
+        store.requestNewSession(title: "새 대화", in: "default")   // confirmation never arrives
+        store.selectSession(workspaceId: "default", sessionId: "existing")
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "elsewhere", title: "남의 대화", origin: .user))
+
+        XCTAssertEqual(store.activeSessionId, "existing")
+    }
+
+    /// The chat a task session was branched out of is closed, so the agent's
+    /// memory of it has to go too -- the branch was handed a copy.
+    func test_moveTurnToTaskSession_announcesTheClosedChatAsDeleted() {
+        let (store, _) = makeStore()
+        store.handleClientUpdate(.sessionCreate(workspaceId: "default", sessionId: "source", title: "출처", origin: .user))
+        var forgotten: [String] = []
+        store.onSessionDeleted = { _, sessionId in forgotten.append(sessionId) }
+
+        store.moveTurnToTaskSession(
+            workspaceId: "default", from: "source", to: "task", title: "작업", userMessage: "고쳐줘"
+        )
+
+        XCTAssertEqual(forgotten, ["source"])
+    }
+
     func test_requestNewSession_delegatesToSender() {
         let (store, transport) = makeStore()
 
@@ -237,6 +419,48 @@ final class ClientWindowStoreTests: XCTestCase {
         store.sendMessage("사파리 켜줘", source: .text)
 
         XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.isRunning, true)
+    }
+
+    /// The transcript is the only place a sent message survives: ChatInputBar
+    /// clears its field the moment it sends, so a send that is not echoed here
+    /// erases what the user typed outright. Asserted on the store for the same
+    /// reason the running state is -- it is the one funnel every send goes
+    /// through, and the chat view that used to echo got rewritten away.
+    func test_sendMessage_echoesWhatTheUserTypedIntoTheTranscript() {
+        let (store, _) = makeStore()
+
+        store.sendMessage("사파리 켜줘", source: .text)
+
+        let timeline = store.session(workspaceId: "default", sessionId: "default")?.timeline ?? []
+        XCTAssertEqual(timeline.count, 1)
+        guard case .userMessage(_, let text) = timeline.first else {
+            return XCTFail("expected userMessage, got \(String(describing: timeline.first))")
+        }
+        XCTAssertEqual(text, "사파리 켜줘")
+    }
+
+    /// Same, on the in-process agent path the shipping app actually takes --
+    /// its early `.sent` return must not skip the echo.
+    func test_sendMessage_toTheLocalAgent_echoesWhatTheUserTyped() {
+        let (store, _) = makeStore()
+        store.onUserCommand = { _, _, _ in }
+
+        store.sendMessage("사파리 켜줘", source: .text)
+
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.timeline.count, 1)
+    }
+
+    /// An undelivered message still echoes. Unlike the running state -- which
+    /// is withheld because no answer is coming -- the echo has nothing to wait
+    /// for, and the composer has already cleared: dropping it too would lose
+    /// the text with nothing on screen to show it ever existed.
+    func test_sendMessage_undelivered_stillEchoesWhatTheUserTyped() {
+        let (store, transport) = makeStore()
+        transport.hasConnectedClients = false
+
+        XCTAssertEqual(store.sendMessage("사파리 켜줘", source: .text), .notDelivered)
+
+        XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.timeline.count, 1)
     }
 
     /// Same, on the in-process agent path -- which is the one the shipping app

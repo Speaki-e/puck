@@ -18,7 +18,7 @@ import Foundation
 enum ChatTimelineEntry: Equatable {
     /// The user's own sent message -- BridgeEvent never carries this (it's
     /// workspace -> pet-app only), so ChatSession.appendUserMessage mints it
-    /// locally the moment the chat view sends, rather than folding it from
+    /// locally the moment the store sends, rather than folding it from
     /// an event like every other case here.
     case userMessage(id: UUID, text: String)
     case assistantText(id: UUID, text: String)
@@ -120,18 +120,105 @@ final class ChatSession: ObservableObject, Identifiable {
         return nil
     }
 
+    /// Whether the name is one this app picked for itself, and may therefore
+    /// replace. False for a task session the agent named through
+    /// open_task_session and for the casual "일상 대화" -- renaming either out
+    /// from under its owner is not a refinement, it is a loss.
+    let isAutoTitled: Bool
+
+    /// Set once the model has named this chat after the first exchange, so a
+    /// second run does not pay for a second title.
+    private(set) var hasTopicTitle = false
+
     init(id: String, workspaceId: String, title: String, origin: SessionOrigin) {
         self.id = id
         self.workspaceId = workspaceId
         self.title = title
         self.origin = origin
+        self.isAutoTitled = title == Self.placeholderTitle
     }
 
-    /// Local echo of the user's own send -- called by ChatView, not folded
-    /// from a BridgeEvent (protocol never sends the user's own text back).
+    /// The opening question and the answer to it -- the material a title is
+    /// read off. Nil until both halves exist: a chat with nothing said in it,
+    /// or one whose run produced only tool calls, has no topic to name yet.
+    ///
+    /// The *last* thing the agent said before the next question, not the
+    /// first. A run that uses tools usually opens with a placeholder ("확인해
+    /// 볼게요") and says what it actually found at the end -- naming the chat
+    /// off the opener would title every one of them after the throat-clearing.
+    var firstExchange: (user: String, reply: String)? {
+        var user: String?
+        var reply: String?
+        for entry in timeline {
+            switch entry {
+            case .userMessage(_, let text):
+                // The second question begins a turn this title is not about.
+                if user != nil { return reply.map { (user!, $0) } }
+                user = text
+            case .assistantText(_, let text):
+                guard user != nil, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                reply = text
+            default:
+                continue
+            }
+        }
+        guard let user, let reply else { return nil }
+        return (user, reply)
+    }
+
+    /// Renames the chat after what the model read the exchange to be about.
+    /// Ignored for a chat this app did not name, and ignored twice over --
+    /// the first topic stands, later runs do not re-title.
+    func applyTopicTitle(_ topic: String) {
+        guard isAutoTitled, !hasTopicTitle else { return }
+        let trimmed = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        hasTopicTitle = true
+        title = Self.title(fromFirstMessage: trimmed)
+    }
+
+    /// The name a chat carries until something is said in it. Matched on
+    /// rather than a separate "has been named" flag: the placeholder *is* the
+    /// state, and a flag could disagree with the title shown in the sidebar.
+    static let placeholderTitle = "새 대화"
+
+    /// Local echo of the user's own send -- called by ClientWindowStore, not
+    /// folded from a BridgeEvent (protocol never sends the user's own text
+    /// back).
+    ///
+    /// Also where a chat gets its name: a sidebar of rows all called "새 대화"
+    /// is one you cannot navigate. Only while the title is still the
+    /// placeholder, which leaves alone both the casual session ("일상 대화",
+    /// the always-present entry point under every workspace) and a task
+    /// session the agent already named through open_task_session -- the latter
+    /// matters because moveTurnToTaskSession feeds it the message that started
+    /// it, which would otherwise overwrite the agent's title immediately.
     func appendUserMessage(_ text: String) {
+        if title == Self.placeholderTitle {
+            title = Self.title(fromFirstMessage: text)
+        }
         timeline.append(.userMessage(id: UUID(), text: text))
     }
+
+    /// What the chat turned out to be about, taken from the first thing said
+    /// in it. Deliberately not a model call: naming is wanted the instant the
+    /// message is sent, and a summary that costs a round trip would land after
+    /// the answer it was meant to label -- for a one-line sidebar row the
+    /// opening line is as good a topic as a paraphrase of it.
+    ///
+    /// First line only, whitespace collapsed: a pasted stack trace or a
+    /// numbered list of repro steps is a paragraph, and a row is one line.
+    static func title(fromFirstMessage text: String) -> String {
+        let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let collapsed = firstLine.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !collapsed.isEmpty else { return placeholderTitle }
+        guard collapsed.count > Self.titleLimit else { return collapsed }
+        return collapsed.prefix(Self.titleLimit).trimmingCharacters(in: .whitespaces) + "…"
+    }
+
+    /// Chosen against the sidebar's own width (180-280pt): long enough to tell
+    /// two chats apart, short enough that the row truncates rarely.
+    private static let titleLimit = 28
 
     /// The send landed, so the agent owes an answer -- shown as the "생각 중"
     /// row until the first text_chunk replaces it -- the user should see that

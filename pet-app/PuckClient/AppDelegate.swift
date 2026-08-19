@@ -38,6 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return AgentRunner.WorkspaceContext(name: workspace.name, projectPath: workspace.projectPath)
         }
     )
+    /// Names chats after their first exchange. Its own client rather than the
+    /// agent's: this is one small stateless call, and it must not join the
+    /// run's conversation.
+    private let chatTitler = ChatTitler(client: makeAgentLLMClient { .load() })
     private var window: ClientWindow?
     private var settingsWindow: NSWindow?
     private var clientThemeStyleObserver: NSObjectProtocol?
@@ -61,8 +65,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clientWindowStore.onApprovalResolved = { [weak self] approvalId, approved in
             self?.agentHost.resolveApproval(id: approvalId, approved: approved)
         }
+        clientWindowStore.onSessionDeleted = { [weak self] _, sessionId in
+            self?.agentHost.forgetSession(sessionId)
+        }
         clientWindowStore.onRunCancelled = { [weak self] in
             self?.agentHost.cancelPendingApprovals()
+        }
+        agentHost.onRunFinished = { [weak self] workspaceId, sessionId in
+            self?.nameChatAfterItsTopic(workspaceId: workspaceId, sessionId: sessionId)
         }
         agentHost.onRevealInEditor = { [weak self] workspaceId, _ in
             self?.clientWindowStore.revealInEditor(workspaceId: workspaceId)
@@ -211,6 +221,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Replaces the name ChatSession gave itself from the opening line with
+    /// one the model read off the whole first exchange.
+    ///
+    /// Everything that decides *whether* to ask lives on the session, so the
+    /// cost is skipped without a call: a chat the agent or the protocol named,
+    /// one already titled, and one whose run produced no answer to read.
+    private func nameChatAfterItsTopic(workspaceId: String, sessionId: String) {
+        guard let session = clientWindowStore.session(workspaceId: workspaceId, sessionId: sessionId),
+              session.isAutoTitled,
+              !session.hasTopicTitle,
+              let exchange = session.firstExchange
+        else { return }
+
+        Task { [chatTitler] in
+            guard let topic = await chatTitler.title(user: exchange.user, reply: exchange.reply) else { return }
+            await MainActor.run { session.applyTopicTitle(topic) }
+        }
     }
 
     private func showWindow() {

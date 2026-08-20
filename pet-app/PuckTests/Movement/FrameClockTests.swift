@@ -62,4 +62,29 @@ final class FrameClockTests: XCTestCase {
         clock.setFramesPerSecond(FrameClock.idleFramesPerSecond)
         XCTAssertEqual(clock.framesPerSecond, FrameClock.idleFramesPerSecond)
     }
+
+    /// The 2D target band (F1, post-RealityKit): 15-30 updates per second.
+    /// Asserted as literals rather than through the constants, because the
+    /// other tests here compare a constant to itself and would pass at any
+    /// value -- which is how 60fps survived the 3D removal unnoticed.
+    func test_rateConstants_areWithinThe2DTargetBand() {
+        XCTAssertEqual(FrameClock.activeFramesPerSecond, 30, "active rate should cap at the 2D target's ceiling")
+        XCTAssertEqual(FrameClock.idleFramesPerSecond, 15, "idle rate should sit at the 2D target's floor")
+
+        for rate in [FrameClock.activeFramesPerSecond, FrameClock.idleFramesPerSecond] {
+            XCTAssertGreaterThanOrEqual(rate, 15, "below the band the pet's motion visibly steps")
+            XCTAssertLessThanOrEqual(rate, 30, "above the band is 3D-era headroom nothing needs now")
+        }
+    }
+
+    /// A frame is the unit dt is clamped against, so the clamp has to stay
+    /// comfortably above the slowest frame interval or every idle frame would
+    /// arrive pre-clamped and time would be silently discarded.
+    func test_maxDelta_staysAboveTheSlowestFrameInterval() {
+        XCTAssertGreaterThan(FrameTicker().maxDelta, 1.0 / FrameClock.idleFramesPerSecond)
+    }
+
+    func test_defaultRate_isTheActiveRate() {
+        XCTAssertEqual(FrameClock().framesPerSecond, FrameClock.activeFramesPerSecond)
+    }
 }

@@ -6,26 +6,18 @@
 > `.glass` 테마는 폐기됐다(macOS 26+ 전용 기능 유지보수 비용 대비 실익이 낮다는 판단,
 > `docs/decisions.md`).
 >
-> 별도 사실 하나 더: F13 클라이언트 창의 사이드바/탑바/메시지 목록은 이 v2 작업보다 하루 앞선
-> 2026-08-13에 이미 `chat-web/`(React/Tailwind/shadcn)로 옮겨갔고 `ChatView.swift`/
-> `ClientSidebarView.swift`는 삭제됐다(`docs/decisions.md` "PuckClient's chat UI moved to
-> web"). `ClientWindowView.swift`가 실제로 그리는 건 `ClientChatWebView`(그 chat-web을 호스팅하는
-> WKWebView) + 조건부 네이티브 `EditorPaneView`(§9.5) + 상시 `ClientStatusBarView`(§4.5) 셋뿐이다.
-> 이번 v2는 그 레이아웃 재설계를 하지 않았다(스코프 밖, 위 스펙 §6) — 아래 §6 이하가 여전히
-> 사이드바/말풍선 레이아웃을 서술하는 건 그 이전 상태의 기록이고, 지금 pet-app Swift 코드가
-> 아니라 chat-web 쪽 이야기다. `ClientPalette`/`ClientTheme`의 실제 현재 소비처는 Settings
-> 화면(`Puck/Settings/*.swift`)과 네이티브 에디터 뷰(`Puck/ClientWindow/Editor/*.swift`,
-> `StatusDotView`/`ClientStatusBarView`) — chat-web/workspace의 CSS도 같은 원시값을 공유한다
-> (§2 참고, 확인함).
+> **v4 — 2026-08-15 채팅 UI가 네이티브 SwiftUI로 복귀.** 이 문서의 이전 판(v2/v3)은 F13
+> 클라이언트 창의 사이드바/탑바/메시지 목록이 `chat-web/`(React/Tailwind/shadcn)에 있다고
+> 적고 있었다. 그 웹 레이어는 **삭제됐다** — 지금 채팅 UI는 전부 Swift이고
+> `Puck/ClientWindow/Chat/`에 산다(`docs/decisions.md`의 "the chat UI goes back to native
+> SwiftUI; chat-web is deleted", 2026-08-15). 같은 날 `workspace/`도 삭제됐다.
 >
-> **v3 — 2026-08-15 클라이언트 레이아웃 재작업.** 바로 위 문단이 "이번 v2는 그 레이아웃
-> 재설계를 하지 않았다"고 적어둔 그 레이아웃을, v3가 다시 손댔다 — 여전히 전부 `chat-web/`
-> 쪽이고 pet-app Swift 코드(§1-3, §5, §9.5)는 그대로다. Swift 쪽 변경은 셋뿐이다:
-> `ChatSession.lastActivityAt`/`lastRunOk`(세션 활동 시각·마지막 실행 결과), `StatusDotView`의
-> `pulses` 파라미터, `ClientStatusBarView`가 그리는 내용(§4.5). 아래 §6은 이제 **v3 기준 현재
-> 상태**로 다시 썼다 — 사이드바가 워크스페이스 트리로, 상단 pill 탑바가 탭 스트립으로, 툴
-> 호출/결과 두 줄이 카드 하나로 바뀐 게 핵심이다. §4.5도 v3에서 바뀐 부분(펄스 긴장 해소,
-> 상태 바 실제 표시 내용)을 반영해 갱신했다.
+> 그래서 아래 §6은 **네이티브 기준으로 다시 썼다**. 팔레트/타이포/간격(§1-§5)과 설정창(§9),
+> 에디터 표면(§9.5)은 그 교체에 영향받지 않았고 값도 그대로다 — 웹은 같은 값을 CSS 변수로
+> 한 벌 더 갖고 있었을 뿐, 정본은 언제나 `ClientPalette`/`ClientTheme`였다.
+>
+> `ClientWindowView.swift`가 실제로 그리는 것: `ChatPaneView`(단독 또는 `HSplitView`로
+> `EditorPaneView`와 나란히, §9.5) + 상시 `ClientStatusBarView`(§4.5).
 
 F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제로 존재하는 값 그대로** 기록한 문서다.
 새 디자인 제안이 아니라 현황 스냅샷이며, 값이 바뀌면 이 문서가 아니라 아래 소스가 먼저 바뀐다.
@@ -90,12 +82,10 @@ F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제�
 | accent | `#ed8c33` |
 | onAccent | `#161616` (거의 검정 — 이 팔레트에서는 흰색보다 accent 위 대비/무드가 낫다) |
 
-v2 값은 Orca 레퍼런스 기반으로 새로 잡은 값이다(`docs/decisions.md`의 2026-08-14 항목 참고)
-— v1처럼 workspace CSS를 그대로 옮겨온 게 아니라, **세 소비처(`ClientPalette.swift`,
-`chat-web/src/styles.css`, `workspace/src/renderer/styles.css`)를 같은 값으로 동시에 갈아끼웠다.**
-실제로 확인한 결과 `chat-web/src/styles.css`의 `--ink`/`--mute`/`--hairline`/`--canvas`/`--surface`/
-`--brand`와 `workspace/src/renderer/styles.css`의 동일 변수들이 위 표와 정확히 같은 hex를 쓴다(light
-변형도 동일 — workspace/chat-web은 이전엔 다크 전용이었는데 v2에서 라이트 세트가 새로 추가됐다).
+v2 값은 Orca 레퍼런스 기반으로 새로 잡은 값이다(`docs/decisions.md`의 2026-08-14 항목 참고).
+당시엔 소비처가 셋이었다 — `ClientPalette.swift`와, 웹 쪽 CSS 변수 두 벌(chat-web/workspace).
+**지금은 `ClientPalette.swift` 하나뿐이다**: 두 웹 레이어 모두 2026-08-15에 삭제됐다. 값 자체는
+그때 갈아끼운 것 그대로이고, 위 표가 유일한 정본이다.
 
 ### 상태 색 (v2 신규)
 
@@ -114,13 +104,12 @@ v2 값은 Orca 레퍼런스 기반으로 새로 잡은 값이다(`docs/decisions
 
 ### accent 사용 규칙
 
-accent는 **여전히 유일하게 튀는 색**이고 값도 안 바뀌었다(`#ed8c33`, light/dark 공통, chat-web
-`--brand`/workspace `--brand`와도 동일 — 확인함). 다만 구체적으로 어디에 칠해지는지(전송 버튼,
-활성 행, 말풍선 배경 등)는 이제 chat-web 쪽 React 컴포넌트의 영역이고, 이번 v2 재작성은 화면
-레이아웃을 다시 건드리지 않았다(스코프 밖, 위 스펙 §6). v1 문서가 나열했던
-`accent.opacity(0.14)`류 구체 수치는 이미 정확하지 않았다 — 실제로 확인해보니 chat-web은 opacity
-대신 `--brand-soft`(`#3d2612`) 같은 별도 고정 토큰을 쓰는 쪽으로 이미 바뀌어 있었다. 그래서 여기선
-그 수치를 다시 단정하지 않는다.
+accent는 **여전히 유일하게 튀는 색**이고 값도 안 바뀌었다(`#ed8c33`, light/dark 공통).
+
+구체적으로 어디에 칠해지는지는 §7의 상태 표현 규칙 표를 보는 게 정확하다. 이 절에서 수치를
+다시 단정하지 않는 건 v2 때부터 지켜온 방침이다 — v1 문서가 나열했던 `accent.opacity(0.14)`류
+수치가 실제 코드와 어긋난 적이 있었고, 값의 정본은 언제나 `ClientPalette`/`ClientTheme`이지
+이 문서가 아니다.
 
 ## 3. 타이포그래피
 
@@ -191,9 +180,9 @@ elsewhere in this codebase and this bar doesn't observe that." 즉 이 바가 �
 `EditorTabStripView`는 이제 `pulses: false`를 넘겨서, 색은 `.active`(accent)를 그대로 쓰되 애니메이션
 없이 정지해 있다. 즉 세션 어휘에서 `.active`의 의미는 이제 확실히 "지금 진짜로 실행 중"(짧게
 지속) 하나로 좁혀졌고, dirty 표시처럼 무기한 지속되는 상태는 `.active`의 색만 빌리되 펄스는 끈
-별도 표현으로 분리됐다 — 이 구분은 chat-web 쪽 `StatusDot`(아래 §6의 "사이드바 구성"/"탭
-스트립" 절, `sessionDotState`)에서도 그대로 지켜진다: 실행 중일 때만 `active`(펄스), 마지막
-실행 결과는 `ok`/`error`(정지), 아직 한 번도 실행 안 했으면 `idle`(정지)이다.
+별도 표현으로 분리됐다 — 이 구분은 사이드바 세션 행(§6, `ChatSessionRow`)에서도 그대로
+지켜진다: `pulses: session.isRunning`이라 실행 중일 때만 펄스하고, 그 외에는 `lastRunOk`가
+성공/실패를 정지 상태로 보여준다.
 
 ## 5. 표면
 
@@ -223,9 +212,14 @@ elsewhere in this codebase and this bar doesn't observe that." 즉 이 바가 �
 
 ## 6. 레이아웃
 
-> **이 절은 v3(2026-08-15) 기준 현재 상태다.** 여기 서술하는 화면은 전부 `chat-web/`
-> (React/Tailwind/shadcn)이 그린다 — pet-app Swift에는 이 레이아웃 코드가 없다. 창 크롬(아래
-> 첫 항목)만 예외로 Swift(`PuckClient/AppDelegate.swift`) 소관이다.
+> **이 절은 v4(2026-08-15) 기준 현재 상태다.** 여기 서술하는 화면은 전부 SwiftUI이고
+> `Puck/ClientWindow/Chat/`에 있다. 창 크롬(아래 첫 항목)만 `PuckClient/AppDelegate.swift`
+> 소관이다.
+>
+> 스톡 macOS 관용구를 쓴다 — `NavigationSplitView`, 워크스페이스마다 `Section`을 둔 `List`,
+> 툴 호출은 `DisclosureGroup`, 작성창은 `TextField(axis: .vertical)`. 커스텀 트리나 커스텀
+> 탭 컨트롤을 짓지 않는 게 이 판의 기본 방침이고, 그래서 선택·키보드 내비게이션·접근성이
+> 공짜로 따라온다.
 
 ### 창 크롬 (Swift)
 
@@ -236,88 +230,80 @@ elsewhere in this codebase and this bar doesn't observe that." 즉 이 바가 �
 ### 골격
 
 ```
-App.tsx
-├ Sidebar                    220 / 68 (접힘), 우측 1px hairline, bg-surface
-└ 메인 컬럼 (flex-1)
-  ├ h-7 스페이서             신호등 자리 비우기 (Sidebar도 같은 값)
-  ├ TabStrip                 h-34, bg-surface, 아래 1px hairline
-  ├ ChatTranscript
-  ├ RunningStatusLine        실행 중일 때만
-  ├ ApprovalBanner           승인 대기 중일 때만
-  └ ChatInputBar
-ClientStatusBarView (Swift)  창 전체 폭, h-22 — §4.5
+ClientWindowView
+├ ChatPaneView                        (에디터가 붙어 있으면 HSplitView 좌측)
+│ └ NavigationSplitView
+│   ├ sidebar  ChatSidebarView        min 180 / ideal 220 / max 280
+│   └ detail   ChatTranscriptView     + Divider + ChatInputBar
+│               └ 툴바: 에디터 토글(⇧⌘E) · 에디터 떼기/붙이기(⇧⌘D) · 설정
+├ EditorPaneView                      (에디터가 붙어 있을 때만, min 540 — §9.5)
+└ ClientStatusBarView                 창 전체 폭 — §4.5
 ```
 
-사이드바 폭은 `EXPANDED_WIDTH = 220` / `COLLAPSED_WIDTH = 68`(v2 이전 Swift 값 그대로 승계),
-접기 전환은 `transition-[width] duration-[180ms] ease-in-out`.
+사이드바 폭은 `.navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)`. 하한이 220이
+아니라 180인 건, 960pt 창 최소폭에서 세 패널이 이미 빡빡해서 사이드바가 폭을 한 뼘도 안 내주면
+작성창 placeholder가 두 줄로 접히기 때문이다. 상한이 있는 건 넓은 창에서 사이드바가 채팅을
+잡아먹지 않게 하려고.
 
-### 사이드바 구성 (v3에서 전면 교체)
+접기/펼치기 버튼은 없다 — `NavigationSplitView`가 제 토글을 갖고 있다.
 
-**워크스페이스 트리**다. v2까지는 워크스페이스 스위처(팝오버)로 하나를 고른 뒤 그 워크스페이스의
-세션만 평평하게 나열했는데, 이제 **모든 워크스페이스를 펼쳐서 세션을 그 아래 중첩**한다. 다른
-워크스페이스의 세션을 보려고 팝오버를 열 필요가 없다.
+### 사이드바 구성
 
-- 워크스페이스 그룹 = 캐럿 + 이름 + 세션 수, `projectPath`가 있으면 그 아래 mono 소자 한 줄
-- 접기/펼치기는 그룹 단위 로컬 상태(`collapsedWorkspaceIds`), 영속화하지 않는다
-- 새 채팅은 **그룹별 호버 버튼**(`SquarePen`)이고 `newSession(workspace.id, "새 채팅")`을 부른다
-  — v2에서 스위처 팝오버가 갖고 있던 동작이 여기로 옮겨왔다
-- 세션 행 = `StatusDot` + 제목 + 상대 시간(`relativeTime`), 활성 행은 `bg-brand/14`
-- `WorkspaceSwitcher.tsx`/`SessionList.tsx`는 삭제됐다
+`List(selection:)` 하나에 **워크스페이스마다 `Section`**, 그 안에 세션 행. 모든 워크스페이스가
+항상 펼쳐져 있어서 다른 워크스페이스의 세션을 보려고 무언가를 열 필요가 없다.
 
-**활성 행 판정은 `state.activeSession`에서 읽는다** — `state.activeSessionId`가 아니다. 후자는
-hydrate/워크스페이스 목록 푸시 때만 갱신되고 `switchSession`마다 갱신되지 않아서, 탭으로 세션을
-바꾸면 엉뚱한 행이 강조된다. 게다가 워크스페이스별로 스코프를 걸어(`workspace.id === activeWorkspaceId`)
-다른 워크스페이스의 동명 세션 id가 잘못 강조되는 것도 막는다. `App.tsx`의 메시지 라우팅도 같은
-이유로 같은 값을 쓴다(아래 참고).
+- 섹션 헤더(`WorkspaceHeader`) = 워크스페이스 이름 + 새 채팅 버튼
+- 세션 행(`ChatSessionRow`) = `StatusDotView` + 제목 + 상대 시간(`RelativeTime`)
+- 선택 강조는 `List`의 것을 그대로 쓴다. 선택 태그는 `SessionSelection`(워크스페이스 id +
+  세션 id를 한 `Hashable` 값으로 묶은 것) — `List`는 태그 하나만 고를 수 있는데 세션을
+  가리키려면 두 id가 다 필요해서다
+- 세션 삭제는 컨텍스트 메뉴 + 확인 다이얼로그(`삭제`/`취소`)
 
-### 탭 스트립 (v3 신규)
-
-상단 pill 하나뿐이던 탑바(`TopBar.tsx`/`SessionSelector.tsx`, 둘 다 삭제)를 대체한다.
-
-- 탭 = `StatusDot` + 제목(`max-w-[200px] truncate`) + `×`, 탭 자체는 `max-w-[260px]`
-- 활성 탭은 `bg-canvas`(본문과 같은 색으로 이어짐) + 상단 2px `bg-brand` 인디케이터
-- 우측 끝 `+`(w-30)는 새 세션, 그 옆에 `EditorToggleButton`·`SettingsButton`
-- **열린 탭 목록은 렌더러 로컬 상태다.** 사이드바든 탭이든 세션을 고르면 없으면 추가되고 있으면
-  활성화된다. `×`는 **탭만 닫고 세션은 지우지 않는다** — 세션은 사이드바에 그대로 남는다.
-  활성 탭을 닫으면 이웃 탭이 활성화된다
+**세션 탭 스트립은 없다.** v3까지 있던 상단 탭 줄은 네이티브 복귀 때 사라졌고, 세션 전환은
+사이드바 선택 하나로 한다. 지금 코드에 남아 있는 탭 스트립은 에디터의 파일 탭
+(`EditorTabStripView`)뿐이며 다른 물건이다.
 
 ### 채팅 영역
 
-- 트랜스크립트/빈 상태/입력바 모두 720px로 중앙 정렬
-- 메시지 라우팅(`sendMessage`/`cancelRun`/`respondApproval`)은 `state.activeSession.workspaceId`/`.id`를
-  쓴다. v3 이전엔 `state.activeWorkspaceId`/`activeSessionId`를 썼는데, 위 사이드바 항목이 설명한
-  staleness 때문에 **세션을 바꾼 뒤 보낸 메시지가 이전 세션으로 가는 실제 버그**였다. 탭이 생기며
-  전환이 일상 경로가 되자 드러났다(Task 7에서 수정)
-- `state.activeWorkspaceId`/`activeSessionId` 필드 자체는 리듀서에 남아 있다 — 다른 소비처가 있어서
-  제거하지 않았고, 라우팅에만 쓰지 않는다
+- 제목은 창 타이틀바가 받는다 — `navigationTitle`은 세션 제목, `navigationSubtitle`은
+  워크스페이스 이름. 별도 탑바를 그리지 않는다
+- 메시지 라우팅(`sendMessage`/`cancelActiveRun`/`respondToPendingApproval`)은
+  `ClientWindowStore`의 활성 워크스페이스/세션 id로 간다. 웹 시절 리듀서 사본이 사라지면서
+  "어느 id가 최신인가" 문제 자체가 없어졌다 — 상태가 한 벌뿐이다
+- 작성창(`ChatInputBar`)은 `TextField(axis: .vertical)`이라 내용에 따라 늘어나고, 포커스 링과
+  텍스트 동작은 스톡 그대로다. 실행 중이면 전송 버튼이 정지 버튼이 된다(§7)
 
-### 툴 호출 표현 (v3에서 카드 하나로 병합)
+### 툴 호출 표현
 
-v2까지 툴 호출(`ToolCallCard`)과 툴 결과(`ToolResultRow`)가 별도 표면 두 개였는데, `ChatSession.swift`가
-둘이 같은 `tool_use` id를 공유한다고 명시하고 있어 **호출 하나당 카드 하나**로 합쳤다.
-`ChatTranscript`가 id로 짝지어 넘기고, `ToolResultRow`는 짝을 못 찾은 경우의 방어적 폴백으로만 남아
-`ToolCallCard`가 export하는 `KVRows`를 공유한다(스타일 중복 없음).
+`ToolCallRow` — **호출 하나당 행 하나**다. `ChatSession.swift`가 호출과 결과가 같은 `tool_use`
+id를 공유한다고 명시하고 있어, 트랜스크립트가 그 id로 결과를 찾아 같은 행에 붙인다.
 
-- 헤더: `StatusDot` + 도구명(mono, `text-ink`)
-- 본문: `키: 값` 나열 — 키 `text-faint`, 값 `text-mute`, 전부 mono
-- 카드: `bg-surface` + `border-hairline` + `rounded-md`
+- `DisclosureGroup`이라 인자/결과 상세는 접혀 있고 펼쳐서 본다
+- 헤더: 상태 아이콘 + 도구명. 성공 `checkmark.circle.fill`(녹색), 실패
+  `exclamationmark.triangle.fill`(주황), 아직 실행 중이면 `ProgressView`
+- 짝이 되는 결과가 아직 없으면 실행 중으로 그린다 — 별도 결과 행을 만들지 않는다
 
-### 실행 상태 줄 (v3 신규)
+### 실행 상태 줄
 
-`RunningStatusLine` — 활성 세션이 실행 중일 때만 나타난다. 좌측에 스피너 + "실행 중… `esc` 로 중단",
-우측에 프로젝트 경로(mono, `text-faint`).
+`RunningStatusLine` — 활성 세션이 실행 중일 때만, 스피너 + "생각 중…" 한 줄.
 
-**모델 이름은 여기 없다.** `model={null}`로 넘어가고 경로만 그린다 — 모델은 브릿지에 실려 있지 않고
-네이티브 상태 바(§4.5)만 `AgentConfiguration`에서 직접 읽는다. 웹 쪽으로 끌어오는 건 의도적으로
-미뤄둔 **후속 과제**이지 누락이 아니다.
+모델 이름과 프로젝트 경로는 여기 없다. 그건 네이티브 상태 바(§4.5)가 `AgentConfiguration`에서
+직접 읽어 그린다 — 한 화면에 두 번 적을 이유가 없다.
 
 ### 말풍선
 
-사용자/어시스턴트가 **같은 채움**을 쓰고, 구분은 아바타+이름 행과 정렬로만 한다.
+`MessageBubble`. 사용자/어시스턴트가 **같은 채움**을 쓰고, 구분은 정렬로만 한다(사용자는 우측).
+
+### 승인 / 완료 줄
+
+- `ApprovalBanner` — 승인 대기 중인 요청이 있을 때. 이미 응답했으면 "응답함", 앞에 다른 요청이
+  밀려 있으면 "앞의 요청에 먼저 응답해 주세요."로 바뀐다 — 승인은 큐라서 오래된 것부터 답한다
+- `DoneRow` — 실행이 끝난 자리에 결과 한 줄
 
 ### 빈 상태
 
-호박 마크 + 인사말 2줄. 프롬프트 추천 카드와 마크 뒤 글로우는 없다.
+`EmptyTranscript` — 인사말 2줄("무엇을 도와드릴까요?" / "코드든 잡담이든, 편하게 말 걸어보세요.").
+호박 마크는 없다. 프롬프트 추천 카드와 글로우도 없다.
 
 ## 7. 상태 표현 규칙
 
@@ -364,5 +350,4 @@ v2까지 툴 호출(`ToolCallCard`)과 툴 결과(`ToolResultRow`)가 별도 표
 
 - 펫 오버레이(F1)·텍스트 입력 버블(F6)은 `ClientTheme` 토큰을 쓰지 않는 별개 표면이다.
 - ~~에디터 뷰(`EditorWebView`)는 아직 어디에도 호스팅되지 않는다~~ — **2026-08-14 해소**. `EditorWebView`(workspace가 서빙하는 웹 뷰) 자체는 삭제되고 네이티브 `Puck/ClientWindow/Editor/`로 대체됐다(위 9.5절, `docs/decisions.md` 참고). "에디터는 따로 할거라 토글 빼"는 그 사이 임시 상태를 설명하던 문장이라 더 이상 유효하지 않다.
-- `onAccent`(§2)는 `ClientPalette`에 정의돼 있지만, 실제로 확인해보니 pet-app Swift 뷰 중 이 필드를 읽는 곳이 **아직 없다** — accent 위에 텍스트/아이콘을 얹는 자리가 지금 pet-app 네이티브 코드엔 없다(chat-web 쪽엔 있을 수 있으나 확인 안 함). v1에서 `success`/`failure`/`warning`이 시스템 색 그대로였던 것과 비슷한 모양의, 정의는 됐지만 아직 안 쓰이는 필드.
-- chat-web의 세션 전환(세션 스위처) UI는 이번 계획에서 한 번도 들여다보지 않았다(Task 7 노트) — `EditorTabStripView`(§4.5, §5)에 적용한 탭 스트립 패턴과 시각적으로 맞는지는 검증되지 않은 별도 후속 과제다.
+- `onAccent`(§2)는 `ClientPalette`에 정의돼 있지만 이 필드를 읽는 뷰가 **아직 없다** — accent 위에 텍스트/아이콘을 얹는 자리가 지금 코드엔 없다. v1에서 `success`/`failure`/`warning`이 시스템 색 그대로였던 것과 비슷한 모양의, 정의는 됐지만 아직 안 쓰이는 필드.

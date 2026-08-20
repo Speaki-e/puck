@@ -43,6 +43,33 @@ final class BridgeSocketClientTests: XCTestCase {
         wait(for: [presenceChanged], timeout: 5)
     }
 
+    /// pet-app quitting mid-run is the case AgentHost.socketDisconnected was
+    /// written for: a tool_dispatch already on the wire can never be answered,
+    /// because BridgeServer's relay holds the connection that died. Without a
+    /// disconnect signal reaching the agent, that dispatch waits out its full
+    /// registry timeout instead -- 60s for run_shell -- and then reports
+    /// "timeout" rather than "pet_app_disconnected".
+    func test_serverGoingAway_tellsTheClientItDisconnected() {
+        let connected = expectation(description: "client connected")
+        server.onGUIPresenceChanged = { present in
+            guard present else { return }
+            connected.fulfill()
+        }
+        let client = BridgeSocketClient(socketURL: socketURL)
+        client.start()
+        wait(for: [connected], timeout: 5)
+
+        // Armed only once the connection is up, so a retry during startup
+        // cannot fulfill this and let the test pass without the drop.
+        let disconnected = expectation(description: "client reported the drop")
+        disconnected.assertForOverFulfill = false
+        client.onDisconnect = { disconnected.fulfill() }
+
+        server.stop()
+
+        wait(for: [disconnected], timeout: 5)
+    }
+
     func test_hasConnectedClients_becomesTrueAfterConnecting() {
         let client = BridgeSocketClient(socketURL: socketURL)
         XCTAssertFalse(client.hasConnectedClients)

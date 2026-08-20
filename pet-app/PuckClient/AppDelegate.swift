@@ -57,6 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bridgeClient.onMessage = { [weak self] message in
             DispatchQueue.main.async { self?.handle(message) }
         }
+        // pet-app hosts every tool the agent dispatches, so its going away
+        // strands whatever is in flight. AgentHost has always known how to
+        // fail those; nothing ever told it to.
+        bridgeClient.onDisconnect = { [weak self] in
+            DispatchQueue.main.async { self?.agentHost.socketDisconnected() }
+        }
         bridgeClient.start()
 
         clientWindowStore.onUserCommand = { [weak self] text, workspaceId, sessionId in

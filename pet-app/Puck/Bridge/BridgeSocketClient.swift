@@ -19,6 +19,18 @@ final class BridgeSocketClient {
     /// editor_view_ready, editor_view_unavailable).
     var onMessage: ((BridgeMessage) -> Void)?
 
+    /// The connection dropped. Reconnection is handled here and needs no
+    /// help, but anything waiting on a reply does: a tool_dispatch already on
+    /// the wire can never be answered, because BridgeServer's relay sends
+    /// replies back on the connection that received the dispatch and that
+    /// connection is gone. Reconnecting does not recover it. Without this the
+    /// dispatch waited out its full registry timeout -- 60s for run_shell --
+    /// and reported "timeout" instead of "pet_app_disconnected".
+    ///
+    /// Fires on every drop, including the ones retried during startup before
+    /// pet-app is up. That is harmless: failing nothing is a no-op.
+    var onDisconnect: (() -> Void)?
+
     private let socketURL: URL
     private let queue = DispatchQueue(label: "PuckClient.BridgeSocketClient")
     private var connection: BridgeConnection?
@@ -44,6 +56,7 @@ final class BridgeSocketClient {
             bridgeConnection?.send(.clientHello(role: .gui))
         }
         bridgeConnection.onClose = { [weak self] in
+            self?.onDisconnect?()
             self?.scheduleReconnect()
         }
         connection = bridgeConnection

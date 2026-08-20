@@ -37,6 +37,12 @@ final class AgentHost {
     /// The approval requests runs are blocked on. Run-scoped -- see
     /// PendingApprovals for why that matters.
     private let pendingApprovals = PendingApprovals()
+    /// The workspace each chat this host has run in belongs to. A session id
+    /// alone does not say which workspace to address an event to, and reading
+    /// the active one is exactly the guess that misfiled a superseded run's
+    /// events -- a wrong workspace makes the event unroutable, so the chat
+    /// never hears its run ended and holds its spinner.
+    private var sessionWorkspaces: [String: String] = [:]
     /// Which run is current. Bumped by `run`, recorded on every approval it
     /// registers. Guarded by `stateQueue`: `run` bumps it from main and
     /// `awaitApproval` reads it from inside the run, on whatever executor.
@@ -46,11 +52,11 @@ final class AgentHost {
     /// The agent turn the 중지 button cancels. Without it the turn outlived
     /// every other thing 중지 stops.
     private let activeRun = AgentRunHandle()
-    /// Guards `activeCodeEditorRequestId` and `runGeneration`. A serial queue
-    /// rather than an NSLock because the writers include an async function
-    /// (`runCodeEditor`), and NSLock's lock/unlock are unavailable from async
-    /// contexts -- a warning today, an error in the Swift 6 language mode. The
-    /// same choice AgentRunner, BridgeServer and ToolExecutor already made.
+    /// Guards `activeCodeEditorRequestId`. A serial queue rather than an
+    /// NSLock because the one writer is an async function (`runCodeEditor`),
+    /// and NSLock's lock/unlock are unavailable from async contexts -- a
+    /// warning today, an error in the Swift 6 language mode. The same choice
+    /// AgentRunner, BridgeServer and ToolExecutor already made.
     private let stateQueue = DispatchQueue(label: "PuckClient.AgentHost.state")
 
     /// Re-read on every access rather than cached: the key can be typed into
@@ -169,9 +175,16 @@ final class AgentHost {
             approve: { [weak self] _, approvalId in
                 await self?.awaitApproval(id: approvalId) ?? false
             },
-            emit: { [weak self] event in
+            emit: { [weak self] event, sessionId in
                 guard let self else { return }
-                _ = self.broadcast(.event(event, workspaceId: self.activeWorkspaceId, sessionId: self.activeSessionId))
+                // Addressed to the run's own chat, which is not necessarily
+                // the active one: a superseded turn keeps emitting until it
+                // notices, and a run can move itself into a task session.
+                _ = self.broadcast(.event(
+                    event,
+                    workspaceId: self.workspace(of: sessionId),
+                    sessionId: sessionId
+                ))
             },
             delegateCodeEditor: { [weak self] task in
                 guard let self else {
@@ -329,6 +342,9 @@ final class AgentHost {
         onTaskSessionOpened?(activeWorkspaceId, sourceSessionId, sessionId, title, activeCommand)
         activeSessionId = sessionId
         runner.sessionId = sessionId
+        // The task session belongs to the workspace the run that opened it
+        // belongs to, so its events stay routable after the user moves on.
+        stateQueue.sync { sessionWorkspaces[sessionId] = activeWorkspaceId }
         if !brief.isEmpty {
             _ = broadcast(.event(.textChunk(text: brief), workspaceId: activeWorkspaceId, sessionId: sessionId))
         }
@@ -346,6 +362,14 @@ final class AgentHost {
     /// A chat was deleted, so its conversation goes with it.
     func forgetSession(_ sessionId: String) {
         runner.forgetSession(sessionId)
+        stateQueue.sync { sessionWorkspaces[sessionId] = nil }
+    }
+
+    /// The workspace a chat belongs to. Falls back to the active one for a
+    /// session this host has never run in -- there is nothing better to say,
+    /// and it is what every event used before.
+    private func workspace(of sessionId: String) -> String {
+        stateQueue.sync { sessionWorkspaces[sessionId] } ?? activeWorkspaceId
     }
 
     /// pet-app went away: nothing in flight can be answered any more. Tool
@@ -381,6 +405,7 @@ final class AgentHost {
         activeWorkspaceId = workspaceId
         activeSessionId = sessionId
         activeCommand = command
+        stateQueue.sync { sessionWorkspaces[sessionId] = workspaceId }
         // Which chat's conversation this run continues. One runner serves every
         // chat, so without this they would all share one context -- see
         // AgentRunner.conversations.

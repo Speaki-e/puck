@@ -33,7 +33,15 @@ import Foundation
 
 /// Emitted for every step of a run. The host decides what to do with them
 /// (render, broadcast, log) -- the runner never touches UI or the socket.
-typealias AgentEventSink = (BridgeEvent) -> Void
+///
+/// - Parameter sessionId: the chat the event belongs to, named rather than
+///   left for the host to guess. The host used to address every event to
+///   whichever run started most recently, which is wrong whenever two runs
+///   overlap -- and they do, because cancelling a turn only asks it to stop.
+///   A superseded turn's last events landed in the chat that replaced it, and
+///   the turn's own chat, never told its run had ended, held its spinner
+///   forever.
+typealias AgentEventSink = (_ event: BridgeEvent, _ sessionId: String) -> Void
 
 /// Asks the user to approve a dangerous tool. Returns whether to proceed.
 typealias AgentApprovalGate = (_ summary: String, _ approvalId: String) async -> Bool
@@ -69,7 +77,14 @@ final class AgentRunner {
     private let client: any AgentLLMClient
     private let dispatcher: PetToolDispatcher
     private let approve: AgentApprovalGate
-    private let emit: AgentEventSink
+    private let sink: AgentEventSink
+
+    /// Every event names the chat it belongs to. `key` is the run's own
+    /// session, captured when the run started -- never `sessionId`, which by
+    /// the time an event is emitted may already belong to a newer run.
+    private func emit(_ event: BridgeEvent, to key: String) {
+        sink(event, key)
+    }
     /// nil in the standalone case (no workspace to delegate to), and then
     /// code_editor is not offered to the model at all -- the same rule the
     /// pet-app-only tool list was already built on.
@@ -211,7 +226,7 @@ final class AgentRunner {
         self.client = client
         self.dispatcher = dispatcher
         self.approve = approve
-        self.emit = emit
+        self.sink = emit
         self.delegateCodeEditor = delegateCodeEditor
         self.openTaskSession = delegateCodeEditor == nil ? nil : openTaskSession
         self.delegateReadFile = delegateReadFile
@@ -301,7 +316,7 @@ final class AgentRunner {
         }
         append(.user(command), to: key)
         trimConversation(key)
-        emit(.agentThinking)
+        emit(.agentThinking, to: key)
 
         for _ in 0..<Self.maxTurns {
             if Task.isCancelled {
@@ -328,7 +343,7 @@ final class AgentRunner {
                 // too put the identical text in an assistant bubble directly
                 // above it.
                 AppLogger.shared.log(.error, "agent run failed: \(Self.rawFailureDescription(for: error))")
-                emit(.agentDone(ok: false, summary: Self.failureSummary(for: error)))
+                emit(.agentDone(ok: false, summary: Self.failureSummary(for: error)), to: key)
                 return
             }
 
@@ -342,14 +357,14 @@ final class AgentRunner {
             }
 
             if let text = turn.text, !text.isEmpty {
-                emit(.textChunk(text: text))
+                emit(.textChunk(text: text), to: key)
             }
 
             guard !turn.toolCalls.isEmpty else {
                 // No tools asked for: the model is answering, so the run ends
                 // here. Its own text is the summary.
                 append(.assistant(text: turn.text, toolCalls: []), to: key)
-                emit(.agentDone(ok: true, summary: turn.text ?? ""))
+                emit(.agentDone(ok: true, summary: turn.text ?? ""), to: key)
                 return
             }
 
@@ -367,8 +382,8 @@ final class AgentRunner {
         }
 
         let hitCeiling = "도구를 \(Self.maxTurns)번 넘게 호출해서 중단했어요."
-        emit(.textChunk(text: hitCeiling))
-        emit(.agentDone(ok: false, summary: hitCeiling))
+        emit(.textChunk(text: hitCeiling), to: key)
+        emit(.agentDone(ok: false, summary: hitCeiling), to: key)
     }
 
     /// The one exit a cancelled run takes. Emits `agent_done` like every other
@@ -376,15 +391,15 @@ final class AgentRunner {
     /// a spinner forever; `ok: false` because the turn did not finish what it
     /// was asked, and EventRouter deliberately gives a failed run no reaction
     /// (a "task_success" jump for a stop would be worse than none).
-    /// Silent when the run being cancelled is no longer the chat's current one.
-    /// Events are addressed to whatever chat is active by the time they are
-    /// emitted, so a run superseded by a command in *another* chat would
-    /// otherwise announce "중지했어요" there -- in a conversation the user never
-    /// stopped. A stop pressed in the chat itself still says so.
+    /// Addressed to `key`, the run's own chat. This used to be silent unless
+    /// the run was still the current one, because events went to whatever chat
+    /// was active when they were emitted and a superseded run would announce
+    /// "중지했어요" in a conversation the user never stopped. The cost was that
+    /// the run's real chat never heard its run had ended and held a spinner
+    /// forever; naming the session fixes both.
     private func emitCancelled(from key: String) {
-        guard key == sessionId else { return }
-        emit(.textChunk(text: Self.cancelledSummary))
-        emit(.agentDone(ok: false, summary: Self.cancelledSummary))
+        emit(.textChunk(text: Self.cancelledSummary), to: key)
+        emit(.agentDone(ok: false, summary: Self.cancelledSummary), to: key)
     }
 
     // MARK: - Failure reporting
@@ -498,7 +513,8 @@ final class AgentRunner {
             name: call.name,
             arguments: arguments,
             argumentsText: call.argumentsJSON,
-            callId: call.id
+            callId: call.id,
+            sessionId: key
         )
         append(
             .tool(
@@ -525,12 +541,18 @@ final class AgentRunner {
     /// `argumentsText` is what the approval prompt shows. The model's own
     /// call passes the JSON it emitted verbatim; a caller that has only a
     /// parsed value can leave it out and get the re-encoded form.
+    /// - Parameter sessionId: the chat to address this call's events to.
+    ///   Defaults to the runner's current one, which is what an out-of-band
+    ///   MCP call wants: it has no run of its own, it belongs to whichever
+    ///   turn handed the CLI the server.
     func invokeTool(
         name: String,
         arguments: JSONValue,
         argumentsText: String? = nil,
-        callId: String = UUID().uuidString
+        callId: String = UUID().uuidString,
+        sessionId: String? = nil
     ) async -> DispatchedToolResult {
+        let key = sessionId ?? self.sessionId
         // `perform` handles this one itself and never reaches here, because
         // opening a session moves the rest of the run into it: it carries the
         // conversation across and returns the new key. An out-of-band caller
@@ -546,7 +568,7 @@ final class AgentRunner {
             )
         }
 
-        emit(.toolCall(id: callId, tool: name, args: arguments, detail: nil))
+        emit(.toolCall(id: callId, tool: name, args: arguments, detail: nil), to: key)
         logger?.log(.agentToolCall(id: callId, tool: name, args: arguments))
 
         if ToolRegistry.tool(named: name)?.requiresApproval == true {
@@ -554,18 +576,18 @@ final class AgentRunner {
                 tool: name,
                 arguments: argumentsText ?? arguments.jsonText ?? ""
             )
-            emit(.awaitApproval(summary: summary, approvalId: callId))
+            emit(.awaitApproval(summary: summary, approvalId: callId), to: key)
             guard await approve(summary, callId) else {
                 // Refusal is the model's to hear about, not an error to abort
                 // on -- it should say so and offer something else. The code
                 // never crosses the socket (docs/socket.md).
                 let denied = DispatchedToolResult(ok: false, data: nil, error: "denied_by_user", detail: nil)
-                reportEvents(callId: callId, result: denied)
+                reportEvents(callId: callId, result: denied, to: key)
                 return denied            }
         }
 
         let result = await route(name: name, arguments: arguments)
-        reportEvents(callId: callId, result: result)
+        reportEvents(callId: callId, result: result, to: key)
         return result
     }
 
@@ -604,7 +626,7 @@ final class AgentRunner {
     /// The UI and the log halves of a tool result -- everything `report` does
     /// except appending to this conversation, which a call made through the
     /// MCP server has no business doing.
-    private func reportEvents(callId: String, result: DispatchedToolResult) {
+    private func reportEvents(callId: String, result: DispatchedToolResult, to key: String) {
         // error is the model-facing vocabulary (may be "denied_by_user", which
         // never crosses the socket -- see ToolErrorCode's doc comment), so the
         // wire event only carries it when it's actually one of the closed
@@ -615,7 +637,7 @@ final class AgentRunner {
             data: result.data,
             error: result.error.flatMap(ToolErrorCode.init(rawValue:)),
             detail: result.detail
-        ))
+        ), to: key)
         // detail rides along in the error field when there is one: the code
         // alone ("execution_failed") is never enough to act on, and this line
         // is the only place the reason survives after the chat scrolls away.

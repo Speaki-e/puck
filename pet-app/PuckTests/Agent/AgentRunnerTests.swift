@@ -53,7 +53,7 @@ final class AgentRunnerTests: XCTestCase {
             client: client,
             dispatcher: PetToolDispatcher(send: { _ in false }),
             approve: { _, _ in false },
-            emit: { _ in }
+            emit: { _, _ in }
         )
         return (runner, client)
     }
@@ -204,7 +204,7 @@ final class AgentRunnerTests: XCTestCase {
             client: fake,
             dispatcher: PetToolDispatcher(send: { _ in false }),
             approve: { _, _ in false },
-            emit: { events.append($0) }
+            emit: { event, _ in events.append(event) }
         )
 
         await runner.run(command: "hi")
@@ -239,7 +239,7 @@ final class AgentRunnerTests: XCTestCase {
             client: HangingLLMClient(started: started),
             dispatcher: PetToolDispatcher(send: { _ in false }),
             approve: { _, _ in false },
-            emit: { event in events.value.append(event) }
+            emit: { event, _ in events.value.append(event) }
         )
 
         let task = Task { await runner.run(command: "천천히 해줘") }
@@ -273,7 +273,7 @@ final class AgentRunnerTests: XCTestCase {
             client: HangingLLMClient(started: started),
             dispatcher: PetToolDispatcher(send: { _ in false }),
             approve: { _, _ in false },
-            emit: { event in events.value.append(event) }
+            emit: { event, _ in events.value.append(event) }
         )
 
         let task = Task { await runner.run(command: "천천히 해줘") }
@@ -319,7 +319,7 @@ final class AgentRunnerTests: XCTestCase {
                 runTask.value?.cancel()
                 return false
             },
-            emit: { event in events.value.append(event) }
+            emit: { event, _ in events.value.append(event) }
         )
 
         // The gate exists so `runTask` is definitely set before the approval
@@ -337,6 +337,49 @@ final class AgentRunnerTests: XCTestCase {
         XCTAssertEqual(approvals.value, ["call-1"], "the second tool must never be asked about")
         XCTAssertEqual(events.value.last, .agentDone(ok: false, summary: AgentRunner.cancelledSummary))
         XCTAssertEqual(fake.sendCount, 1, "no further turn may be requested after a stop")
+    }
+
+    /// A run that is superseded by a command in *another* chat used to emit
+    /// nothing at all: events were addressed to whichever chat was active when
+    /// they were emitted, so announcing "중지했어요" would have said it in a
+    /// conversation the user never stopped. The cost was that the run's own
+    /// chat never heard its run had ended and held its spinner forever.
+    /// Naming the session on every event settles both: the ending goes to the
+    /// chat that was running, and nowhere else.
+    func test_cancelledRun_reportsIntoItsOwnChat_notWhicheverIsActiveNow() async {
+        let started = expectation(description: "model call in flight")
+        let events = UncheckedBox([(event: BridgeEvent, sessionId: String)]())
+        let runner = AgentRunner(
+            client: HangingLLMClient(started: started),
+            dispatcher: PetToolDispatcher(send: { _ in false }),
+            approve: { _, _ in false },
+            emit: { event, sessionId in events.value.append((event, sessionId)) }
+        )
+
+        runner.sessionId = "chat-a"
+        let task = Task { await runner.run(command: "첫 번째") }
+        // Waited for, not slept on: the run has to have captured its own
+        // session before the next line repoints it, or the test proves nothing.
+        await fulfillment(of: [started], timeout: 2)
+        // The user moves to another chat and starts a run there, which is what
+        // repoints sessionId and cancels this one.
+        runner.sessionId = "chat-b"
+        task.cancel()
+        await task.value
+
+        let endings = events.value.filter {
+            if case .agentDone = $0.event { return true }
+            return false
+        }
+        XCTAssertEqual(
+            endings.map(\.sessionId),
+            ["chat-a"],
+            "the run's ending belongs to the chat it ran in, so that chat can leave its running state"
+        )
+        XCTAssertFalse(
+            events.value.contains { $0.sessionId == "chat-b" },
+            "nothing may land in the chat that replaced it"
+        )
     }
 
     /// Fails the turn with whatever it was handed -- a model call that throws
@@ -357,7 +400,7 @@ final class AgentRunnerTests: XCTestCase {
             client: ThrowingLLMClient(error: error),
             dispatcher: PetToolDispatcher(send: { _ in false }),
             approve: { _, _ in false },
-            emit: { event in events.value.append(event) }
+            emit: { event, _ in events.value.append(event) }
         )
         await runner.run(command: "안녕")
         return events.value
@@ -484,7 +527,7 @@ final class AgentRunnerTests: XCTestCase {
         client: any AgentLLMClient = RecordingLLMClient(),
         dispatched: UncheckedBox<[BridgeMessage]>? = nil,
         approve: @escaping AgentApprovalGate = { _, _ in false },
-        emit: @escaping AgentEventSink = { _ in },
+        emit: @escaping AgentEventSink = { _, _ in },
         delegateReadFile: AgentFileDelegation? = nil
     ) -> AgentRunner {
         AgentRunner(
@@ -508,7 +551,7 @@ final class AgentRunnerTests: XCTestCase {
     /// happens.
     func test_invokeTool_emitsTheSameToolCallAndResultPairAModelsOwnCallDoes() async {
         let events = UncheckedBox([BridgeEvent]())
-        let runner = makeRunner(emit: { events.value.append($0) })
+        let runner = makeRunner(emit: { event, _ in events.value.append(event) })
 
         _ = await runner.invokeTool(
             name: "launch_app",
@@ -537,7 +580,7 @@ final class AgentRunnerTests: XCTestCase {
                 asked.value.append(summary)
                 return true
             },
-            emit: { events.value.append($0) }
+            emit: { event, _ in events.value.append(event) }
         )
 
         _ = await runner.invokeTool(

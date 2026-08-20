@@ -45,9 +45,10 @@ struct FrameTicker {
 
 /// Timer + FrameTicker. Thin by design — the logic lives in FrameTicker.
 final class FrameClock {
-    /// F1's performance rule: drop to `idleFramesPerSecond` after the pet has
-    /// been idle for a while, back to `activeFramesPerSecond` when it acts.
-    static let activeFramesPerSecond: Double = 60
+    /// The 2D renderer needs a continuous heartbeat for movement, toy physics,
+    /// and time-based behaviors, but it does not need the old 60 Hz 3D loop.
+    /// Active work is capped at 30 Hz and long idle periods run at 15 Hz.
+    static let activeFramesPerSecond: Double = 30
     static let idleFramesPerSecond: Double = 15
 
     var onTick: ((TimeInterval) -> Void)?

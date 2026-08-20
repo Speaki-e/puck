@@ -84,6 +84,10 @@ final class LoopbackHTTPServer {
     /// reachable URL into `session/new`, and a URL for a port nothing is
     /// listening on would fail later, inside the agent, as an MCP error nobody
     /// can read.
+    /// A loopback listener on an OS-chosen port is ready in milliseconds;
+    /// this only exists so an unreachable state cannot stall a turn.
+    private static let readyTimeout: TimeInterval = 5
+
     func start() async throws -> Endpoint {
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
@@ -117,6 +121,15 @@ final class LoopbackHTTPServer {
         let ready = ResumeOnce<Result<Void, Error>>()
         let outcome: Result<Void, Error> = await withCheckedContinuation { continuation in
             ready.arm(continuation)
+            // Bounded, because `default: break` is a state machine we do not
+            // own: NWListener can sit in `.waiting` (a port it cannot take
+            // yet) without ever reaching `.ready` or `.failed`, and this await
+            // has no other way out. A turn that hangs here shows "생각 중"
+            // forever with nothing spawned and nothing logged. Failing instead
+            // is safe -- the caller falls back to a text-only turn.
+            queue.asyncAfter(deadline: .now() + Self.readyTimeout) {
+                ready.resolve(.failure(StartFailure.listenerFailed("did not become ready in time")))
+            }
             listener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
@@ -131,7 +144,12 @@ final class LoopbackHTTPServer {
             }
             listener.start(queue: queue)
         }
-        try outcome.get()
+        do {
+            try outcome.get()
+        } catch {
+            stop()
+            throw error
+        }
 
         guard let port = listener.port?.rawValue, port != 0 else {
             stop()

@@ -27,11 +27,10 @@ extension JSONValue {
     }
 
     /// args: `{"<key>": "..."}` — a single required top-level string field.
+    /// Both halves already exist as JSONValue accessors; this name is what the
+    /// handlers read against the tool registry's argument spec.
     func extractString(key: String) -> String? {
-        guard case .object(let fields) = self, case .string(let value) = fields[key] else {
-            return nil
-        }
-        return value
+        self[key]?.stringValue
     }
 }
 

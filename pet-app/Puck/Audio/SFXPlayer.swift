@@ -34,7 +34,7 @@ enum SFXDecisionMaker {
 final class SFXPlayer: SFXTriggering {
     private let engine: AVAudioEngine
     private let pool: PlayerNodePool<AVAudioPlayerNode>
-    private var soundTable: SoundTable
+    private let soundTable: SoundTable
     private var currentLoopKey: String?
     private var currentLoopNode: AVAudioPlayerNode?
     private var baseVolume: Float = 1.0
@@ -76,14 +76,6 @@ final class SFXPlayer: SFXTriggering {
         self.engine = engine
         pool = PlayerNodePool(nodes: nodes)
         try? engine.start()
-    }
-
-    /// Called when the active avatar changes (its sounds table differs).
-    func updateSoundTable(_ soundTable: SoundTable) {
-        self.soundTable = soundTable
-        // The old avatar's decoded audio is dead weight now; its URLs will
-        // never be asked for again.
-        bufferCache.removeAll()
     }
 
     func trigger(_ key: String, loop: Bool) {

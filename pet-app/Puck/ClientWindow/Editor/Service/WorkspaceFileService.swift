@@ -218,12 +218,7 @@ final class WorkspaceFileService {
     }
 
     private func relativeForWire(_ target: URL) -> String {
-        let rootPath = root.path
-        var targetPath = target.path
-        guard targetPath.hasPrefix(rootPath) else { return targetPath }
-        targetPath.removeFirst(rootPath.count)
-        if targetPath.hasPrefix("/") { targetPath.removeFirst() }
-        return targetPath
+        PathContainment.relativePath(root: root.path, candidate: target.path) ?? target.path
     }
 
     // MARK: - Primitives

@@ -241,11 +241,7 @@ final class EditorPaneStore: ObservableObject {
     }
 
     private func relativePath(for absolutePath: String) -> String? {
-        let rootPath = service.root.path
-        guard absolutePath.hasPrefix(rootPath) else { return nil }
-        var relative = String(absolutePath.dropFirst(rootPath.count))
-        if relative.hasPrefix("/") { relative.removeFirst() }
-        return relative
+        PathContainment.relativePath(root: service.root.path, candidate: absolutePath)
     }
 
     private static func isImagePath(_ path: String) -> Bool {

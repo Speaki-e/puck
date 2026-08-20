@@ -137,8 +137,7 @@ final class WorkspaceFileWatcher {
     }
 
     private static func isInsideIgnoredDirectory(_ path: String, root: String) -> Bool {
-        guard path.hasPrefix(root) else { return false }
-        let relative = path.dropFirst(root.count).drop(while: { $0 == "/" })
+        guard let relative = PathContainment.relativePath(root: root, candidate: path) else { return false }
         return relative.split(separator: "/").contains { workspaceFileServiceDefaultIgnores.contains(String($0)) }
     }
 }

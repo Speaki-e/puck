@@ -12,6 +12,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Puck.xcodeproj is generated from project.yml and deliberately untracked (it
+# embeds a per-developer DEVELOPMENT_TEAM), so a fresh clone -- CI included --
+# has no project to test until xcodegen has run.
+[ -d Puck.xcodeproj ] || scripts/generate.sh
+
 xcodebuild test \
     -project Puck.xcodeproj \
     -scheme Puck \

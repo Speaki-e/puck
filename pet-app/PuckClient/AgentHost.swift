@@ -38,14 +38,20 @@ final class AgentHost {
     /// PendingApprovals for why that matters.
     private let pendingApprovals = PendingApprovals()
     /// Which run is current. Bumped by `run`, recorded on every approval it
-    /// registers.
+    /// registers. Guarded by `stateQueue`: `run` bumps it from main and
+    /// `awaitApproval` reads it from inside the run, on whatever executor.
     private var runGeneration = 0
     /// The code_editor run the 중지 button would cancel, if any.
     private var activeCodeEditorRequestId: String?
     /// The agent turn the 중지 button cancels. Without it the turn outlived
     /// every other thing 중지 stops.
     private let activeRun = AgentRunHandle()
-    private let lock = NSLock()
+    /// Guards `activeCodeEditorRequestId` and `runGeneration`. A serial queue
+    /// rather than an NSLock because the writers include an async function
+    /// (`runCodeEditor`), and NSLock's lock/unlock are unavailable from async
+    /// contexts -- a warning today, an error in the Swift 6 language mode. The
+    /// same choice AgentRunner, BridgeServer and ToolExecutor already made.
+    private let stateQueue = DispatchQueue(label: "PuckClient.AgentHost.state")
 
     /// Re-read on every access rather than cached: the key can be typed into
     /// Puck's settings panel while this app is running, and the two are
@@ -249,11 +255,11 @@ final class AgentHost {
             )
         }
         let requestId = UUID().uuidString
-        lock.lock(); activeCodeEditorRequestId = requestId; lock.unlock()
+        stateQueue.sync { activeCodeEditorRequestId = requestId }
         defer {
-            lock.lock()
-            if activeCodeEditorRequestId == requestId { activeCodeEditorRequestId = nil }
-            lock.unlock()
+            stateQueue.sync {
+                if activeCodeEditorRequestId == requestId { activeCodeEditorRequestId = nil }
+            }
         }
 
         let result = await codeEditorRunner.run(
@@ -276,10 +282,7 @@ final class AgentHost {
     /// The chat's 중지 button. Reaches the ACP agent through session/cancel,
     /// in-process, now that the agent is ours.
     func cancelActiveCodeEditor() {
-        lock.lock()
-        let requestId = activeCodeEditorRequestId
-        lock.unlock()
-        guard let requestId else { return }
+        guard let requestId = stateQueue.sync(execute: { activeCodeEditorRequestId }) else { return }
         Task { _ = await codeEditorRunner.cancel(requestId: requestId) }
     }
 
@@ -385,8 +388,10 @@ final class AgentHost {
         // Before the run, not at init: which workspace is active changes
         // between turns, and the runner only re-announces it when it differs.
         runner.workspaceContext = describeWorkspace(workspaceId)
-        runGeneration += 1
-        let thisRun = runGeneration
+        let thisRun = stateQueue.sync {
+            runGeneration += 1
+            return runGeneration
+        }
 
         activeRun.start { [weak self] in
             guard let self else { return }
@@ -425,11 +430,8 @@ final class AgentHost {
         cancelActiveCodeEditor()
     }
 
-    /// Read plainly rather than under `lock`, like the `active*` properties
-    /// the approval broadcast above it reads: NSLock is unavailable from an
-    /// async context, and this is written once per run from main.
     private func awaitApproval(id: String) async -> Bool {
-        let run = runGeneration
+        let run = stateQueue.sync { runGeneration }
         return await withCheckedContinuation { continuation in
             pendingApprovals.add(id: id, run: run) { continuation.resume(returning: $0) }
         }

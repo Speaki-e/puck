@@ -44,7 +44,11 @@ final class MCPRequestHandler {
     private let toolDefinitions: [JSONValue]
     private let invoke: AgentToolInvocation
 
-    private let lock = NSLock()
+    /// Guards `callsInFlight`. A serial queue rather than an NSLock because
+    /// both writers are in an async function (`callTool`), and NSLock's
+    /// lock/unlock are unavailable from async contexts -- a warning today, an
+    /// error in the Swift 6 language mode.
+    private let stateQueue = DispatchQueue(label: "Puck.MCPRequestHandler.state")
     private var callsInFlight = 0
 
     init(toolDefinitions: [JSONValue], invoke: @escaping AgentToolInvocation) {
@@ -58,8 +62,7 @@ final class MCPRequestHandler {
     /// the CLI mid-approval would look like the pet ignoring the button the
     /// user just pressed.
     var isServingToolCall: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return callsInFlight > 0
+        stateQueue.sync { callsInFlight > 0 }
     }
 
     /// One JSON-RPC message in, its response out. nil means "nothing to
@@ -124,9 +127,9 @@ final class MCPRequestHandler {
         }
         let arguments = params["arguments"] ?? .object([:])
 
-        lock.lock(); callsInFlight += 1; lock.unlock()
+        stateQueue.sync { callsInFlight += 1 }
         let outcome = await invoke(name, arguments)
-        lock.lock(); callsInFlight -= 1; lock.unlock()
+        stateQueue.sync { callsInFlight -= 1 }
 
         let text = AgentRunner.toolResultText(
             ok: outcome.ok,

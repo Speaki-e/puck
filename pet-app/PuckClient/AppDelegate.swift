@@ -135,10 +135,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // notification arrived (the same race AppAppearance's old
             // broadcast hit first); re-reading is only the fallback for a
             // notification that somehow arrived without one.
-            let style = ClientThemeStyle.resolved(fromCrossProcessUserInfo: notification.userInfo)
-                ?? self?.currentClientThemeStyle()
-                ?? .dark
-            self?.applyClientThemeStyle(style)
+            // `queue: .main` above is what makes this true; NotificationCenter's
+            // block is not isolated in its signature, so the compiler cannot
+            // see it and warns on both main-actor calls below.
+            MainActor.assumeIsolated {
+                let style = ClientThemeStyle.resolved(fromCrossProcessUserInfo: notification.userInfo)
+                    ?? self?.currentClientThemeStyle()
+                    ?? .dark
+                self?.applyClientThemeStyle(style)
+            }
         }
     }
 

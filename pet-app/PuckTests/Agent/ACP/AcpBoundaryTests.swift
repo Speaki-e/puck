@@ -6,9 +6,9 @@
 //  deleted -- the Swift ACP port had no equivalent, and the two branches did
 //  the same Electron removal in parallel.
 //
-//  Detection, not containment: the ACP child has no OS sandbox, so this reads
-//  the locations it voluntarily reports and flags the write-shaped ones that
-//  land outside the project. These tests pin down which updates count.
+//  Protocol-level defense in depth: AcpAgentProcess blocks outside writes with
+//  an OS sandbox, while this mapping records write-shaped locations the agent
+//  reports so an attempted escape is still visible in the tool result.
 //
 
 import XCTest

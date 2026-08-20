@@ -6,8 +6,9 @@
 //  session/prompt, streaming session/update and answering
 //  session/request_permission -- lives in AcpTurnSession, which a CLI-backed
 //  chat turn drives the same way. What is left here is what makes a run a
-//  *code_editor* run: watching for writes outside the project, and turning the
-//  turn's outcome into the CodeEditorResult a tool executor reports.
+//  *code_editor* run: retaining a protocol-level audit of attempted writes
+//  outside the project, and turning the turn's outcome into the result a tool
+//  executor reports. AcpAgentProcess enforces the boundary at the OS layer.
 //
 
 import Foundation
@@ -48,8 +49,9 @@ final class AcpCodeEditorSession {
     private let turn: AcpTurnSession
 
     private let lock = NSLock()
-    /// Write-shaped locations the agent reported outside the project. Detection
-    /// only -- see AcpEventMapping.writesOutside.
+    /// Write-shaped locations the agent reported outside the project. This is
+    /// defense-in-depth and user-facing evidence; the child sandbox blocks the
+    /// filesystem write itself.
     private var writesOutsideProject: Set<String> = []
 
     init(

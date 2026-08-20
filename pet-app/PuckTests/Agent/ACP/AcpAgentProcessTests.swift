@@ -185,7 +185,10 @@ final class AcpAgentCommandResolverTests: XCTestCase {
     }
 
     func testOnlyTheSelectedAgentsCredentialsAreNamed() {
-        XCTAssertEqual(CodingAgentKind.claude.apiKeyEnvironmentVariables, ["ANTHROPIC_API_KEY"])
+        XCTAssertEqual(
+            CodingAgentKind.claude.apiKeyEnvironmentVariables,
+            ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"]
+        )
         XCTAssertEqual(CodingAgentKind.codex.apiKeyEnvironmentVariables, ["CODEX_API_KEY", "OPENAI_API_KEY"])
     }
 }
@@ -260,6 +263,58 @@ final class AcpAgentProcessOutputDrainTests: XCTestCase {
 
         XCTAssertTrue(reported.contains("could not start"), "got: \(reported)")
     }
+}
+
+final class AcpAgentProcessSandboxTests: XCTestCase {
+    func testChildCanWriteInsideProjectButNotToASiblingDirectory() async throws {
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("puck-acp-sandbox-\(UUID().uuidString)", isDirectory: true)
+        let project = parent.appendingPathComponent("project", isDirectory: true)
+        let sibling = parent.appendingPathComponent("sibling", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sibling, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let inside = project.appendingPathComponent("inside.txt")
+        let outside = sibling.appendingPathComponent("outside.txt")
+        let agent = AcpAgentProcess(
+            command: AcpAgentCommand(
+                executable: URL(fileURLWithPath: "/bin/sh"),
+                arguments: [
+                    "-c",
+                    "printf inside > \"$1\"; printf outside > \"$2\"",
+                    "puck-sandbox-test",
+                    inside.path,
+                    outside.path,
+                ],
+                extraEnvironment: [:]
+            ),
+            projectPath: project.path,
+            credentials: [:]
+        )
+        let exited = expectation(description: "the child exits")
+        agent.onExit = { _, _ in exited.fulfill() }
+
+        let childHome = try XCTUnwrap(agent.childEnvironment["HOME"])
+        let childTemp = try XCTUnwrap(agent.childEnvironment["TMPDIR"])
+        XCTAssertTrue(
+            childHome.hasPrefix(childTemp + "/"),
+            "the child must not receive the user's writable home directory"
+        )
+
+        try agent.start()
+        await fulfillment(of: [exited], timeout: 5)
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: inside.path),
+            "inside write failed: \(agent.currentStderrTail())"
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: outside.path),
+            "the ACP child wrote outside its project root"
+        )
+    }
+
 }
 
 /// Spawns the real thing. Skips rather than fails when node is missing -- a

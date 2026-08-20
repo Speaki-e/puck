@@ -17,7 +17,7 @@ final class ClickElementHandlerTests: XCTestCase {
         let handler = ClickElementHandler()
 
         let expectation = expectation(description: "completion called")
-        handler.execute(args: .object([:])) { result in
+        handler.execute(id: "test", args: .object([:])) { result in
             switch result {
             case .success:
                 XCTFail("expected failure")

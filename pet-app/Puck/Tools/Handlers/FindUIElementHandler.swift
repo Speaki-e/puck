@@ -16,7 +16,7 @@ import Foundation
 final class FindUIElementHandler: ToolHandler {
     let toolName = "find_ui_element"
 
-    func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let pid = args.extractPID() else {
             completion(.failure(.executionFailed("find_ui_element requires a numeric pid")))
             return

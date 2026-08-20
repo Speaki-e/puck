@@ -59,7 +59,7 @@ final class ClickElementPermissionTests: XCTestCase {
         ])
 
         var result: Result<JSONValue?, ToolExecutionError>?
-        handler.execute(args: frame) { result = $0 }
+        handler.execute(id: "test", args: frame) { result = $0 }
 
         guard case .failure(let error) = result else {
             return XCTFail("expected a failure, got \(String(describing: result))")
@@ -75,7 +75,7 @@ final class ClickElementPermissionTests: XCTestCase {
         handler.isAccessibilityTrusted = { false }
 
         var result: Result<JSONValue?, ToolExecutionError>?
-        handler.execute(args: .object([:])) { result = $0 }
+        handler.execute(id: "test", args: .object([:])) { result = $0 }
 
         guard case .failure(let error) = result else {
             return XCTFail("expected a failure, got \(String(describing: result))")

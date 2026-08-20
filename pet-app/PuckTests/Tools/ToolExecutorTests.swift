@@ -19,11 +19,11 @@ private final class StubHandler: ToolHandler {
         self.behavior = behavior
     }
 
-    func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         behavior(args, completion)
     }
 
-    func cancel() {
+    func cancel(id _: String) {
         cancelCallCount += 1
     }
 }

@@ -14,7 +14,7 @@ final class RunAppleScriptHandlerTests: XCTestCase {
         let handler = RunAppleScriptHandler()
 
         let expectation = expectation(description: "completion called")
-        handler.execute(args: .object([:])) { result in
+        handler.execute(id: "test", args: .object([:])) { result in
             switch result {
             case .success:
                 XCTFail("expected failure")
@@ -31,7 +31,7 @@ final class RunAppleScriptHandlerTests: XCTestCase {
         let handler = RunAppleScriptHandler()
 
         let expectation = expectation(description: "completion called")
-        handler.execute(args: .object(["script": .string("return \"hello\"")])) { result in
+        handler.execute(id: "test", args: .object(["script": .string("return \"hello\"")])) { result in
             switch result {
             case .success(let data):
                 XCTAssertEqual(data, .string("hello"))

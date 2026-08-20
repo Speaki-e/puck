@@ -44,7 +44,7 @@ final class PointAtHandlerTests: XCTestCase {
         let handler = PointAtHandler(coordinator: SpyPointingCoordinator())
 
         let done = expectation(description: "completion called")
-        handler.execute(args: .object([:])) { result in
+        handler.execute(id: "test", args: .object([:])) { result in
             switch result {
             case .success:
                 XCTFail("expected failure")
@@ -60,7 +60,7 @@ final class PointAtHandlerTests: XCTestCase {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
 
-        handler.execute(args: frameArgs) { _ in }
+        handler.execute(id: "test", args: frameArgs) { _ in }
 
         XCTAssertEqual(coordinator.requestedFrames, [CGRect(x: 100, y: 200, width: 50, height: 20)])
     }
@@ -73,7 +73,7 @@ final class PointAtHandlerTests: XCTestCase {
         let handler = PointAtHandler(coordinator: coordinator)
 
         var replied = false
-        handler.execute(args: frameArgs) { _ in replied = true }
+        handler.execute(id: "test", args: frameArgs) { _ in replied = true }
         XCTAssertFalse(replied, "the pet is still walking there")
 
         coordinator.completeArrival()
@@ -85,7 +85,7 @@ final class PointAtHandlerTests: XCTestCase {
         let handler = PointAtHandler(coordinator: coordinator)
 
         var ok: Bool?
-        handler.execute(args: frameArgs) { result in
+        handler.execute(id: "test", args: frameArgs) { result in
             if case .success = result { ok = true } else { ok = false }
         }
         coordinator.completeArrival()
@@ -100,9 +100,39 @@ final class PointAtHandlerTests: XCTestCase {
     func test_cancel_tellsTheCoordinatorToCancelPointing() {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
+        handler.execute(id: "test", args: frameArgs) { _ in }
 
-        handler.cancel()
+        handler.cancel(id: "test")
 
         XCTAssertEqual(coordinator.cancelCount, 1)
+    }
+
+    /// One handler instance serves every point_at, and there is only one pet,
+    /// so a second call supersedes the first. Its cancel must not then stop
+    /// the pointing the second call is doing -- which is what a 30s timeout on
+    /// the abandoned first call would otherwise do.
+    func test_cancelOfASupersededCall_doesNotStopTheCurrentOne() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+        handler.execute(id: "first", args: frameArgs) { _ in }
+        handler.execute(id: "second", args: frameArgs) { _ in }
+
+        handler.cancel(id: "first")
+
+        XCTAssertEqual(coordinator.cancelCount, 0, "the current point_at must keep going")
+
+        handler.cancel(id: "second")
+        XCTAssertEqual(coordinator.cancelCount, 1)
+    }
+
+    /// ToolExecutor only cancels ids it dispatched, but a cancel racing a
+    /// completion can arrive for one that has already finished.
+    func test_cancelOfAnUnknownId_isANoOp() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+
+        handler.cancel(id: "never-dispatched")
+
+        XCTAssertEqual(coordinator.cancelCount, 0)
     }
 }

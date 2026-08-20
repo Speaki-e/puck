@@ -12,6 +12,7 @@
 //
 
 import CoreGraphics
+import Foundation
 
 /// How PointAtHandler asks the FSM to carry out a point_at. Implemented at
 /// bootstrap, where the character controller and pointing timer both live.
@@ -30,22 +31,39 @@ final class PointAtHandler: ToolHandler {
     let toolName = "point_at"
     private let coordinator: PetPointingCoordinating
 
+    /// The dispatch the pet is currently walking/pointing for. There is one
+    /// pet, so a second point_at replaces the first rather than running
+    /// beside it -- but a *cancel* still has to name which call it is for, or
+    /// the 30s timeout of a superseded call stops the pointing its replacement
+    /// is doing. Guarded: `execute` runs on the caller's queue and `cancel`
+    /// arrives from ToolExecutor's.
+    private let stateQueue = DispatchQueue(label: "Puck.PointAtHandler.state")
+    private var activeID: String?
+
     init(coordinator: PetPointingCoordinating) {
         self.coordinator = coordinator
     }
 
-    func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let frame = args.extractFrame() else {
             completion(.failure(.executionFailed("point_at requires a frame {x,y,width,height}")))
             return
         }
 
-        coordinator.pointAt(frame: frame) {
+        stateQueue.sync { activeID = id }
+        coordinator.pointAt(frame: frame) { [weak self] in
+            self?.stateQueue.sync { if self?.activeID == id { self?.activeID = nil } }
             completion(.success(nil))
         }
     }
 
-    func cancel() {
+    func cancel(id: String) {
+        let isCurrent = stateQueue.sync {
+            guard activeID == id else { return false }
+            activeID = nil
+            return true
+        }
+        guard isCurrent else { return }
         coordinator.cancelPointing()
     }
 }

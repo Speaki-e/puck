@@ -47,7 +47,7 @@ final class LaunchAppHandler: ToolHandler {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
-    func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard case .object(let fields) = args else {
             completion(.failure(.executionFailed("launch_app requires an args object")))
             return

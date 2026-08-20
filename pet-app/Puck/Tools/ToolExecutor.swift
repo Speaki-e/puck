@@ -51,17 +51,25 @@ enum ToolExecutionError: Error, Equatable {
 /// match the registry's tool name exactly.
 protocol ToolHandler: AnyObject {
     var toolName: String { get }
-    func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void)
 
-    /// Abandon whatever `execute` started. Called when the call times out —
-    /// without it a timed-out run_shell leaves its process running forever
-    /// with nobody to collect it.
-    func cancel()
+    /// - Parameter id: the dispatch this call belongs to. One handler instance
+    ///   serves every dispatch of its tool, so anything a handler keeps for
+    ///   `cancel` has to be keyed by this -- otherwise a slow call's timeout
+    ///   tears down whatever call happens to be in flight when it fires, and
+    ///   the call it was actually for is left running with nobody to collect
+    ///   it. Handlers with nothing to tear down ignore it.
+    func execute(id: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void)
+
+    /// Abandon what `execute` started for `id`, and nothing else. Called when
+    /// that call times out or is cancelled — without it a timed-out run_shell
+    /// leaves its process running forever with nobody to collect it. Unknown
+    /// or already-finished ids are a no-op.
+    func cancel(id: String)
 }
 
 extension ToolHandler {
     /// Most tools finish promptly and have nothing to tear down.
-    func cancel() {}
+    func cancel(id: String) {}
 }
 
 /// Routes an incoming tool_dispatch to its registered ToolHandler and enforces
@@ -157,19 +165,19 @@ final class ToolExecutor {
         // success can cancel it. Left uncancelled, every call held a queued
         // block for its full timeout — 600s in code_editor's case.
         let timeoutWork = DispatchWorkItem { [weak handler] in
-            handler?.cancel()
+            handler?.cancel(id: request.id)
             completeOnce(false, nil, .timeout)
         }
         completionQueue.sync {
             inFlightCancels[request.id] = { [weak handler] in
                 timeoutWork.cancel()
-                handler?.cancel()
+                handler?.cancel(id: request.id)
                 completeOnce(false, nil, .cancelled)
             }
         }
         scheduleTimeout(timeout, timeoutWork)
 
-        handler.execute(args: request.args) { result in
+        handler.execute(id: request.id, args: request.args) { result in
             timeoutWork.cancel()
             switch result {
             case .success(let data):

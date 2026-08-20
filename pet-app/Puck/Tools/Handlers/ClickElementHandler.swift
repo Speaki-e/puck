@@ -19,7 +19,7 @@ final class ClickElementHandler: ToolHandler {
     /// state of whoever runs the suite.
     var isAccessibilityTrusted: () -> Bool = { AccessibilityPermission.isTrusted(prompt: false) }
 
-    func execute(args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let frame = args.extractFrame() else {
             completion(.failure(.executionFailed("click_element requires a frame {x,y,width,height}")))
             return

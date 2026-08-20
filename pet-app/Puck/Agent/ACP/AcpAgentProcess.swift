@@ -12,6 +12,7 @@
 //
 
 import Foundation
+import Darwin
 
 /// What CodeEditorRunner needs from a running agent. Exists so the queue and
 /// cancellation logic can be tested against a scripted stream -- spawning node
@@ -34,6 +35,7 @@ extension AcpAgentTransport {
 
 final class AcpAgentProcess: AcpAgentTransport {
     private let process = Process()
+    private let sandboxTemporaryDirectory: URL
     private let stdinPipe = Pipe()
     private let stdoutPipe = Pipe()
     private let stderrPipe = Pipe()
@@ -51,6 +53,16 @@ final class AcpAgentProcess: AcpAgentTransport {
     var onExit: ((_ status: Int32, _ stderrTail: String) -> Void)?
 
     init(command: AcpAgentCommand, projectPath: String, credentials: [String: String]) {
+        let projectRoot = URL(
+            fileURLWithPath: Self.canonicalPath(projectPath),
+            isDirectory: true
+        )
+        let temporaryRoot = URL(
+            fileURLWithPath: Self.canonicalPath(FileManager.default.temporaryDirectory.path),
+            isDirectory: true
+        )
+        sandboxTemporaryDirectory = temporaryRoot
+            .appendingPathComponent("puck-acp-\(UUID().uuidString)", isDirectory: true)
         connection = AcpConnection(send: { [stdinPipe] data in
             // The agent can exit between our decision to write and the write
             // itself; a closed pipe raises SIGPIPE through FileHandle, and an
@@ -58,9 +70,16 @@ final class AcpAgentProcess: AcpAgentTransport {
             try? stdinPipe.fileHandleForWriting.write(contentsOf: data)
         })
 
-        process.executableURL = command.executable
-        process.arguments = command.arguments
-        process.currentDirectoryURL = URL(fileURLWithPath: projectPath, isDirectory: true)
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
+        process.arguments = [
+            "-p",
+            Self.sandboxProfile(
+                projectRoot: projectRoot,
+                temporaryDirectory: sandboxTemporaryDirectory
+            ),
+            command.executable.path,
+        ] + command.arguments
+        process.currentDirectoryURL = projectRoot
         process.standardInput = stdinPipe
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
@@ -68,21 +87,65 @@ final class AcpAgentProcess: AcpAgentTransport {
         var environment = [
             "PATH": Self.childSearchPath(for: command),
             "NODE_ENV": "production",
-            // The agents write scratch state under HOME; without it they fall
-            // back to "/" and fail in ways that read as protocol errors.
-            "HOME": ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory(),
-            // Required, and not obviously so: the vendor CLIs look their saved
-            // login up in the macOS Keychain by account name, and USER is
-            // where they read it. Without it a perfectly logged-in `claude`
-            // reports "Not logged in", which arrives here as ACP error -32000
-            // "Authentication required" -- a message that sends you looking
-            // for a missing API key rather than a missing variable.
+            // Vendor CLIs write session state under HOME. Give them a private
+            // home inside the sandbox rather than access to the user's real
+            // config, credentials, shell files, or other projects.
+            "HOME": sandboxTemporaryDirectory.appendingPathComponent("home", isDirectory: true).path,
+            // Some vendor subprocesses use this when naming account-scoped
+            // state. It is identity metadata, not a filesystem permission;
+            // HOME and the seatbelt profile still determine writable paths.
             "USER": ProcessInfo.processInfo.environment["USER"] ?? NSUserName(),
+            // A private, explicitly allowed scratch directory keeps vendor
+            // temporary files working without opening all of /tmp for writes.
+            "TMPDIR": sandboxTemporaryDirectory.path,
         ]
         environment.merge(command.extraEnvironment) { _, new in new }
         environment.merge(credentials) { _, new in new }
         process.environment = environment
         childEnvironment = environment
+    }
+
+    /// The ACP adapter and every process it launches inherit this seatbelt
+    /// profile. Reads, network access and subprocesses remain available, but
+    /// filesystem writes are limited to the selected project, a private temp
+    /// directory. HOME also points into that private directory, so vendor
+    /// session state remains writable without opening the user's real home.
+    private static func sandboxProfile(
+        projectRoot: URL,
+        temporaryDirectory: URL
+    ) -> String {
+        let writableSubpaths = [
+            canonicalPath(projectRoot.path),
+            canonicalPath(temporaryDirectory.deletingLastPathComponent().path)
+                + "/" + temporaryDirectory.lastPathComponent,
+        ]
+        let subpathRules = writableSubpaths
+            .map { "(subpath \"\(sandboxEscaped($0))\")" }
+            .joined(separator: "\n        ")
+        return """
+        (version 1)
+        (deny default)
+        (import "system.sb")
+        (allow file-read*)
+        (allow process*)
+        (allow network*)
+        (allow file-write*
+            \(subpathRules))
+        """
+    }
+
+    private static func sandboxEscaped(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    /// Foundation's `resolvingSymlinksInPath()` leaves `/var` untouched on
+    /// current macOS even though the sandbox compares it as `/private/var`.
+    /// `realpath` gives the kernel spelling that seatbelt rules actually use.
+    private static func canonicalPath(_ path: String) -> String {
+        guard let resolved = Darwin.realpath(path, nil) else { return path }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     /// What the child gets as PATH.
@@ -126,6 +189,19 @@ final class AcpAgentProcess: AcpAgentTransport {
     }
 
     func start() throws {
+        do {
+            try FileManager.default.createDirectory(
+                at: sandboxTemporaryDirectory,
+                withIntermediateDirectories: true
+            )
+            try FileManager.default.createDirectory(
+                at: sandboxTemporaryDirectory.appendingPathComponent("home", isDirectory: true),
+                withIntermediateDirectories: true
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: sandboxTemporaryDirectory)
+            throw error
+        }
         stdoutPipe.fileHandleForReading.readabilityHandler = { [connection] handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
@@ -145,11 +221,17 @@ final class AcpAgentProcess: AcpAgentTransport {
             // is usually the reply that finished the run, so a run that
             // succeeded would be reported as "the process exited".
             self.drainRemainingOutput()
+            try? FileManager.default.removeItem(at: self.sandboxTemporaryDirectory)
             let tail = self.currentStderrTail()
             self.connection.failAllPending(with: AcpError.processExited(detail: tail))
             self.onExit?(process.terminationStatus, tail)
         }
-        try process.run()
+        do {
+            try process.run()
+        } catch {
+            try? FileManager.default.removeItem(at: sandboxTemporaryDirectory)
+            throw error
+        }
     }
 
     private func appendStderr(_ data: Data) {

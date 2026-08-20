@@ -60,11 +60,10 @@ struct AgentSettingsView: View {
                 .labelsHidden()
             }
 
-            if agentConfiguration.provider.requiresAPIKey {
-                apiKeyRows
-            } else {
+            if agentConfiguration.provider == .cli {
                 codingAgentRows
             }
+            if agentConfiguration.requiresCredential { apiKeyRows }
 
             if agentConfiguration.provider.supportsModelSelection {
                 modelRows
@@ -78,7 +77,7 @@ struct AgentSettingsView: View {
 
     @ViewBuilder
     private var apiKeyRows: some View {
-        SettingsStackedRow(label: String(format: text(.apiKeyLabelFormat), agentConfiguration.provider.displayName)) {
+        SettingsStackedRow(label: credentialFieldLabel) {
             HStack {
                 // SecureField, so a key isn't left legible on a screen
                 // that gets shared or recorded.
@@ -101,11 +100,18 @@ struct AgentSettingsView: View {
 
         Text(String(
             format: text(.apiKeyExplanationFormat),
-            agentConfiguration.provider.apiKeyEnvironmentVariable ?? ""
+            agentConfiguration.credentialEnvironmentVariables.joined(separator: " 또는 ")
         ))
         .font(.footnote)
         .foregroundStyle(.secondary)
         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+    }
+
+    private var credentialFieldLabel: String {
+        if agentConfiguration.provider == .cli {
+            return "\(agentConfiguration.codingAgent.displayName) 설정 토큰 / API 키"
+        }
+        return String(format: text(.apiKeyLabelFormat), agentConfiguration.provider.displayName)
     }
 
     /// Shown only for the CLI provider. The picker writes the *same*
@@ -211,7 +217,7 @@ struct AgentSettingsView: View {
     /// saving while Anthropic is selected can never clobber an OpenAI key
     /// sitting in the same file.
     private func saveAPIKey(_ key: String?) {
-        guard let keyVariable = agentConfiguration.provider.apiKeyEnvironmentVariable else { return }
+        guard let keyVariable = agentConfiguration.writableCredentialEnvironmentVariable else { return }
         let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
         let target = AgentConfiguration.writableEnvFile
         guard DotEnv.write(key: keyVariable, value: trimmed?.isEmpty == false ? trimmed : nil, to: target) else {

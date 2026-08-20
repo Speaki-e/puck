@@ -58,6 +58,13 @@ private func cliConfiguration() -> AgentConfiguration {
 
 final class CodingAgentCLIClientTests: XCTestCase {
 
+    func test_projectlessWorkingDirectoryIsScopedAwayFromTheUsersHome() {
+        let directory = CodingAgentCLIClient.projectlessWorkingDirectory()
+
+        XCTAssertNotEqual(directory, NSHomeDirectory())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory))
+    }
+
     // MARK: - The happy path
 
     func test_send_returnsTheAgentsTextAsATextOnlyTurn() async throws {

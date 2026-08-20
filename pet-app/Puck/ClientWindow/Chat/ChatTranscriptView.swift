@@ -46,7 +46,13 @@ struct ChatTranscriptView: View {
                             .id(Self.runningRowID)
                     }
                 }
-                .padding(16)
+                // One column for every row -- messages, tool cards, banners --
+                // capped and centred, with margin outside it. Widening the
+                // window widens the margin, not the lines.
+                .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth, alignment: .leading)
+                .padding(.horizontal, ClientTheme.Metrics.transcriptHorizontalPadding)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
             }
             .onChange(of: session.timeline.count) { scrollToEnd(proxy) }
             .onChange(of: session.isRunning) { scrollToEnd(proxy) }
@@ -81,10 +87,10 @@ struct ChatTranscriptView: View {
     private func row(for entry: ChatTimelineEntry) -> some View {
         switch entry {
         case .userMessage(_, let text):
-            MessageBubble(text: text, isFromUser: true)
+            UserMessageBubble(text: text)
 
         case .assistantText(_, let text):
-            MessageBubble(text: text, isFromUser: false)
+            AgentMessage(text: text)
 
         case .toolCall(let id, let tool, let args):
             ToolCallRow(tool: tool, args: args, result: result(forCall: id))
@@ -148,18 +154,34 @@ func toolFailureLine(ok: Bool?, error: ToolErrorCode?, detail: String?) -> Strin
 
 // MARK: - Rows
 
-private struct MessageBubble: View {
+/// What the user said: still a balloon, still trailing, still one glance's
+/// worth. It hugs its text and stops short of the full column so the two
+/// sides of the conversation stay told apart by shape rather than by colour
+/// alone.
+private struct UserMessageBubble: View {
     let text: String
-    let isFromUser: Bool
 
     var body: some View {
         Text(text)
             .textSelection(.enabled)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isFromUser ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary), in: .rect(cornerRadius: 12))
-            .foregroundStyle(isFromUser ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-            .frame(maxWidth: 520, alignment: isFromUser ? .trailing : .leading)
+            .background(.tint, in: .rect(cornerRadius: 12))
+            .foregroundStyle(.white)
+            .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth * 0.8, alignment: .trailing)
+    }
+}
+
+/// What the agent said: no balloon at all. A reply is a short document --
+/// headings, lists, code -- and a rounded rect around several hundred words
+/// of it reads as a quoted card rather than as the answer. Without one it is
+/// just the page, at a size meant to be read rather than skimmed.
+private struct AgentMessage: View {
+    let text: String
+
+    var body: some View {
+        MarkdownText(markdown: text)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -216,7 +238,7 @@ private struct ToolCallRow: View {
         }
         .padding(10)
         .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 10))
-        .frame(maxWidth: 520, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var isPending: Bool { result == nil }
@@ -296,7 +318,7 @@ private struct ApprovalBanner: View {
         }
         .padding(12)
         .background(.yellow.opacity(0.12), in: .rect(cornerRadius: 10))
-        .frame(maxWidth: 520, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -317,7 +339,7 @@ private struct DoneRow: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .textSelection(.enabled)
-        .frame(maxWidth: 520, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

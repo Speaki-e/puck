@@ -29,7 +29,8 @@
 //  default `openai`; an unrecognized value falls back to `openai` rather than
 //  crashing -- see `AgentProvider.resolved(fromRawValue:)`). The provider then
 //  decides which key is read: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, or
-//  none at all for `cli`, which uses the vendor CLI's own login. Model
+//  none at all for `cli`; the selected coding CLI's stable credential is
+//  resolved separately by `codingAgentCredentials`. Model
 //  override is provider-specific too -- `OPENAI_MODEL` / `ANTHROPIC_MODEL` --
 //  with the provider-neutral `AGENT_MODEL` as a fallback for either one, so
 //  `OPENAI_MODEL` keeps winning for existing OpenAI users even if `AGENT_MODEL`
@@ -42,6 +43,8 @@ struct AgentConfiguration {
     let apiKey: String?
     let model: String
     let provider: AgentProvider
+    let codingAgent: CodingAgentKind
+    let credentialVariable: String?
     /// Which of the search paths actually supplied the key. Surfaced in
     /// Settings because "I changed the key and nothing happened" is otherwise
     /// unanswerable -- an env var or a nearer .env silently outranking the one
@@ -72,13 +75,41 @@ struct AgentConfiguration {
     /// often; re-check that page when this stops being current.
     static let defaultAnthropicModel = "claude-sonnet-5"
 
-    /// Whether the agent can run at all. A provider that authenticates through
-    /// a CLI the user already logged into has no key to be missing, so it is
-    /// configured the moment it is selected -- gating it on `apiKey` would tell
-    /// someone who deliberately picked the no-key provider to go set a key.
+    init(
+        apiKey: String?,
+        model: String,
+        provider: AgentProvider,
+        keySource: KeySource?,
+        codingAgent: CodingAgentKind = .claude,
+        credentialVariable: String? = nil
+    ) {
+        self.apiKey = apiKey
+        self.model = model
+        self.provider = provider
+        self.keySource = keySource
+        self.codingAgent = codingAgent
+        self.credentialVariable = credentialVariable
+    }
+
+    /// For `.cli`, `apiKey` holds the first stable credential accepted by the
+    /// selected coding agent; interactive login state is not considered.
     var isConfigured: Bool {
-        guard provider.requiresAPIKey else { return true }
+        guard requiresCredential else { return true }
         return !(apiKey ?? "").isEmpty
+    }
+
+    var requiresCredential: Bool { provider.requiresAPIKey || provider == .cli }
+
+    var credentialEnvironmentVariables: [String] {
+        if provider == .cli { return codingAgent.apiKeyEnvironmentVariables }
+        return provider.apiKeyEnvironmentVariable.map { [$0] } ?? []
+    }
+
+    var writableCredentialEnvironmentVariable: String? {
+        if provider == .cli {
+            return credentialVariable ?? codingAgent.preferredCredentialEnvironmentVariable
+        }
+        return provider.apiKeyEnvironmentVariable
     }
 
     static func load(
@@ -86,38 +117,53 @@ struct AgentConfiguration {
         searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
     ) -> AgentConfiguration {
         let provider = provider(environment: environment, searchPaths: searchPaths)
-        guard let keyVariable = provider.apiKeyEnvironmentVariable else {
+        let selectedCodingAgent = codingAgent(environment: environment, searchPaths: searchPaths)
+        let credentialVariables = provider == .cli
+            ? selectedCodingAgent.apiKeyEnvironmentVariables
+            : provider.apiKeyEnvironmentVariable.map { [$0] } ?? []
+        guard !credentialVariables.isEmpty else {
             return AgentConfiguration(
                 apiKey: nil,
                 model: model(provider: provider, environment: environment, searchPaths: searchPaths),
                 provider: provider,
-                keySource: nil
+                keySource: nil,
+                codingAgent: selectedCodingAgent
             )
         }
-        if let fromEnvironment = environment[keyVariable]?.nilIfBlank {
-            return AgentConfiguration(
-                apiKey: fromEnvironment,
-                model: model(provider: provider, environment: environment, searchPaths: searchPaths),
-                provider: provider,
-                keySource: .environment(variable: keyVariable)
-            )
+        for keyVariable in credentialVariables {
+            if let fromEnvironment = environment[keyVariable]?.nilIfBlank {
+                return AgentConfiguration(
+                    apiKey: fromEnvironment,
+                    model: model(provider: provider, environment: environment, searchPaths: searchPaths),
+                    provider: provider,
+                    keySource: .environment(variable: keyVariable),
+                    codingAgent: selectedCodingAgent,
+                    credentialVariable: keyVariable
+                )
+            }
         }
         for directory in searchPaths {
             let file = directory.appendingPathComponent(".env")
-            if let fromFile = DotEnv.parse(fileAt: file)[keyVariable]?.nilIfBlank {
-                return AgentConfiguration(
-                    apiKey: fromFile,
-                    model: model(provider: provider, environment: environment, searchPaths: searchPaths),
-                    provider: provider,
-                    keySource: .file(file)
-                )
+            let values = DotEnv.parse(fileAt: file)
+            for keyVariable in credentialVariables {
+                if let fromFile = values[keyVariable]?.nilIfBlank {
+                    return AgentConfiguration(
+                        apiKey: fromFile,
+                        model: model(provider: provider, environment: environment, searchPaths: searchPaths),
+                        provider: provider,
+                        keySource: .file(file),
+                        codingAgent: selectedCodingAgent,
+                        credentialVariable: keyVariable
+                    )
+                }
             }
         }
         return AgentConfiguration(
             apiKey: nil,
             model: model(provider: provider, environment: environment, searchPaths: searchPaths),
             provider: provider,
-            keySource: nil
+            keySource: nil,
+            codingAgent: selectedCodingAgent
         )
     }
 
@@ -142,10 +188,6 @@ struct AgentConfiguration {
     /// with OpenAI while handing edits to Claude Code, and that combination is
     /// a normal one rather than a misconfiguration. Named `codingAgent` to
     /// match the setting workspace used, so an existing `.env` keeps working.
-    var codingAgent: CodingAgentKind {
-        Self.codingAgent(environment: Self.loadedEnvironment, searchPaths: Self.loadedSearchPaths)
-    }
-
     static func codingAgent(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
@@ -170,9 +212,11 @@ struct AgentConfiguration {
     /// process gets only the variables its own agent reads.
     ///
     /// Resolved from the same places the pet's own key is, so a `.env` holding
-    /// one key for both purposes just works. An agent whose key is missing is
-    /// still started: several are authenticated by their own CLI login rather
-    /// than an API key, and refusing to start would break that setup.
+    /// one key for both purposes just works. The child has a private HOME, so
+    /// interactive CLI login files are deliberately not copied: refresh-token
+    /// rotation would either corrupt the user's real login or lose the new
+    /// token when the sandbox is removed. Claude setup-tokens and API keys are
+    /// stable credentials and are forwarded explicitly instead.
     func codingAgentCredentials(
         for kind: CodingAgentKind,
         environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -198,9 +242,6 @@ struct AgentConfiguration {
         }
         return credentials
     }
-
-    private static let loadedEnvironment = ProcessInfo.processInfo.environment
-    private static let loadedSearchPaths = AgentConfiguration.defaultSearchPaths
 
     /// Resolved independently of the key: a `.env` that only sets the model is
     /// a reasonable thing to have next to one that only sets the key.
@@ -279,10 +320,10 @@ struct AgentConfiguration {
 enum AgentProvider: String, CaseIterable {
     case openai
     case anthropic
-    /// The vendor coding-agent CLI the user has already logged into, driven
-    /// over ACP -- the same child process `code_editor` uses, asked to hold a
-    /// conversation instead of to edit a project. No API key: the CLI's own
-    /// login is the credential, which is the entire reason this exists.
+    /// The vendor coding-agent CLI driven over ACP -- the same child process
+    /// `code_editor` uses, asked to hold a conversation instead of editing.
+    /// It receives a stable setup-token or API key, never copied interactive
+    /// login state.
     ///
     /// Which CLI is `CODING_AGENT`'s existing claude/codex choice, not a
     /// second axis (see `AgentConfiguration.codingAgent`).
@@ -293,12 +334,12 @@ enum AgentProvider: String, CaseIterable {
         switch self {
         case .openai: return "ChatGPT (OpenAI)"
         case .anthropic: return "Claude (Anthropic)"
-        case .cli: return "코딩 CLI (로그인)"
+        case .cli: return "코딩 CLI"
         }
     }
 
-    /// nil when the provider has no API key to hold -- `.cli` authenticates
-    /// through the vendor CLI's own login.
+    /// nil for `.cli` because its accepted credential variables depend on the
+    /// selected `CODING_AGENT`; AgentConfiguration resolves those dynamically.
     var apiKeyEnvironmentVariable: String? {
         switch self {
         case .openai: return "OPENAI_API_KEY"

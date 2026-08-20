@@ -3,15 +3,19 @@
 //  Puck
 //
 //  F1 test · owner: 강상우 (Sangwoo Kang)
-//  plan/02_pet-app.md F1: "Idle 30초 지속 시 프레임레이트 60→15 다운시프트".
-//  FrameClock could already change rate; nothing decided when to. A pet
-//  standing still was measured holding ~20% CPU.
+//  Locks the current 2D heartbeat budget: 30 Hz while active and 15 Hz after
+//  sustained idle, with immediate restoration when activity resumes.
 //
 
 import XCTest
 @testable import Puck
 
 final class IdleFrameRatePolicyTests: XCTestCase {
+    func test_defaultRatesStayInsideThe2DUpdateBudget() {
+        XCTAssertEqual(FrameClock.activeFramesPerSecond, 30)
+        XCTAssertEqual(FrameClock.idleFramesPerSecond, 15)
+    }
+
     func test_runsAtFullRateWhileTheStateIsNotIdle() {
         var policy = IdleFrameRatePolicy()
 

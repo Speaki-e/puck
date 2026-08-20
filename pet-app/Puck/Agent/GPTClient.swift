@@ -147,7 +147,7 @@ final class RoutingAgentLLMClient: AgentLLMClient {
 /// providers' tool calls reach. Left nil, the CLI turn is text-only.
 func makeAgentLLMClient(
     _ configuration: @escaping () -> AgentConfiguration,
-    workingDirectory: @escaping () -> String = { NSHomeDirectory() },
+    workingDirectory: @escaping () -> String = CodingAgentCLIClient.projectlessWorkingDirectory,
     invokeTool: AgentToolInvocation? = nil
 ) -> any AgentLLMClient {
     RoutingAgentLLMClient(

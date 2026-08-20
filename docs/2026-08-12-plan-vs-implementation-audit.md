@@ -1,5 +1,17 @@
 # PetAgent 기획 vs 구현 차이 점검 (2026-08-12)
 
+> **이 문서는 역사 기록이다. 현재 상태 설명이 아니다.**
+>
+> 2026-08-12 시점의 5개 저장소(plan, protocol, ai-module, workspace, pet-app, landing)를
+> 대조한 스냅샷이다. 그 직후 저장소 구조가 통째로 바뀌었다 — `workspace`/`protocol`/
+> `ai-module`은 2026-08-15에 삭제됐고, 지금 이 저장소에는 `pet-app` 하나만 있다
+> (`README.md`의 "What used to be here", `docs/decisions.md`의 2026-08-15 항목들).
+>
+> 그래서 아래 본문이 "실제 코드 상태"라고 적은 것들은 **그때의** 코드 상태이고, 참조하는
+> 경로(`workspace/src/...`, `ai-module/`, `protocol/` 등) 대부분은 지금 존재하지 않는다.
+> 근거를 그대로 보존하려고 본문은 고치지 않았다 — 어떤 항목이 지금 어떻게 됐는지는
+> `docs/decisions.md`를 보면 된다.
+
 ## 사용 방법
 
 - 각 항목은 `증상 → 기획서 내용 → 실제 코드 상태 → 왜 문제인지` 순으로 정리했습니다.

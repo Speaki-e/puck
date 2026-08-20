@@ -138,8 +138,9 @@ final class AgentHost {
                 // one to look at. Resolved per turn, not captured once -- the
                 // user switches workspaces between turns.
                 workingDirectory: { [weak self] in
-                    guard let self else { return NSHomeDirectory() }
-                    return self.resolveProjectPath(self.activeWorkspaceId) ?? NSHomeDirectory()
+                    guard let self else { return CodingAgentCLIClient.projectlessWorkingDirectory() }
+                    return self.resolveProjectPath(self.activeWorkspaceId)
+                        ?? CodingAgentCLIClient.projectlessWorkingDirectory()
                 },
                 // Only the CLI provider reads this too: it hands Puck's tools
                 // to the CLI as an MCP server and calls back in here for each
@@ -354,19 +355,15 @@ final class AgentHost {
             // in the transcript next to the message that couldn't be answered.
             // Names the actual paths that were searched rather than "check
             // your config" -- the search order is the answer to the question
-            // this message provokes. Names the key variable the *selected*
-            // provider reads, not always OpenAI's -- switching to Anthropic
-            // in Settings and still being told to set OPENAI_API_KEY is the
-            // exact confusion the provider picker exists to prevent.
-            // Only a provider that has a key can be missing one -- `.cli`
-            // authenticates through the CLI's own login and never reaches
-            // here, since `isConfigured` is already true for it.
-            let keyVariable = configuration.provider.apiKeyEnvironmentVariable ?? "API_KEY"
+            // this message provokes. Names every stable credential the
+            // selected provider accepts; interactive CLI login state is
+            // deliberately outside the child sandbox.
+            let keyVariable = configuration.credentialEnvironmentVariables.joined(separator: " 또는 ")
             let searched = AgentConfiguration.defaultSearchPaths
                 .map { $0.appendingPathComponent(".env").path }
                 .joined(separator: "\n")
             let message = """
-            \(configuration.provider.displayName) API 키가 없어요. 아래 중 한 곳의 .env에 \(keyVariable)=... 를 넣어주세요.
+            \(configuration.provider.displayName) 인증 정보가 없어요. 아래 중 한 곳의 .env에 \(keyVariable)=... 를 넣어주세요.
             \(searched)
             """
             _ = broadcast(.event(.textChunk(text: message), workspaceId: workspaceId, sessionId: sessionId))

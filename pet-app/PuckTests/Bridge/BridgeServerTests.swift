@@ -209,7 +209,6 @@ final class BridgeServerTests: XCTestCase {
         guiClient.stateUpdateHandler = { state in
             if case .ready = state {
                 self.send(.clientHello(role: .gui), on: guiClient)
-                self.send(.userInput(UserInput(text: "hi", source: .text)), on: guiClient)
             }
         }
         receiveOne(on: workspaceClient, into: workspaceBuffer) { message in
@@ -220,6 +219,17 @@ final class BridgeServerTests: XCTestCase {
 
         workspaceClient.start(queue: .main)
         guiClient.start(queue: .main)
+
+        // A ready client has only connected to the socket; the server may not
+        // have consumed its role handshake yet. Wait until both handshakes are
+        // registered before sending the message whose routing depends on that
+        // role, otherwise this test races the server queue under load.
+        let bothRegistered = expectation(description: "both gui roles are registered")
+        pollUntilTrue(timeout: 5, expectation: bothRegistered) {
+            self.server.currentConnections().filter { $0.role == .gui }.count == 2
+        }
+        wait(for: [bothRegistered], timeout: 6)
+        send(.userInput(UserInput(text: "hi", source: .text)), on: guiClient)
 
         wait(for: [workspaceReceived], timeout: 5)
         workspaceClient.cancel()

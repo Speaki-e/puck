@@ -150,7 +150,7 @@ enum Strings {
         .modelExplanationFormat: "비워 두고 저장하면 기본값 %1$@을(를) 씁니다. 환경변수 %2$@가 있으면 그쪽이 우선합니다.",
         .codingAgentLabel: "코딩 CLI",
         .cliProviderExplanation:
-            "이미 로그인한 CLI를 그대로 씁니다. API 키가 필요 없는 대신 대화만 할 수 있어요 — 앱 실행, 화면 가리키기, 코드 편집 같은 펫 기능은 이 공급자에서는 동작하지 않습니다.",
+            "선택한 CLI와 안정적인 설정 토큰 또는 API 키를 씁니다. 펫 도구는 MCP로 연결되고, 선택한 프로젝트 안의 파일 작업은 샌드박스 안에서 실행됩니다.",
         .installedFormat: "'%1$@' 설치 완료.",
         .installedMissingRecommendedFormat: "'%1$@' 설치 완료 — 권장 클립 누락(대기 이미지로 대체): %2$@",
         .failedToInstallFormat: "'%1$@' 설치 실패: %2$@",

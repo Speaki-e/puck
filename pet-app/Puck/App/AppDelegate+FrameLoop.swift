@@ -54,7 +54,8 @@ extension AppDelegate {
             // sends no events -- so it has to be noticed on a tick.
             self.apply(self.headPetDetector.tick(now: CACurrentMediaTime()))
 
-            // F1's idle downshift: a resting pet doesn't need 60fps.
+            // A resting 2D pet can use the lower heartbeat immediately after
+            // the policy's idle threshold without losing timer-driven work.
             let isResting = self.characterController?.currentState === self.idleState
             self.frameClock.setFramesPerSecond(self.idleFrameRate.framesPerSecond(idle: isResting, dt: dt))
 

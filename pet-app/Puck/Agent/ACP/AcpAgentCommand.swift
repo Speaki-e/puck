@@ -52,13 +52,21 @@ enum CodingAgentKind: String, Codable, CaseIterable {
         }
     }
 
-    /// The environment variable the agent reads its credentials from. codex
-    /// accepts either, and both are forwarded when present -- CODEX_API_KEY
-    /// first because it is the more specific of the two.
+    /// The environment variables the sandboxed agent reads credentials from.
+    /// Claude's setup-token is intentionally supported alongside an API key;
+    /// unlike copying a short-lived interactive login, it remains valid when
+    /// the child's private HOME is discarded. Codex accepts either key name.
     var apiKeyEnvironmentVariables: [String] {
         switch self {
-        case .claude: return ["ANTHROPIC_API_KEY"]
+        case .claude: return ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"]
         case .codex: return ["CODEX_API_KEY", "OPENAI_API_KEY"]
+        }
+    }
+
+    var preferredCredentialEnvironmentVariable: String {
+        switch self {
+        case .claude: return "CLAUDE_CODE_OAUTH_TOKEN"
+        case .codex: return "CODEX_API_KEY"
         }
     }
 }

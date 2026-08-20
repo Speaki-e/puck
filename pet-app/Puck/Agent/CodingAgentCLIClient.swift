@@ -2,11 +2,10 @@
 //  CodingAgentCLIClient.swift
 //  Puck
 //
-//  An AgentLLMClient backed by the vendor coding-agent CLI the user is already
-//  logged into -- `claude` or `codex`, driven over ACP, the same child process
-//  `code_editor` spawns. The point is the credential: this path needs no API
-//  key at all, so the pet answers ordinary conversation on a machine that only
-//  ever logged into a CLI.
+//  An AgentLLMClient backed by `claude` or `codex`, driven over ACP through the
+//  same sandboxed child process `code_editor` spawns. The child receives only
+//  an explicitly configured setup-token or API key; interactive CLI login
+//  state is deliberately not copied into its private HOME.
 //
 //  ## How it gets Puck's tools
 //
@@ -75,7 +74,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
     private let startAgent: (_ kind: CodingAgentKind, _ cwd: String) throws -> AcpAgentTransport
     /// Where `session/new` opens the agent. The active workspace's project when
     /// there is one -- a CLI asked about "this file" can then actually look --
-    /// falling back to the home directory for a chat-only workspace.
+    /// falling back to an app-owned directory for a chat-only workspace.
     private let workingDirectory: () -> String
     private let timeoutSeconds: TimeInterval
     /// Runs one of Puck's tools for the CLI. nil means there is no host to run
@@ -91,7 +90,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
 
     init(
         configuration: @escaping () -> AgentConfiguration,
-        workingDirectory: @escaping () -> String = { NSHomeDirectory() },
+        workingDirectory: @escaping () -> String = CodingAgentCLIClient.projectlessWorkingDirectory,
         timeoutSeconds: TimeInterval = CodingAgentCLIClient.defaultTimeoutSeconds,
         invokeTool: AgentToolInvocation? = nil,
         startAgent: @escaping (_ kind: CodingAgentKind, _ cwd: String) throws -> AcpAgentTransport
@@ -102,6 +101,16 @@ final class CodingAgentCLIClient: AgentLLMClient {
         self.timeoutSeconds = timeoutSeconds
         self.invokeTool = invokeTool
         self.startAgent = startAgent
+    }
+
+    /// A CLI session's project root is also its filesystem write boundary.
+    /// Chat-only turns therefore use one narrow app-owned folder instead of
+    /// accidentally granting the child write access to the entire home tree.
+    static func projectlessWorkingDirectory() -> String {
+        let directory = AgentConfiguration.supportDirectory
+            .appendingPathComponent("ChatWorkspace", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.path
     }
 
     /// The real spawn, identical to the one `code_editor` uses -- same command

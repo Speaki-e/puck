@@ -208,31 +208,74 @@ final class AgentConfigurationTests: XCTestCase {
         XCTAssertEqual(config.provider, .cli)
     }
 
-    /// The whole point of this provider: the vendor CLI's own login is the
-    /// credential, so there is no key to be missing. Gating it on `apiKey`
-    /// would tell someone who deliberately picked the no-key provider to go
-    /// set a key, and AgentHost would refuse to run the turn.
-    func test_theCliProviderIsConfiguredWithNoKeyAnywhere() {
+    func test_theCliProviderIsNotConfiguredWithoutAStableCredential() {
         let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "cli"], searchPaths: [])
 
-        XCTAssertTrue(config.isConfigured)
+        XCTAssertFalse(config.isConfigured)
         XCTAssertNil(config.apiKey)
         XCTAssertNil(config.keySource)
         XCTAssertNil(config.provider.apiKeyEnvironmentVariable)
         XCTAssertFalse(config.provider.requiresAPIKey)
+        XCTAssertTrue(config.requiresCredential)
     }
 
     /// A key sitting in the same .env for another provider must not be picked
     /// up and reported as this one's source -- Settings' status line would
     /// then name a file that has nothing to do with the selected provider.
     func test_theCliProviderIgnoresKeysMeantForTheOthers() throws {
-        let directory = try directory(withEnv: "AGENT_PROVIDER=cli\nOPENAI_API_KEY=sk-oai\nANTHROPIC_API_KEY=sk-ant")
+        let directory = try directory(withEnv: "AGENT_PROVIDER=cli\nGOOGLE_API_KEY=unrelated")
 
         let config = AgentConfiguration.load(environment: [:], searchPaths: [directory])
 
         XCTAssertEqual(config.provider, .cli)
         XCTAssertNil(config.apiKey)
         XCTAssertNil(config.keySource)
+    }
+
+    func test_theCliProviderLoadsTheSelectedAgentsStableCredential() {
+        let config = AgentConfiguration.load(
+            environment: [
+                "AGENT_PROVIDER": "cli",
+                "CODING_AGENT": "codex",
+                "OPENAI_API_KEY": "codex-key",
+            ],
+            searchPaths: []
+        )
+
+        XCTAssertEqual(config.codingAgent, .codex)
+        XCTAssertEqual(config.apiKey, "codex-key")
+        XCTAssertEqual(config.keySource, .environment(variable: "OPENAI_API_KEY"))
+        XCTAssertTrue(config.isConfigured)
+    }
+
+    func test_cliEnvironmentCredentialBeatsAFileCredential() throws {
+        let directory = try directory(withEnv: "AGENT_PROVIDER=cli\nANTHROPIC_API_KEY=file-key")
+
+        let config = AgentConfiguration.load(
+            environment: [
+                "AGENT_PROVIDER": "cli",
+                "CLAUDE_CODE_OAUTH_TOKEN": "environment-token",
+            ],
+            searchPaths: [directory]
+        )
+
+        XCTAssertEqual(config.apiKey, "environment-token")
+        XCTAssertEqual(config.keySource, .environment(variable: "CLAUDE_CODE_OAUTH_TOKEN"))
+    }
+
+    func test_claudeSetupTokenIsForwardedWithoutInteractiveLoginState() {
+        let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "cli"], searchPaths: [])
+
+        let credentials = config.codingAgentCredentials(
+            for: .claude,
+            environment: [
+                "CLAUDE_CODE_OAUTH_TOKEN": "setup-token",
+                "CLAUDE_CODE_OAUTH_REFRESH_TOKEN": "short-lived-refresh",
+            ],
+            searchPaths: []
+        )
+
+        XCTAssertEqual(credentials, ["CLAUDE_CODE_OAUTH_TOKEN": "setup-token"])
     }
 
     /// ACP carries no model field, so nothing would send one. Resolving

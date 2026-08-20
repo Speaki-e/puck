@@ -136,6 +136,22 @@ extension AppDelegate {
     /// the bubble window is shared, so an input session's dismissal (which
     /// unpins the pet) would otherwise still be attached when a notice shows.
     func showNoticeBubble(_ message: String, for duration: TimeInterval, onExpire: (() -> Void)? = nil) {
+        // A hidden pet doesn't speak. Every notice here is the pet talking
+        // over its own head, and the overlay windows are ordered out while
+        // hidden -- so the bubble arrived as a balloon pointing at nothing,
+        // which is how an agent reply put the pet back on screen after the
+        // user had explicitly hidden it. Guarded in the funnel rather than at
+        // the four call sites so a fifth notice can't reintroduce it.
+        //
+        // `onExpire` still runs: callers use it to release state they took
+        // before showing (isGuidingPermission, the mute sulk), and skipping it
+        // would strand them.
+        guard !isCharacterHidden else {
+            if let onExpire {
+                DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: onExpire)
+            }
+            return
+        }
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
         bubbleView.onCancel = { bubbleWindow.closeAndYieldFocus() }

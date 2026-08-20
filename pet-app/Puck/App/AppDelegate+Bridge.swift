@@ -123,8 +123,20 @@ extension AppDelegate {
         // typography the size is measured from.
         anchorBubbleToPet(bubbleWindow, size: TextInputBubbleView.speechSize(for: message))
         bubbleWindow.showSpeech()
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak bubbleWindow] in
-            bubbleWindow?.closeAndYieldFocus()
+        // Tagged, because the window is shared: a 5s agent summary followed
+        // two seconds later by a 2s mute sulk used to have the summary's timer
+        // close the sulk three seconds early -- and run the summary's onExpire
+        // against a bubble that was no longer its own.
+        noticeBubbleGeneration += 1
+        let generation = noticeBubbleGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak bubbleWindow] in
+            if self?.noticeBubbleGeneration == generation {
+                bubbleWindow?.closeAndYieldFocus()
+            }
+            // Run either way: this notice is over whether it timed out or was
+            // replaced, and the one caller that passes a handler uses it to
+            // clear isGuidingPermission -- skipped, that wedges permission
+            // guidance off for the rest of the session.
             onExpire?()
         }
     }

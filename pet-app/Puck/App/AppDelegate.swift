@@ -138,6 +138,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     var pendingClientMirror: BridgeMessage?
     /// True from the moment guidance starts until its bubble expires.
     var isGuidingPermission = false
+    /// Which timed notice the shared bubble window is currently showing --
+    /// see showNoticeBubble(). Bumped per notice so an earlier one's expiry
+    /// timer cannot close the notice that replaced it.
+    var noticeBubbleGeneration = 0
     /// Set once a capture completes, cleared on submit/cancel/dismiss --
     /// see AppDelegate+HotkeysVoice.swift's showTextInputBubble(). At most
     /// one: the panel has room for a single thumbnail, and multi-image

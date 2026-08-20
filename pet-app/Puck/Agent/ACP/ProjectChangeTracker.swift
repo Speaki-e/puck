@@ -82,9 +82,8 @@ final class ProjectChangeTracker {
     }
 
     static func relativePath(for absolutePath: String, under rootPath: String) -> String? {
-        let root = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-        guard absolutePath.hasPrefix(root) else { return nil }
-        let relative = String(absolutePath.dropFirst(root.count))
+        guard let relative = PathContainment.relativePath(root: rootPath, candidate: absolutePath) else { return nil }
+        // The root itself is inside itself but is not a changed *file*.
         guard !relative.isEmpty else { return nil }
         let first = relative.split(separator: "/").first.map(String.init)
         if let first, ignoredDirectories.contains(first) { return nil }

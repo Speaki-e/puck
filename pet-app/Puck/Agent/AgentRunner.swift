@@ -103,10 +103,25 @@ final class AgentRunner {
     /// or list" -- a line that had been true of a different workspace.
     private var conversations: [String: [GPTMessage]] = [:]
 
+    /// Guards every stored property below. `run` is async and this is a plain
+    /// class, so its body resumes on whatever executor the API call came back
+    /// on -- and runs genuinely overlap, because AgentRunHandle only *requests*
+    /// cancellation and the superseded turn keeps going until it next checks
+    /// `Task.isCancelled`. Two turns writing a Swift Dictionary at once is
+    /// memory corruption, not a lost update. A serial queue rather than an
+    /// NSLock because NSLock is unavailable from async contexts (an error in
+    /// the Swift 6 language mode); the same choice BridgeServer and
+    /// ToolExecutor already made.
+    private let stateQueue = DispatchQueue(label: "Puck.AgentRunner.state")
+
     /// Which chat the next `run` belongs to. Set by the host before each run,
     /// like `workspaceContext`; the default keeps every existing call site and
     /// test working as a single conversation.
-    var sessionId: String = "default"
+    var sessionId: String {
+        get { stateQueue.sync { storedSessionId } }
+        set { stateQueue.sync { storedSessionId = newValue } }
+    }
+    private var storedSessionId = "default"
 
     /// A chat's stack, seeded on first read.
     ///
@@ -116,22 +131,26 @@ final class AgentRunner {
     /// notices -- reading it late is how a dying run's last answer would land
     /// in the chat that replaced it.
     private func conversation(_ key: String) -> [GPTMessage] {
-        conversations[key] ?? [.system(Self.systemPrompt)]
+        stateQueue.sync { conversations[key] ?? [.system(Self.systemPrompt)] }
     }
 
     private func append(_ message: GPTMessage, to key: String) {
-        var stack = conversation(key)
-        stack.append(message)
-        conversations[key] = stack
+        stateQueue.sync {
+            var stack = conversations[key] ?? [.system(Self.systemPrompt)]
+            stack.append(message)
+            conversations[key] = stack
+        }
     }
 
     /// Gives `to` the conversation `from` has, for the one case where a new
     /// chat is a continuation rather than a beginning: the agent branching its
     /// work into a task session (openTaskSession).
     func carryConversation(from sourceSessionId: String, to sessionId: String) {
-        guard let source = conversations[sourceSessionId] else { return }
-        conversations[sessionId] = source
-        announcedWorkspaceContexts[sessionId] = announcedWorkspaceContexts[sourceSessionId]
+        stateQueue.sync {
+            guard let source = conversations[sourceSessionId] else { return }
+            conversations[sessionId] = source
+            announcedWorkspaceContexts[sessionId] = announcedWorkspaceContexts[sourceSessionId]
+        }
     }
 
     /// How many non-system messages a chat keeps. Nothing trimmed the stack
@@ -148,23 +167,27 @@ final class AgentRunner {
     /// what is kept is never a tool result: the API rejects one whose
     /// assistant tool_calls message has been trimmed away above it.
     private func trimConversation(_ key: String) {
-        let stack = conversation(key)
-        var systems: [GPTMessage] = []
-        var rest: [GPTMessage] = []
-        for message in stack {
-            if case .system = message { systems.append(message) } else { rest.append(message) }
+        stateQueue.sync {
+            let stack = conversations[key] ?? [.system(Self.systemPrompt)]
+            var systems: [GPTMessage] = []
+            var rest: [GPTMessage] = []
+            for message in stack {
+                if case .system = message { systems.append(message) } else { rest.append(message) }
+            }
+            guard rest.count > Self.maxMessages else { return }
+            var kept = Array(rest.suffix(Self.maxMessages))
+            while let first = kept.first, case .tool = first { kept.removeFirst() }
+            conversations[key] = systems + kept
         }
-        guard rest.count > Self.maxMessages else { return }
-        var kept = Array(rest.suffix(Self.maxMessages))
-        while let first = kept.first, case .tool = first { kept.removeFirst() }
-        conversations[key] = systems + kept
     }
 
     /// Drops a deleted chat's conversation. The user threw it away; the model
     /// should not still be holding it.
     func forgetSession(_ sessionId: String) {
-        conversations.removeValue(forKey: sessionId)
-        announcedWorkspaceContexts.removeValue(forKey: sessionId)
+        stateQueue.sync {
+            conversations.removeValue(forKey: sessionId)
+            announcedWorkspaceContexts.removeValue(forKey: sessionId)
+        }
     }
 
     /// A model that keeps calling tools without concluding would otherwise
@@ -206,8 +229,10 @@ final class AgentRunner {
     /// apart by `sessionId` and dropped by `forgetSession` -- but it stays as
     /// the way to hand the runner a clean slate.
     func reset() {
-        conversations.removeAll()
-        announcedWorkspaceContexts.removeAll()
+        stateQueue.sync {
+            conversations.removeAll()
+            announcedWorkspaceContexts.removeAll()
+        }
     }
 
     /// Describes the workspace this run belongs to. Injected per run rather
@@ -238,7 +263,11 @@ final class AgentRunner {
 
     /// Set by the host before each run. Kept as a property rather than a `run`
     /// parameter so the many existing call sites and tests stay untouched.
-    var workspaceContext: WorkspaceContext?
+    var workspaceContext: WorkspaceContext? {
+        get { stateQueue.sync { storedWorkspaceContext } }
+        set { stateQueue.sync { storedWorkspaceContext = newValue } }
+    }
+    private var storedWorkspaceContext: WorkspaceContext?
 
     /// What was last announced to each chat, so a ten-turn conversation in one
     /// workspace does not accumulate ten identical system lines -- and so a
@@ -246,9 +275,16 @@ final class AgentRunner {
     /// own, which a single shared value did not do.
     private var announcedWorkspaceContexts: [String: WorkspaceContext] = [:]
 
-    private var announcedWorkspaceContext: WorkspaceContext? {
-        get { announcedWorkspaceContexts[sessionId] }
-        set { announcedWorkspaceContexts[sessionId] = newValue }
+    /// Records `context` as announced to `key`, and reports whether that was
+    /// news. One step, under the lock, because the check and the write have to
+    /// be atomic: two turns in the same chat that both read "not announced"
+    /// would each append the same system line.
+    private func markAnnounced(_ context: WorkspaceContext, to key: String) -> Bool {
+        stateQueue.sync {
+            guard announcedWorkspaceContexts[key] != context else { return false }
+            announcedWorkspaceContexts[key] = context
+            return true
+        }
     }
 
     /// What the transcript ends with when the user presses 중지. Not an error
@@ -260,9 +296,8 @@ final class AgentRunner {
         // Captured once. Everything this run writes goes here even if a newer
         // run has already pointed `sessionId` somewhere else.
         var key = sessionId
-        if let workspaceContext, workspaceContext != announcedWorkspaceContexts[key] {
+        if let workspaceContext, markAnnounced(workspaceContext, to: key) {
             append(.system(workspaceContext.promptLine), to: key)
-            announcedWorkspaceContexts[key] = workspaceContext
         }
         append(.user(command), to: key)
         trimConversation(key)

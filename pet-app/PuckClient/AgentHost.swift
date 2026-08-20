@@ -34,8 +34,12 @@ final class AgentHost {
     private let editorFileDelegate: EditorFileDelegate
     private var runner: AgentRunner!
 
-    /// approvalId -> the run waiting on the user's answer.
-    private var pendingApprovals: [String: CheckedContinuation<Bool, Never>] = [:]
+    /// The approval requests runs are blocked on. Run-scoped -- see
+    /// PendingApprovals for why that matters.
+    private let pendingApprovals = PendingApprovals()
+    /// Which run is current. Bumped by `run`, recorded on every approval it
+    /// registers.
+    private var runGeneration = 0
     /// The code_editor run the 중지 button would cancel, if any.
     private var activeCodeEditorRequestId: String?
     /// The agent turn the 중지 button cancels. Without it the turn outlived
@@ -381,6 +385,9 @@ final class AgentHost {
         // Before the run, not at init: which workspace is active changes
         // between turns, and the runner only re-announces it when it differs.
         runner.workspaceContext = describeWorkspace(workspaceId)
+        runGeneration += 1
+        let thisRun = runGeneration
+
         activeRun.start { [weak self] in
             guard let self else { return }
             await self.runner.run(command: command)
@@ -389,7 +396,9 @@ final class AgentHost {
             // nothing legitimate is still awaiting one -- anything left is an
             // answer that can never arrive (the window closed, the transcript
             // moved on), and a continuation left suspended is a leak.
-            self.failPendingApprovals()
+            // Scoped to this run: a superseded turn gets here while its
+            // replacement is mid-approval.
+            self.pendingApprovals.failAll(run: thisRun)
             // Addressed to the chat the run started in, not the active one: a
             // run can move itself into a task session, and the user can click
             // away to another chat while it works.
@@ -399,10 +408,7 @@ final class AgentHost {
 
     /// The chat's 허용/거부 buttons land here.
     func resolveApproval(id: String, approved: Bool) {
-        lock.lock()
-        let continuation = pendingApprovals.removeValue(forKey: id)
-        lock.unlock()
-        continuation?.resume(returning: approved)
+        pendingApprovals.resolve(id: id, approved: approved)
     }
 
     /// Denies everything still waiting -- used when the run is cancelled, so
@@ -415,27 +421,17 @@ final class AgentHost {
         // blocked on, and it has to already be cancelled when it wakes up or
         // it just carries on to the next tool call.
         activeRun.cancel()
-        failPendingApprovals()
+        pendingApprovals.failAll()
         cancelActiveCodeEditor()
     }
 
-    /// Denies everything still waiting. Answering with `false` rather than
-    /// leaving the continuation suspended: the caller of an approval is a tool
-    /// that has to return something, and "not allowed" is the only safe answer
-    /// to give on its behalf.
-    private func failPendingApprovals() {
-        lock.lock()
-        let waiting = pendingApprovals
-        pendingApprovals.removeAll()
-        lock.unlock()
-        for (_, continuation) in waiting { continuation.resume(returning: false) }
-    }
-
+    /// Read plainly rather than under `lock`, like the `active*` properties
+    /// the approval broadcast above it reads: NSLock is unavailable from an
+    /// async context, and this is written once per run from main.
     private func awaitApproval(id: String) async -> Bool {
-        await withCheckedContinuation { continuation in
-            lock.lock()
-            pendingApprovals[id] = continuation
-            lock.unlock()
+        let run = runGeneration
+        return await withCheckedContinuation { continuation in
+            pendingApprovals.add(id: id, run: run) { continuation.resume(returning: $0) }
         }
     }
 

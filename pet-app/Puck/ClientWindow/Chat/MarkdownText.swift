@@ -292,6 +292,14 @@ func markdownInline(_ source: String) -> AttributedString {
     }
     for range in disallowed { parsed[range].link = nil }
 
+    // `code` spans carry only a presentation *intent*; SwiftUI's Text draws
+    // them in the body font unless the font is set here, which made
+    // `identifier` and prose indistinguishable once the backticks were gone.
+    let codeRanges = parsed.runs.compactMap { run -> Range<AttributedString.Index>? in
+        run.inlinePresentationIntent?.contains(.code) == true ? run.range : nil
+    }
+    for range in codeRanges { parsed[range].font = ClientTheme.Typography.transcriptCode }
+
     return parsed
 }
 

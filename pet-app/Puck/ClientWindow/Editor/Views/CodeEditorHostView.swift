@@ -47,6 +47,7 @@ struct CodeEditorHostView: View {
         // there is no change for onChange to see.
         .task(id: reveal?.token) {
             guard let reveal, reveal.path == path else { return }
+            revealCoordinator.onScrollTarget = { state.scrollPosition = $0 }
             revealCoordinator.reveal(lines: reveal.lines)
         }
     }

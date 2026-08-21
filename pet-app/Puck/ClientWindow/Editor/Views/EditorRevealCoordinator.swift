@@ -10,14 +10,28 @@
 //  makes the controller; its update path compares state.cursorPositions
 //  against itself (SourceEditor.swift, 0.15.2), so nothing set afterwards
 //  ever reaches the text view. A TextViewCoordinator hands over the
-//  controller itself, which also gets us scroll-to-visible -- something the
-//  state route never offered.
+//  controller itself, which is the only way to set the selection at all.
+//
+//  Scrolling is the mirror image: the controller's own scrollToVisible does
+//  not survive, because the state binding holds the previous scroll position
+//  and the very next update puts it back. So the selection goes through the
+//  controller and the scroll goes through the state -- each by the only route
+//  that sticks.
 //
 
 import AppKit
 import CodeEditSourceEditor
 
 final class EditorRevealCoordinator: TextViewCoordinator {
+    /// Where the view should scroll to, handed back rather than done here.
+    ///
+    /// Scrolling the controller directly does not survive: the editor's own
+    /// SwiftUI state holds the last scroll position, and the update that
+    /// follows our selection change re-applies that stale value, snapping the
+    /// pane straight back to where it was. Writing the position into that
+    /// state instead is the one route the editor honours.
+    var onScrollTarget: ((CGPoint) -> Void)?
+
     private weak var controller: TextViewController?
     /// Held until there is a text view to apply it to. A tour normally
     /// reveals a file that is not open yet, so the request arrives while
@@ -47,6 +61,8 @@ final class EditorRevealCoordinator: TextViewCoordinator {
         guard let lines = pending, lines.lowerBound >= 1,
               let controller,
               let layoutManager = controller.textView?.layoutManager,
+              // Not laid out yet: keep the request and try again from
+              // controllerDidAppear.
               let first = layoutManager.textLineForIndex(lines.lowerBound - 1)
         else {
             return
@@ -59,12 +75,12 @@ final class EditorRevealCoordinator: TextViewCoordinator {
         // An explicit NSRange rather than line/column: setCursorPositions'
         // own column arithmetic clamps a column against an absolute offset,
         // and offsets we compute here skip that entirely.
-        controller.setCursorPositions(
-            [CursorPosition(range: NSRange(
-                location: first.range.lowerBound,
-                length: max(0, last.range.upperBound - first.range.lowerBound)
-            ))],
-            scrollToVisible: true
-        )
+        controller.setCursorPositions([CursorPosition(range: NSRange(
+            location: first.range.lowerBound,
+            length: max(0, last.range.upperBound - first.range.lowerBound)
+        ))])
+        // A few lines of headroom, so the range reads as part of a file rather
+        // than starting at its very top edge.
+        onScrollTarget?(CGPoint(x: 0, y: max(0, first.yPos - first.height * 3)))
     }
 }

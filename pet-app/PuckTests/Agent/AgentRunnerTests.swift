@@ -253,7 +253,9 @@ final class AgentRunnerTests: XCTestCase {
             .agentDone(ok: false, summary: AgentRunner.cancelledSummary),
             "a cancelled run still has to finish, or the chat spins forever"
         )
-        XCTAssertTrue(emitted.contains(.textChunk(text: AgentRunner.cancelledSummary)))
+        // The done event carries it and DoneRow renders it; a text chunk
+        // saying the same thing would print the stop twice.
+        XCTAssertFalse(emitted.contains(.textChunk(text: AgentRunner.cancelledSummary)))
         XCTAssertFalse(
             emitted.contains { event in
                 if case .textChunk(let text) = event { return text.lowercased().contains("cancel") }

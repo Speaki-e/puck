@@ -445,7 +445,8 @@ final class AgentHost {
             \(configuration.provider.displayName) 인증 정보가 없어요. 아래 중 한 곳의 .env에 \(keyVariable)=... 를 넣어주세요.
             \(searched)
             """
-            _ = broadcast(.event(.textChunk(text: message), workspaceId: workspaceId, sessionId: sessionId))
+            // Only the done event: DoneRow renders a failed run's summary, so
+            // sending the same words as a text chunk first prints them twice.
             _ = broadcast(.event(.agentDone(ok: false, summary: message), workspaceId: workspaceId, sessionId: sessionId))
             return
         }

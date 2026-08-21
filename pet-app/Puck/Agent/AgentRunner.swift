@@ -399,7 +399,9 @@ final class AgentRunner {
         }
 
         let hitCeiling = String(format: Strings.text(.agentToolCeilingFormat), "\(Self.maxTurns)")
-        emit(.textChunk(text: hitCeiling), to: key)
+        // Only the done event. A failed run's summary is what DoneRow renders,
+        // so sending the same words as a text chunk first prints them twice --
+        // the same mistake the reply echo was.
         emit(.agentDone(ok: false, summary: hitCeiling), to: key)
     }
 
@@ -415,7 +417,6 @@ final class AgentRunner {
     /// the run's real chat never heard its run had ended and held a spinner
     /// forever; naming the session fixes both.
     private func emitCancelled(from key: String) {
-        emit(.textChunk(text: Self.cancelledSummary), to: key)
         emit(.agentDone(ok: false, summary: Self.cancelledSummary), to: key)
     }
 

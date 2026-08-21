@@ -22,6 +22,23 @@ final class CodeTourDelegateTests: XCTestCase {
         return root
     }
 
+    /// A project with the shape that made the fallback necessary: the file
+    /// the model names by bare name is buried, and another name is
+    /// deliberately duplicated across two directories.
+    private func makeNestedProject() throws -> URL {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        for directory in ["app/agent", "client"] {
+            try FileManager.default.createDirectory(
+                at: root.appendingPathComponent(directory, isDirectory: true),
+                withIntermediateDirectories: true
+            )
+        }
+        try Data("a\nb\nc\n".utf8).write(to: root.appendingPathComponent("app/agent/Runner.swift"))
+        try Data("a\nb\nc\n".utf8).write(to: root.appendingPathComponent("app/agent/AppDelegate.swift"))
+        try Data("a\nb\nc\n".utf8).write(to: root.appendingPathComponent("client/AppDelegate.swift"))
+        return root
+    }
+
     func test_noProjectBound_failsWithAReason() async {
         let sut = CodeTourDelegate(
             resolveProjectPath: { _ in nil },
@@ -133,5 +150,67 @@ final class CodeTourDelegateTests: XCTestCase {
     func test_onlyPathFailuresGetThePathHint() {
         let tooLarge = WorkspaceFileServiceError(code: .fileTooLarge, message: "파일이 너무 커요")
         XCTAssertEqual(tooLarge.agentDetail, "파일이 너무 커요")
+    }
+
+    /// The model names files by their bare name often enough to answer it
+    /// (seen live), and list_files cannot rescue it in a big project -- that
+    /// list truncates long before the file it wants.
+    @MainActor
+    func test_bareFileNameResolvesWhenOnlyOneFileHasIt() async throws {
+        let root = try makeNestedProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let workspaceId = UUID().uuidString
+        let sut = CodeTourDelegate(
+            resolveProjectPath: { _ in root.path },
+            showEditorPane: { _, _ in },
+            point: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) }
+        )
+
+        let result = await sut.showCode(path: "Runner.swift", startLine: 1, endLine: 2, workspaceId: workspaceId)
+
+        XCTAssertTrue(result.ok)
+        let store = try EditorPaneStorePool.shared.store(forWorkspace: workspaceId, root: root, onRootChanged: {})
+        XCTAssertEqual(store.activeTabPath, "app/agent/Runner.swift")
+        XCTAssertEqual(store.pendingReveal?.path, "app/agent/Runner.swift", "the reveal follows the resolved path")
+    }
+
+    /// Two files can share a name -- this repo has AppDelegate.swift twice.
+    /// Picking one would put the pet in front of a file nobody asked about,
+    /// so the model chooses, with the candidates already in hand.
+    @MainActor
+    func test_ambiguousFileNameFailsWithTheCandidates() async throws {
+        let root = try makeNestedProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sut = CodeTourDelegate(
+            resolveProjectPath: { _ in root.path },
+            showEditorPane: { _, _ in },
+            point: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) }
+        )
+
+        let result = await sut.showCode(
+            path: "AppDelegate.swift", startLine: 1, endLine: 1, workspaceId: UUID().uuidString
+        )
+
+        XCTAssertFalse(result.ok)
+        let detail = try XCTUnwrap(result.detail)
+        XCTAssertTrue(detail.contains("app/agent/AppDelegate.swift"), detail)
+        XCTAssertTrue(detail.contains("client/AppDelegate.swift"), detail)
+    }
+
+    func test_candidatesMatchOnTheFileNameOnly() {
+        let tree = [
+            FileTreeEntry(name: "app", path: "app", kind: .directory, children: [
+                FileTreeEntry(name: "Runner.swift", path: "app/Runner.swift", kind: .file, children: nil),
+                FileTreeEntry(name: "Other.swift", path: "app/Other.swift", kind: .file, children: nil),
+            ]),
+        ]
+
+        XCTAssertEqual(CodeTourDelegate.candidates(matching: "Runner.swift", in: tree), ["app/Runner.swift"])
+        XCTAssertEqual(
+            CodeTourDelegate.candidates(matching: "wherever/Runner.swift", in: tree),
+            ["app/Runner.swift"],
+            "a wrong directory with the right file name still resolves"
+        )
+        XCTAssertEqual(CodeTourDelegate.candidates(matching: "Missing.swift", in: tree), [])
     }
 }

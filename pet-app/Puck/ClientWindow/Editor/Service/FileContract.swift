@@ -23,6 +23,15 @@ struct FileTreeEntry: Identifiable, Equatable {
     /// tears down and rebuilds the whole array) so selection/expansion state
     /// survives, and two entries never share a path within one tree.
     var id: String { path }
+
+    /// Every file in `entries`, as a flat list of relative paths. Files only:
+    /// a directory holds nothing anyone can open, and its name is already
+    /// implied by its children.
+    static func flattenedPaths(_ entries: [FileTreeEntry]) -> [String] {
+        entries.flatMap { entry in
+            entry.children.map(flattenedPaths) ?? [entry.path]
+        }
+    }
 }
 
 struct FileContent: Equatable {

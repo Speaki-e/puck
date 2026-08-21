@@ -53,8 +53,7 @@ final class EditorFileDelegate {
         }
         do {
             let service = try WorkspaceFileService(root: URL(fileURLWithPath: projectPath, isDirectory: true))
-            var paths: [String] = []
-            Self.flatten(try service.listTree(), into: &paths)
+            let paths = FileTreeEntry.flattenedPaths(try service.listTree())
             let truncated = paths.count > Self.listFileLimit
             let data = JSONValue.object([
                 "projectPath": .string(projectPath),
@@ -67,18 +66,6 @@ final class EditorFileDelegate {
             return .failed(error.agentDetail)
         } catch {
             return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.localizedDescription)
-        }
-    }
-
-    /// Files only. A directory that holds nothing readable is not something
-    /// the model can act on, and its name is already implied by its children.
-    private static func flatten(_ entries: [FileTreeEntry], into paths: inout [String]) {
-        for entry in entries {
-            if let children = entry.children {
-                flatten(children, into: &paths)
-            } else {
-                paths.append(entry.path)
-            }
         }
     }
 

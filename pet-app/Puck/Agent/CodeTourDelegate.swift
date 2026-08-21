@@ -50,6 +50,32 @@ final class CodeTourDelegate {
         return low...high
     }
 
+    /// Files in the project whose *name* is the last component of `path`.
+    ///
+    /// The model sends a bare file name often enough to be worth answering
+    /// (seen live: show_code with "AgentRunner.swift"), and telling it to
+    /// check list_files is not a real recovery in a large project -- that
+    /// list truncates at 400 paths, and this repo has 8,000. So the lookup
+    /// happens here, where the whole tree is already in hand.
+    static func candidates(matching path: String, in tree: [FileTreeEntry]) -> [String] {
+        let name = (path as NSString).lastPathComponent
+        guard !name.isEmpty else { return [] }
+        return FileTreeEntry.flattenedPaths(tree).filter { ($0 as NSString).lastPathComponent == name }
+    }
+
+    /// Several files share the name, so the model picks -- with the candidates
+    /// in hand, which costs it no extra call. Guessing one instead would put
+    /// the pet in front of a file nobody asked about.
+    static func ambiguityDetail(for path: String, candidates: [String]) -> String {
+        let shown = candidates.prefix(maximumCandidatesShown)
+        let more = candidates.count > shown.count ? " 외 \(candidates.count - shown.count)개" : ""
+        return "\(path)와 이름이 같은 파일이 여러 개예요: \(shown.joined(separator: ", "))\(more)."
+            + " 이 중 하나를 전체 경로로 다시 불러주세요."
+    }
+
+    /// Enough to choose from, few enough not to bury the ask.
+    static let maximumCandidatesShown = 8
+
     @MainActor
     func showCode(
         path: String,
@@ -74,15 +100,27 @@ final class CodeTourDelegate {
         }
 
         store.open(path: path)
-        guard store.activeTabPath == path else {
-            return .failed(store.lastError?.agentDetail ?? "\(path)를 열지 못했어요.")
+        var openPath = path
+        if store.activeTabPath != path {
+            switch Self.candidates(matching: path, in: store.tree) {
+            case let candidates where candidates.count == 1:
+                openPath = candidates[0]
+                store.open(path: openPath)
+            case let candidates where candidates.count > 1:
+                return .failed(Self.ambiguityDetail(for: path, candidates: candidates))
+            default:
+                return .failed(store.lastError?.agentDetail ?? "\(path)를 열지 못했어요.")
+            }
+        }
+        guard store.activeTabPath == openPath else {
+            return .failed(store.lastError?.agentDetail ?? "\(openPath)를 열지 못했어요.")
         }
         let lineCount = store.activeTab?.content.split(separator: "\n", omittingEmptySubsequences: false).count ?? 0
         guard let lines = Self.clamp(start: startLine, end: endLine, lineCount: lineCount) else {
-            return .failed("\(path)에는 \(startLine)번째 줄이 없어요. (\(lineCount)줄짜리 파일이에요)")
+            return .failed("\(openPath)에는 \(startLine)번째 줄이 없어요. (\(lineCount)줄짜리 파일이에요)")
         }
-        showEditorPane(workspaceId, path)
-        store.reveal(path: path, lines: lines)
+        showEditorPane(workspaceId, openPath)
+        store.reveal(path: openPath, lines: lines)
 
         guard
             let appKitFrame = await paneFrame(of: store),

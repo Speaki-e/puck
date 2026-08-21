@@ -32,6 +32,16 @@ final class EditorRevealCoordinator: TextViewCoordinator {
     /// state instead is the one route the editor honours.
     var onScrollTarget: ((CGPoint) -> Void)?
 
+    /// The revealed lines' vertical span in the text view's own coordinates,
+    /// for the pane to draw its highlight band over. Reported rather than
+    /// drawn here for the reason the scroll is: what the editor draws itself
+    /// is not usable as a highlight. Its selection is drawn in grayscale
+    /// whenever the text view is not first responder -- which, during a tour,
+    /// is always, because the user is typing in the chat -- and its emphasis
+    /// layers cover only the lines that happen to be laid out, which for a
+    /// range taller than the viewport is never all of them.
+    var onHighlightSpan: ((ClosedRange<CGFloat>?) -> Void)?
+
     private weak var controller: TextViewController?
     /// Held until there is a text view to apply it to. A tour normally
     /// reveals a file that is not open yet, so the request arrives while
@@ -50,6 +60,7 @@ final class EditorRevealCoordinator: TextViewCoordinator {
 
     func destroy() {
         controller = nil
+        onHighlightSpan?(nil)
     }
 
     func reveal(lines: ClosedRange<Int>) {
@@ -79,6 +90,7 @@ final class EditorRevealCoordinator: TextViewCoordinator {
             location: first.range.lowerBound,
             length: max(0, last.range.upperBound - first.range.lowerBound)
         ))])
+        onHighlightSpan?(first.yPos...max(first.yPos, last.yPos + last.height))
         // A few lines of headroom, so the range reads as part of a file rather
         // than starting at its very top edge.
         onScrollTarget?(CGPoint(x: 0, y: max(0, first.yPos - first.height * 3)))

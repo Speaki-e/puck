@@ -126,6 +126,52 @@ struct AgentConfiguration {
         return provider.apiKeyEnvironmentVariable
     }
 
+    /// The nearest-first lookup every setting below shares: the process
+    /// environment wins, then the first `.env` in `searchPaths` that sets one
+    /// of `variables`. Within a single source the variables are tried in the
+    /// order given, so a provider-specific name can outrank a neutral one.
+    ///
+    /// `transform` is what makes this usable for the settings that only
+    /// accept certain values. A variable set to something unrecognized has to
+    /// keep falling through to the next source rather than resolving to
+    /// nothing -- a stale `CODING_AGENT` in the environment must not shadow a
+    /// good one in a file.
+    ///
+    /// Blank counts as absent everywhere (`nilIfBlank`): an `OPENAI_API_KEY=`
+    /// left in a file otherwise reports "configured" and fails at the API
+    /// instead of at startup.
+    private static func firstResolved<Value>(
+        of variables: [String],
+        environment: [String: String],
+        searchPaths: [URL],
+        transform: (String) -> Value?
+    ) -> (value: Value, variable: String, source: KeySource)? {
+        for variable in variables {
+            if let raw = environment[variable]?.nilIfBlank, let value = transform(raw) {
+                return (value, variable, .environment(variable: variable))
+            }
+        }
+        for directory in searchPaths {
+            let file = directory.appendingPathComponent(".env")
+            let values = DotEnv.parse(fileAt: file)
+            for variable in variables {
+                if let raw = values[variable]?.nilIfBlank, let value = transform(raw) {
+                    return (value, variable, .file(file))
+                }
+            }
+        }
+        return nil
+    }
+
+    /// The common case: any non-blank value will do.
+    private static func firstValue(
+        of variables: [String],
+        environment: [String: String],
+        searchPaths: [URL]
+    ) -> (value: String, variable: String, source: KeySource)? {
+        firstResolved(of: variables, environment: environment, searchPaths: searchPaths) { $0 }
+    }
+
     static func load(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
@@ -135,49 +181,17 @@ struct AgentConfiguration {
         let credentialVariables = provider == .cli
             ? selectedCodingAgent.apiKeyEnvironmentVariables
             : provider.apiKeyEnvironmentVariable.map { [$0] } ?? []
-        guard !credentialVariables.isEmpty else {
-            return AgentConfiguration(
-                apiKey: nil,
-                model: model(provider: provider, environment: environment, searchPaths: searchPaths),
-                provider: provider,
-                keySource: nil,
-                codingAgent: selectedCodingAgent
-            )
-        }
-        for keyVariable in credentialVariables {
-            if let fromEnvironment = environment[keyVariable]?.nilIfBlank {
-                return AgentConfiguration(
-                    apiKey: fromEnvironment,
-                    model: model(provider: provider, environment: environment, searchPaths: searchPaths),
-                    provider: provider,
-                    keySource: .environment(variable: keyVariable),
-                    codingAgent: selectedCodingAgent,
-                    credentialVariable: keyVariable
-                )
-            }
-        }
-        for directory in searchPaths {
-            let file = directory.appendingPathComponent(".env")
-            let values = DotEnv.parse(fileAt: file)
-            for keyVariable in credentialVariables {
-                if let fromFile = values[keyVariable]?.nilIfBlank {
-                    return AgentConfiguration(
-                        apiKey: fromFile,
-                        model: model(provider: provider, environment: environment, searchPaths: searchPaths),
-                        provider: provider,
-                        keySource: .file(file),
-                        codingAgent: selectedCodingAgent,
-                        credentialVariable: keyVariable
-                    )
-                }
-            }
-        }
+        // No early return for an empty `credentialVariables`: looking up
+        // nothing finds nothing, which is the same configuration the special
+        // case used to build by hand.
+        let credential = firstValue(of: credentialVariables, environment: environment, searchPaths: searchPaths)
         return AgentConfiguration(
-            apiKey: nil,
+            apiKey: credential?.value,
             model: model(provider: provider, environment: environment, searchPaths: searchPaths),
             provider: provider,
-            keySource: nil,
-            codingAgent: selectedCodingAgent
+            keySource: credential?.source,
+            codingAgent: selectedCodingAgent,
+            credentialVariable: credential?.variable
         )
     }
 
@@ -192,15 +206,11 @@ struct AgentConfiguration {
     /// credential -- `requiresCredential` counts `.cli` too, because the ACP
     /// child gets a private HOME and never inherits an interactive login.
     private static func provider(environment: [String: String], searchPaths: [URL]) -> AgentProvider {
-        if let fromEnvironment = environment["AGENT_PROVIDER"]?.nilIfBlank {
-            return AgentProvider.resolved(fromRawValue: fromEnvironment)
-        }
-        for directory in searchPaths {
-            if let fromFile = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))["AGENT_PROVIDER"]?.nilIfBlank {
-                return AgentProvider.resolved(fromRawValue: fromFile)
-            }
-        }
-        return AgentProvider.fallback
+        // Any non-blank value resolves here, valid or not: an unrecognized
+        // AGENT_PROVIDER is answered by `resolved(fromRawValue:)`'s fallback
+        // rather than by looking for a better one further down.
+        let found = firstValue(of: ["AGENT_PROVIDER"], environment: environment, searchPaths: searchPaths)
+        return AgentProvider.resolved(fromRawValue: found?.value)
     }
 
     /// Which ACP coding agent `code_editor` runs. A **different axis** from
@@ -212,15 +222,16 @@ struct AgentConfiguration {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
     ) -> CodingAgentKind {
-        if let fromEnvironment = environment["CODING_AGENT"]?.nilIfBlank,
-           let kind = CodingAgentKind(rawValue: fromEnvironment.lowercased()) {
-            return kind
-        }
-        for directory in searchPaths {
-            if let fromFile = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))["CODING_AGENT"]?.nilIfBlank,
-               let kind = CodingAgentKind(rawValue: fromFile.lowercased()) {
-                return kind
-            }
+        // Unlike the provider above, an unrecognized value keeps looking:
+        // this setting has no "resolved" fallback of its own, so a stale
+        // CODING_AGENT must not shadow a good one in a nearer file.
+        if let found = firstResolved(
+            of: ["CODING_AGENT"],
+            environment: environment,
+            searchPaths: searchPaths,
+            transform: { CodingAgentKind(rawValue: $0.lowercased()) }
+        ) {
+            return found.value
         }
         // claude, not the pet's own provider: it is the agent this repo
         // vendors self-contained, so it is the one that works with no further
@@ -244,16 +255,9 @@ struct AgentConfiguration {
     ) -> [String: String] {
         var credentials: [String: String] = [:]
         for variable in kind.apiKeyEnvironmentVariables {
-            if let fromEnvironment = environment[variable]?.nilIfBlank {
-                credentials[variable] = fromEnvironment
-                continue
-            }
-            for directory in searchPaths {
-                if let fromFile = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))[variable]?.nilIfBlank {
-                    credentials[variable] = fromFile
-                    break
-                }
-            }
+            // One variable at a time, because this collects every credential
+            // the agent reads rather than stopping at the first.
+            credentials[variable] = Self.firstValue(of: [variable], environment: environment, searchPaths: searchPaths)?.value
         }
         // The pet's own Anthropic key doubles as claude-agent-acp's when only
         // one of the two was ever set -- they are the same credential.
@@ -275,14 +279,14 @@ struct AgentConfiguration {
         // resolves nothing at all: honouring AGENT_MODEL there would report a
         // model name that nothing sends anywhere.
         guard let providerVariable = provider.modelEnvironmentVariable else { return provider.defaultModel }
-        if let fromEnvironment = environment[providerVariable]?.nilIfBlank { return fromEnvironment }
-        if let fromEnvironment = environment["AGENT_MODEL"]?.nilIfBlank { return fromEnvironment }
-        for directory in searchPaths {
-            let values = DotEnv.parse(fileAt: directory.appendingPathComponent(".env"))
-            if let fromFile = values[providerVariable]?.nilIfBlank { return fromFile }
-            if let fromFile = values["AGENT_MODEL"]?.nilIfBlank { return fromFile }
-        }
-        return provider.defaultModel
+        // Provider-specific first within each source, so a legacy
+        // OPENAI_MODEL keeps winning over the neutral AGENT_MODEL.
+        let found = firstValue(
+            of: [providerVariable, "AGENT_MODEL"],
+            environment: environment,
+            searchPaths: searchPaths
+        )
+        return found?.value ?? provider.defaultModel
     }
 
     /// Where Settings writes a key typed into it: the one search path both

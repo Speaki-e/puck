@@ -28,11 +28,15 @@ struct EditorContentHostView: View {
                             set: { store.updateDraft(path: tab.path, content: $0) }
                         ),
                         isEditable: !tab.readOnly,
-                        path: tab.path
+                        path: tab.path,
+                        reveal: store.pendingReveal
                     )
                     .id(tab.path)
                 }
             }
+            // Behind the content, so the reported rect is the code pane the
+            // pet should point at rather than the whole window.
+            .background(PaneFrameReporter { store.setPaneScreenFrame($0) })
         } else {
             VStack(spacing: ClientTheme.Metrics.spacingMedium) {
                 Image(systemName: "doc.text")

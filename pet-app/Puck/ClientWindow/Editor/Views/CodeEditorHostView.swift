@@ -19,8 +19,12 @@ struct CodeEditorHostView: View {
     @Binding var content: String
     let isEditable: Bool
     let path: String
+    /// The range a code tour (or anything else) asked to be shown. Applied
+    /// only by the editor whose tab it names.
+    let reveal: EditorPaneStore.RevealRequest?
 
     @State private var state = SourceEditorState()
+    @State private var revealCoordinator = EditorRevealCoordinator()
     @Environment(\.clientPalette) private var palette
 
     var body: some View {
@@ -35,8 +39,16 @@ struct CodeEditorHostView: View {
                 ),
                 behavior: .init(isEditable: isEditable, indentOption: .spaces(count: 2))
             ),
-            state: $state
+            state: $state,
+            coordinators: [revealCoordinator]
         )
+        // task(id:), not onChange: a tour usually reveals a file that was
+        // not open, so this view is created *because* of the request and
+        // there is no change for onChange to see.
+        .task(id: reveal?.token) {
+            guard let reveal, reveal.path == path else { return }
+            revealCoordinator.reveal(lines: reveal.lines)
+        }
     }
 
     private static func theme(for palette: ClientPalette) -> EditorTheme {

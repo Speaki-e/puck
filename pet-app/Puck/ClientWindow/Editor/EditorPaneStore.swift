@@ -23,6 +23,26 @@ final class EditorPaneStore: ObservableObject {
     /// waiting on the user.
     @Published private(set) var pendingClosePath: String?
 
+    /// A request for the editor view to select a line range and scroll it
+    /// into view. `token` changes on every request, so the same range asked
+    /// for twice still fires -- the user may have scrolled away since, and
+    /// an equal value is a value the view ignores.
+    struct RevealRequest: Equatable {
+        let path: String
+        let lines: ClosedRange<Int>
+        let token: Int
+    }
+
+    /// The last range someone asked to be shown, for the editor view to
+    /// apply. Consumed by whichever tab's editor matches `path`.
+    @Published private(set) var pendingReveal: RevealRequest?
+    /// Where the editor pane is, in AppKit global (bottom-left) screen
+    /// coordinates, or nil when it is not on screen. Published by the view,
+    /// because only the view knows where it ended up -- the pet is sent here.
+    @Published private(set) var paneScreenFrame: CGRect?
+
+    private var revealToken = 0
+
     private let service: WorkspaceFileService
     private var watcher: WorkspaceFileWatcher?
 
@@ -89,6 +109,22 @@ final class EditorPaneStore: ObservableObject {
         } catch {
             lastError = nil
         }
+    }
+
+    /// Opens `path` if it is not open already, then asks the view to select
+    /// and scroll to `lines`. What a code tour calls for each of its stops.
+    func reveal(path: String, lines: ClosedRange<Int>) {
+        open(path: path)
+        // The tab being active is the direct evidence that the file opened;
+        // lastError is not, because it may be left over from an earlier call.
+        guard activeTabPath == path else { return }
+        revealToken += 1
+        pendingReveal = RevealRequest(path: path, lines: lines, token: revealToken)
+    }
+
+    func setPaneScreenFrame(_ frame: CGRect?) {
+        guard frame != paneScreenFrame else { return }
+        paneScreenFrame = frame
     }
 
     func select(path: String) {

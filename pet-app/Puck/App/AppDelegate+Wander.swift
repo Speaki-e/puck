@@ -22,7 +22,8 @@ extension AppDelegate {
         guard let controller = characterController else { return }
         switch outcome {
         case .walkToRandomPoint:
-            walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+            varyWalkSpeed()
+            walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
             controller.transition(to: .walk)
         case .climbNearestWindow:
             // Walk to the nearest climbable window's side; WalkState's own
@@ -38,7 +39,7 @@ extension AppDelegate {
                     avatarHeight: avatarHitboxSize.height,
                     excluding: unclimbableWindowIDs(in: windows)
                 )
-            } ?? Self.randomRoamPoint(in: controller.roamableArea)
+            } ?? Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
             controller.transition(to: .walk)
         case .climbToCeiling:
             // ClimbToCeilingState falls back to .fall on its own if there's no
@@ -49,7 +50,7 @@ extension AppDelegate {
             // without a wall to begin with.
             guard let body = characterBody,
                   WindowSupport.windowBeingClimbed(at: body.position, in: overlayLocalWindows(excluding: nil)) != nil else {
-                walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+                walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
                 controller.transition(to: .walk)
                 return
             }
@@ -67,7 +68,7 @@ extension AppDelegate {
                       petPosition: characterBody?.position ?? .zero
                   )
             else {
-                walkState.target = Self.randomRoamPoint(in: controller.roamableArea)
+                walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
                 controller.transition(to: .walk)
                 return
             }
@@ -157,9 +158,54 @@ extension AppDelegate {
     /// choose one.
     static let roamEdgeMargin: CGFloat = 0.08
 
-    private static func randomRoamPoint(in area: CGRect) -> CGPoint {
+    /// Where the next wander goes, drawn as a *distance from where the pet
+    /// already is* rather than as a point anywhere on screen.
+    ///
+    /// Uniform over the whole width, almost every draw landed far away, so
+    /// the pet spent its life crossing the screen end to end at one speed --
+    /// the same trip over and over. A distance draw gives mostly short
+    /// shuffles with the occasional long trip, which is what reads as
+    /// wandering rather than commuting.
+    ///
+    /// Static and pure so the distribution is testable without a screen.
+    static func randomRoamPoint(in area: CGRect, from currentX: CGFloat) -> CGPoint {
         guard area.width > 0 else { return .zero }
         let margin = area.width * roamEdgeMargin
-        return CGPoint(x: CGFloat.random(in: (area.minX + margin)...(area.maxX - margin)), y: area.maxY)
+        let low = area.minX + margin
+        let high = max(low, area.maxX - margin)
+
+        let range = CGFloat.random(in: 0...1) < longTripChance ? longTripDistance : shortHopDistance
+        let distance = CGFloat.random(in: range) * area.width
+        let step = Bool.random() ? distance : -distance
+
+        // Reflected off the ends rather than clamped: clamping piles every
+        // over-long draw onto the same two x values, which is the metronome
+        // this is meant to break.
+        var x = currentX + step
+        if x < low { x = low + (low - x) }
+        if x > high { x = high - (x - high) }
+        return CGPoint(x: min(max(x, low), high), y: area.maxY)
+    }
+
+    /// Where the pet is now, or the middle of the area before there is a
+    /// body to ask -- a wander drawn without one has nothing to be relative to.
+    private func currentRoamX(in controller: CharacterController) -> CGFloat {
+        characterBody?.position.x ?? controller.roamableArea.midX
+    }
+
+    /// As a fraction of the roamable width.
+    private static let shortHopDistance: ClosedRange<CGFloat> = 0.05...0.3
+    private static let longTripDistance: ClosedRange<CGFloat> = 0.3...0.8
+    /// Most wanders are short; now and then the pet crosses the room.
+    private static let longTripChance: CGFloat = 0.25
+
+    /// A little slower or quicker each time, so repeated walks don't look
+    /// like the same clip replayed. Applied per wander, on top of Settings'
+    /// movement slider, and overwritten by the code tour's own speed while
+    /// one is running (restoreWalkSpeed).
+    private func varyWalkSpeed() {
+        characterController?.walkSpeed = MovementSolver.walkSpeed
+            * settingsStore.walkSpeedMultiplier
+            * CGFloat.random(in: 0.8...1.25)
     }
 }

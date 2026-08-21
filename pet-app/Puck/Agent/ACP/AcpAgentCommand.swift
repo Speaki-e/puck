@@ -96,18 +96,18 @@ extension AcpAgentCommandError {
     func summary(purpose: String, kind: CodingAgentKind) -> String {
         switch self {
         case .nodeNotFound:
-            return "\(purpose)에는 Node.js가 필요합니다. 설치 후 다시 시도해 주세요."
+            return String(format: Strings.text(.acpNeedsNodeFormat), purpose)
         case .vendorCLINotFound(let missing):
             // Both agents need their vendor's own CLI installed; neither ships
             // inside Puck.app (see scripts/vendor-acp.sh).
-            return "\(missing.vendorCLIName) CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요."
+            return String(format: Strings.text(.acpCLINotFoundFormat), missing.vendorCLIName)
         case .agentScriptMissing:
-            return "코딩 에이전트(\(kind.rawValue))가 앱에 포함되어 있지 않습니다."
+            return String(format: Strings.text(.acpAgentNotBundledFormat), kind.rawValue)
         }
     }
 
     /// What to say for an error that is not one of ours at all.
-    static let unknownStartFailureSummary = "코딩 에이전트를 시작하지 못했습니다."
+    static let unknownStartFailureSummary = Strings.text(.acpCouldNotStart)
 }
 
 struct AcpAgentCommand: Equatable {

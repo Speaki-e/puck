@@ -44,14 +44,14 @@ final class WorkspaceFileService {
         let target = try resolveExisting(requestPath)
         let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
         guard (attributes[.type] as? FileAttributeType) == .typeRegular else {
-            throw WorkspaceFileServiceError(code: .invalidPath, message: "파일 경로가 아닙니다")
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileNotAFilePath))
         }
         let data = try Data(contentsOf: target)
         guard !Self.isBinary(data) else {
-            throw WorkspaceFileServiceError(code: .binaryFile, message: "바이너리 파일은 편집할 수 없습니다")
+            throw WorkspaceFileServiceError(code: .binaryFile, message: Strings.text(.fileBinaryNotEditable))
         }
         guard let content = String(data: data, encoding: .utf8) else {
-            throw WorkspaceFileServiceError(code: .encodingError, message: "UTF-8 텍스트 파일만 지원합니다")
+            throw WorkspaceFileServiceError(code: .encodingError, message: Strings.text(.fileOnlyUTF8))
         }
         let size = (attributes[.size] as? Int) ?? data.count
         return FileContent(
@@ -68,18 +68,18 @@ final class WorkspaceFileService {
         let target = try resolveExisting(requestPath)
         let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
         guard (attributes[.type] as? FileAttributeType) == .typeRegular else {
-            throw WorkspaceFileServiceError(code: .invalidPath, message: "파일 경로가 아닙니다")
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileNotAFilePath))
         }
         let size = (attributes[.size] as? Int) ?? 0
         guard size <= WorkspaceFileServiceDefaults.imagePreviewSizeLimit else {
-            throw WorkspaceFileServiceError(code: .fileTooLarge, message: "10MB를 초과하는 이미지는 미리 볼 수 없습니다")
+            throw WorkspaceFileServiceError(code: .fileTooLarge, message: Strings.text(.fileImageTooLargeToPreview))
         }
         let data = try Data(contentsOf: target)
         let extensionName = "." + target.pathExtension.lowercased()
         guard let detected = ImageMime.detect(data),
               let expected = ImageMime.extensionMap[extensionName],
               detected == expected else {
-            throw WorkspaceFileServiceError(code: .binaryFile, message: "지원하는 이미지 형식과 실제 파일 내용이 일치하지 않습니다")
+            throw WorkspaceFileServiceError(code: .binaryFile, message: Strings.text(.fileImageFormatMismatch))
         }
         return FileContent(
             path: relativeForWire(target),
@@ -97,24 +97,24 @@ final class WorkspaceFileService {
         let target = try resolveExisting(request.path)
         let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
         guard (attributes[.type] as? FileAttributeType) == .typeRegular else {
-            throw WorkspaceFileServiceError(code: .invalidPath, message: "파일 경로가 아닙니다")
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileNotAFilePath))
         }
         let size = (attributes[.size] as? Int) ?? 0
         guard size <= editableSizeLimit else {
-            throw WorkspaceFileServiceError(code: .fileTooLarge, message: "2MB를 초과하는 파일은 읽기 전용입니다")
+            throw WorkspaceFileServiceError(code: .fileTooLarge, message: Strings.text(.fileTooLargeReadOnly))
         }
         let current = try Data(contentsOf: target)
         guard !Self.isBinary(current) else {
-            throw WorkspaceFileServiceError(code: .binaryFile, message: "바이너리 파일은 저장할 수 없습니다")
+            throw WorkspaceFileServiceError(code: .binaryFile, message: Strings.text(.fileBinaryNotSavable))
         }
         guard Self.revision(of: current) == request.expectedRevision else {
-            throw WorkspaceFileServiceError(code: .fileConflict, message: "디스크 파일이 마지막 읽기 이후 변경되었습니다")
+            throw WorkspaceFileServiceError(code: .fileConflict, message: Strings.text(.fileChangedOnDisk))
         }
         guard let next = request.content.data(using: .utf8) else {
-            throw WorkspaceFileServiceError(code: .encodingError, message: "UTF-8 텍스트 파일만 지원합니다")
+            throw WorkspaceFileServiceError(code: .encodingError, message: Strings.text(.fileOnlyUTF8))
         }
         guard next.count <= editableSizeLimit else {
-            throw WorkspaceFileServiceError(code: .fileTooLarge, message: "저장할 내용이 2MB 제한을 초과합니다")
+            throw WorkspaceFileServiceError(code: .fileTooLarge, message: Strings.text(.fileSaveExceedsLimit))
         }
 
         let temporary = target.deletingLastPathComponent().appendingPathComponent(
@@ -135,7 +135,7 @@ final class WorkspaceFileService {
             // though less selective about which underlying errors qualify.
             _ = try FileManager.default.replaceItemAt(target, withItemAt: temporary)
         } catch {
-            throw WorkspaceFileServiceError(code: .fileConflict, message: "디스크 파일이 다른 프로세스에 의해 사용 중입니다")
+            throw WorkspaceFileServiceError(code: .fileConflict, message: Strings.text(.fileInUseByAnotherProcess))
         }
         return SaveFileResult(path: relativeForWire(target), revision: Self.revision(of: next), size: next.count)
     }
@@ -198,17 +198,17 @@ final class WorkspaceFileService {
 
     private func resolveExisting(_ requestPath: String) throws -> URL {
         guard !requestPath.isEmpty, !requestPath.contains("\0") else {
-            throw WorkspaceFileServiceError(code: .invalidPath, message: "잘못된 파일 경로입니다")
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileInvalidPath))
         }
         let candidate = requestPath.hasPrefix("/")
             ? URL(fileURLWithPath: requestPath).standardizedFileURL
             : root.appendingPathComponent(requestPath).standardizedFileURL
         guard isInside(candidate.path) else {
-            throw WorkspaceFileServiceError(code: .pathOutsideWorkspace, message: "프로젝트 밖 경로입니다")
+            throw WorkspaceFileServiceError(code: .pathOutsideWorkspace, message: Strings.text(.fileOutsideProject))
         }
         let resolved = try Self.realpath(candidate)
         guard isInside(resolved.path) else {
-            throw WorkspaceFileServiceError(code: .pathOutsideWorkspace, message: "심볼릭 링크가 프로젝트 밖을 가리킵니다")
+            throw WorkspaceFileServiceError(code: .pathOutsideWorkspace, message: Strings.text(.fileSymlinkEscapesProject))
         }
         return resolved
     }
@@ -237,7 +237,7 @@ final class WorkspaceFileService {
         var buffer = [Int8](repeating: 0, count: Int(PATH_MAX))
         guard let resolvedC = Darwin.realpath(url.path, &buffer) else {
             if errno == ENOENT {
-                throw WorkspaceFileServiceError(code: .fileNotFound, message: "파일을 찾을 수 없습니다")
+                throw WorkspaceFileServiceError(code: .fileNotFound, message: Strings.text(.fileNotFound))
             }
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
         }

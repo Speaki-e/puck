@@ -10,6 +10,13 @@
 import Foundation
 
 struct ClientWorkspace: Identifiable, Equatable {
+    /// The name WorkspaceRegistry writes for the workspace the app creates
+    /// for itself. Stored and sent over the bridge, so it is deliberately
+    /// language-independent; `displayName` is where the language enters.
+    /// Defined here rather than on the registry because both targets compile
+    /// this file and only Puck compiles that one.
+    static let defaultName = "기본 워크스페이스"
+
     let id: String
     var name: String
     /// nil for a pure-chat workspace -- code_editor and the editor pane are
@@ -29,6 +36,14 @@ struct ClientWorkspace: Identifiable, Equatable {
         self.name = name
         self.projectPath = projectPath
         editorAvailability = EditorAvailability.resolve(projectPath: projectPath)
+    }
+
+    /// The name to show. The one workspace this app creates for itself is
+    /// stored under a language-independent name (see
+    /// `ClientWorkspace.defaultName`), so this is where it becomes
+    /// words; a workspace the user named stands as-is.
+    var displayName: String {
+        name == Self.defaultName ? Strings.text(.workspaceDefaultName) : name
     }
 
     var canOpenEditor: Bool {

@@ -21,7 +21,7 @@ struct CodeEditorResult: Equatable {
     var detail: String?
 
     static func cancelled(changedFiles: [String] = []) -> CodeEditorResult {
-        CodeEditorResult(ok: false, summary: "중단됨", changedFiles: changedFiles, error: "cancelled")
+        CodeEditorResult(ok: false, summary: Strings.text(.acpAborted), changedFiles: changedFiles, error: "cancelled")
     }
 
     /// What the tool_result should carry as its `detail`.
@@ -95,7 +95,7 @@ final class AcpCodeEditorSession {
         case .failed(let failure):
             return CodeEditorResult(
                 ok: false,
-                summary: "ACP 작업에 실패했습니다.",
+                summary: Strings.text(.acpTaskFailed),
                 changedFiles: [],
                 error: "acp_error",
                 detail: failure.text
@@ -108,7 +108,7 @@ final class AcpCodeEditorSession {
                 // know which paths to go look at.
                 return CodeEditorResult(
                     ok: false,
-                    summary: "이 작업이 프로젝트 밖의 파일을 수정했다고 보고했어요. 확인이 필요합니다.",
+                    summary: Strings.text(.acpWroteOutsideProject),
                     changedFiles: [],
                     error: "wrote_outside_project",
                     detail: escaped.sorted().joined(separator: "\n")
@@ -117,7 +117,7 @@ final class AcpCodeEditorSession {
             return CodeEditorResult(
                 ok: true,
                 summary: completion.text.isEmpty
-                    ? "ACP 작업 완료 (\(completion.stopReason))"
+                    ? String(format: Strings.text(.acpTaskDoneFormat), "\(completion.stopReason)")
                     : completion.text,
                 changedFiles: []
             )

@@ -26,8 +26,8 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
     /// Shown in Settings' theme picker.
     var displayName: String {
         switch self {
-        case .light: return "화이트"
-        case .dark: return "다크"
+        case .light: return Strings.text(.themeLight)
+        case .dark: return Strings.text(.themeDark)
         }
     }
 

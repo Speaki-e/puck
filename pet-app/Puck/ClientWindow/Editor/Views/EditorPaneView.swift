@@ -87,16 +87,16 @@ private struct EditorPaneContentView: View {
         // draft on the way out is its own kind of damage. Three answers, in
         // the order macOS puts them.
         .confirmationDialog(
-            "저장하지 않은 변경사항이 있어요",
+            Strings.text(.editorUnsavedTitle),
             isPresented: Binding(
                 get: { store.pendingClosePath != nil },
                 set: { if !$0 { store.cancelPendingClose() } }
             ),
             titleVisibility: .visible
         ) {
-            Button("저장 후 닫기") { store.confirmPendingCloseSaving() }
-            Button("저장 안 함", role: .destructive) { store.confirmPendingCloseDiscarding() }
-            Button("취소", role: .cancel) { store.cancelPendingClose() }
+            Button(Strings.text(.editorSaveAndClose)) { store.confirmPendingCloseSaving() }
+            Button(Strings.text(.editorDiscard), role: .destructive) { store.confirmPendingCloseDiscarding() }
+            Button(Strings.text(.commonCancel), role: .cancel) { store.cancelPendingClose() }
         } message: {
             Text(pendingCloseMessage)
         }
@@ -104,6 +104,6 @@ private struct EditorPaneContentView: View {
 
     private var pendingCloseMessage: String {
         guard let path = store.pendingClosePath else { return "" }
-        return "\((path as NSString).lastPathComponent)의 변경사항을 저장할까요?"
+        return String(format: Strings.text(.editorUnsavedMessageFormat), (path as NSString).lastPathComponent)
     }
 }

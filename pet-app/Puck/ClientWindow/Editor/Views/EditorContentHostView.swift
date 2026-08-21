@@ -42,7 +42,7 @@ struct EditorContentHostView: View {
                 Image(systemName: "doc.text")
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
-                Text("왼쪽 탐색기에서 파일을 선택하세요")
+                Text(Strings.text(.editorSelectAFile))
                     .font(ClientTheme.Typography.sessionTitle)
                     .foregroundStyle(.secondary)
             }

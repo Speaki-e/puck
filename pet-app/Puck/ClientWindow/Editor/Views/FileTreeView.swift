@@ -52,7 +52,7 @@ struct FileTreeView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11))
                 .foregroundStyle(palette.textSecondary)
-            TextField("파일 검색", text: $query)
+            TextField(Strings.text(.editorSearchFiles), text: $query)
                 .textFieldStyle(.plain)
                 .font(ClientTheme.Typography.caption)
         }

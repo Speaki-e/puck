@@ -55,7 +55,7 @@ struct EditorTabStripView: View {
         .foregroundStyle(canSave ? palette.textPrimary : palette.textSecondary)
         .opacity(canSave ? 1 : 0.35)
         .keyboardShortcut("s", modifiers: .command)
-        .help("저장 (⌘S)")
+        .help(Strings.text(.editorSaveHint))
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .accessibilityIdentifier("editor.save")
     }

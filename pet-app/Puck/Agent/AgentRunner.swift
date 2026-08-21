@@ -284,7 +284,8 @@ final class AgentRunner {
             guard let projectPath else {
                 return "Current workspace: \(name). No project folder is bound to it, so the file tools have nothing to read. "
                     + "If the user asks about code or files, say that this workspace has no project folder, and that they can switch "
-                    + "to one that has a project in the sidebar or make one with 새 워크스페이스 -- never ask them to paste files to you."
+                    + "to one that has a project in the sidebar or make one with "
+                    + "\(Strings.text(.chatNewWorkspace)) -- never ask them to paste files to you."
             }
             return "Current workspace: \(name), bound to the project at \(projectPath). "
                 + "\"this project\" / \"this directory\" / \"여기\" mean that folder. "
@@ -318,10 +319,10 @@ final class AgentRunner {
         }
     }
 
-    /// What the transcript ends with when the user presses 중지. Not an error
+    /// What the transcript ends with when the user presses Stop. Not an error
     /// string: a stop the user asked for is an outcome, not a failure, so it
     /// never goes through the `catch` path that reports a reason.
-    static let cancelledSummary = "중지했어요."
+    static var cancelledSummary: String { Strings.text(.agentCancelled) }
 
     func run(command: String) async {
         // Captured once. Everything this run writes goes here even if a newer
@@ -397,7 +398,7 @@ final class AgentRunner {
             }
         }
 
-        let hitCeiling = "도구를 \(Self.maxTurns)번 넘게 호출해서 중단했어요."
+        let hitCeiling = String(format: Strings.text(.agentToolCeilingFormat), "\(Self.maxTurns)")
         emit(.textChunk(text: hitCeiling), to: key)
         emit(.agentDone(ok: false, summary: hitCeiling), to: key)
     }
@@ -410,7 +411,7 @@ final class AgentRunner {
     /// Addressed to `key`, the run's own chat. This used to be silent unless
     /// the run was still the current one, because events went to whatever chat
     /// was active when they were emitted and a superseded run would announce
-    /// "중지했어요" in a conversation the user never stopped. The cost was that
+    /// its cancellation in a conversation the user never stopped. The cost was that
     /// the run's real chat never heard its run had ended and held a spinner
     /// forever; naming the session fixes both.
     private func emitCancelled(from key: String) {
@@ -436,7 +437,7 @@ final class AgentRunner {
     static func failureSummary(for error: Error) -> String {
         switch error {
         case GPTError.notConfigured:
-            return "API 키가 없어요. \(settingsHint)"
+            return String(format: Strings.text(.agentNoAPIKeyFormat), settingsHint)
         case GPTError.http(let status, let body):
             return httpFailureSummary(status: status, body: body)
         default:
@@ -449,28 +450,30 @@ final class AgentRunner {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }
 
-    /// ⌘, opens 설정 in both apps (ClientMainMenu binds it), so naming the
+    /// ⌘, opens Settings in both apps (ClientMainMenu binds it), so naming the
     /// shortcut is a real instruction and not decoration.
-    private static let settingsHint = "설정(⌘,)에서 키를 확인해 주세요."
+    private static var settingsHint: String { Strings.text(.agentSettingsHint) }
 
     private static func httpFailureSummary(status: Int, body: String) -> String {
         switch status {
         case 401, 403:
-            return "API 키가 올바르지 않아요. \(settingsHint)"
+            return String(format: Strings.text(.agentBadAPIKeyFormat), settingsHint)
         case 404:
             // What a wrong model name returns; a missing endpoint would be our
             // bug, and then the log is where to look anyway.
-            return "모델을 찾을 수 없어요. 설정(⌘,)에서 모델 이름을 확인해 주세요."
+            return Strings.text(.agentModelNotFound)
         case 429:
-            return "요청이 너무 잦거나 사용 한도를 넘었어요. 잠시 후 다시 시도해 주세요."
+            return Strings.text(.agentRateLimited)
         case 500...599:
-            return "AI 서버가 응답하지 못했어요 (오류 \(status)). 잠시 후 다시 시도해 주세요."
+            return String(format: Strings.text(.agentServerErrorFormat), "\(status)")
         default:
             // Anything else keeps the provider's own reason -- a bare status
             // does not say what to change -- but one sentence of it, not the
             // envelope it arrived in.
-            guard let message = providerMessage(in: body) else { return "API 오류 \(status)가 났어요." }
-            return "API 오류 \(status): \(message)"
+            guard let message = providerMessage(in: body) else {
+                return String(format: Strings.text(.agentAPIErrorFormat), "\(status)")
+            }
+            return String(format: Strings.text(.agentAPIErrorWithMessageFormat), "\(status)", message)
         }
     }
 
@@ -692,10 +695,10 @@ final class AgentRunner {
 
     private static func approvalSummary(tool: String, arguments: String) -> String {
         switch tool {
-        case "run_shell": return "셸 명령 실행: \(arguments)"
-        case "run_applescript": return "AppleScript 실행: \(arguments)"
-        case "click_element": return "화면 클릭: \(arguments)"
-        default: return "\(tool) 실행: \(arguments)"
+        case "run_shell": return String(format: Strings.text(.approvalRunShellFormat), arguments)
+        case "run_applescript": return String(format: Strings.text(.approvalRunAppleScriptFormat), arguments)
+        case "click_element": return String(format: Strings.text(.approvalClickElementFormat), arguments)
+        default: return String(format: Strings.text(.approvalRunToolFormat), tool, arguments)
         }
     }
 

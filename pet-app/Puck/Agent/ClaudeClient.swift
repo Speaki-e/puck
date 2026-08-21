@@ -226,10 +226,10 @@ final class ClaudeClient: AgentLLMClient {
         if let stopReason = root["stop_reason"] as? String {
             switch stopReason {
             case "refusal":
-                throw GPTError.malformedResponse("모델이 응답을 거부했습니다 (stop_reason: refusal)")
+                throw GPTError.malformedResponse(Strings.text(.providerRefusedResponse))
             case "max_tokens":
                 throw GPTError.malformedResponse(
-                    "응답이 max_tokens(\(Self.maxTokens))에서 잘렸습니다 -- 도구 호출이 중간에 끊겼을 수 있습니다"
+                    String(format: Strings.text(.providerTruncatedFormat), "\(Self.maxTokens)")
                 )
             default:
                 break

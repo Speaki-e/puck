@@ -57,7 +57,7 @@ struct AgentConfiguration {
 
         var displayName: String {
             switch self {
-            case .environment(let variable): return "환경변수 \(variable)"
+            case .environment(let variable): return String(format: Strings.text(.keySourceEnvironmentFormat), variable)
             case .file(let url):
                 return url.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
             }
@@ -354,7 +354,7 @@ enum AgentProvider: String, CaseIterable {
         switch self {
         case .openai: return "ChatGPT (OpenAI)"
         case .anthropic: return "Claude (Anthropic)"
-        case .cli: return "코딩 CLI"
+        case .cli: return Strings.text(.codingAgentLabel)
         }
     }
 

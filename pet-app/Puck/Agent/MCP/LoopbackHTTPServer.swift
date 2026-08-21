@@ -40,8 +40,8 @@ final class LoopbackHTTPServer {
 
         var errorDescription: String? {
             switch self {
-            case .listenerFailed(let detail): return "로컬 서버를 열지 못했습니다: \(detail)"
-            case .noPort: return "로컬 서버가 포트를 얻지 못했습니다."
+            case .listenerFailed(let detail): return String(format: Strings.text(.mcpCouldNotOpenFormat), detail)
+            case .noPort: return Strings.text(.mcpNoPort)
             }
         }
     }

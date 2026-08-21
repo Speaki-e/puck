@@ -220,7 +220,7 @@ final class AcpTurnSession {
             return Self.appending(stderrTail(), to: "ACP error \(code): \(message)")
         case AcpError.processExited(let detail):
             // Already the stderr tail (AcpAgentProcess passes it in).
-            return detail.isEmpty ? "ACP 프로세스가 종료되었습니다." : detail
+            return detail.isEmpty ? Strings.text(.acpProcessExited) : detail
         default:
             return Self.appending(stderrTail(), to: String(describing: error))
         }

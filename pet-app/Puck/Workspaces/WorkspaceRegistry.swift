@@ -168,7 +168,7 @@ final class WorkspaceRegistry {
         let now = Self.nowMilliseconds()
         records[Self.defaultWorkspaceID] = WorkspaceRecord(
             id: Self.defaultWorkspaceID,
-            name: "기본 워크스페이스",
+            name: ClientWorkspace.defaultName,
             projectPath: nil,
             realProjectPath: nil,
             createdAt: now,

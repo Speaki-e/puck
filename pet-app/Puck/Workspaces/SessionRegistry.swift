@@ -40,7 +40,7 @@ final class SessionRegistry {
         let record = SessionRecord(
             id: id,
             workspaceId: workspaceId,
-            title: trimmed.isEmpty ? "새 세션" : trimmed,
+            title: trimmed.isEmpty ? ChatSession.untitledTitle : trimmed,
             origin: origin,
             createdAt: Int64(Date().timeIntervalSince1970 * 1000)
         )

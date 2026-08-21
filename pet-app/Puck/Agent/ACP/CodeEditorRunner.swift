@@ -184,7 +184,7 @@ actor CodeEditorRunner {
     ) async -> CodeEditorResult {
         guard runs[requestId] == nil else {
             return CodeEditorResult(
-                ok: false, summary: "중복된 요청입니다.", changedFiles: [],
+                ok: false, summary: Strings.text(.toolDuplicateRequest), changedFiles: [],
                 error: "duplicate_request", detail: requestId
             )
         }
@@ -308,7 +308,7 @@ actor CodeEditorRunner {
             shutDown(process, cancelGrace: 0)
             return CodeEditorResult(
                 ok: false,
-                summary: "코드 편집이 \(Int(timeoutSeconds))초 안에 끝나지 않아 중단했어요.",
+                summary: String(format: Strings.text(.toolCodeEditTimedOutFormat), "\(Int(timeoutSeconds))"),
                 changedFiles: tracker.finish(),
                 error: "timeout",
                 detail: "code_editor exceeded \(Int(timeoutSeconds))s"
@@ -323,6 +323,6 @@ actor CodeEditorRunner {
         guard let error = error as? AcpAgentCommandError else {
             return AcpAgentCommandError.unknownStartFailureSummary
         }
-        return error.summary(purpose: "코드 편집", kind: kind)
+        return error.summary(purpose: Strings.text(.toolCodeEditPurpose), kind: kind)
     }
 }

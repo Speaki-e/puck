@@ -68,9 +68,12 @@ final class CodeTourDelegate {
     /// the pet in front of a file nobody asked about.
     static func ambiguityDetail(for path: String, candidates: [String]) -> String {
         let shown = candidates.prefix(maximumCandidatesShown)
-        let more = candidates.count > shown.count ? " 외 \(candidates.count - shown.count)개" : ""
-        return "\(path)와 이름이 같은 파일이 여러 개예요: \(shown.joined(separator: ", "))\(more)."
-            + " 이 중 하나를 전체 경로로 다시 불러주세요."
+        let more = candidates.count > shown.count
+            ? String(format: Strings.text(.toolAmbiguousPathMoreFormat), "\(candidates.count - shown.count)")
+            : ""
+        let listed = shown.joined(separator: ", ") + more
+        return String(format: Strings.text(.toolAmbiguousPathFormat), path, listed)
+            + Strings.text(.toolPickOneFullPath)
     }
 
     /// Enough to choose from, few enough not to bury the ask.
@@ -84,7 +87,7 @@ final class CodeTourDelegate {
         workspaceId: String
     ) async -> DispatchedToolResult {
         guard let projectPath = resolveProjectPath(workspaceId) else {
-            return .failed("이 워크스페이스에는 연결된 프로젝트가 없어요.")
+            return .failed(Strings.text(.toolNoProjectLinked))
         }
         let store: EditorPaneStore
         do {
@@ -109,15 +112,15 @@ final class CodeTourDelegate {
             case let candidates where candidates.count > 1:
                 return .failed(Self.ambiguityDetail(for: path, candidates: candidates))
             default:
-                return .failed(store.lastError?.agentDetail ?? "\(path)를 열지 못했어요.")
+                return .failed(store.lastError?.agentDetail ?? String(format: Strings.text(.toolCouldNotOpenFormat), path))
             }
         }
         guard store.activeTabPath == openPath else {
-            return .failed(store.lastError?.agentDetail ?? "\(openPath)를 열지 못했어요.")
+            return .failed(store.lastError?.agentDetail ?? String(format: Strings.text(.toolCouldNotOpenFormat), openPath))
         }
         let lineCount = store.activeTab?.content.split(separator: "\n", omittingEmptySubsequences: false).count ?? 0
         guard let lines = Self.clamp(start: startLine, end: endLine, lineCount: lineCount) else {
-            return .failed("\(openPath)에는 \(startLine)번째 줄이 없어요. (\(lineCount)줄짜리 파일이에요)")
+            return .failed(String(format: Strings.text(.toolNoSuchLineFormat), openPath, "\(startLine)", "\(lineCount)"))
         }
         showEditorPane(workspaceId, openPath)
         store.reveal(path: openPath, lines: lines)
@@ -129,12 +132,12 @@ final class CodeTourDelegate {
             // The highlight is up; the pet just has nowhere to go. A success
             // with a reason, so the explanation still reaches the chat rather
             // than the model apologising for a failed tool call.
-            return .succeeded(detail: "에디터가 화면에 없어서 펫은 가지 못했어요. 코드는 표시했습니다.")
+            return .succeeded(detail: Strings.text(.toolEditorOffscreenShownAnyway))
         }
 
         let pointed = await point(Self.normalized(appKitFrame, in: space), Self.holdSeconds)
         guard pointed.ok else {
-            return .succeeded(detail: "펫이 가지 못했지만 코드는 표시했어요. (\(pointed.error ?? "unknown"))")
+            return .succeeded(detail: String(format: Strings.text(.toolShownButPetCouldNotGo), pointed.error ?? "unknown"))
         }
         return .succeeded(detail: nil)
     }

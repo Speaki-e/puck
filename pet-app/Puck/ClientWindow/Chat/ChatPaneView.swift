@@ -48,7 +48,7 @@ struct ChatPaneView: View {
                 )
             }
             .navigationTitle(session.displayTitle)
-            .navigationSubtitle(activeWorkspace?.name ?? "")
+            .navigationSubtitle(activeWorkspace?.displayName ?? "")
             .toolbar { toolbarContent }
         } else {
             // Only reachable if the active ids point at a session that no
@@ -113,7 +113,7 @@ struct ChatPaneView: View {
     /// Names the workspace the chat would be created in -- "this workspace"
     /// only when it has no name to give.
     private var newSessionHelp: String {
-        let workspace = activeWorkspace?.name ?? Strings.text(.chatThisWorkspace)
+        let workspace = activeWorkspace?.displayName ?? Strings.text(.chatThisWorkspace)
         return "\(workspace) · \(Strings.text(.chatNewSession))"
     }
 

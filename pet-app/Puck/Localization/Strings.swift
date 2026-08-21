@@ -109,6 +109,60 @@ enum L10nKey: String, CaseIterable, Hashable {
     case timeJustNow, timeYesterday
     case timeMinutesFormat, timeHoursFormat, timeDaysFormat, timeMonthDayFormat
 
+
+    // MARK: - Editor pane
+
+    case editorUnsavedTitle, editorSaveAndClose, editorDiscard
+    case editorUnsavedMessageFormat
+    case editorProjectFolderMissing, editorProjectPathNotAFolder, editorProjectFolderUnreadable
+    case editorConflictTitle, editorConflictMessage, editorUseDiskVersion, editorKeepMyVersion
+
+    /// WorkspaceFileService's refusals. The user reads these in the editor
+    /// pane, so they are copy, not diagnostics.
+    case fileNotAFilePath, fileInvalidPath, fileOutsideProject, fileSymlinkEscapesProject
+    case fileNotFound, fileBinaryNotEditable, fileBinaryNotSavable, fileOnlyUTF8
+    case fileImageTooLargeToPreview, fileImageFormatMismatch
+    case fileTooLargeReadOnly, fileChangedOnDisk, fileSaveExceedsLimit, fileInUseByAnotherProcess
+
+
+    // MARK: - Agent run outcomes and approval prompts
+
+    /// What the user reads when a run ends badly. Not the tool-protocol
+    /// `detail` strings, which are addressed to the model.
+    case agentCancelled, agentSettingsHint, agentModelNotFound, agentRateLimited
+    case agentToolCeilingFormat, agentNoAPIKeyFormat, agentBadAPIKeyFormat
+    case agentServerErrorFormat, agentAPIErrorFormat, agentAPIErrorWithMessageFormat
+
+    case approvalRunShellFormat, approvalRunAppleScriptFormat
+    case approvalClickElementFormat, approvalRunToolFormat
+
+
+    // MARK: - Agent tool results and setup failures
+
+    /// Tool `detail` the user reads in the transcript. The strings that only
+    /// the model ever sees -- protocol errors, path hints -- stay put.
+    case toolNoProjectLinked, toolShownButPetCouldNotGo
+    case toolAmbiguousPathFormat, toolAmbiguousPathMoreFormat, toolPickOneFullPath
+    case toolCouldNotOpenFormat, toolNoSuchLineFormat
+    case toolEditorOffscreenShownAnyway
+    case toolDuplicateRequest, toolCodeEditTimedOutFormat, toolCodeEditPurpose
+
+    case acpAborted, acpTaskFailed, acpWroteOutsideProject, acpTaskDoneFormat
+    case acpNeedsNodeFormat, acpCLINotFoundFormat, acpAgentNotBundledFormat, acpCouldNotStart
+
+    case cliErrorFormat, cliTimedOutFormat, cliNoAnswerFormat
+    case cliNoToolsFallbackFormat, cliConversationPurpose
+
+    case providerNoAPIKey, providerAPIErrorFormat, providerUndecodableFormat
+    case mcpCouldNotOpenFormat, mcpNoPort
+    case keySourceEnvironmentFormat
+
+
+    case themeLight, themeDark
+    case workspaceDefaultName, sessionDefaultTitle
+    case editorSelectAFile, editorSearchFiles, editorSaveHint
+    case providerRefusedResponse, providerTruncatedFormat, acpProcessExited
+
     /// The panel's action rows. Settings and Switch Avatar are gone with the
     /// NSMenu: the panel *is* settings, and it opens on the avatar section.
     case menuToys, menuHide, menuShow, menuQuit
@@ -262,6 +316,94 @@ enum Strings {
         .timeDaysFormat: "%1$@일",
         .timeMonthDayFormat: "%1$@월 %2$@일",
 
+        .editorUnsavedTitle: "저장하지 않은 변경사항이 있어요",
+        .editorSaveAndClose: "저장 후 닫기",
+        .editorDiscard: "저장 안 함",
+        .editorUnsavedMessageFormat: "%1$@의 변경사항을 저장할까요?",
+        .editorProjectFolderMissing: "프로젝트 폴더를 찾을 수 없어요 -- 이동되었거나 삭제된 것 같아요",
+        .editorProjectPathNotAFolder: "연결된 경로가 폴더가 아니에요",
+        .editorProjectFolderUnreadable: "프로젝트 폴더를 읽을 권한이 없어요",
+        .editorConflictTitle: "디스크에서 파일이 변경됐습니다",
+        .editorConflictMessage: "저장하기 전에 사용할 버전을 선택하세요.",
+        .editorUseDiskVersion: "디스크 내용 사용",
+        .editorKeepMyVersion: "내 내용 유지",
+
+        .fileNotAFilePath: "파일 경로가 아닙니다",
+        .fileInvalidPath: "잘못된 파일 경로입니다",
+        .fileOutsideProject: "프로젝트 밖 경로입니다",
+        .fileSymlinkEscapesProject: "심볼릭 링크가 프로젝트 밖을 가리킵니다",
+        .fileNotFound: "파일을 찾을 수 없습니다",
+        .fileBinaryNotEditable: "바이너리 파일은 편집할 수 없습니다",
+        .fileBinaryNotSavable: "바이너리 파일은 저장할 수 없습니다",
+        .fileOnlyUTF8: "UTF-8 텍스트 파일만 지원합니다",
+        .fileImageTooLargeToPreview: "10MB를 초과하는 이미지는 미리 볼 수 없습니다",
+        .fileImageFormatMismatch: "지원하는 이미지 형식과 실제 파일 내용이 일치하지 않습니다",
+        .fileTooLargeReadOnly: "2MB를 초과하는 파일은 읽기 전용입니다",
+        .fileChangedOnDisk: "디스크 파일이 마지막 읽기 이후 변경되었습니다",
+        .fileSaveExceedsLimit: "저장할 내용이 2MB 제한을 초과합니다",
+        .fileInUseByAnotherProcess: "디스크 파일이 다른 프로세스에 의해 사용 중입니다",
+
+        .agentCancelled: "중지했어요.",
+        .agentSettingsHint: "설정(⌘,)에서 키를 확인해 주세요.",
+        .agentModelNotFound: "모델을 찾을 수 없어요. 설정(⌘,)에서 모델 이름을 확인해 주세요.",
+        .agentRateLimited: "요청이 너무 잦거나 사용 한도를 넘었어요. 잠시 후 다시 시도해 주세요.",
+        .agentToolCeilingFormat: "도구를 %1$@번 넘게 호출해서 중단했어요.",
+        .agentNoAPIKeyFormat: "API 키가 없어요. %1$@",
+        .agentBadAPIKeyFormat: "API 키가 올바르지 않아요. %1$@",
+        .agentServerErrorFormat: "AI 서버가 응답하지 못했어요 (오류 %1$@). 잠시 후 다시 시도해 주세요.",
+        .agentAPIErrorFormat: "API 오류 %1$@가 났어요.",
+        .agentAPIErrorWithMessageFormat: "API 오류 %1$@: %2$@",
+
+        .approvalRunShellFormat: "셸 명령 실행: %1$@",
+        .approvalRunAppleScriptFormat: "AppleScript 실행: %1$@",
+        .approvalClickElementFormat: "화면 클릭: %1$@",
+        .approvalRunToolFormat: "%1$@ 실행: %2$@",
+
+        .toolNoProjectLinked: "이 워크스페이스에는 연결된 프로젝트가 없어요.",
+        .toolShownButPetCouldNotGo: "펫이 가지 못했지만 코드는 표시했어요. (%1$@)",
+        .toolAmbiguousPathFormat: "%1$@와 이름이 같은 파일이 여러 개예요: %2$@.",
+        .toolAmbiguousPathMoreFormat: " 외 %1$@개",
+        .toolPickOneFullPath: " 이 중 하나를 전체 경로로 다시 불러주세요.",
+        .toolCouldNotOpenFormat: "%1$@를 열지 못했어요.",
+        .toolNoSuchLineFormat: "%1$@에는 %2$@번째 줄이 없어요. (%3$@줄짜리 파일이에요)",
+        .toolEditorOffscreenShownAnyway: "에디터가 화면에 없어서 펫은 가지 못했어요. 코드는 표시했습니다.",
+        .toolDuplicateRequest: "중복된 요청입니다.",
+        .toolCodeEditTimedOutFormat: "코드 편집이 %1$@초 안에 끝나지 않아 중단했어요.",
+        .toolCodeEditPurpose: "코드 편집",
+
+        .acpAborted: "중단됨",
+        .acpTaskFailed: "ACP 작업에 실패했습니다.",
+        .acpWroteOutsideProject: "이 작업이 프로젝트 밖의 파일을 수정했다고 보고했어요. 확인이 필요합니다.",
+        .acpTaskDoneFormat: "ACP 작업 완료 (%1$@)",
+        .acpNeedsNodeFormat: "%1$@에는 Node.js가 필요합니다. 설치 후 다시 시도해 주세요.",
+        .acpCLINotFoundFormat: "%1$@ CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요.",
+        .acpAgentNotBundledFormat: "코딩 에이전트(%1$@)가 앱에 포함되어 있지 않습니다.",
+        .acpCouldNotStart: "코딩 에이전트를 시작하지 못했습니다.",
+
+        .cliErrorFormat: "코딩 CLI 오류: %1$@",
+        .cliTimedOutFormat: "코딩 CLI가 %1$@초 안에 답하지 않아 중단했어요.",
+        .cliNoAnswerFormat: "코딩 CLI가 답을 주지 않았어요. (%1$@)",
+        .cliNoToolsFallbackFormat: "MCP 서버를 열지 못해 도구 없이 대화합니다: %1$@",
+        .cliConversationPurpose: "대화",
+
+        .providerNoAPIKey: "API 키가 설정되지 않았습니다.",
+        .providerAPIErrorFormat: "API 오류 %1$@: %2$@",
+        .providerUndecodableFormat: "응답을 해석할 수 없습니다: %1$@",
+        .mcpCouldNotOpenFormat: "로컬 서버를 열지 못했습니다: %1$@",
+        .mcpNoPort: "로컬 서버가 포트를 얻지 못했습니다.",
+        .keySourceEnvironmentFormat: "환경변수 %1$@",
+
+        .workspaceDefaultName: "기본 워크스페이스",
+        .sessionDefaultTitle: "새 세션",
+        .themeLight: "화이트",
+        .themeDark: "다크",
+        .editorSelectAFile: "왼쪽 탐색기에서 파일을 선택하세요",
+        .editorSearchFiles: "파일 검색",
+        .editorSaveHint: "저장 (⌘S)",
+        .providerRefusedResponse: "모델이 응답을 거부했습니다 (stop_reason: refusal)",
+        .providerTruncatedFormat: "응답이 max_tokens(%1$@)에서 잘렸습니다 -- 도구 호출이 중간에 끊겼을 수 있습니다",
+        .acpProcessExited: "ACP 프로세스가 종료되었습니다.",
+
         .menuToys: "장난감",
         .menuHide: "숨기기",
         .menuShow: "보이기",
@@ -391,6 +533,94 @@ enum Strings {
         .timeHoursFormat: "%1$@ hr",
         .timeDaysFormat: "%1$@ d",
         .timeMonthDayFormat: "%1$@/%2$@",
+
+        .editorUnsavedTitle: "There are unsaved changes",
+        .editorSaveAndClose: "Save and close",
+        .editorDiscard: "Don't save",
+        .editorUnsavedMessageFormat: "Save the changes to %1$@?",
+        .editorProjectFolderMissing: "The project folder is gone -- moved or deleted, by the look of it",
+        .editorProjectPathNotAFolder: "The linked path is not a folder",
+        .editorProjectFolderUnreadable: "No permission to read the project folder",
+        .editorConflictTitle: "The file changed on disk",
+        .editorConflictMessage: "Choose which version to keep before saving.",
+        .editorUseDiskVersion: "Use the disk version",
+        .editorKeepMyVersion: "Keep mine",
+
+        .fileNotAFilePath: "That is not a file path",
+        .fileInvalidPath: "That file path is not valid",
+        .fileOutsideProject: "That path is outside the project",
+        .fileSymlinkEscapesProject: "That symlink points outside the project",
+        .fileNotFound: "File not found",
+        .fileBinaryNotEditable: "Binary files cannot be edited",
+        .fileBinaryNotSavable: "Binary files cannot be saved",
+        .fileOnlyUTF8: "Only UTF-8 text files are supported",
+        .fileImageTooLargeToPreview: "Images over 10MB cannot be previewed",
+        .fileImageFormatMismatch: "The file's contents do not match any supported image format",
+        .fileTooLargeReadOnly: "Files over 2MB are read-only",
+        .fileChangedOnDisk: "The file on disk changed since it was last read",
+        .fileSaveExceedsLimit: "The content to save is over the 2MB limit",
+        .fileInUseByAnotherProcess: "The file on disk is in use by another process",
+
+        .agentCancelled: "Stopped.",
+        .agentSettingsHint: "Check the key in Settings (⌘,).",
+        .agentModelNotFound: "No such model. Check the model name in Settings (⌘,).",
+        .agentRateLimited: "Too many requests, or the usage limit is reached. Try again shortly.",
+        .agentToolCeilingFormat: "Stopped after more than %1$@ tool calls.",
+        .agentNoAPIKeyFormat: "There's no API key. %1$@",
+        .agentBadAPIKeyFormat: "That API key isn't right. %1$@",
+        .agentServerErrorFormat: "The AI server didn't answer (error %1$@). Try again shortly.",
+        .agentAPIErrorFormat: "API error %1$@.",
+        .agentAPIErrorWithMessageFormat: "API error %1$@: %2$@",
+
+        .approvalRunShellFormat: "Run a shell command: %1$@",
+        .approvalRunAppleScriptFormat: "Run AppleScript: %1$@",
+        .approvalClickElementFormat: "Click on screen: %1$@",
+        .approvalRunToolFormat: "Run %1$@: %2$@",
+
+        .toolNoProjectLinked: "No project is linked to this workspace.",
+        .toolShownButPetCouldNotGo: "The pet couldn't get there, but the code is showing. (%1$@)",
+        .toolAmbiguousPathFormat: "Several files are named like %1$@: %2$@.",
+        .toolAmbiguousPathMoreFormat: " and %1$@ more",
+        .toolPickOneFullPath: " Call again with one of them as a full path.",
+        .toolCouldNotOpenFormat: "Couldn't open %1$@.",
+        .toolNoSuchLineFormat: "%1$@ has no line %2$@. (the file is %3$@ lines)",
+        .toolEditorOffscreenShownAnyway: "The editor isn't on screen, so the pet couldn't go there. The code is showing.",
+        .toolDuplicateRequest: "That request is a duplicate.",
+        .toolCodeEditTimedOutFormat: "Code editing didn't finish within %1$@s, so it was stopped.",
+        .toolCodeEditPurpose: "Code editing",
+
+        .acpAborted: "Aborted",
+        .acpTaskFailed: "The ACP task failed.",
+        .acpWroteOutsideProject: "This task reported writing to a file outside the project. Worth a look.",
+        .acpTaskDoneFormat: "ACP task finished (%1$@)",
+        .acpNeedsNodeFormat: "%1$@ needs Node.js. Install it and try again.",
+        .acpCLINotFoundFormat: "Couldn't find the %1$@ CLI. Install it and try again.",
+        .acpAgentNotBundledFormat: "The coding agent (%1$@) isn't bundled with the app.",
+        .acpCouldNotStart: "Couldn't start the coding agent.",
+
+        .cliErrorFormat: "Coding CLI error: %1$@",
+        .cliTimedOutFormat: "The coding CLI didn't answer within %1$@s, so it was stopped.",
+        .cliNoAnswerFormat: "The coding CLI gave no answer. (%1$@)",
+        .cliNoToolsFallbackFormat: "Couldn't open the MCP server, so this turn runs without tools: %1$@",
+        .cliConversationPurpose: "Conversation",
+
+        .providerNoAPIKey: "No API key is set.",
+        .providerAPIErrorFormat: "API error %1$@: %2$@",
+        .providerUndecodableFormat: "Couldn't read the response: %1$@",
+        .mcpCouldNotOpenFormat: "Couldn't open the local server: %1$@",
+        .mcpNoPort: "The local server got no port.",
+        .keySourceEnvironmentFormat: "the %1$@ environment variable",
+
+        .workspaceDefaultName: "Default workspace",
+        .sessionDefaultTitle: "New session",
+        .themeLight: "Light",
+        .themeDark: "Dark",
+        .editorSelectAFile: "Pick a file in the navigator on the left",
+        .editorSearchFiles: "Search files",
+        .editorSaveHint: "Save (⌘S)",
+        .providerRefusedResponse: "The model refused to answer (stop_reason: refusal)",
+        .providerTruncatedFormat: "The answer was cut off at max_tokens(%1$@) -- a tool call may have been left unfinished",
+        .acpProcessExited: "The ACP process exited.",
 
         .menuToys: "Toys",
         .menuHide: "Hide",

@@ -117,7 +117,7 @@ private struct WorkspaceHeader: View {
 
     private var name: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(workspace.name)
+            Text(workspace.displayName)
             if let projectPath = workspace.projectPath {
                 // Same size as the name would shout twice; the path is
                 // context for the name, not a second title.

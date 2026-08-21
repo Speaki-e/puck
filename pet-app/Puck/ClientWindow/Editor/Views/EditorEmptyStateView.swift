@@ -20,13 +20,13 @@ struct EditorEmptyStateView: View {
         case .ready:
             return ""
         case .noProject:
-            return "이 워크스페이스에는 연결된 프로젝트가 없어요"
+            return Strings.text(.chatNoProjectLinked)
         case .unavailable(.pathMissing):
-            return "프로젝트 폴더를 찾을 수 없어요 -- 이동되었거나 삭제된 것 같아요"
+            return Strings.text(.editorProjectFolderMissing)
         case .unavailable(.notADirectory):
-            return "연결된 경로가 폴더가 아니에요"
+            return Strings.text(.editorProjectPathNotAFolder)
         case .unavailable(.notReadable):
-            return "프로젝트 폴더를 읽을 권한이 없어요"
+            return Strings.text(.editorProjectFolderUnreadable)
         }
     }
 

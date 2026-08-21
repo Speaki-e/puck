@@ -70,11 +70,11 @@ enum GPTError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "API 키가 설정되지 않았습니다."
+            return Strings.text(.providerNoAPIKey)
         case .http(let status, let body):
-            return "API 오류 \(status): \(body)"
+            return String(format: Strings.text(.providerAPIErrorFormat), "\(status)", body)
         case .malformedResponse(let what):
-            return "응답을 해석할 수 없습니다: \(what)"
+            return String(format: Strings.text(.providerUndecodableFormat), what)
         }
     }
 }

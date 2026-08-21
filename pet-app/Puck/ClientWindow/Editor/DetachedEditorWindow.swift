@@ -102,7 +102,7 @@ private struct DetachedEditorWindowHost: NSViewRepresentable {
                 backing: .buffered,
                 defer: false
             )
-            newWindow.title = "에디터"
+            newWindow.title = Strings.text(.chatEditor)
             newWindow.isReleasedWhenClosed = false
             newWindow.contentViewController = controller
             newWindow.setContentSize(CGSize(width: 900, height: 700))

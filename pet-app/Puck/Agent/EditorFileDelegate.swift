@@ -63,7 +63,7 @@ final class EditorFileDelegate {
     @MainActor
     func listFiles(workspaceId: String, contains: String? = nil) async -> DispatchedToolResult {
         guard let projectPath = resolveProjectPath(workspaceId) else {
-            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "이 워크스페이스에는 연결된 프로젝트가 없어요.")
+            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: Strings.text(.toolNoProjectLinked))
         }
         do {
             let service = try WorkspaceFileService(root: URL(fileURLWithPath: projectPath, isDirectory: true))
@@ -90,7 +90,7 @@ final class EditorFileDelegate {
     @MainActor
     func readFile(path: String, workspaceId: String) async -> DispatchedToolResult {
         guard let projectPath = resolveProjectPath(workspaceId) else {
-            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "이 워크스페이스에는 연결된 프로젝트가 없어요.")
+            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: Strings.text(.toolNoProjectLinked))
         }
         do {
             let service = try WorkspaceFileService(root: URL(fileURLWithPath: projectPath, isDirectory: true))
@@ -118,7 +118,7 @@ final class EditorFileDelegate {
     @MainActor
     func openInEditor(path: String, workspaceId: String) async -> DispatchedToolResult {
         guard let projectPath = resolveProjectPath(workspaceId) else {
-            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "이 워크스페이스에는 연결된 프로젝트가 없어요.")
+            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: Strings.text(.toolNoProjectLinked))
         }
         do {
             let store = try EditorPaneStorePool.shared.store(

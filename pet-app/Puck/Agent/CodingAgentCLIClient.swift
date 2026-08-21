@@ -57,10 +57,10 @@ enum CodingAgentCLIError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unavailable(let summary): return summary
-        case .failed(let detail): return "코딩 CLI 오류: \(detail)"
-        case .timedOut(let seconds): return "코딩 CLI가 \(seconds)초 안에 답하지 않아 중단했어요."
-        case .emptyReply(let stopReason): return "코딩 CLI가 답을 주지 않았어요. (\(stopReason))"
-        case .cancelled: return "중지했어요."
+        case .failed(let detail): return String(format: Strings.text(.cliErrorFormat), detail)
+        case .timedOut(let seconds): return String(format: Strings.text(.cliTimedOutFormat), "\(seconds)")
+        case .emptyReply(let stopReason): return String(format: Strings.text(.cliNoAnswerFormat), stopReason)
+        case .cancelled: return Strings.text(.agentCancelled)
         }
     }
 }
@@ -154,7 +154,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
                 server.stop()
                 AppLogger.shared.log(
                     .error,
-                    "MCP 서버를 열지 못해 도구 없이 대화합니다: \(AgentRunner.rawFailureDescription(for: error))"
+                    String(format: Strings.text(.cliNoToolsFallbackFormat), AgentRunner.rawFailureDescription(for: error))
                 )
             }
         }
@@ -170,7 +170,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
             // A `codex` that is not installed has to fail here, plainly and
             // immediately, rather than hang: nothing was spawned, so there is
             // nothing to wait on.
-            throw CodingAgentCLIError.unavailable(error.summary(purpose: "대화", kind: kind))
+            throw CodingAgentCLIError.unavailable(error.summary(purpose: Strings.text(.cliConversationPurpose), kind: kind))
         }
 
         let session = AcpTurnSession(

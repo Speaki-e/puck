@@ -47,7 +47,7 @@ struct ClientStatusBarView: View {
     // sibling string here is Korean, e.g. ConflictBannerView's "디스크에서
     // 파일이 변경됐습니다").
     private var projectLabel: String {
-        guard let projectPath = workspace?.projectPath else { return workspace?.name ?? Strings.text(.chatCasualSession) }
+        guard let projectPath = workspace?.projectPath else { return workspace?.displayName ?? Strings.text(.chatCasualSession) }
         return abbreviatedPath(projectPath, home: NSHomeDirectory())
     }
 

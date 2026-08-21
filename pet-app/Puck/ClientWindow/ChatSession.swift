@@ -191,6 +191,10 @@ final class ChatSession: ObservableObject, Identifiable {
     /// `displayTitle`.
     static let casualTitle = "일상 대화"
 
+    /// What SessionRegistry stores for a session created without a name.
+    /// Stored, not displayed, for the same reason as the two above.
+    static let untitledTitle = "새 세션"
+
     /// The title to show. The two titles this app assigns itself are
     /// language-independent on disk (see `casualTitle`), so this is where
     /// they become words; anything the user or the agent named stands as-is.
@@ -198,6 +202,7 @@ final class ChatSession: ObservableObject, Identifiable {
         switch title {
         case Self.placeholderTitle: return Strings.text(.chatNewSession)
         case Self.casualTitle: return Strings.text(.chatCasualSession)
+        case Self.untitledTitle: return Strings.text(.sessionDefaultTitle)
         default: return title
         }
     }

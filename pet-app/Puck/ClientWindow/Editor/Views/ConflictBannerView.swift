@@ -21,15 +21,15 @@ struct ConflictBannerView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(palette.statusWarning)
             VStack(alignment: .leading, spacing: 2) {
-                Text("디스크에서 파일이 변경됐습니다")
+                Text(Strings.text(.editorConflictTitle))
                     .font(ClientTheme.Typography.toolLabel)
-                Text("저장하기 전에 사용할 버전을 선택하세요.")
+                Text(Strings.text(.editorConflictMessage))
                     .font(ClientTheme.Typography.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("디스크 내용 사용", action: onUseDisk)
-            Button("내 내용 유지", action: onKeepMine)
+            Button(Strings.text(.editorUseDiskVersion), action: onUseDisk)
+            Button(Strings.text(.editorKeepMyVersion), action: onKeepMine)
                 .buttonStyle(.borderedProminent)
         }
         .padding(ClientTheme.Metrics.spacingMedium)

@@ -83,6 +83,8 @@ extension AppDelegate {
         // hop back to idle.
         if reaction.runFinished {
             releasePointingForFinishedRun()
+            // The caption goes with the pointing it was describing.
+            closeSpeechBubble()
         }
         if let kind = reaction.stateTransition {
             characterController?.transition(to: kind)
@@ -97,18 +99,36 @@ extension AppDelegate {
             characterBody?.triggerJump()
         }
         if let bubbleText = reaction.bubbleText {
-            showAgentSummaryBubble(bubbleText)
+            showAgentSummaryBubble(bubbleText, holdsForRun: reaction.bubbleHoldsForRun)
         }
+    }
+
+    /// Ends whatever the pet is currently saying. Called when a run ends, so
+    /// a held caption and the pointing it describes let go together.
+    ///
+    /// The generation is bumped even when there is nothing to close: a notice
+    /// whose timer is still pending must not fire against a bubble that by
+    /// then belongs to someone else.
+    func closeSpeechBubble() {
+        noticeBubbleGeneration += 1
+        // Speech only. The input panel is the user's, and this is not their
+        // run to end.
+        guard let bubbleWindow = textInputBubbleWindow, bubbleWindow.isShowingSpeech else { return }
+        bubbleWindow.closeAndYieldFocus()
     }
 
     /// 02_pet-app.md F3: agent_done(ok=true) shows its summary in a "말풍선"
     /// -- reuses TextInputBubbleView's read-only notice mode (its own doc
     /// comment already anticipated this exact use, found via spec
     /// cross-check), same pattern as showClientOfflineBubble.
-    private func showAgentSummaryBubble(_ summary: String) {
+    private func showAgentSummaryBubble(_ summary: String, holdsForRun: Bool = false) {
         // Longer than the 2.5s "workspace offline" notice -- a summary is
         // meant to actually be read, not just glanced at.
-        showNoticeBubble(summary, for: 5.0)
+        //
+        // A caption held for the run gets the same backstop the pointing it
+        // accompanies does, so the two expire together even if the run never
+        // reports finishing at all.
+        showNoticeBubble(summary, for: holdsForRun ? PointAtHandler.maximumHoldSeconds : 5.0)
     }
 
     /// The one timed-notice path (agent summary, workspace offline, mute

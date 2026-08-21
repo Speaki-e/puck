@@ -63,6 +63,11 @@ struct EventReaction: Equatable {
     var jump: Bool = false
     var bubbleText: String?
     var emotion: String?
+    /// The bubble stays up until the run ends, instead of the few seconds a
+    /// notice gets. What a code tour's caption wants: it describes pointing
+    /// that is held just as long, and a caption that expires first leaves the
+    /// pet standing over code with nothing said about it.
+    var bubbleHoldsForRun: Bool = false
     /// The run this event belongs to has ended, whether it succeeded or not.
     /// The pet holds things on a run's behalf -- a point_at with a long
     /// `hold_seconds`, the tour's raised walking speed -- and this is when it
@@ -132,7 +137,7 @@ enum EventRouter {
             // Through the same shortener agent_done's summary goes through:
             // the bubble is one line beside a 100px character either way, and
             // a caption is only as short as the model felt like being.
-            return EventReaction(bubbleText: bubbleSummary(from: text))
+            return EventReaction(bubbleText: bubbleSummary(from: text), bubbleHoldsForRun: true)
         }
     }
 

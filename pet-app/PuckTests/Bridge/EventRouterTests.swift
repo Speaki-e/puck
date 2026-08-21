@@ -141,6 +141,16 @@ final class EventRouterTests: XCTestCase {
         XCTAssertEqual(reaction.bubbleText, "여기가 진입점이에요")
     }
 
+    /// The caption is held as long as the pointing it describes, rather than
+    /// expiring like a notice while the pet still stands over the code.
+    func test_petSays_holdsUntilTheRunEnds() {
+        XCTAssertTrue(EventRouter.reaction(for: .petSays(text: "여기예요")).bubbleHoldsForRun)
+        XCTAssertFalse(
+            EventRouter.reaction(for: .agentDone(ok: true, summary: "끝")).bubbleHoldsForRun,
+            "a summary is read once and gone; nothing is holding it open"
+        )
+    }
+
     /// Speech and nothing else: the stop's point_at has already put the pet
     /// where it wants it, and a transition here would undo the pointing.
     func test_petSays_doesNotMoveThePet() {

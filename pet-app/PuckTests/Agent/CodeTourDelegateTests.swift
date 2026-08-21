@@ -105,4 +105,33 @@ final class CodeTourDelegateTests: XCTestCase {
         XCTAssertFalse(result.ok)
         XCTAssertEqual(result.error, "execution_failed")
     }
+
+    /// The model guesses paths -- it called show_code with a bare
+    /// "AgentRunner.swift" on the first live run -- so a not-found failure
+    /// says what a path is supposed to look like instead of only that this
+    /// one was wrong.
+    @MainActor
+    func test_missingFileSaysHowPathsWork() async throws {
+        let root = try makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sut = CodeTourDelegate(
+            resolveProjectPath: { _ in root.path },
+            showEditorPane: { _, _ in },
+            point: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) }
+        )
+
+        let result = await sut.showCode(path: "gone.swift", startLine: 1, endLine: 1, workspaceId: UUID().uuidString)
+
+        let detail = try XCTUnwrap(result.detail)
+        XCTAssertTrue(detail.contains("상대 경로"), detail)
+        XCTAssertTrue(detail.contains("list_files"), detail)
+    }
+
+    /// Only for failures a different path would fix. Telling the model to
+    /// check list_files about a file that is simply too large sends it
+    /// looking in the wrong place.
+    func test_onlyPathFailuresGetThePathHint() {
+        let tooLarge = WorkspaceFileServiceError(code: .fileTooLarge, message: "파일이 너무 커요")
+        XCTAssertEqual(tooLarge.agentDetail, "파일이 너무 커요")
+    }
 }

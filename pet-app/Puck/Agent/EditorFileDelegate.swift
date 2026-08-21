@@ -64,7 +64,7 @@ final class EditorFileDelegate {
             ])
             return DispatchedToolResult(ok: true, data: data, error: nil, detail: nil)
         } catch let error as WorkspaceFileServiceError {
-            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.message)
+            return .failed(error.agentDetail)
         } catch {
             return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.localizedDescription)
         }
@@ -102,7 +102,7 @@ final class EditorFileDelegate {
             ])
             return DispatchedToolResult(ok: true, data: data, error: nil, detail: nil)
         } catch let error as WorkspaceFileServiceError {
-            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.message)
+            return .failed(error.agentDetail)
         } catch {
             return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.localizedDescription)
         }
@@ -126,11 +126,11 @@ final class EditorFileDelegate {
             )
             store.open(path: path)
             if let lastError = store.lastError {
-                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: lastError.message)
+                return .failed(lastError.agentDetail)
             }
             return DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         } catch let error as WorkspaceFileServiceError {
-            return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.message)
+            return .failed(error.agentDetail)
         } catch {
             return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: error.localizedDescription)
         }

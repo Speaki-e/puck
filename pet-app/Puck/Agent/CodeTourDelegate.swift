@@ -68,14 +68,14 @@ final class CodeTourDelegate {
                 onRootChanged: {}
             )
         } catch let error as WorkspaceFileServiceError {
-            return .failed(error.message)
+            return .failed(error.agentDetail)
         } catch {
             return .failed(error.localizedDescription)
         }
 
         store.open(path: path)
         guard store.activeTabPath == path else {
-            return .failed(store.lastError?.message ?? "\(path)를 열지 못했어요.")
+            return .failed(store.lastError?.agentDetail ?? "\(path)를 열지 못했어요.")
         }
         let lineCount = store.activeTab?.content.split(separator: "\n", omittingEmptySubsequences: false).count ?? 0
         guard let lines = Self.clamp(start: startLine, end: endLine, lineCount: lineCount) else {
@@ -128,15 +128,5 @@ final class CodeTourDelegate {
             origin: space.normalized(fromAppKit: CGPoint(x: appKitFrame.minX, y: appKitFrame.maxY)),
             size: appKitFrame.size
         )
-    }
-}
-
-private extension DispatchedToolResult {
-    static func failed(_ detail: String) -> DispatchedToolResult {
-        DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: detail)
-    }
-
-    static func succeeded(detail: String?) -> DispatchedToolResult {
-        DispatchedToolResult(ok: true, data: nil, error: nil, detail: detail)
     }
 }

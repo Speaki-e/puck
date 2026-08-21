@@ -18,13 +18,20 @@ enum WindowSupport {
     /// How close to a side counts as bumping into it.
     static let edgeTolerance: CGFloat = 4
 
-    /// The frontmost window covering `point`, if any.
+    /// The frontmost window a pet standing at `groundPoint` would be inside.
     ///
-    /// What "covering" means for the pet: it draws above every window, so a
-    /// spot inside a window is one where the pet appears to stand *in* that
-    /// window's content rather than on the desktop.
-    static func coveringWindow(at point: CGPoint, in windows: [WindowInfo]) -> WindowInfo? {
-        windows.first { $0.frame.contains(point) }
+    /// Measured at the pet's middle rather than at its feet: the pet draws
+    /// above every window, so what matters is whether its *body* lands in a
+    /// window's content. The chat window's bottom edge sits a few points above
+    /// the floor, so feet alone said "not covered" for a pet sitting squarely
+    /// on top of the message box (2026-08-22).
+    static func coveringWindow(
+        standingAt groundPoint: CGPoint,
+        petHeight: CGFloat,
+        in windows: [WindowInfo]
+    ) -> WindowInfo? {
+        let middle = CGPoint(x: groundPoint.x, y: groundPoint.y - petHeight / 2)
+        return windows.first { $0.frame.contains(middle) }
     }
 
     /// Somewhere to stand that `frame` does not cover: the nearer side of it,

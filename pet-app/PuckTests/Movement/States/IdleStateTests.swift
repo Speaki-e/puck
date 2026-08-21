@@ -81,6 +81,7 @@ final class IdleStateTests: XCTestCase {
     /// spot to a more annoying one (2026-08-22).
     func test_theSurfaceGoingBehindAWindow_asksTheDelegateInsteadOfFalling() {
         let world = TestStateWorld(position: CGPoint(x: 400, y: 200))
+        world.avatarHeight = 120
         world.landingY = 900
         world.windows = [Self.window(CGRect(x: 0, y: 40, width: 1000, height: 900))]
         let delegate = SpyWanderDelegate()
@@ -97,6 +98,7 @@ final class IdleStateTests: XCTestCase {
     /// pet would land, so landing there is visible and correct.
     func test_theSurfaceSimplyDisappearing_stillFalls() {
         let world = TestStateWorld(position: CGPoint(x: 400, y: 200))
+        world.avatarHeight = 120
         world.landingY = 900
         world.windows = [Self.window(CGRect(x: 0, y: 40, width: 100, height: 900))]
         let delegate = SpyWanderDelegate()

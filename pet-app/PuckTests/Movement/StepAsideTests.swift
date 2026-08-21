@@ -17,17 +17,38 @@ final class StepAsideTests: XCTestCase {
         WindowInfo(windowID: id, ownerPID: 1, ownerName: nil, title: nil, layer: 0, frame: frame)
     }
 
-    func test_coveringWindow_isTheFrontmostOneThePointFallsInside() {
+    func test_coveringWindow_isTheFrontmostOneThePetsBodyLandsInside() {
         let front = window(CGRect(x: 0, y: 0, width: 500, height: 500), id: 1)
         let behind = window(CGRect(x: 0, y: 0, width: 800, height: 800), id: 2)
 
-        XCTAssertEqual(WindowSupport.coveringWindow(at: CGPoint(x: 100, y: 100), in: [front, behind])?.windowID, 1)
         XCTAssertEqual(
-            WindowSupport.coveringWindow(at: CGPoint(x: 600, y: 600), in: [front, behind])?.windowID,
+            WindowSupport.coveringWindow(standingAt: CGPoint(x: 100, y: 300), petHeight: 120, in: [front, behind])?.windowID,
+            1
+        )
+        XCTAssertEqual(
+            WindowSupport.coveringWindow(standingAt: CGPoint(x: 600, y: 700), petHeight: 120, in: [front, behind])?.windowID,
             2,
             "outside the front one, still inside the one behind it"
         )
-        XCTAssertNil(WindowSupport.coveringWindow(at: CGPoint(x: 900, y: 900), in: [front, behind]))
+        XCTAssertNil(
+            WindowSupport.coveringWindow(standingAt: CGPoint(x: 900, y: 900), petHeight: 120, in: [front, behind])
+        )
+    }
+
+    /// The measurement that made the fix miss: the chat window ends at y=939
+    /// on a 956-tall screen, so a pet on the floor has its feet *below* it and
+    /// everything else inside it -- sitting squarely on the message box.
+    func test_coveringWindow_countsAPetWhoseFeetClearTheBottomEdge() {
+        let chat = window(CGRect(x: 15, y: 39, width: 1440, height: 900), id: 9)
+
+        XCTAssertNil(
+            WindowSupport.coveringWindow(standingAt: CGPoint(x: 700, y: 950), petHeight: 0, in: [chat]),
+            "feet alone are below the window"
+        )
+        XCTAssertEqual(
+            WindowSupport.coveringWindow(standingAt: CGPoint(x: 700, y: 950), petHeight: 120, in: [chat])?.windowID,
+            9
+        )
     }
 
     func test_asideTarget_isTheNearerSideOfTheWindow_onTheFloor() {

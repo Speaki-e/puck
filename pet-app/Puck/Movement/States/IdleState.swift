@@ -50,7 +50,11 @@ final class IdleState: StateHandler {
             // user is working in -- which is what clicking the chat window
             // used to do to it (2026-08-22).
             let landing = CGPoint(x: context.body.position.x, y: surfaceY)
-            if let covering = WindowSupport.coveringWindow(at: landing, in: context.windows) {
+            if let covering = WindowSupport.coveringWindow(
+                standingAt: landing,
+                petHeight: context.avatarHeight,
+                in: context.windows
+            ) {
                 wanderDelegate?.idleStateDidLoseFootingBehind(covering)
             } else {
                 context.requestTransition(.fall)

@@ -42,6 +42,9 @@ enum ToolTimeouts {
         "open_in_editor": 10,
         "list_files": 15,
         "read_file": 10,
+        // A stop is a point_at (30) plus the walk to the pane and the wait
+        // for it to report where it is, so it cannot be tighter than that.
+        "show_code": 45,
         // ai-module executor -- never dispatched, so this never actually
         // applies; 0 mirrors tools.ts's placeholder value (2026-07-29).
         "open_task_session": 0,

@@ -32,6 +32,9 @@ final class AgentHost {
     private let describeWorkspace: (String) -> AgentRunner.WorkspaceContext?
     /// read_file/open_in_editor's implementation -- see EditorFileDelegate.
     private let editorFileDelegate: EditorFileDelegate
+    /// show_code's implementation. Assigned after `runner`, because it
+    /// captures `self` to reach the pane and the point_at dispatcher.
+    private var codeTourDelegate: CodeTourDelegate!
     private var runner: AgentRunner!
 
     /// The approval requests runs are blocked on. Run-scoped -- see
@@ -216,12 +219,54 @@ final class AgentHost {
                 }
                 return await self.editorFileDelegate.listFiles(workspaceId: self.activeWorkspaceId)
             },
+            delegateShowCode: { [weak self] path, startLine, endLine, caption in
+                guard let self else {
+                    return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
+                }
+                let workspaceId = self.activeWorkspaceId
+                let result = await self.codeTourDelegate.showCode(
+                    path: path, startLine: startLine, endLine: endLine, workspaceId: workspaceId
+                )
+                // Said after the stop answers, not before: showCode returns
+                // when the pet has arrived, and a bubble raised at dispatch
+                // time would have expired while it was still walking.
+                if result.ok {
+                    _ = self.broadcast(.event(
+                        .petSays(text: caption),
+                        workspaceId: workspaceId,
+                        sessionId: self.activeSessionId
+                    ))
+                }
+                return result
+            },
             // Same directory Puck's executor writes to, so `id` joins the
             // agent's tool_call/tool_result with pet-app's exec lines in one
             // file (protocol section 7). Two processes appending to one file:
             // each line is a single small write, which append-mode keeps
             // whole -- interleaved order, never interleaved bytes.
             logger: ToolExecutionLogger()
+        )
+
+        codeTourDelegate = CodeTourDelegate(
+            resolveProjectPath: resolveProjectPath,
+            // The same reveal open_in_editor uses: a tour stop the user
+            // cannot see is not a stop, and the pane publishes its rect only
+            // once it is actually on screen.
+            showEditorPane: { [weak self] workspaceId, path in
+                self?.onRevealInEditor?(workspaceId, path)
+            },
+            point: { [weak self] frame, hold in
+                guard let self else {
+                    return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
+                }
+                return await self.dispatcher.execute(tool: "point_at", arguments: .object([
+                    "frame": .object([
+                        "x": .number(frame.minX), "y": .number(frame.minY),
+                        "width": .number(frame.width), "height": .number(frame.height),
+                    ]),
+                    "hold_seconds": .number(hold),
+                ]))
+            }
         )
 
         // Now that `self` exists, close the two loops the runner was built

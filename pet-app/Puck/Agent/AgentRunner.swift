@@ -60,6 +60,14 @@ typealias AgentCodeEditorDelegation = (_ task: String) async -> DispatchedToolRe
 /// PuckClient's own editor-pane state to answer anyway.
 typealias AgentFileDelegation = (_ path: String) async -> DispatchedToolResult
 
+/// One stop of a code tour: highlight a line range in the editor pane and
+/// send the pet to stand in front of it. Answers only once the pet has
+/// arrived, which is what keeps a tour's stops in order -- the model cannot
+/// start the next one until this one has actually happened.
+typealias AgentCodeTourStop = (
+    _ path: String, _ startLine: Int, _ endLine: Int, _ caption: String
+) async -> DispatchedToolResult
+
 /// Lists the active workspace's project files. Takes no path -- which project
 /// is a property of the run, not something the model chooses.
 typealias AgentFileListing = () async -> DispatchedToolResult
@@ -102,6 +110,9 @@ final class AgentRunner {
     /// and a model that can read a file but not find one is the situation this
     /// was added to fix.
     private let delegateListFiles: AgentFileListing?
+    /// Offered on the same terms as read_file: a tour is only possible where
+    /// there is a project bound and an editor pane to show it in.
+    private let delegateShowCode: AgentCodeTourStop?
     /// protocol section 7's `src: "agent"` lines. Without them a failed call
     /// is an opaque uuid in pet-app's log with no tool name and no reason.
     private let logger: ToolExecutionLogging?
@@ -220,6 +231,7 @@ final class AgentRunner {
         delegateReadFile: AgentFileDelegation? = nil,
         delegateOpenInEditor: AgentFileDelegation? = nil,
         delegateListFiles: AgentFileListing? = nil,
+        delegateShowCode: AgentCodeTourStop? = nil,
         logger: ToolExecutionLogging? = nil
     ) {
         self.logger = logger
@@ -232,12 +244,14 @@ final class AgentRunner {
         self.delegateReadFile = delegateReadFile
         self.delegateOpenInEditor = delegateOpenInEditor
         self.delegateListFiles = delegateListFiles
+        self.delegateShowCode = delegateShowCode
         toolSpecs = Self.petToolSpecs
             + (delegateCodeEditor == nil ? [] : [Self.codeEditorSpec])
             + (self.openTaskSession == nil ? [] : [Self.openTaskSessionSpec])
             + (delegateReadFile == nil ? [] : [Self.readFileSpec])
             + (delegateOpenInEditor == nil ? [] : [Self.openInEditorSpec])
             + (delegateListFiles == nil ? [] : [Self.listFilesSpec])
+            + (delegateShowCode == nil ? [] : [Self.showCodeSpec])
     }
 
     /// Forgets every chat. Nothing in the app calls this -- chats are kept
@@ -615,6 +629,21 @@ final class AgentRunner {
                 return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "path가 비어 있어요.")            }
             return await delegateOpenInEditor(path)
         }
+        if name == Self.showCodeToolName, let delegateShowCode {
+            guard
+                case .object(let args) = arguments,
+                let path = Self.pathArgument(from: arguments),
+                case .number(let start)? = args["start_line"],
+                case .number(let end)? = args["end_line"],
+                case .string(let caption)? = args["caption"]
+            else {
+                return DispatchedToolResult(
+                    ok: false, data: nil, error: "execution_failed",
+                    detail: "show_code는 path, start_line, end_line, caption이 모두 필요해요."
+                )
+            }
+            return await delegateShowCode(path, Int(start), Int(end), caption)
+        }
         if name == Self.listFilesToolName, let delegateListFiles {
             // No arguments to validate: which project is a property of the
             // run, not something the model picks.
@@ -720,6 +749,14 @@ final class AgentRunner {
         parameters: ToolRegistry.tool(named: listFilesToolName)?.parameters ?? []
     )
 
+    static let showCodeToolName = "show_code"
+
+    private static let showCodeSpec: GPTToolSpec = GPTToolSpec(
+        name: showCodeToolName,
+        description: description(for: showCodeToolName),
+        parameters: ToolRegistry.tool(named: showCodeToolName)?.parameters ?? []
+    )
+
     private static let openInEditorSpec: GPTToolSpec = GPTToolSpec(
         name: openInEditorToolName,
         description: description(for: openInEditorToolName),
@@ -802,6 +839,16 @@ final class AgentRunner {
             the file's contents to you -- call read_file first if you need to know what's in it. Use \
             this when the user asks to see or work on a specific file, not as a way to read it yourself.
             """
+        case showCodeToolName:
+            return """
+            Show the user a specific range of lines: the editor highlights them and the pet walks \
+            over and points at the pane while saying `caption`. Call it once per stop of a \
+            walkthrough, in reading order, and explain that stop in your reply right after. \
+            `path` is relative to the project root and `start_line`/`end_line` are 1-indexed. \
+            `caption` is ONE short line in the user's language for the pet to say out loud -- the \
+            real explanation goes in your reply, not in the caption. It returns only once the pet \
+            has arrived, so call the next stop only after this one answers.
+            """
         default:
             return tool
         }
@@ -831,6 +878,9 @@ final class AgentRunner {
       read-only and costs no approval. Use open_in_editor, if you have it, when the user should see \
       or edit the file themselves instead of just being told what's in it. Neither edits a file; \
       code_editor is the only tool that changes one.
+    - If you have show_code, use it when the user asks you to explain, review or walk through \
+      code: one call per place worth looking at, then your explanation of that place. Reading a \
+      file to answer a plain question does not need it.
     - When a tool fails with permission_denied, tell the user which permission to grant in System \
       Settings. When it fails with pet_app_disconnected, tell them the pet app isn't running.
     - Never claim you did something a tool did not actually report success for.

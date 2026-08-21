@@ -134,6 +134,16 @@ enum ToolRegistry {
         Tool(name: "open_in_editor", executor: .delegated, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
         ]),
+        // One stop of a pet-guided code tour (2026-08-21): highlight the
+        // lines, walk the pet to the pane, say one line about them. Delegated
+        // for the same reason read_file is -- it answers from the client
+        // window's own editor pane, which pet-app's executor cannot reach.
+        Tool(name: "show_code", executor: .delegated, approval: .notRequired, parameters: [
+            Parameter(name: "path", type: .string, isRequired: true),
+            Parameter(name: "start_line", type: .number, isRequired: true),
+            Parameter(name: "end_line", type: .number, isRequired: true),
+            Parameter(name: "caption", type: .string, isRequired: true),
+        ]),
         Tool(name: "read_file", executor: .delegated, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
         ]),

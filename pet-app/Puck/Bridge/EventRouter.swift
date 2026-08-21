@@ -128,7 +128,11 @@ enum EventRouter {
             // Speech and nothing else. A code tour's stop has already put the
             // pet where it wants it (point_at), so a state transition here
             // would undo the pointing the caption is describing.
-            return EventReaction(bubbleText: text.isEmpty ? nil : text)
+            //
+            // Through the same shortener agent_done's summary goes through:
+            // the bubble is one line beside a 100px character either way, and
+            // a caption is only as short as the model felt like being.
+            return EventReaction(bubbleText: bubbleSummary(from: text))
         }
     }
 

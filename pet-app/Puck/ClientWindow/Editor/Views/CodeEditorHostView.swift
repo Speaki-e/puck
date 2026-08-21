@@ -25,10 +25,6 @@ struct CodeEditorHostView: View {
 
     @State private var state = SourceEditorState()
     @State private var revealCoordinator = EditorRevealCoordinator()
-    /// The revealed lines, in the text view's coordinates. Turned into a band
-    /// on screen by subtracting the current scroll offset, so it follows the
-    /// pane as the user scrolls away from it and back.
-    @State private var highlightSpan: ClosedRange<CGFloat>?
     @Environment(\.clientPalette) private var palette
 
     var body: some View {
@@ -46,39 +42,13 @@ struct CodeEditorHostView: View {
             state: $state,
             coordinators: [revealCoordinator]
         )
-        .overlay(alignment: .topLeading) { highlightBand }
-        .clipped()
         // task(id:), not onChange: a tour usually reveals a file that was
         // not open, so this view is created *because* of the request and
         // there is no change for onChange to see.
         .task(id: reveal?.token) {
             guard let reveal, reveal.path == path else { return }
             revealCoordinator.onScrollTarget = { state.scrollPosition = $0 }
-            revealCoordinator.onHighlightSpan = { highlightSpan = $0 }
             revealCoordinator.reveal(lines: reveal.lines)
-        }
-    }
-
-    /// The band over the lines a tour stop is talking about, in the Mac's own
-    /// accent colour -- the same "look here" the rest of the system uses.
-    ///
-    /// Drawn here rather than by the editor because neither thing the editor
-    /// offers works for this: see EditorRevealCoordinator.onHighlightSpan.
-    /// Translucent, and never taking the mouse, because the code underneath
-    /// still has to be readable and clickable.
-    @ViewBuilder
-    private var highlightBand: some View {
-        if let highlightSpan, let scrollY = state.scrollPosition?.y {
-            let accent = Color(nsColor: .controlAccentColor)
-            RoundedRectangle(cornerRadius: 4)
-                .fill(accent.opacity(0.18))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(accent.opacity(0.9), lineWidth: 1.5)
-                )
-                .frame(height: highlightSpan.upperBound - highlightSpan.lowerBound)
-                .offset(y: highlightSpan.lowerBound - scrollY)
-                .allowsHitTesting(false)
         }
     }
 

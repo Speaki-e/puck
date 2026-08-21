@@ -14,22 +14,27 @@
 //  its own, so it's fully testable without RealityKit/AppKit.
 
 import CoreGraphics
+import Foundation
 
 final class PendingPointTracker {
-    private var pending: (frame: CGRect, onStarted: () -> Void)?
+    private var pending: (frame: CGRect, holdSeconds: TimeInterval?, onStarted: () -> Void)?
 
     /// Registers a new pending point_at, returning the previous one's
     /// callback (if any) so the caller can invoke it -- it was superseded,
     /// not failed, but still needs a reply.
-    func replace(frame: CGRect, onStarted: @escaping () -> Void) -> (() -> Void)? {
+    ///
+    /// - Parameter holdSeconds: how long this request wants the pointing held
+    ///   for, carried here rather than on the delegate so a request that is
+    ///   superseded mid-walk takes its own hold with it.
+    func replace(frame: CGRect, holdSeconds: TimeInterval? = nil, onStarted: @escaping () -> Void) -> (() -> Void)? {
         let superseded = pending?.onStarted
-        pending = (frame, onStarted)
+        pending = (frame, holdSeconds, onStarted)
         return superseded
     }
 
     /// Called once Point actually starts. Returns the pending frame/callback
     /// and clears state, or nil if nothing is pending.
-    func consumeIfPending() -> (frame: CGRect, onStarted: () -> Void)? {
+    func consumeIfPending() -> (frame: CGRect, holdSeconds: TimeInterval?, onStarted: () -> Void)? {
         defer { pending = nil }
         return pending
     }

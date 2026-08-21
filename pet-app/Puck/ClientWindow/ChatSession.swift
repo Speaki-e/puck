@@ -273,6 +273,12 @@ final class ChatSession: ObservableObject, Identifiable {
             // so no answer is silently dropped here.
             pendingApprovals.removeAll()
             timeline.append(.done(id: UUID(), ok: ok, summary: summary))
+
+        case .petSays:
+            // The pet's speech bubble only. The caption is a shortened echo of
+            // what the model is already saying in text_chunk, so putting it in
+            // the timeline too would print every tour stop twice.
+            break
         }
     }
 

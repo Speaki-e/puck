@@ -16,7 +16,7 @@ extension AppDelegate {
     /// point_at: walk to the target, then point at it. The tool only learns
     /// the pet arrived when Point is actually entered, which is what protocol
     /// section 4 promises the agent.
-    func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void) {
+    func pointAt(frame: CGRect, holdSeconds: TimeInterval? = nil, onPointingStarted: @escaping () -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self, let controller = self.characterController else {
                 onPointingStarted() // nothing can point; don't strand the caller
@@ -28,8 +28,19 @@ extension AppDelegate {
             // caller was still waiting on onPointingStarted, which would
             // otherwise be silently dropped and hang until ToolExecutor's
             // 15s timeout instead of getting a reply now.
-            if let superseded = self.pendingPointTracker.replace(frame: frame, onStarted: onPointingStarted) {
+            if let superseded = self.pendingPointTracker.replace(frame: frame, holdSeconds: holdSeconds, onStarted: onPointingStarted) {
                 superseded()
+            }
+
+            // A hold this long means a guided tour is running (show_code),
+            // and the pet's normal 90 px/s takes ~17s to cross a wide display
+            // -- most of the first stop would be spent watching it walk.
+            // Sped up rather than teleported: the pet going there is the
+            // feature, so removing the walk removes it.
+            if holdSeconds != nil {
+                self.characterController?.walkSpeed = MovementSolver.walkSpeed
+                    * self.settingsStore.walkSpeedMultiplier
+                    * Self.tourWalkSpeedMultiplier
             }
 
             // Stand beside the target rather than on top of it, so the
@@ -53,12 +64,40 @@ extension AppDelegate {
 
     /// Called by PointState once the pet is in place and the point clip is up.
     func beginPointingTimer() {
-        guard let (frame, onStarted) = pendingPointTracker.consumeIfPending() else { return }
+        guard let (frame, holdSeconds, onStarted) = pendingPointTracker.consumeIfPending() else { return }
 
         pointingController.onPointingReleased = { [weak self] in
             self?.characterController?.transition(to: .idle)
         }
-        pointingController.beginPointing(targetFrame: frame)
+        pointingController.beginPointing(
+            targetFrame: frame,
+            timeout: holdSeconds ?? PointingController.defaultTimeout
+        )
         onStarted()
     }
+
+    /// The run that asked for the pointing is over, so there is nothing left
+    /// to point at -- without this a tour's last stop, which asked to be held
+    /// until the next instruction, would stand there for its full backstop
+    /// (PointAtHandler.maximumHoldSeconds) after the pet had already said its
+    /// piece.
+    ///
+    /// Only the holding half: a point_at still walking to its target keeps
+    /// going, because its caller has not been replied to yet and dropping it
+    /// here would hang that dispatch until ToolExecutor's timeout.
+    func releasePointingForFinishedRun() {
+        pointingController.releaseIfActive()
+        restoreWalkSpeed()
+    }
+
+    /// Back to whatever Settings' movement slider says. Called on agent_done
+    /// rather than at the end of each stop: a tour is several point_at calls
+    /// and the walk between them should stay quick throughout.
+    func restoreWalkSpeed() {
+        characterController?.walkSpeed = MovementSolver.walkSpeed * settingsStore.walkSpeedMultiplier
+    }
+
+    /// Fast enough that the one walk a tour actually makes lands in a few
+    /// seconds, slow enough to still read as walking.
+    static let tourWalkSpeedMultiplier: CGFloat = 3
 }

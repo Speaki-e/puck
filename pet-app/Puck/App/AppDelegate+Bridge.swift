@@ -78,6 +78,12 @@ extension AppDelegate {
     }
 
     func applyEventReaction(_ reaction: EventReaction) {
+        // First, so the state transition below (if any) is the last word on
+        // where the pet ends up rather than being undone by the release's own
+        // hop back to idle.
+        if reaction.runFinished {
+            releasePointingForFinishedRun()
+        }
         if let kind = reaction.stateTransition {
             characterController?.transition(to: kind)
         }

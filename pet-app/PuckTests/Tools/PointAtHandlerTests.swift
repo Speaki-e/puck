@@ -14,11 +14,13 @@ import CoreGraphics
 
 private final class SpyPointingCoordinator: PetPointingCoordinating {
     private(set) var requestedFrames: [CGRect] = []
+    private(set) var requestedHolds: [TimeInterval?] = []
     private(set) var cancelCount = 0
     private var pending: (() -> Void)?
 
-    func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void) {
+    func pointAt(frame: CGRect, holdSeconds: TimeInterval?, onPointingStarted: @escaping () -> Void) {
         requestedFrames.append(frame)
+        requestedHolds.append(holdSeconds)
         pending = onPointingStarted
     }
 
@@ -134,5 +136,42 @@ final class PointAtHandlerTests: XCTestCase {
         handler.cancel(id: "never-dispatched")
 
         XCTAssertEqual(coordinator.cancelCount, 0)
+    }
+
+    /// A tour stop holds until the next stop; a plain point_at keeps the 8s
+    /// default so nothing that already calls it changes.
+    func test_holdSeconds_isPassedThroughWhenGiven() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+        let args = JSONValue.object([
+            "frame": .object([
+                "x": .number(100), "y": .number(200), "width": .number(50), "height": .number(20),
+            ]),
+            "hold_seconds": .number(45),
+        ])
+
+        handler.execute(id: "t", args: args) { _ in }
+
+        XCTAssertEqual(coordinator.requestedHolds, [45])
+    }
+
+    func test_holdSeconds_omitted_leavesTheDefault() {
+        let coordinator = SpyPointingCoordinator()
+        let handler = PointAtHandler(coordinator: coordinator)
+
+        handler.execute(id: "t", args: frameArgs) { _ in }
+
+        XCTAssertEqual(coordinator.requestedHolds, [nil])
+    }
+
+    /// The cap exists so a run that never reports finishing cannot leave the
+    /// pet pointing for the rest of the session.
+    func test_holdSeconds_isCappedAndGarbageFallsBackToTheDefault() {
+        XCTAssertEqual(
+            PointAtHandler.holdSeconds(from: .object(["hold_seconds": .number(9999)])),
+            PointAtHandler.maximumHoldSeconds
+        )
+        XCTAssertNil(PointAtHandler.holdSeconds(from: .object(["hold_seconds": .number(-1)])))
+        XCTAssertNil(PointAtHandler.holdSeconds(from: .object(["hold_seconds": .number(.infinity)])))
     }
 }

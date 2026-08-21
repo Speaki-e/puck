@@ -63,6 +63,11 @@ struct EventReaction: Equatable {
     var jump: Bool = false
     var bubbleText: String?
     var emotion: String?
+    /// The run this event belongs to has ended, whether it succeeded or not.
+    /// The pet holds things on a run's behalf -- a point_at with a long
+    /// `hold_seconds`, the tour's raised walking speed -- and this is when it
+    /// lets go of them.
+    var runFinished: Bool = false
 }
 
 enum EventRouter {
@@ -110,8 +115,20 @@ enum EventRouter {
             // Only agent_done(ok=true) is specified; a failed run is already
             // signaled via toolResult(ok=false).
             return ok
-                ? EventReaction(sfxKey: "task_success", jump: true, bubbleText: bubbleSummary(from: summary), emotion: "happy")
-                : EventReaction()
+                ? EventReaction(
+                    sfxKey: "task_success",
+                    jump: true,
+                    bubbleText: bubbleSummary(from: summary),
+                    emotion: "happy",
+                    runFinished: true
+                )
+                : EventReaction(runFinished: true)
+
+        case .petSays(let text):
+            // Speech and nothing else. A code tour's stop has already put the
+            // pet where it wants it (point_at), so a state transition here
+            // would undo the pointing the caption is describing.
+            return EventReaction(bubbleText: text.isEmpty ? nil : text)
         }
     }
 

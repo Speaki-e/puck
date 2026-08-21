@@ -71,6 +71,11 @@ enum BridgeEvent: Equatable {
     case toolResult(id: String, ok: Bool, data: JSONValue?, error: ToolErrorCode?, detail: String?)
     case awaitApproval(summary: String, approvalId: String)
     case agentDone(ok: Bool, summary: String)
+    /// One line for the pet to say out of its own speech bubble, with no
+    /// state change attached (2026-08-21, show_code). Distinct from
+    /// agentDone's summary, which also ends the run: a code tour speaks at
+    /// every stop while the run is still going.
+    case petSays(text: String)
 }
 
 /// An image attached to a user_input (e.g. pet-app's F14 drag capture).
@@ -199,6 +204,7 @@ extension BridgeMessage: Codable {
         case toolResult = "tool_result"
         case awaitApproval = "await_approval"
         case agentDone = "agent_done"
+        case petSays = "pet_says"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -278,6 +284,8 @@ extension BridgeMessage: Codable {
                     ok: try container.decode(Bool.self, forKey: .ok),
                     summary: try container.decode(String.self, forKey: .summary)
                 )
+            case .petSays:
+                event = .petSays(text: try container.decode(String.self, forKey: .text))
             }
             self = .event(event, workspaceId: workspaceId, sessionId: sessionId)
 
@@ -378,6 +386,9 @@ extension BridgeMessage: Codable {
                 try container.encode(EventKey.agentDone, forKey: .event)
                 try container.encode(ok, forKey: .ok)
                 try container.encode(summary, forKey: .summary)
+            case .petSays(let text):
+                try container.encode(EventKey.petSays, forKey: .event)
+                try container.encode(text, forKey: .text)
             }
 
         case .userInput(let input):

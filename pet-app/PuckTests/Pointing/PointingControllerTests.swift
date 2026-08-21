@@ -85,4 +85,33 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertEqual(releaseCount, 1)
         XCTAssertEqual(clickDetector.stopCallCount, 1)
     }
+
+    /// A tour holds for a long time on purpose, so the run ending has to let
+    /// go -- otherwise the pet stands pointing at code nobody is discussing.
+    func test_releaseIfActive_stopsAnActiveHoldEarly() {
+        let clickDetector = FakeClickDetector()
+        let controller = PointingController(clickDetector: clickDetector)
+        var released = false
+        controller.onPointingReleased = { released = true }
+
+        controller.beginPointing(targetFrame: .zero, timeout: 60)
+        controller.releaseIfActive()
+
+        XCTAssertTrue(released)
+        XCTAssertEqual(clickDetector.stopCallCount, 1)
+    }
+
+    /// agent_done arrives whether or not the run pointed at anything, so the
+    /// caller must not have to check first.
+    func test_releaseIfActive_whenNothingIsPointing_isANoOp() {
+        let clickDetector = FakeClickDetector()
+        let controller = PointingController(clickDetector: clickDetector)
+        var releaseCount = 0
+        controller.onPointingReleased = { releaseCount += 1 }
+
+        controller.releaseIfActive()
+
+        XCTAssertEqual(releaseCount, 0)
+        XCTAssertEqual(clickDetector.stopCallCount, 0)
+    }
 }

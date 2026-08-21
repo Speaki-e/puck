@@ -18,8 +18,13 @@ import Foundation
 /// bootstrap, where the character controller and pointing timer both live.
 protocol PetPointingCoordinating: AnyObject {
     /// Walks the pet to `frame` and starts pointing at it.
+    /// - Parameter holdSeconds: how long to keep pointing once it starts.
+    ///   nil means PointingController's own default (8s), which is what every
+    ///   caller before the code tour wanted -- "point once and go back to
+    ///   idle". A tour stop passes a longer hold because the model is still
+    ///   explaining while the pet stands there.
     /// - Parameter onPointingStarted: called when Point actually begins.
-    func pointAt(frame: CGRect, onPointingStarted: @escaping () -> Void)
+    func pointAt(frame: CGRect, holdSeconds: TimeInterval?, onPointingStarted: @escaping () -> Void)
 
     /// Abandons the in-flight point_at (tool_cancel or ToolExecutor's
     /// timeout) -- without this the pet kept walking/pointing on the
@@ -51,11 +56,27 @@ final class PointAtHandler: ToolHandler {
         }
 
         stateQueue.sync { activeID = id }
-        coordinator.pointAt(frame: frame) { [weak self] in
+        coordinator.pointAt(frame: frame, holdSeconds: Self.holdSeconds(from: args)) { [weak self] in
             self?.stateQueue.sync { if self?.activeID == id { self?.activeID = nil } }
             completion(.success(nil))
         }
     }
+
+    /// `hold_seconds`, the optional argument a code tour uses to keep the pet
+    /// pointing until its next stop. Absent, zero-or-negative and non-finite
+    /// all mean "use the default" rather than failing the call: the pointing
+    /// is the useful part, and refusing it over a malformed hint would lose
+    /// that for no gain.
+    static func holdSeconds(from args: JSONValue) -> TimeInterval? {
+        guard case .object(let fields) = args, case .number(let seconds)? = fields["hold_seconds"] else { return nil }
+        guard seconds.isFinite, seconds > 0 else { return nil }
+        return min(seconds, maximumHoldSeconds)
+    }
+
+    /// The backstop for a run that never says it finished: a tour stop is
+    /// normally released by the next point_at or by agent_done, and this only
+    /// applies when both of those fail to arrive.
+    static let maximumHoldSeconds: TimeInterval = 60
 
     func cancel(id: String) {
         let isCurrent = stateQueue.sync {

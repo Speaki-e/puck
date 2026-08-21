@@ -54,6 +54,13 @@ final class PointingController {
         }
     }
 
+    /// Ends the hold early. A no-op when nothing is being pointed at, so the
+    /// caller (agent_done, which arrives whether or not the run pointed at
+    /// anything) does not have to know.
+    func releaseIfActive() {
+        release()
+    }
+
     private func release() {
         guard isActive else { return }
         isActive = false

@@ -104,8 +104,12 @@ enum ToolRegistry {
             Parameter(name: "role", type: .string, isRequired: false),
             Parameter(name: "title_contains", type: .string, isRequired: false),
         ]),
+        // hold_seconds (2026-08-21) is optional and omitted means the usual
+        // 8s: a code tour keeps the pet pointing until its next stop, but a
+        // one-off "it's over there" still wants to point and go.
         Tool(name: "point_at", executor: .petApp, approval: .notRequired, parameters: [
             Parameter(name: "frame", type: .object, isRequired: true),
+            Parameter(name: "hold_seconds", type: .number, isRequired: false),
         ]),
         Tool(name: "click_element", executor: .petApp, approval: .required, parameters: [
             Parameter(name: "frame", type: .object, isRequired: true),

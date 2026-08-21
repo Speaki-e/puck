@@ -89,7 +89,13 @@ final class EventRouterTests: XCTestCase {
         let reaction = EventRouter.reaction(for: .agentDone(ok: true, summary: "3 tests passed"))
         XCTAssertEqual(
             reaction,
-            EventReaction(sfxKey: "task_success", jump: true, bubbleText: "3 tests passed", emotion: "happy")
+            EventReaction(
+                sfxKey: "task_success",
+                jump: true,
+                bubbleText: "3 tests passed",
+                emotion: "happy",
+                runFinished: true
+            )
         )
     }
 
@@ -118,10 +124,30 @@ final class EventRouterTests: XCTestCase {
         XCTAssertEqual(EventRouter.bubbleSummary(from: "Safari 켰어요!"), "Safari 켰어요!")
     }
 
-    func test_agentDone_failure_isNoOp() {
+    func test_agentDone_failure_isSilentButStillEndsTheRun() {
         // Not specified in the reaction table — only agent_done(ok=true) is; toolResult(ok=false)
-        // already covers the failure-signaling case.
+        // already covers the failure-signaling case. runFinished is not a
+        // reaction the user sees: it is what makes the pet let go of a long
+        // point_at hold, and a failed run has to let go too.
         let reaction = EventRouter.reaction(for: .agentDone(ok: false, summary: "failed"))
-        XCTAssertEqual(reaction, EventReaction())
+        XCTAssertEqual(reaction, EventReaction(runFinished: true))
+    }
+
+    /// text_chunk is chat-only; a tour stop needs the pet itself to say a
+    /// line while it points.
+    func test_petSays_becomesABubble() {
+        let reaction = EventRouter.reaction(for: .petSays(text: "여기가 진입점이에요"))
+
+        XCTAssertEqual(reaction.bubbleText, "여기가 진입점이에요")
+    }
+
+    /// Speech and nothing else: the stop's point_at has already put the pet
+    /// where it wants it, and a transition here would undo the pointing.
+    func test_petSays_doesNotMoveThePet() {
+        let reaction = EventRouter.reaction(for: .petSays(text: "여기예요"))
+
+        XCTAssertNil(reaction.stateTransition)
+        XCTAssertFalse(reaction.jump)
+        XCTAssertFalse(reaction.runFinished)
     }
 }

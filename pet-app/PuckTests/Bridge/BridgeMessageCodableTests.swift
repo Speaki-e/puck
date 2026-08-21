@@ -257,4 +257,13 @@ final class BridgeMessageCodableTests: XCTestCase {
 
         XCTAssertThrowsError(try decoder.decode(BridgeMessage.self, from: Data(json.utf8)))
     }
+
+    func test_petSays_roundTrips() throws {
+        let message = BridgeMessage.event(.petSays(text: "여기예요"), workspaceId: "w", sessionId: "s")
+
+        let data = try JSONEncoder().encode(message)
+        let decoded = try JSONDecoder().decode(BridgeMessage.self, from: data)
+
+        XCTAssertEqual(decoded, message)
+    }
 }

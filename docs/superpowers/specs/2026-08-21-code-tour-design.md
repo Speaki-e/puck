@@ -134,6 +134,50 @@ case petSays(text: String)   // BridgeEvent
 캡션은 160자에서 자른다. `AgentRunner`가 DoneRow 캡션에 쓰는 상한과 같다.
 긴 문장은 채팅에 있고 말풍선은 한 줄이다.
 
+### 5-6. 속도 — 빨리 가서, 오래 머문다
+
+투어에서 느린 지점은 하나가 아니라 **두 개가 반대 방향**이다.
+
+| | 현재 | 문제 |
+|---|---|---|
+| 걷기 | `MovementSolver.walkSpeed` = 90 px/s | 1500px 화면을 가로지르면 약 17초. 도착이 너무 느리다 |
+| 포인팅 유지 | `PointingController.defaultTimeout` = 8초 | 모델이 아직 설명 중인데 펫이 idle로 돌아가 배회를 시작한다 |
+
+**걷기는 투어 동안 3배**(270 px/s)로 올리고 투어가 끝나면 복원한다.
+`CharacterController.walkSpeed`가 이미 `var`라 조정 지점이 있다. 순간이동은 쓰지
+않는다 — "펫이 이동해서"가 이 기능의 핵심이고, 이동을 없애면 기능이 사라진다.
+
+같은 패인을 가리키는 연속 지점은 **애초에 다시 걷지 않는다**. 좌표가 패인 단위라
+2번째 이후 지점은 하이라이트와 캡션만 바뀐다. 즉 투어 전체에서 걷기는 사실상
+한 번뿐이고, 3배는 그 한 번을 6초 아래로 줄이기 위한 것이다.
+
+**포인팅은 다음 지점이나 런 종료까지 유지한다.** `point_at`의 8초는 "한 번
+가리키고 끝"에 맞춘 값이고, 투어는 "다음 지시까지 유지"가 맞다. 구현은
+`point_at` args에 선택적 `hold_seconds`를 더한다 — `PointAtHandler`가 이미
+`beginPointing(targetFrame:timeout:)`으로 넘기고 있어 값만 다르게 주면 되고,
+인자를 안 주면 기존 8초라 하위 호환이 깨지지 않는다.
+
+해제는 세 경로다:
+
+- 다음 `point_at`이 대체 — 기존 `pendingPointTracker.replace`가 처리
+- `agent_done` 수신 시 진행 중인 포인팅 해제 — 런이 끝났으면 가리킬 이유가 없다
+- **60초 상한** — 모델이 마무리를 안 하고 끝나도 펫이 영원히 서 있지 않게 하는
+  안전망. 위 두 경로가 정상 종료고, 이건 그것들이 다 실패했을 때만 걸린다
+
+### 5-7. 말풍선이 펫을 따라간다 (기존 결함)
+
+`anchorBubbleToPet`은 **띄울 때 한 번만** 호출되고 프레임 루프는 말풍선을 갱신하지
+않는다. 펫이 걸어가면 말풍선은 그 자리에 남는다. 투어만의 문제가 아니라 기존
+알림(에이전트 요약, 음소거 투정, 권한 안내) 전부가 그렇다.
+
+프레임 루프가 이미 매 프레임 펫 위치로 `clickThroughController.updateCharacter`를
+갱신하므로, 같은 자리에서 말풍선도 재배치한다.
+
+**speech 모드일 때만 따라간다.** 입력 말풍선은 사용자가 타이핑 중이고 화면
+하단 중앙에 고정돼 있으며 `wasMovedByUser`까지 존중한다 — 그것이 펫을 따라다니면
+쓸 수 없게 된다. `showSpeech()`가 `showAndActivate()`와 별도 메서드라 모드 구분은
+이미 가능하다.
+
 ## 6. 실패 처리
 
 **원칙: 부분 실패는 투어를 죽이지 않는다.** `AppDelegate+Bridge`의 "Independence
@@ -167,6 +211,10 @@ set up"의 거울상이다. 펫이 못 와도 하이라이트와 채팅 설명�
 - `EventRouter` — `petSays` → `bubbleText` 매핑
 - `BridgeMessageCodableTests` — `pet_says` 왕복 인코딩 (기존 파일에 추가)
 - `GlobalScreenSpace` — 변환 테스트가 이미 있다
+- `PointAtHandler` — `hold_seconds`가 `beginPointing`의 timeout으로 넘어가는지,
+  없으면 기존 8초로 남는지 (하위 호환)
+- 말풍선 추적 — speech 모드에서는 펫 위치를 따라 재배치하고, 입력 모드에서는
+  움직이지 않는지. 위치 계산은 `anchorBubbleToPet`의 순수 부분을 분리해 검증한다
 
 유닛 테스트로 불가능한 것: 펫이 실제로 걸어가 그 자리를 가리키는지. 살아있는 두
 앱과 화면이 필요하다. `docs/verification.md`에 수동 검증 행을 추가한다 — 이

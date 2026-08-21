@@ -14,6 +14,12 @@
 import SwiftUI
 
 struct ChatSidebarView: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     @ObservedObject var store: ClientWindowStore
     /// Presented by the new-workspace button; the folder picker itself is
     /// AppKit's, since SwiftUI has no directory-choosing equivalent.
@@ -103,6 +109,12 @@ struct SessionSelection: Hashable {
 }
 
 private struct WorkspaceHeader: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     let workspace: ClientWorkspace
 
     // No new-chat button here. It lived in this header so it could name its
@@ -136,6 +148,12 @@ private struct WorkspaceHeader: View {
 }
 
 private struct ChatSessionRow: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     @ObservedObject var session: ChatSession
     @Environment(\.clientPalette) private var palette
 

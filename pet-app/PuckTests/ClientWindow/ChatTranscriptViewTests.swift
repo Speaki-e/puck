@@ -29,7 +29,7 @@ final class ChatTranscriptViewTests: XCTestCase {
     }
 
     func test_aFailedCallWithNothingAtAll_stillSaysSomething() {
-        XCTAssertEqual(toolFailureLine(ok: false, error: nil, detail: nil), "실패했어요.")
+        XCTAssertEqual(toolFailureLine(ok: false, error: nil, detail: nil), Strings.text(.chatFailed))
     }
 
     func test_aSucceededOrPendingCall_showsNoFailureLine() {

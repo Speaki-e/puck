@@ -14,6 +14,12 @@
 import SwiftUI
 
 struct ChatPaneView: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     @ObservedObject var store: ClientWindowStore
     /// Where the editor is showing, owned by ClientWindowView -- the toggle
     /// lives in this view's toolbar but the split is its parent's.
@@ -153,6 +159,12 @@ private struct ControlGlyph: View {
 /// keeps the stock focus ring and text behaviours, which a custom NSTextView
 /// wrapper would have to reproduce.
 struct ChatInputBar: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     let isRunning: Bool
     let onSend: (String) -> Void
     let onCancel: () -> Void
@@ -229,6 +241,12 @@ struct ChatInputBar: View {
 /// has no directory picker, and the panel is what the web version reached
 /// through the bridge to get anyway.
 struct NewWorkspaceSheet: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     @ObservedObject var store: ClientWindowStore
     @Environment(\.dismiss) private var dismiss
 

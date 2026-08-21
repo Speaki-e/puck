@@ -89,7 +89,7 @@ final class ListFilesToolTests: XCTestCase {
         let result = await makeDelegate(projectPath: nil).listFiles(workspaceId: "w1")
 
         XCTAssertFalse(result.ok)
-        XCTAssertEqual(result.detail, "이 워크스페이스에는 연결된 프로젝트가 없어요.")
+        XCTAssertEqual(result.detail, Strings.text(.toolNoProjectLinked))
     }
 
     @MainActor

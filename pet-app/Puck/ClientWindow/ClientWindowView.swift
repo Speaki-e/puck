@@ -27,9 +27,13 @@ import SwiftUI
 
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
-    /// Watched here rather than in each view that reads `Strings`: this is
-    /// the window's root, so one observer redraws the whole hierarchy when
-    /// the language changes.
+    /// Redraws this view when the UI language changes.
+    ///
+    /// One observer at the root is not enough, which is worth stating because
+    /// it looks like it should be: SwiftUI skips re-running a child whose own
+    /// inputs are unchanged, and a `Strings` lookup inside `body` is not an
+    /// input. Every view that resolves a string carries this property for
+    /// that reason.
     @ObservedObject private var localization = Localization.shared
     @State private var editor: EditorPresentation = .hidden
 

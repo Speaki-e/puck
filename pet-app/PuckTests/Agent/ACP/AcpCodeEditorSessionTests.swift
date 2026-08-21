@@ -118,7 +118,7 @@ final class AcpCodeEditorSessionTests: XCTestCase {
 
         let result = await session.run(task: "go")
 
-        XCTAssertEqual(result.summary, "ACP 작업 완료 (max_tokens)")
+        XCTAssertEqual(result.summary, String(format: Strings.text(.acpTaskDoneFormat), "max_tokens"))
     }
 
     func testAMalformedLineIsSkippedRatherThanEndingTheRun() async {

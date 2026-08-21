@@ -13,6 +13,12 @@
 import SwiftUI
 
 struct ChatTranscriptView: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     @ObservedObject var session: ChatSession
     let onApproval: (Bool) -> Void
 
@@ -292,6 +298,12 @@ private struct ToolCallRow: View {
 }
 
 private struct ApprovalBanner: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     let summary: String
     let state: ApprovalState
     let onApproval: (Bool) -> Void
@@ -323,6 +335,12 @@ private struct ApprovalBanner: View {
 }
 
 private struct DoneRow: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     let ok: Bool
     let summary: String
 
@@ -347,6 +365,12 @@ private struct DoneRow: View {
 /// EmptyTranscript, which the native rewrite dropped -- a new chat opened onto
 /// a blank rectangle with no indication it was ready for input.
 private struct EmptyTranscript: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     var body: some View {
         VStack(spacing: 4) {
             Text(Strings.text(.chatEmptyTitle))
@@ -360,6 +384,12 @@ private struct EmptyTranscript: View {
 }
 
 private struct RunningStatusLine: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     var body: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)

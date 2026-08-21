@@ -433,7 +433,7 @@ final class AgentRunnerTests: XCTestCase {
         guard case .agentDone(_, let summary)? = events.last else {
             return XCTFail("a failed run must still finish")
         }
-        XCTAssertEqual(summary, "API 키가 올바르지 않아요. 설정(⌘,)에서 키를 확인해 주세요.")
+        XCTAssertEqual(summary, String(format: Strings.text(.agentBadAPIKeyFormat), Strings.text(.agentSettingsHint)))
         XCTAssertFalse(summary.contains("invalid_request_error"))
         XCTAssertFalse(summary.contains("cp_jUkL5"), "the body quotes the key back; it must not reach the transcript")
         XCTAssertFalse(summary.contains("{"))
@@ -449,7 +449,10 @@ final class AgentRunnerTests: XCTestCase {
     }
 
     func test_failureSummary_missingKeyPointsAtSettings() {
-        XCTAssertEqual(AgentRunner.failureSummary(for: GPTError.notConfigured), "API 키가 없어요. 설정(⌘,)에서 키를 확인해 주세요.")
+        XCTAssertEqual(
+            AgentRunner.failureSummary(for: GPTError.notConfigured),
+            String(format: Strings.text(.agentNoAPIKeyFormat), Strings.text(.agentSettingsHint))
+        )
     }
 
     /// Every other kind of failure keeps its own words -- collapsing them into
@@ -464,7 +467,7 @@ final class AgentRunnerTests: XCTestCase {
         ]
 
         XCTAssertEqual(Set(summaries).count, summaries.count, "each failure kind needs its own text")
-        XCTAssertTrue(summaries[0].contains("모델"))
+        XCTAssertEqual(summaries[0], Strings.text(.agentModelNotFound))
         XCTAssertTrue(summaries[2].contains("503"))
         XCTAssertTrue(summaries[3].contains("no choices[0].message"), "a decoding failure names what failed to decode")
     }
@@ -483,7 +486,7 @@ final class AgentRunnerTests: XCTestCase {
     func test_failureSummary_unmappedStatusWithAnUnreadableBodyFallsBackToTheStatus() {
         let summary = AgentRunner.failureSummary(for: GPTError.http(status: 418, body: "<html>nope</html>"))
 
-        XCTAssertEqual(summary, "API 오류 418가 났어요.")
+        XCTAssertEqual(summary, String(format: Strings.text(.agentAPIErrorFormat), "418"))
         XCTAssertFalse(summary.contains("html"))
     }
 
@@ -590,7 +593,7 @@ final class AgentRunnerTests: XCTestCase {
         )
 
         XCTAssertEqual(asked.value.count, 1)
-        XCTAssertTrue(asked.value.first?.contains("셸 명령 실행") == true)
+        XCTAssertTrue(asked.value.first?.hasPrefix(String(format: Strings.text(.approvalRunShellFormat), "")) == true)
         XCTAssertTrue(events.value.contains { event in
             if case .awaitApproval(_, let approvalId) = event { return approvalId == "c-2" }
             return false

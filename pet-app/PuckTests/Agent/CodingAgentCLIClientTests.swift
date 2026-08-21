@@ -169,7 +169,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         } catch {
             XCTAssertEqual(
                 (error as? LocalizedError)?.errorDescription,
-                "codex CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요."
+                String(format: Strings.text(.acpCLINotFoundFormat), "codex")
             )
         }
     }
@@ -186,7 +186,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         } catch {
             XCTAssertEqual(
                 (error as? LocalizedError)?.errorDescription,
-                "대화에는 Node.js가 필요합니다. 설치 후 다시 시도해 주세요."
+                String(format: Strings.text(.acpNeedsNodeFormat), Strings.text(.cliConversationPurpose))
             )
         }
     }
@@ -574,7 +574,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         } catch {
             XCTAssertEqual(
                 (error as? LocalizedError)?.errorDescription,
-                "codex CLI를 찾을 수 없습니다. 설치한 뒤 다시 시도해 주세요."
+                String(format: Strings.text(.acpCLINotFoundFormat), "codex")
             )
         }
         XCTAssertLessThan(Date().timeIntervalSince(before), 5, "it must fail, not hang")

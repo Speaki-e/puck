@@ -58,6 +58,12 @@ struct EditorPaneView: View {
 }
 
 private struct EditorPaneContentView: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
     @ObservedObject var store: EditorPaneStore
 
     var body: some View {

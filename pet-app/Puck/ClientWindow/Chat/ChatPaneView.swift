@@ -124,6 +124,24 @@ struct ChatPaneView: View {
     }
 }
 
+/// A composer button's icon, drawn at the control height instead of at the
+/// surrounding font's icon size. `Label` sizes a glyph from the font, which
+/// left a 15pt circle beside a 32pt field -- the hit target matched, but the
+/// button read as half the field's size.
+private struct ControlGlyph: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: ChatInputBar.controlHeight, height: ChatInputBar.controlHeight)
+            // The whole square is the target, not just the glyph -- .plain
+            // hit-tests the image's own bounds otherwise.
+            .contentShape(.rect)
+    }
+}
+
 /// The composer. `TextField(axis: .vertical)` grows with its content and
 /// keeps the stock focus ring and text behaviours, which a custom NSTextView
 /// wrapper would have to reproduce.
@@ -169,26 +187,23 @@ struct ChatInputBar: View {
 
             if isRunning {
                 Button(role: .cancel, action: onCancel) {
-                    Label("중지", systemImage: "stop.circle.fill")
-                        .labelStyle(.iconOnly)
-                        .frame(width: Self.controlHeight, height: Self.controlHeight)
-                        // The whole square is the target, not just the glyph --
-                        // .plain hit-tests the label's own bounds otherwise.
-                        .contentShape(.rect)
+                    ControlGlyph(systemName: "stop.circle.fill")
                 }
+                .accessibilityLabel("중지")
                 .help("중지")
             } else {
                 Button(action: send) {
-                    Label("보내기", systemImage: "arrow.up.circle.fill")
-                        .labelStyle(.iconOnly)
-                        .frame(width: Self.controlHeight, height: Self.controlHeight)
-                        .contentShape(.rect)
+                    ControlGlyph(systemName: "arrow.up.circle.fill")
                 }
                 .disabled(trimmed.isEmpty)
+                .accessibilityLabel("보내기")
                 .help("보내기")
             }
         }
-        .padding(12)
+        .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth)
+        .padding(.horizontal, ClientTheme.Metrics.transcriptHorizontalPadding)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
         .buttonStyle(.plain)
         .font(.title3)
         .onAppear { isFocused = true }

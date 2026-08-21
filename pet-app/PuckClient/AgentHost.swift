@@ -213,11 +213,14 @@ final class AgentHost {
                 if result.ok { self.onRevealInEditor?(self.activeWorkspaceId, path) }
                 return result
             },
-            delegateListFiles: { [weak self] in
+            delegateListFiles: { [weak self] contains in
                 guard let self else {
                     return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
                 }
-                return await self.editorFileDelegate.listFiles(workspaceId: self.activeWorkspaceId)
+                return await self.editorFileDelegate.listFiles(
+                    workspaceId: self.activeWorkspaceId,
+                    contains: contains
+                )
             },
             delegateShowCode: { [weak self] path, startLine, endLine, caption in
                 guard let self else {

@@ -68,9 +68,11 @@ typealias AgentCodeTourStop = (
     _ path: String, _ startLine: Int, _ endLine: Int, _ caption: String
 ) async -> DispatchedToolResult
 
-/// Lists the active workspace's project files. Takes no path -- which project
-/// is a property of the run, not something the model chooses.
-typealias AgentFileListing = () async -> DispatchedToolResult
+/// Lists the active workspace's project files, optionally only those whose
+/// path contains a given string. Which project is a property of the run, not
+/// something the model chooses -- but *which files* has to be, or the answer
+/// is a truncated list of whatever sorts first.
+typealias AgentFileListing = (_ contains: String?) async -> DispatchedToolResult
 
 /// Branches the casual conversation into its own task session; everything the
 /// run emits after this is addressed to the new one.
@@ -645,9 +647,12 @@ final class AgentRunner {
             return await delegateShowCode(path, Int(start), Int(end), caption)
         }
         if name == Self.listFilesToolName, let delegateListFiles {
-            // No arguments to validate: which project is a property of the
-            // run, not something the model picks.
-            return await delegateListFiles()
+            // Which project is a property of the run, so the only argument is
+            // the optional filter, and a malformed one is simply no filter.
+            guard case .object(let args) = arguments, case .string(let contains)? = args["contains"] else {
+                return await delegateListFiles(nil)
+            }
+            return await delegateListFiles(contains)
         }
         return await dispatcher.execute(tool: name, arguments: arguments)
     }
@@ -831,6 +836,14 @@ final class AgentRunner {
             Use this to answer questions about code or show the user what a file contains -- it does \
             not open a tab in the editor pane; use open_in_editor for that. Fails with execution_failed \
             if the workspace has no project open, the path doesn't exist, or the file is binary/too large.
+            """
+        case listFilesToolName:
+            return """
+            List the project's files as relative paths. Pass `contains` to narrow it to paths holding \
+            that text (case-insensitive, matched against the whole path): "bubble", "Pointing/", \
+            ".swift". Use it to find the file you need before read_file or show_code, instead of \
+            guessing a path -- a large project returns only its first 400 paths without a filter, \
+            and those may all be generated output. Never use run_shell to look for files.
             """
         case openInEditorToolName:
             return """

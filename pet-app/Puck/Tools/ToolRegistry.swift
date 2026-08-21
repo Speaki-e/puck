@@ -152,7 +152,13 @@ enum ToolRegistry {
         // -- "이 디렉토리 분석해줘" dead-ended in get_frontmost_window, which
         // reports a window and knows nothing about directories. No parameters:
         // the project is whichever one the active workspace is bound to.
-        Tool(name: "list_files", executor: .delegated, approval: .notRequired, parameters: []),
+        // contains (2026-08-22) filters *before* the 400-path cap. Without it
+        // the cap is the whole tool in a large project: this repo has 8,116
+        // files and the first 400 are all generated output, so the model
+        // could not see a single source file and fell back to run_shell.
+        Tool(name: "list_files", executor: .delegated, approval: .notRequired, parameters: [
+            Parameter(name: "contains", type: .string, isRequired: false),
+        ]),
         // Branches the casual conversation into a task session. Never crosses
         // the socket, which is why its registry timeout is a placeholder 0
         // rather than a duration.

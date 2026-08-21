@@ -35,6 +35,20 @@ final class EditorFileDelegate {
     /// conversation.
     static let listFileLimit = 400
 
+    /// Paths containing `contains`, case-insensitively, anywhere in them --
+    /// so "bubble" and "Input/Speech" both work.
+    ///
+    /// Applied before the cap, which is the whole point: truncating first and
+    /// filtering second would search only the alphabetically-first 400 files.
+    /// An empty or whitespace-only filter is treated as none rather than as a
+    /// filter nothing can match.
+    static func filtered(_ paths: [String], contains: String?) -> [String] {
+        guard let needle = contains?.trimmingCharacters(in: .whitespacesAndNewlines), !needle.isEmpty else {
+            return paths
+        }
+        return paths.filter { $0.range(of: needle, options: .caseInsensitive) != nil }
+    }
+
     /// list_files' delegate body: the project's files as a flat list of
     /// relative paths.
     ///
@@ -47,19 +61,20 @@ final class EditorFileDelegate {
     /// Flat rather than nested: the model only needs paths, and a nested JSON
     /// tree spends most of its tokens on structure.
     @MainActor
-    func listFiles(workspaceId: String) async -> DispatchedToolResult {
+    func listFiles(workspaceId: String, contains: String? = nil) async -> DispatchedToolResult {
         guard let projectPath = resolveProjectPath(workspaceId) else {
             return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "이 워크스페이스에는 연결된 프로젝트가 없어요.")
         }
         do {
             let service = try WorkspaceFileService(root: URL(fileURLWithPath: projectPath, isDirectory: true))
-            let paths = FileTreeEntry.flattenedPaths(try service.listTree())
+            let paths = Self.filtered(FileTreeEntry.flattenedPaths(try service.listTree()), contains: contains)
             let truncated = paths.count > Self.listFileLimit
             let data = JSONValue.object([
                 "projectPath": .string(projectPath),
                 "files": .array(paths.prefix(Self.listFileLimit).map(JSONValue.string)),
                 "truncated": .bool(truncated),
                 "totalCount": .number(Double(paths.count)),
+                "filter": contains.map(JSONValue.string) ?? .null,
             ])
             return DispatchedToolResult(ok: true, data: data, error: nil, detail: nil)
         } catch let error as WorkspaceFileServiceError {

@@ -115,6 +115,36 @@ final class ListFilesToolTests: XCTestCase {
         // Read-only: making the user approve it would tax the one call the
         // agent should reach for first.
         XCTAssertEqual(tool?.approval, .notRequired)
-        XCTAssertTrue(tool?.parameters.isEmpty ?? false, "which project is not the model's choice")
+        // Which project is still not the model's choice; which *files* is,
+        // and has to be -- unfiltered, a large project answers with the first
+        // 400 paths, which can be entirely generated output.
+        XCTAssertEqual(tool?.parameters.map(\.name), ["contains"])
+        XCTAssertEqual(tool?.parameters.first?.isRequired, false)
+    }
+
+    /// The cap is the whole tool without this: a real project's first 400
+    /// paths were entirely generated output, so the model never saw a source
+    /// file and went looking through run_shell instead.
+    @MainActor
+    func testContainsNarrowsTheListBeforeTheCap() async {
+        let result = await makeDelegate(projectPath: project.path).listFiles(workspaceId: "w1", contains: "main")
+
+        XCTAssertTrue(result.ok)
+        let files = result.data?["files"]?.arrayValue?.compactMap(\.stringValue) ?? []
+        XCTAssertEqual(files, ["src/main.swift"])
+        XCTAssertEqual(result.data?["totalCount"], .number(1), "the count is of matches, not of the whole tree")
+        XCTAssertEqual(result.data?["filter"], .string("main"))
+    }
+
+    func testTheFilterMatchesAnywhereInThePathAndIgnoresCase() {
+        let paths = ["src/main.swift", "Puck/Input/SpeechBubblePlacement.swift", "README.md"]
+
+        XCTAssertEqual(
+            EditorFileDelegate.filtered(paths, contains: "bubble"),
+            ["Puck/Input/SpeechBubblePlacement.swift"]
+        )
+        XCTAssertEqual(EditorFileDelegate.filtered(paths, contains: "Input/"), ["Puck/Input/SpeechBubblePlacement.swift"])
+        XCTAssertEqual(EditorFileDelegate.filtered(paths, contains: "   "), paths, "a blank filter is no filter")
+        XCTAssertEqual(EditorFileDelegate.filtered(paths, contains: nil), paths)
     }
 }

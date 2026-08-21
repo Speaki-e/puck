@@ -183,8 +183,14 @@ struct AgentConfiguration {
 
     /// Resolved the same way the key is: process environment beats the
     /// nearest `.env` that sets it. An unrecognized value (a stale `.env`, a
-    /// provider this build predates) falls back to `.openai` rather than
+    /// provider this build predates) falls back to the default rather than
     /// crashing -- mirrors `ClientThemeStyle.resolved(fromDefaultsValue:)`.
+    ///
+    /// That default is `.cli`, which pairs with `codingAgent()`'s own default
+    /// of `.claude`: the coding agent this repo vendors self-contained, so it
+    /// is the one already present on a fresh install. It still needs a
+    /// credential -- `requiresCredential` counts `.cli` too, because the ACP
+    /// child gets a private HOME and never inherits an interactive login.
     private static func provider(environment: [String: String], searchPaths: [URL]) -> AgentProvider {
         if let fromEnvironment = environment["AGENT_PROVIDER"]?.nilIfBlank {
             return AgentProvider.resolved(fromRawValue: fromEnvironment)
@@ -194,7 +200,7 @@ struct AgentConfiguration {
                 return AgentProvider.resolved(fromRawValue: fromFile)
             }
         }
-        return .openai
+        return AgentProvider.fallback
     }
 
     /// Which ACP coding agent `code_editor` runs. A **different axis** from
@@ -392,8 +398,12 @@ enum AgentProvider: String, CaseIterable {
     /// `ClientThemeStyle.resolved(fromDefaultsValue:)` -- a raw value this
     /// build doesn't recognize (a stale `.env`, a future provider) falls back
     /// to `.openai` instead of crashing.
+    /// What an absent or unreadable setting resolves to. See
+    /// `AgentConfiguration.provider(environment:searchPaths:)`.
+    static let fallback: AgentProvider = .cli
+
     static func resolved(fromRawValue raw: String?) -> AgentProvider {
-        raw.flatMap(AgentProvider.init(rawValue:)) ?? .openai
+        raw.flatMap(AgentProvider.init(rawValue:)) ?? AgentProvider.fallback
     }
 }
 

@@ -73,7 +73,7 @@ final class AgentConfigurationTests: XCTestCase {
     }
 
     func test_readsTheKeyAndModelFromADotEnv() throws {
-        let directory = try directory(withEnv: "OPENAI_API_KEY=sk-from-file\nOPENAI_MODEL=gpt-4.1")
+        let directory = try directory(withEnv: "AGENT_PROVIDER=openai\nOPENAI_API_KEY=sk-from-file\nOPENAI_MODEL=gpt-4.1")
 
         let configuration = AgentConfiguration.load(environment: [:], searchPaths: [directory])
 
@@ -83,7 +83,7 @@ final class AgentConfigurationTests: XCTestCase {
     }
 
     func test_environmentBeatsTheFile_soAOneOffOverrideNeedsNoEdit() throws {
-        let directory = try directory(withEnv: "OPENAI_API_KEY=sk-from-file")
+        let directory = try directory(withEnv: "AGENT_PROVIDER=openai\nOPENAI_API_KEY=sk-from-file")
 
         let configuration = AgentConfiguration.load(
             environment: ["OPENAI_API_KEY": "sk-from-environment"],
@@ -96,7 +96,7 @@ final class AgentConfigurationTests: XCTestCase {
     /// Nearest-first: the first .env that supplies a value owns it, so adding
     /// a fallback file can never shadow the one next to the project.
     func test_theEarlierSearchPathWins() throws {
-        let nearer = try directory(withEnv: "OPENAI_API_KEY=sk-nearer")
+        let nearer = try directory(withEnv: "AGENT_PROVIDER=openai\nOPENAI_API_KEY=sk-nearer")
         let further = try directory(withEnv: "OPENAI_API_KEY=sk-further\nOPENAI_MODEL=gpt-4.1")
 
         let configuration = AgentConfiguration.load(environment: [:], searchPaths: [nearer, further])
@@ -124,7 +124,7 @@ final class AgentConfigurationTests: XCTestCase {
     }
 
     func test_noKeyAnywhere_isNotConfiguredAndStillHasADefaultModel() {
-        let configuration = AgentConfiguration.load(environment: [:], searchPaths: [])
+        let configuration = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "openai"], searchPaths: [])
 
         XCTAssertFalse(configuration.isConfigured)
         XCTAssertEqual(configuration.model, AgentConfiguration.defaultModel)
@@ -151,7 +151,7 @@ final class AgentConfigurationTests: XCTestCase {
     /// `OPENAI_API_KEY=` left in a file reports "configured" and fails at the
     /// API instead of at startup.
     func test_blankValuesCountAsAbsent() throws {
-        let directory = try directory(withEnv: "OPENAI_API_KEY=\nOPENAI_MODEL=   ")
+        let directory = try directory(withEnv: "AGENT_PROVIDER=openai\nOPENAI_API_KEY=\nOPENAI_MODEL=   ")
 
         let configuration = AgentConfiguration.load(environment: [:], searchPaths: [directory])
 
@@ -161,9 +161,12 @@ final class AgentConfigurationTests: XCTestCase {
 
     // MARK: - Provider
 
-    func test_defaultsToOpenAIWhenNothingSelectsAProvider() {
+    func test_defaultsToTheCLIWhenNothingSelectsAProvider() {
         let config = AgentConfiguration.load(environment: [:], searchPaths: [])
-        XCTAssertEqual(config.provider, .openai)
+        XCTAssertEqual(config.provider, .cli)
+        // Pairs with codingAgent()'s own default, so the pair a fresh install
+        // gets is the coding agent this repo vendors.
+        XCTAssertEqual(config.codingAgent, .claude)
     }
 
     func test_readsProviderFromEnvironment() {
@@ -171,9 +174,9 @@ final class AgentConfigurationTests: XCTestCase {
         XCTAssertEqual(config.provider, .anthropic)
     }
 
-    func test_unknownProviderFallsBackToOpenAI() {
+    func test_unknownProviderFallsBackToTheDefault() {
         let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "gemini"], searchPaths: [])
-        XCTAssertEqual(config.provider, .openai)
+        XCTAssertEqual(config.provider, AgentProvider.fallback)
     }
 
     func test_selectedProviderDecidesWhichKeyIsRead() {
@@ -198,7 +201,7 @@ final class AgentConfigurationTests: XCTestCase {
     /// already relies on the specific one.
     func test_legacyOpenAIModelVariableStillWinsOverProviderNeutralOne() {
         let config = AgentConfiguration.load(
-            environment: ["OPENAI_MODEL": "gpt-4.1", "AGENT_MODEL": "gpt-5"],
+            environment: ["AGENT_PROVIDER": "openai", "OPENAI_MODEL": "gpt-4.1", "AGENT_MODEL": "gpt-5"],
             searchPaths: []
         )
 
@@ -374,7 +377,7 @@ final class MakeAgentLLMClientTests: XCTestCase {
         XCTAssertTrue(cli is RoutingAgentLLMClient)
     }
 
-    /// No `AGENT_PROVIDER` at all resolves to `.openai` (AgentConfiguration's
+    /// No `AGENT_PROVIDER` at all resolves to `.cli` (AgentConfiguration's
     /// own default) -- the factory has to follow that fallback rather than
     /// crash or pick arbitrarily. `RoutingAgentLLMClient` re-reads this on
     /// every `send`, so the default only has to be right in `configuration`,

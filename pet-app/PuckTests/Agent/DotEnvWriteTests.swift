@@ -98,7 +98,10 @@ final class DotEnvWriteTests: XCTestCase {
 
 final class AgentConfigurationKeySourceTests: XCTestCase {
     func test_reportsTheEnvironmentWhenItSuppliedTheKey() {
-        let configuration = AgentConfiguration.load(environment: ["OPENAI_API_KEY": "sk-env"], searchPaths: [])
+        let configuration = AgentConfiguration.load(
+            environment: ["AGENT_PROVIDER": "openai", "OPENAI_API_KEY": "sk-env"],
+            searchPaths: []
+        )
 
         XCTAssertEqual(configuration.keySource, .environment(variable: "OPENAI_API_KEY"))
     }
@@ -108,7 +111,7 @@ final class AgentConfigurationKeySourceTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let file = directory.appendingPathComponent(".env")
-        try "OPENAI_API_KEY=sk-file".write(to: file, atomically: true, encoding: .utf8)
+        try "AGENT_PROVIDER=openai\nOPENAI_API_KEY=sk-file".write(to: file, atomically: true, encoding: .utf8)
 
         let configuration = AgentConfiguration.load(environment: [:], searchPaths: [directory])
 

@@ -88,41 +88,57 @@ extension AppDelegate {
     /// made rather than cached, since the panel writes it while the pet runs.
     /// The pet's footing went behind a window the user just brought forward.
     ///
-    /// Climb onto it where that is allowed -- standing on the title bar of the
-    /// window you are working in is the classic desktop-pet answer and keeps
-    /// the pet somewhere visible. Where the "포커스된 창 위로는 올라가지 않기"
-    /// setting forbids that, step out to the side of it instead. Where neither
-    /// is possible (a window spanning the screen), stay put: the pet is on a
-    /// covered edge either way, and walking to a different covered spot is
-    /// motion that buys nothing.
+    /// It still falls: the surface it was standing on really did go away, and
+    /// dropping is what that looks like. Where it lands is the part that was
+    /// wrong -- the window that took the footing usually covers the floor too,
+    /// and the pet draws above every window, so it came to rest on top of the
+    /// user's content (2026-08-22). `perchAfterLandingIfNeeded` picks it up
+    /// from there, once the fall is over.
     func idleStateDidLoseFootingBehind(_ window: WindowInfo) {
-        guard let controller = characterController, let body = characterBody else { return }
+        pendingPerchWindowID = window.windowID
+        characterController?.transition(to: .fall)
+    }
+
+    /// Moves a pet that landed inside a window up onto its top edge. Called
+    /// from the frame loop because the decision belongs *after* the fall, and
+    /// nothing else reports a landing.
+    ///
+    /// The title bar is the one place left on a window that covers the screen:
+    /// its sides leave no room for a pet, and every spot below is the user's
+    /// content. Deliberately not gated on "포커스된 창 위로는 올라가지 않기" --
+    /// that setting is there to keep the pet off the work you are looking at,
+    /// which is the same thing this move is for.
+    func perchAfterLandingIfNeeded() {
+        guard let windowID = pendingPerchWindowID,
+              let controller = characterController,
+              let body = characterBody,
+              controller.currentState === idleState
+        else {
+            return
+        }
+        pendingPerchWindowID = nil
+
         let windows = overlayLocalWindows(excluding: nil)
-        let unclimbable = unclimbableWindowIDs(in: windows)
-
-        if !unclimbable.contains(window.windowID),
-           let climb = WindowSupport.nearestClimbTarget(
-               from: body.position,
-               in: windows,
-               roamableTop: controller.roamableArea.minY,
-               avatarHeight: avatarHitboxSize.height,
-               excluding: unclimbable
-           ) {
-            walkState.target = climb
-            controller.transition(to: .walk)
+        guard let window = windows.first(where: { $0.windowID == windowID }),
+              // It may have come down somewhere clear after all -- a window
+              // that stops above the floor, a pet that fell past its edge.
+              WindowSupport.coveringWindow(
+                  standingAt: body.position,
+                  petHeight: avatarHitboxSize.height,
+                  in: windows
+              )?.windowID == windowID,
+              let perch = WindowSupport.perchTarget(
+                  on: window,
+                  from: body.position,
+                  roamableTop: controller.roamableArea.minY,
+                  avatarHeight: avatarHitboxSize.height,
+                  petHalfWidth: avatarHitboxSize.width / 2
+              )
+        else {
             return
         }
-
-        guard let aside = WindowSupport.asideTarget(
-            from: body.position,
-            avoiding: window.frame,
-            in: controller.roamableArea,
-            petHalfWidth: avatarHitboxSize.width / 2
-        ) else {
-            return
-        }
-        walkState.target = aside
-        controller.transition(to: .walk)
+        moveToState.target = perch
+        controller.transition(to: .moveTo)
     }
 
     func unclimbableWindowIDs(in windows: [WindowInfo]) -> Set<CGWindowID> {

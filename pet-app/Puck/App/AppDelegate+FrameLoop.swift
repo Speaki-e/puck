@@ -113,6 +113,9 @@ extension AppDelegate {
             // pet walked off (agent summary, mute sulk, permission notice, and
             // every stop of a code tour).
             self.keepSpeechBubbleOnPet()
+            // Only does anything in the frame after a fall that ended inside
+            // the window that caused it.
+            self.perchAfterLandingIfNeeded()
         }
         frameClock.start()
     }

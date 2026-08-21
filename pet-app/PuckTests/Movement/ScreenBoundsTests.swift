@@ -177,14 +177,32 @@ final class ScreenBoundsTests: XCTestCase {
     /// bounce point follows the measured outline rather than the position.
     func test_ceiling_limitFollowsTheOutlineHeight() {
         let tall = CGRect(x: -50, y: -300, width: 100, height: 300)
+        let rising = CGPoint(x: 500, y: 290)
 
         let bounce = ScreenBounds.bounceOffCeiling(
-            position: CGPoint(x: 500, y: 290),
+            position: rising,
             velocity: -700,
             visualBounds: tall,
             in: area
         )
 
+        // Its head is at 290 - 300 = -10, already through the ceiling at 0,
+        // so the limit it reflects about is 300 rather than its own position.
+        XCTAssertEqual(bounce.velocity, 700 * ScreenBounds.restitution, "bounced back downward")
+        XCTAssertEqual(bounce.position.y, 2 * 300 - 290, "reflected about the tall outline's limit")
+
+        // The same point, with the short outline this file's other tests use,
+        // is nowhere near the ceiling -- which is the whole claim: the limit
+        // follows the measured outline, not the position.
+        let short = ScreenBounds.bounceOffCeiling(
+            position: rising,
+            velocity: -700,
+            visualBounds: outline,
+            in: area
+        )
+
+        XCTAssertEqual(short.velocity, -700, "a short avatar at the same point has not reached it")
+        XCTAssertEqual(short.position.y, rising.y)
     }
 
     func test_ceiling_belowTheMinimumSpeed_stopsAtTheCeiling() {

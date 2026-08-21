@@ -130,6 +130,23 @@ final class AgentConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.model, AgentConfiguration.defaultModel)
     }
 
+    /// The OpenAI default shipped as gpt-5.3-codex, which v1/chat/completions
+    /// -- the only endpoint GPTClient posts to -- refuses with a 404 saying to
+    /// use v1/responses instead. Every fresh install with a perfectly good key
+    /// therefore got "모델을 찾을 수 없어요" on its first turn.
+    ///
+    /// A unit test cannot ask OpenAI what it serves, and `/v1/models` is no
+    /// help: it lists codex models regardless of which endpoint accepts them.
+    /// What it can do is hold the line that made the default unusable -- no
+    /// Responses-API-only family in a chat/completions default. Switching
+    /// GPTClient to v1/responses is what would retire this test.
+    func test_openAIDefaultModel_isOneChatCompletionsCanServe() {
+        XCTAssertFalse(
+            AgentConfiguration.defaultModel.contains("codex"),
+            "codex models are Responses-API only; GPTClient posts to v1/chat/completions"
+        )
+    }
+
     /// An empty assignment is the same as not setting it -- otherwise an
     /// `OPENAI_API_KEY=` left in a file reports "configured" and fails at the
     /// API instead of at startup.

@@ -65,7 +65,21 @@ struct AgentConfiguration {
     }
 
     /// Used when nothing names one, for `.openai`.
-    static let defaultModel = "gpt-5.3-codex"
+    ///
+    /// Must be a model `GPTClient`'s endpoint actually serves. It posts to
+    /// v1/chat/completions, and OpenAI's `*-codex` models are Responses-API
+    /// only: asking for one there is a 404 whose body says "use the
+    /// v1/responses endpoint instead", which this app then reports as
+    /// "모델을 찾을 수 없어요" -- so the default shipped unusable, and looked
+    /// like a bad API key. `/v1/models` lists codex models regardless, so
+    /// checking availability that way does not catch it; only a real request
+    /// to this endpoint does.
+    ///
+    /// gpt-5.5 fills the same balanced-default role as the Anthropic default
+    /// below -- the plain model, not the `-pro` frontier one. Verified against
+    /// the live endpoint with a tools payload, since tool calling is the whole
+    /// loop here and a model that only answers prose would be useless.
+    static let defaultModel = "gpt-5.5"
 
     /// Used when nothing names one, for `.anthropic`. `claude-sonnet-5` is
     /// Anthropic's "best combination of speed and intelligence" model per

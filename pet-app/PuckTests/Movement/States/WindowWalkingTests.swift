@@ -216,4 +216,38 @@ final class WalkOnTopStateTests: XCTestCase {
         XCTAssertTrue(world.requestedTransitions.isEmpty, "should walk into the window, not fall off the edge just climbed")
         XCTAssertLessThan(world.body.position.x, 695, "should be walking left, into the window")
     }
+
+    /// A window reaching the edge of the display has no end to walk off, so
+    /// the stroll has to turn around by itself -- otherwise the pet walks
+    /// into the screen edge and stays there playing the walk clip, looking
+    /// like it is trying to leave (2026-08-22).
+    func test_reachingTheScreenEdge_turnsAroundInsteadOfPressingIntoIt() {
+        let world = TestStateWorld(position: CGPoint(x: 900, y: 200))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
+        world.windows = [window(x: 0, y: 200, width: 1000, height: 400)]
+        let state = WalkOnTopState()
+        state.enter()
+
+        world.run(state, seconds: 4) // long enough to reach the edge and come back
+
+        let rightLimit = world.roamableArea.maxX - world.visualBounds.maxX
+        XCTAssertLessThanOrEqual(world.body.position.x, rightLimit)
+        XCTAssertEqual(world.body.facing, .left, "turned around")
+        XCTAssertLessThan(world.body.position.x, rightLimit - 1, "and walked back from the edge")
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "the window is still underfoot -- no fall")
+    }
+
+    /// Walking off the *end of a window* is still a fall: that is the stroll
+    /// finishing, not the screen getting in the way.
+    func test_walkingOffTheEndOfTheWindow_stillFalls() {
+        let world = TestStateWorld(position: CGPoint(x: 500, y: 200))
+        world.roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 600)
+        world.windows = [window(x: 300, y: 200, width: 300, height: 400)]
+        let state = WalkOnTopState()
+        state.enter()
+
+        world.run(state, seconds: 4)
+
+        XCTAssertEqual(world.requestedTransitions, [.fall])
+    }
 }

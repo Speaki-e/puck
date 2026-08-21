@@ -51,12 +51,36 @@ final class WalkOnTopState: StateHandler {
             return
         }
 
-        let resolvedDirection = direction ?? Self.initialDirection(position: context.body.position, windowFrame: window.frame)
+        var resolvedDirection = direction ?? Self.initialDirection(position: context.body.position, windowFrame: window.frame)
+        var nextX = context.body.position.x + resolvedDirection * context.walkSpeed * CGFloat(dt)
+
+        // Turning around at the screen edge, the way a wander target already
+        // stays clear of it (AppDelegate+Wander.roamEdgeMargin). A window
+        // reaching the edge of the display has no end to walk off, so without
+        // this the pet walked into the edge and stayed there, still playing
+        // the walk clip -- looking like it was trying to leave the screen
+        // (2026-08-22).
+        let limits = Self.walkableX(in: context.roamableArea, visualBounds: context.visualBounds)
+        if nextX < limits.lowerBound || nextX > limits.upperBound {
+            resolvedDirection = -resolvedDirection
+            nextX = context.body.position.x + resolvedDirection * context.walkSpeed * CGFloat(dt)
+        }
         direction = resolvedDirection
 
-        let nextX = context.body.position.x + resolvedDirection * context.walkSpeed * CGFloat(dt)
         context.body.facing = resolvedDirection > 0 ? .right : .left
-        context.body.position = CGPoint(x: nextX, y: window.frame.minY)
+        context.body.position = CGPoint(
+            x: min(max(nextX, limits.lowerBound), limits.upperBound),
+            y: window.frame.minY
+        )
+    }
+
+    /// The x a pet may stand at with its whole body on screen. Empty-safe:
+    /// an area narrower than the pet collapses to a single point rather than
+    /// an invalid range.
+    private static func walkableX(in area: CGRect, visualBounds: CGRect) -> ClosedRange<CGFloat> {
+        let low = area.minX - visualBounds.minX
+        let high = area.maxX - visualBounds.maxX
+        return low...max(low, high)
     }
 
     /// Walk into the window from whichever edge is nearer, not off the side

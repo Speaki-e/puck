@@ -829,8 +829,8 @@ final class AgentRunner {
             any constraint the user gave). Do NOT pass project_path; the workspace decides that. \
             This is the only way to change files: never use run_shell to edit code. It can take \
             minutes, and the user watches the edit happen in the editor while it runs. Returns the \
-            editor agent's summary, or fails with pet_app_disconnected when no workspace is connected \
-            -- in which case tell the user to open the workspace app.
+            editor agent's summary, or fails with pet_app_disconnected when the pet app is not \
+            running -- in which case tell the user to start Puck.
             """
         case readFileToolName:
             return """

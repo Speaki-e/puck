@@ -104,11 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// Closing this app's window should be enough to put it away --
-    /// 커맨드 큐를 하든 가능한데" -- closing the window quits the app, same
-    /// as Cmd+Q, rather than lingering in the Dock with no window the way
-    /// Mail/Notes do. This never touches Puck: CompanionAppLauncher only
-    /// runs at each app's own launch, not on the other's quit.
+    /// Closing this app's window quits it, the same as Cmd+Q, rather than
+    /// lingering in the Dock with no window the way Mail and Notes do -- for
+    /// this app the window *is* the app. This never touches Puck:
+    /// CompanionAppLauncher only runs at each app's own launch, not on the
+    /// other's quit.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
@@ -121,8 +121,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Theme (ClientThemeStyle, synced from Puck's Settings)
 
-    /// The theme follows the pet's, so changing it from the menu bar
-    /// 셰이디 설정으로 변경할 수 있어야하거든" -- this process has no
+    /// The theme follows the pet's, so it can be changed from the menu bar
+    /// rather than from a window buried in this app. This process has no
     /// SettingsStore of its own (same reasoning as everywhere else this
     /// process reads Puck's UserDefaults domain directly instead), so it
     /// reads Puck's `clientThemeStyle` at launch and listens for the

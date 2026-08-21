@@ -26,11 +26,7 @@ struct AppLogLine: Encodable {
 final class AppLogger {
     static let shared = AppLogger(directory: isRunningTests ? testLogDirectory : defaultLogDirectory)
 
-    static let defaultLogDirectory: URL = {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(AppIdentity.applicationSupportDirectoryName, isDirectory: true)
-            .appendingPathComponent("logs", isDirectory: true)
-    }()
+    static let defaultLogDirectory = JSONLinesFileAppender.defaultLogDirectory
 
     /// The test bundle exercises SpriteAvatar, CharacterController and the
     /// rest with throwaway fixtures, and every failure they log went into the
@@ -42,36 +38,13 @@ final class AppLogger {
     private static let testLogDirectory = FileManager.default.temporaryDirectory
         .appendingPathComponent("PuckTestLogs", isDirectory: true)
 
-    private let directory: URL
-    private let queue = DispatchQueue(label: "Puck.AppLogger")
+    private let appender: JSONLinesFileAppender
 
     init(directory: URL = AppLogger.defaultLogDirectory) {
-        self.directory = directory
+        appender = JSONLinesFileAppender(directory: directory, queueLabel: "Puck.AppLogger")
     }
 
     func log(_ level: LogLevel, _ message: String) {
-        let line = AppLogLine(ts: ISO8601DateFormatter().string(from: Date()), level: level, message: message)
-        queue.async { [directory] in
-            guard var data = try? JSONEncoder().encode(line) else { return }
-            data.append(0x0A)
-
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let fileURL = directory.appendingPathComponent(Self.logFileName(for: Date()))
-
-            if let handle = try? FileHandle(forWritingTo: fileURL) {
-                defer { try? handle.close() }
-                handle.seekToEndOfFile()
-                handle.write(data)
-            } else {
-                try? data.write(to: fileURL)
-            }
-        }
-    }
-
-    private static func logFileName(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: date) + ".jsonl"
+        appender.append(AppLogLine(ts: ISO8601DateFormatter().string(from: Date()), level: level, message: message))
     }
 }

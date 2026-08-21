@@ -73,42 +73,15 @@ struct ToolExecutionLogLine: Encodable {
 /// file per day (UTC). Thin file-I/O wrapper — not unit tested beyond
 /// ToolExecutionLogLine's pure formatting.
 final class ToolExecutionLogger: ToolExecutionLogging {
-    static let defaultLogDirectory: URL = {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(AppIdentity.applicationSupportDirectoryName, isDirectory: true)
-            .appendingPathComponent("logs", isDirectory: true)
-    }()
+    static let defaultLogDirectory = JSONLinesFileAppender.defaultLogDirectory
 
-    private let directory: URL
-    private let queue = DispatchQueue(label: "Puck.ToolExecutionLogger")
+    private let appender: JSONLinesFileAppender
 
     init(directory: URL = ToolExecutionLogger.defaultLogDirectory) {
-        self.directory = directory
+        appender = JSONLinesFileAppender(directory: directory, queueLabel: "Puck.ToolExecutionLogger")
     }
 
     func log(_ event: ToolExecutionLogEvent) {
-        let line = ToolExecutionLogLine(event: event, timestamp: ISO8601DateFormatter().string(from: Date()))
-        queue.async { [directory] in
-            guard var data = try? JSONEncoder().encode(line) else { return }
-            data.append(0x0A)
-
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let fileURL = directory.appendingPathComponent(Self.logFileName(for: Date()))
-
-            if let handle = try? FileHandle(forWritingTo: fileURL) {
-                defer { try? handle.close() }
-                handle.seekToEndOfFile()
-                handle.write(data)
-            } else {
-                try? data.write(to: fileURL)
-            }
-        }
-    }
-
-    private static func logFileName(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: date) + ".jsonl"
+        appender.append(ToolExecutionLogLine(event: event, timestamp: ISO8601DateFormatter().string(from: Date())))
     }
 }

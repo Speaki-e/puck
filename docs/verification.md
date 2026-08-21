@@ -41,6 +41,12 @@ one pass of every item below on the supported macOS version:
 - Send one chat turn through each model provider that the release supports.
 - Open a project, read and edit a file in the native editor, then run
   `code_editor` on that project.
+- Ask the agent to explain a function in that project and confirm the code
+  tour runs end to end: the editor highlights and scrolls to each range, the
+  pet walks to the pane and points at it, its bubble says one line per stop
+  and follows it as it moves, and the full explanation lands in the chat. No
+  automated test covers this -- the highlight is applied by a live text view
+  and the walk needs a screen.
 - Ask `code_editor` to write to a sibling directory and confirm the operation
   is denied and no file is created there.
 - Trigger an approval-required tool and confirm allow and deny both resume the

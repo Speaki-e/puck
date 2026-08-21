@@ -61,4 +61,25 @@ final class RoamPointTests: XCTestCase {
     func test_aZeroWidthAreaDoesNotCrash() {
         XCTAssertEqual(AppDelegate.randomRoamPoint(in: .zero, from: 0), .zero)
     }
+
+    // MARK: - Legs (2026-08-22)
+
+    /// One trip and a long sit was the shape that read as monotonous, so a
+    /// wander is walked in legs with a beat between them.
+    func test_wanderLegs_areMostlyOneSometimesMore() {
+        let draws = (0..<600).map { _ in AppDelegate.drawWanderLegs() }
+
+        XCTAssertTrue(draws.allSatisfy { (1...3).contains($0) })
+        XCTAssertGreaterThan(draws.filter { $0 == 1 }.count, 250, "most wanders stay one leg")
+        XCTAssertGreaterThan(draws.filter { $0 > 1 }.count, 100, "but a good share meander")
+    }
+
+    /// Long enough to look like the pet stopped to consider something, short
+    /// enough that the legs still read as one wander rather than two.
+    func test_legPause_isABeatNotARest() {
+        let pauses = (0..<100).map { _ in AppDelegate.randomLegPause() }
+
+        XCTAssertTrue(pauses.allSatisfy { $0 >= 0.4 && $0 <= 1.4 })
+        XCTAssertGreaterThan(Set(pauses.map { Int($0 * 10) }).count, 3, "not a fixed beat")
+    }
 }

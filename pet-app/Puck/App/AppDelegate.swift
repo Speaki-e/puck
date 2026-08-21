@@ -55,6 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// The window the pet fell behind, until it has landed and been moved onto
     /// that window's top edge -- see perchAfterLandingIfNeeded().
     var pendingPerchWindowID: CGWindowID?
+    /// Legs of the current wander still to walk, and the pause before the next
+    /// one -- see continueWanderIfNeeded(dt:).
+    var pendingWanderLegs = 0
+    var wanderLegPause: TimeInterval = 0
     let typeState = TypeState()
     let pointState = PointState()
     let listenState = ListenState()

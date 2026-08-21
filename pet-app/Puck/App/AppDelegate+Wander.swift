@@ -20,11 +20,18 @@ extension AppDelegate {
     /// the window list), which is bootstrap knowledge, not state knowledge.
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) {
         guard let controller = characterController else { return }
+        // Whatever was half-walked is abandoned: the pet has been given
+        // something else to do, and finishing the old route afterwards would
+        // read as it changing its mind twice.
+        if case .walkToRandomPoint = outcome {} else { cancelWander() }
         switch outcome {
         case .walkToRandomPoint:
-            varyWalkSpeed()
-            walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
-            controller.transition(to: .walk)
+            // A wander is one to three legs with a beat between them, not one
+            // straight line to one point. Drawn here; the rest are started by
+            // continueWanderIfNeeded once each leg lands.
+            pendingWanderLegs = Self.drawWanderLegs() - 1
+            wanderLegPause = Self.randomLegPause()
+            startWanderLeg(controller)
         case .climbNearestWindow:
             // Walk to the nearest climbable window's side; WalkState's own
             // blockingWindow check takes it from there and hands off to Climb.
@@ -96,6 +103,7 @@ extension AppDelegate {
     /// user's content (2026-08-22). `perchAfterLandingIfNeeded` picks it up
     /// from there, once the fall is over.
     func idleStateDidLoseFootingBehind(_ window: WindowInfo) {
+        cancelWander()
         pendingPerchWindowID = window.windowID
         characterController?.transition(to: .fall)
     }
@@ -186,6 +194,54 @@ extension AppDelegate {
         if x > high { x = high - (x - high) }
         return CGPoint(x: min(max(x, low), high), y: area.maxY)
     }
+
+    /// One leg of a wander: somewhere nearby, at a slightly different pace
+    /// each time.
+    private func startWanderLeg(_ controller: CharacterController) {
+        varyWalkSpeed()
+        walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: currentRoamX(in: controller))
+        controller.transition(to: .walk)
+    }
+
+    /// Starts the next leg once the previous one has landed and the pause has
+    /// run out. Called every frame; does nothing the rest of the time.
+    ///
+    /// Driven from the frame loop because nothing reports an arrival: Walk
+    /// hands back to Idle on its own, and Idle's next draw is 8-15s away --
+    /// which is the gap that made a wander read as one trip and a long sit.
+    func continueWanderIfNeeded(dt: TimeInterval) {
+        guard pendingWanderLegs > 0,
+              let controller = characterController,
+              controller.currentState === idleState
+        else {
+            return
+        }
+        wanderLegPause -= dt
+        guard wanderLegPause <= 0 else { return }
+        pendingWanderLegs -= 1
+        wanderLegPause = Self.randomLegPause()
+        startWanderLeg(controller)
+    }
+
+    /// Drops whatever legs are left. Anything that takes the pet over --
+    /// another wander outcome, a tool, a fall behind a window -- calls this,
+    /// or the pet would resume a walk nobody asked for any more.
+    func cancelWander() {
+        pendingWanderLegs = 0
+        wanderLegPause = 0
+    }
+
+    /// Mostly one leg, sometimes two, now and then three. More than that and
+    /// the pet never settles.
+    static func drawWanderLegs() -> Int {
+        let roll = CGFloat.random(in: 0...1)
+        if roll < 0.55 { return 1 }
+        return roll < 0.85 ? 2 : 3
+    }
+
+    /// Long enough to read as the pet stopping to look at something, short
+    /// enough that the walk still feels like one wander.
+    static func randomLegPause() -> TimeInterval { .random(in: 0.4...1.4) }
 
     /// Where the pet is now, or the middle of the area before there is a
     /// body to ask -- a wander drawn without one has nothing to be relative to.

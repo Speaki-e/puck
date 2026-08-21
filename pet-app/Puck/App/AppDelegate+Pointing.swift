@@ -32,6 +32,10 @@ extension AppDelegate {
                 superseded()
             }
 
+            // A wander half-walked is not something to come back to after
+            // pointing at something the user asked about.
+            self.cancelWander()
+
             // A hold this long means a guided tour is running (show_code),
             // and the pet's normal 90 px/s takes ~17s to cross a wide display
             // -- most of the first stop would be spent watching it walk.

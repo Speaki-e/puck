@@ -116,6 +116,8 @@ extension AppDelegate {
             // Only does anything in the frame after a fall that ended inside
             // the window that caused it.
             self.perchAfterLandingIfNeeded()
+            // A wander is walked in legs, and this is what starts the next one.
+            self.continueWanderIfNeeded(dt: dt)
         }
         frameClock.start()
     }

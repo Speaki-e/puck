@@ -73,7 +73,7 @@ final class BridgeMessageRouter {
                 toolExecutor.cancel(id: id)
             }
 
-        case .event(let event, let workspaceId, let sessionId):
+        case .event(let event, _, _):
             dispatchToMain { [weak self] in
                 guard let self else { return }
                 let reaction = EventRouter.reaction(for: event, previousCodeEditorPath: self.lastCodeEditorPath)

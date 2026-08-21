@@ -126,7 +126,7 @@ final class AcpTurnSession {
             guard let sessionID = created["sessionId"]?.stringValue else {
                 return .failed(.noSessionID)
             }
-            lock.lock(); self.sessionID = sessionID; lock.unlock()
+            store(sessionID: sessionID)
 
             if currentlyCancelled() {
                 cancel()
@@ -188,6 +188,16 @@ final class AcpTurnSession {
         } else {
             connection.respond(to: request.id, result: AcpPermissionRequest.cancelledOutcome())
         }
+    }
+
+    /// Taken in a synchronous helper, like the two accessors below, rather
+    /// than inline in `run`: NSLock is unavailable from an async context (an
+    /// error in the Swift 6 language mode) precisely because a lock must not
+    /// be held across an await, and a sync function cannot hold one across
+    /// anything.
+    private func store(sessionID: String) {
+        lock.lock(); defer { lock.unlock() }
+        self.sessionID = sessionID
     }
 
     private func currentlyCancelled() -> Bool {

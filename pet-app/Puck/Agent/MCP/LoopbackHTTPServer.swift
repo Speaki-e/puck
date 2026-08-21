@@ -57,7 +57,13 @@ final class LoopbackHTTPServer {
 
     private let handler: Handler
     private let queue = DispatchQueue(label: "com.speaki-e.puck.mcp.http")
-    private let lock = NSLock()
+    /// Guards the mutable state below. Deliberately *not* `queue`: that one
+    /// runs the listener's and connections' callbacks, and `accept`/`forget`
+    /// are called from it -- taking it synchronously from inside its own
+    /// callback would deadlock. A queue rather than an NSLock because `start`
+    /// is async, and NSLock is unavailable from async contexts (an error in
+    /// the Swift 6 language mode).
+    private let stateQueue = DispatchQueue(label: "com.speaki-e.puck.mcp.http.state")
     private var listener: NWListener?
     /// Held for as long as the socket is open. The session owns the escaping
     /// read/write closures, and nothing else refers to it -- dropped here it
@@ -94,14 +100,15 @@ final class LoopbackHTTPServer {
             throw StartFailure.listenerFailed(String(describing: error))
         }
 
-        lock.lock()
-        if isStopped {
-            lock.unlock()
+        let accepted: Bool = stateQueue.sync {
+            guard !isStopped else { return false }
+            self.listener = listener
+            return true
+        }
+        guard accepted else {
             listener.cancel()
             throw StartFailure.listenerFailed("stopped before start")
         }
-        self.listener = listener
-        lock.unlock()
 
         listener.newConnectionHandler = { [weak self] connection in
             self?.accept(connection)
@@ -131,7 +138,7 @@ final class LoopbackHTTPServer {
             throw StartFailure.noPort
         }
         let endpoint = Endpoint(port: port, token: Self.makeToken())
-        lock.lock(); self.endpoint = endpoint; lock.unlock()
+        stateQueue.sync { self.endpoint = endpoint }
         return endpoint
     }
 
@@ -139,19 +146,24 @@ final class LoopbackHTTPServer {
     /// the turn's success, failure, timeout and cancel paths all call it, and
     /// two of them can run.
     func stop() {
-        lock.lock()
-        if isStopped { lock.unlock(); return }
-        isStopped = true
-        let listener = self.listener
-        let sessions = Array(self.sessions.values)
-        self.listener = nil
-        self.sessions.removeAll()
-        lock.unlock()
+        // Torn down outside the lock: cancelling a listener and closing
+        // sessions runs their callbacks, which come back through `accept`
+        // and `forget`.
+        let torn: (listener: NWListener?, sessions: [HTTPConnection])? = stateQueue.sync {
+            guard !isStopped else { return nil }
+            isStopped = true
+            let listener = self.listener
+            let sessions = Array(self.sessions.values)
+            self.listener = nil
+            self.sessions.removeAll()
+            return (listener, sessions)
+        }
+        guard let torn else { return }
 
-        listener?.stateUpdateHandler = nil
-        listener?.newConnectionHandler = nil
-        listener?.cancel()
-        for session in sessions { session.close() }
+        torn.listener?.stateUpdateHandler = nil
+        torn.listener?.newConnectionHandler = nil
+        torn.listener?.cancel()
+        for session in torn.sessions { session.close() }
     }
 
     deinit { stop() }
@@ -159,29 +171,27 @@ final class LoopbackHTTPServer {
     // MARK: - Connections
 
     private func accept(_ connection: NWConnection) {
-        lock.lock()
-        if isStopped {
-            lock.unlock()
+        let session: HTTPConnection? = stateQueue.sync {
+            guard !isStopped else { return nil }
+            let session = HTTPConnection(
+                connection: connection,
+                token: endpoint?.token ?? "",
+                handler: handler,
+                onClose: { [weak self] in self?.forget(connection) }
+            )
+            sessions[ObjectIdentifier(connection)] = session
+            return session
+        }
+        guard let session else {
             connection.cancel()
             return
         }
-        let token = endpoint?.token ?? ""
-        let session = HTTPConnection(
-            connection: connection,
-            token: token,
-            handler: handler,
-            onClose: { [weak self] in self?.forget(connection) }
-        )
-        sessions[ObjectIdentifier(connection)] = session
-        lock.unlock()
 
         session.start(on: queue)
     }
 
     private func forget(_ connection: NWConnection) {
-        lock.lock()
-        sessions.removeValue(forKey: ObjectIdentifier(connection))
-        lock.unlock()
+        stateQueue.sync { _ = sessions.removeValue(forKey: ObjectIdentifier(connection)) }
     }
 
     // MARK: - Token

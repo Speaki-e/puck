@@ -27,7 +27,12 @@ struct DispatchedToolResult {
     let detail: String?
 }
 
-final class PetToolDispatcher {
+/// `@unchecked` because the compiler cannot see what the header describes:
+/// `pending` is reached from socket reads, the agent's task and timeout
+/// timers, and every access goes through `lock`. Without the conformance the
+/// timeout closure -- which is `@Sendable` and captures self -- warns on every
+/// build, 33 times over the targets that compile this file.
+final class PetToolDispatcher: @unchecked Sendable {
     /// Sends one message on the socket; false when nothing is connected.
     private let send: (BridgeMessage) -> Bool
     private let timeoutSeconds: (String) -> TimeInterval

@@ -44,7 +44,7 @@ final class WalkOnTopState: StateHandler {
             // apart by watching. ClimbHandoffTests covers the geometry; this
             // covers the live data those tests can't see.
             let nearby = context.windows.prefix(6).map {
-                "[\(Int($0.frame.minX))..\(Int($0.frame.maxX)) top=\(Int($0.frame.minY)) \($0.ownerName)]"
+                "[\(Int($0.frame.minX))..\(Int($0.frame.maxX)) top=\(Int($0.frame.minY)) \($0.ownerName ?? "?")]"
             }.joined(separator: " ")
             AppLogger.shared.log(.warning, "WalkOnTop fell: pet=(\(Int(context.body.position.x)),\(Int(context.body.position.y))) windows=\(context.windows.count) \(nearby)")
             oneShot.fire(.fall, using: context.requestTransition)

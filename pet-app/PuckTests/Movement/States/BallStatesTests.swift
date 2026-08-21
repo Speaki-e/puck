@@ -200,7 +200,6 @@ final class JuggleBallStateTests: XCTestCase {
 
 final class KickBallStateTests: XCTestCase {
     func test_firesOnEnterOnceWhenEntered() {
-        let world = TestStateWorld()
         let state = KickBallState()
         var kickCount = 0
         state.onEnter = { kickCount += 1 }

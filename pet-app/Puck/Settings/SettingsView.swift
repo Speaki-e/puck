@@ -163,7 +163,7 @@ struct SettingsView: View {
             }
             SettingsStackedRow(label: text(.toySizeLabel), value: String(format: "%.2fx", toyScale)) {
                 Slider(value: $toyScale, in: 0.5...3.0)
-                    .onChange(of: toyScale) { store.toyScale = $0 }
+                    .onChange(of: toyScale) { _, newValue in store.toyScale = newValue }
             }
         }
     }
@@ -172,25 +172,25 @@ struct SettingsView: View {
         SettingsSection(title: text(.tabSound)) {
             SettingsStackedRow(label: text(.volumeLabel)) {
                 Slider(value: $volume, in: 0...1)
-                    .onChange(of: volume) { store.volume = Float($0) }
+                    .onChange(of: volume) { _, newValue in store.volume = Float(newValue) }
             }
             SettingsRow(label: text(.muteLabel)) {
                 Toggle("", isOn: $isMuted)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .onChange(of: isMuted) { store.isMuted = $0 }
+                    .onChange(of: isMuted) { _, newValue in store.isMuted = newValue }
             }
             SettingsRow(label: text(.autoMuteLabel)) {
                 Toggle("", isOn: $autoMuteOnFocus)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .onChange(of: autoMuteOnFocus) { store.autoMuteOnFocus = $0 }
+                    .onChange(of: autoMuteOnFocus) { _, newValue in store.autoMuteOnFocus = newValue }
             }
             SettingsRow(label: text(.muteComplaintLabel)) {
                 Toggle("", isOn: $isMuteComplaintEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .onChange(of: isMuteComplaintEnabled) { store.isMuteComplaintEnabled = $0 }
+                    .onChange(of: isMuteComplaintEnabled) { _, newValue in store.isMuteComplaintEnabled = newValue }
             }
         }
     }
@@ -201,11 +201,11 @@ struct SettingsView: View {
                 Toggle("", isOn: $avoidClimbingFocusedWindow)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .onChange(of: avoidClimbingFocusedWindow) { store.avoidClimbingFocusedWindow = $0 }
+                    .onChange(of: avoidClimbingFocusedWindow) { _, newValue in store.avoidClimbingFocusedWindow = newValue }
             }
             SettingsStackedRow(label: text(.speedLabel), value: String(format: "%.2fx", walkSpeedMultiplier)) {
                 Slider(value: $walkSpeedMultiplier, in: 0.25...3.0)
-                    .onChange(of: walkSpeedMultiplier) { store.walkSpeedMultiplier = $0 }
+                    .onChange(of: walkSpeedMultiplier) { _, newValue in store.walkSpeedMultiplier = newValue }
             }
         }
     }
@@ -222,7 +222,7 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .onChange(of: appearance) { store.appearance = $0 }
+                .onChange(of: appearance) { _, newValue in store.appearance = newValue }
             }
             // The client theme should stay in sync with the menu bar
             // settings the way Shady-style apps do -- the client
@@ -237,7 +237,7 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .onChange(of: clientThemeStyle) { store.clientThemeStyle = $0 }
+                .onChange(of: clientThemeStyle) { _, newValue in store.clientThemeStyle = newValue }
             }
             SettingsRow(label: text(.accessibilityLabel)) {
                 Text(AccessibilityPermission.isTrusted(prompt: false) ? text(.accessibilityGranted) : text(.accessibilityNotGranted))

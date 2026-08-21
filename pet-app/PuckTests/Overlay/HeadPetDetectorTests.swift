@@ -71,7 +71,7 @@ final class HeadPetDetectorTests: XCTestCase {
     func test_jitteringInPlaceIsNotPetting() {
         for step in 0..<40 {
             now += 0.016
-            detector.cursorMoved(to: CGPoint(x: step.isMultiple(of: 2) ? 100 : 102, y: 50), overHead: true, now: now)
+            _ = detector.cursorMoved(to: CGPoint(x: step.isMultiple(of: 2) ? 100 : 102, y: 50), overHead: true, now: now)
         }
 
         XCTAssertFalse(detector.isPetting, "2px wiggles are not strokes")
@@ -132,7 +132,7 @@ final class HeadPetDetectorTests: XCTestCase {
     /// gets re-petted by a cursor merely re-entering the head.
     func test_returningToTheHeadStartsFromScratch() {
         stroke(1); stroke(-1); stroke(1); stroke(-1)
-        detector.cursorMoved(to: CGPoint(x: 999, y: 999), overHead: false, now: now)
+        _ = detector.cursorMoved(to: CGPoint(x: 999, y: 999), overHead: false, now: now)
 
         stroke(1)
         stroke(-1)

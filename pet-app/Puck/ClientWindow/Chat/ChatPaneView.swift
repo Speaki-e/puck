@@ -89,7 +89,7 @@ struct ChatPaneView: View {
         }
         ToolbarItem {
             Button {
-                NSApp.sendAction(Selector(("showSettings:")), to: nil, from: nil)
+                NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
             } label: {
                 Label("설정", systemImage: "gearshape")
             }

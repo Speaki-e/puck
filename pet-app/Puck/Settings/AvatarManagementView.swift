@@ -95,7 +95,7 @@ struct AvatarManagementView: View {
                     .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 SettingsStackedRow(label: text(.sizeHeader), value: String(format: "%.2fx", scale)) {
                     Slider(value: $scale, in: 0.25...3.0)
-                        .onChange(of: scale) { applyScale($0) }
+                        .onChange(of: scale) { _, newValue in applyScale(newValue) }
                 }
             }
 

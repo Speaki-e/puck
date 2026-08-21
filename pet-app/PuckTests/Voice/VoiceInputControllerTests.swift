@@ -130,7 +130,7 @@ final class VoiceInputControllerTests: XCTestCase {
         // by the eventual hold-duration check (that only applies to the
         // final, submitted text).
         let speech = FakeSpeechRecognitionService()
-        var uptime: TimeInterval = 0
+        let uptime: TimeInterval = 0
         let controller = VoiceInputController(speechService: speech, now: { uptime })
         var receivedPartial: String?
         controller.onPartialText = { receivedPartial = $0 }

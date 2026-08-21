@@ -107,6 +107,12 @@ extension AppDelegate {
                     isUpsideDown: body.isUpsideDown
                 )
             }
+
+            // And so does anything the pet is currently saying -- the bubble
+            // was placed once at show time, so it stayed behind the moment the
+            // pet walked off (agent summary, mute sulk, permission notice, and
+            // every stop of a code tour).
+            self.keepSpeechBubbleOnPet()
         }
         frameClock.start()
     }

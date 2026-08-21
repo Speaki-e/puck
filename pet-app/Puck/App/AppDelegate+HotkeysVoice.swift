@@ -203,27 +203,47 @@ extension AppDelegate {
             return
         }
 
-        let petPoint = globalAppKitPoint(fromWindowLocal: body.position, window: window)
-        // body.position is the pet's ground point, so its head is a hitbox up
-        // from there -- in AppKit's bottom-left space, up is +y.
-        let headY = petPoint.y + avatarHitboxSize.height
-        var origin = CGPoint(x: petPoint.x - size.width / 2, y: headY + Self.speechBubbleGap)
-
-        // Clamped, because a pet in a corner would otherwise put half its
-        // speech off the screen. Vertically it flips below the pet instead of
-        // being shoved down over its head.
-        let frame = screen.visibleFrame
-        origin.x = min(max(origin.x, frame.minX + 8), frame.maxX - size.width - 8)
-        if origin.y + size.height > frame.maxY - 8 {
-            origin.y = petPoint.y - size.height - Self.speechBubbleGap
-        }
-        origin.y = max(origin.y, frame.minY + 8)
-
+        let origin = SpeechBubblePlacement.origin(
+            // body.position is the pet's ground point.
+            petGroundPoint: globalAppKitPoint(fromWindowLocal: body.position, window: window),
+            petHeight: avatarHitboxSize.height,
+            bubbleSize: size,
+            visibleFrame: screen.visibleFrame
+        )
         bubbleWindow.setFrameOrigin(NSPoint(x: origin.x, y: origin.y))
     }
 
-    /// Close enough to read as attached, far enough not to cover the pet.
-    private static let speechBubbleGap: CGFloat = 8
+    /// Keeps an open speech bubble over the pet's head as it moves. Called
+    /// every frame, next to the click-through hitbox update, which has to
+    /// follow the pet for the same reason.
+    ///
+    /// Placement only, never sizing: the text has not changed, and re-running
+    /// `speechSize(for:)` per frame would measure the same string 60 times a
+    /// second.
+    func keepSpeechBubbleOnPet() {
+        guard
+            let bubbleWindow = textInputBubbleWindow,
+            bubbleWindow.isVisible,
+            // Speech only. The input panel sits at its own fixed spot, is
+            // being typed into, and honours a drag the user made.
+            bubbleWindow.isShowingSpeech,
+            let window = primaryWindow,
+            let screen = bubbleWindow.screen ?? window.screen ?? NSScreen.main,
+            let body = characterBody
+        else {
+            return
+        }
+
+        let origin = SpeechBubblePlacement.origin(
+            petGroundPoint: globalAppKitPoint(fromWindowLocal: body.position, window: window),
+            petHeight: avatarHitboxSize.height,
+            bubbleSize: bubbleWindow.frame.size,
+            visibleFrame: screen.visibleFrame
+        )
+        guard bubbleWindow.frame.origin != NSPoint(x: origin.x, y: origin.y) else { return }
+        bubbleWindow.setFrameOrigin(NSPoint(x: origin.x, y: origin.y))
+    }
+
     /// Gap between the quick-capture panel and the bottom of the visible
     /// (Dock-excluded) screen area.
     private static let bottomModalMargin: CGFloat = 60

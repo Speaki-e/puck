@@ -69,6 +69,9 @@ final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
     /// Puck -- closeAndRestoreFocus() would then "restore" focus to
     /// Puck instead of the app the user actually invoked this from.
     func showAndActivate() {
+        // The window is shared with speech, so opening the input panel has to
+        // take the flag back or the panel would start chasing the pet.
+        isShowingSpeech = false
         guard !isVisible else {
             makeKeyAndOrderFront(nil)
             return
@@ -90,6 +93,12 @@ final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
         }
     }
 
+    /// True while the bubble is up as the pet's speech rather than as the
+    /// input panel. The frame loop reads this to keep speech anchored to a
+    /// pet that walks away mid-sentence; the input panel deliberately stays
+    /// where it is, because the user is aiming at it.
+    private(set) var isShowingSpeech = false
+
     /// Shows the bubble as the pet *speaking*: visible, but it never becomes
     /// key and never activates Puck.
     ///
@@ -100,6 +109,7 @@ final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
     /// that activates while another app is frontmost loses key almost
     /// immediately, so the bubble closed in the same breath it opened.
     func showSpeech() {
+        isShowingSpeech = true
         alphaValue = 0
         // Regardless: Puck is .accessory and usually not the active app,
         // which is exactly when the pet has something to say.
@@ -114,12 +124,14 @@ final class TextInputBubbleWindow: NSWindow, NSWindowDelegate {
     /// is about to go to PuckClient's window instead of back to the app
     /// the user invoked the bubble from (2026-07-30).
     func closeAndYieldFocus() {
+        isShowingSpeech = false
         orderOut(nil)
         previouslyFrontmostApp = nil
     }
 
     /// Hides the bubble and restores focus to whatever was frontmost before `showAndActivate()`.
     func closeAndRestoreFocus() {
+        isShowingSpeech = false
         orderOut(nil)
         previouslyFrontmostApp?.activate()
         previouslyFrontmostApp = nil

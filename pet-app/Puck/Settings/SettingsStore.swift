@@ -20,6 +20,7 @@ final class SettingsStore {
         static let speechLocale = "Puck.speechLocale"
         static let appearance = AppAppearance.defaultsKey
         static let clientThemeStyle = ClientThemeStyle.defaultsKey
+        static let language = AppLanguage.defaultsKey
         static let pushToTalk = "Puck.hotkey.pushToTalk"
         static let textInput = "Puck.hotkey.textInput"
         static let characterSummon = "Puck.hotkey.characterSummon"
@@ -51,6 +52,10 @@ final class SettingsStore {
     /// same shape as onAppearanceChanged's own broadcast) so the client
     /// window picks it up immediately.
     var onClientThemeStyleChanged: ((ClientThemeStyle) -> Void)?
+    /// The UI language is read on every `Strings.text(_:)` call from a
+    /// per-process copy, so a change has to be pushed into this process and
+    /// broadcast to PuckClient -- same shape as the theme above.
+    var onLanguageChanged: ((AppLanguage) -> Void)?
     /// Picking a different installed avatar in Settings has to
     /// swap the *running* pet immediately, not just take effect next launch.
     var onSelectedAvatarChanged: ((String) -> Void)?
@@ -163,6 +168,14 @@ final class SettingsStore {
         set {
             defaults.set(newValue.rawValue, forKey: Keys.clientThemeStyle)
             onClientThemeStyleChanged?(newValue)
+        }
+    }
+
+    var language: AppLanguage {
+        get { AppLanguage.resolved(fromDefaultsValue: defaults.string(forKey: Keys.language)) }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.language)
+            onLanguageChanged?(newValue)
         }
     }
 

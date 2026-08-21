@@ -169,6 +169,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             return
         }
 
+        // Before anything that builds UI text: the menu bar, Settings and the
+        // pet's own bubbles all read `Strings` at construction.
+        setUpLanguage()
         requestPermissions()
         setUpAppearance()
         setUpClientThemeStyle()

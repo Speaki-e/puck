@@ -36,6 +36,11 @@ struct SettingsView: View {
     var onToggleVisibility: (() -> Void)?
     var onQuit: (() -> Void)?
 
+    /// Watched so flipping the language redraws this window's own text
+    /// immediately -- every `text(_:)` call below reads through it.
+    @ObservedObject private var localization = Localization.shared
+
+    @State private var language: AppLanguage
     @State private var appearance: AppAppearance
     @State private var clientThemeStyle: ClientThemeStyle
     @State private var volume: Double
@@ -69,6 +74,7 @@ struct SettingsView: View {
         self.onOpenClient = onOpenClient
         self.onToggleVisibility = onToggleVisibility
         self.onQuit = onQuit
+        _language = State(initialValue: store.language)
         _appearance = State(initialValue: store.appearance)
         _clientThemeStyle = State(initialValue: store.clientThemeStyle)
         _volume = State(initialValue: Double(store.volume))
@@ -82,7 +88,9 @@ struct SettingsView: View {
         _isCharacterHidden = State(initialValue: initialIsCharacterHidden)
     }
 
-    private func text(_ key: L10nKey) -> String { Strings.text(key) }
+    private func text(_ key: L10nKey) -> String {
+        Strings.text(key, language: localization.language)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -212,6 +220,19 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         SettingsSection(title: text(.tabGeneral)) {
+            // First in General: it changes every other label on screen, so
+            // finding it should not require reading the rest in a language
+            // you don't have. Options name themselves for the same reason.
+            SettingsStackedRow(label: text(.languageLabel)) {
+                Picker("", selection: $language) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .onChange(of: language) { _, newValue in store.language = newValue }
+            }
             // An explicit override,
             // not just passively following the system (.system does that).
             SettingsStackedRow(label: text(.appearanceLabel)) {

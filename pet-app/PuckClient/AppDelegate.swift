@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: ClientWindow?
     private var settingsWindow: NSWindow?
     private var clientThemeStyleObserver: NSObjectProtocol?
+    private var languageObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // The two processes go together -- launching either app brings up
@@ -52,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // bridge.sock on the other end.
         CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.puckBundleID)
 
+        setUpLanguage()
         setUpClientThemeStyle()
 
         bridgeClient.onMessage = { [weak self] message in
@@ -128,6 +130,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// whenever the setting changes -- the exact shape the old (2026-08-01,
     /// removed 2026-08-01, now reinstated here for a different value)
     /// AppAppearance cross-process wiring used.
+    // MARK: - UI language, synced from Puck's Settings
+
+    /// Same wiring as the theme below, for the same reason: this process has
+    /// no SettingsStore, so it reads Puck's `language` at launch and follows
+    /// the broadcast afterwards. Applied before the window is built, since
+    /// every string in it is resolved as the views are constructed.
+    private func setUpLanguage() {
+        Localization.shared.apply(currentLanguage())
+        languageObserver = DistributedNotificationCenter.default().addObserver(
+            forName: AppLanguage.crossProcessChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            // The value travels with the notification; re-reading Puck's
+            // defaults domain is only the fallback for one that arrived
+            // without it. See the theme observer below.
+            let language = AppLanguage.resolved(fromCrossProcessUserInfo: notification.userInfo)
+                ?? self?.currentLanguage()
+                ?? .systemDefault
+            Localization.shared.apply(language)
+        }
+    }
+
+    private func currentLanguage() -> AppLanguage {
+        let raw = UserDefaults(suiteName: AppIdentity.puckBundleID)?.string(forKey: AppLanguage.defaultsKey)
+        return AppLanguage.resolved(fromDefaultsValue: raw)
+    }
+
     private func setUpClientThemeStyle() {
         applyClientThemeStyle(currentClientThemeStyle())
         clientThemeStyleObserver = DistributedNotificationCenter.default().addObserver(

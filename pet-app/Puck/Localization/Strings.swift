@@ -4,10 +4,14 @@
 //
 //  Shared · owner: 박해영 (Haeyoung Park)
 //  All user-facing text in the Settings window, the merged Avatar tab, and
-//  the menu bar, in Korean only. A flat key/table lookup rather than Apple's .lproj/
-//  Localizable.strings + Bundle mechanism, because the language here was an
-//  in-app setting the user could flip live, not a fixed-at-launch system
+//  the menu bar. A flat key/table lookup rather than Apple's .lproj/
+//  Localizable.strings + Bundle mechanism, because the language here is an
+//  in-app setting the user can flip live, not a fixed-at-launch system
 //  locale -- there is no real bundle to swap.
+//
+//  One table per AppLanguage. A key missing from the selected table falls
+//  back to Korean rather than showing its raw name; `StringsTests` holds the
+//  line that no key is ever actually missing.
 //
 //  Format-string keys (ending in "Format") take %1$@, %2$@, ... via
 //  String(format:) at the call site -- positional specifiers because
@@ -20,6 +24,10 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// Section headers in the menu bar panel. `tabAvatar` went with the tabs
     /// themselves -- AvatarManagementView titles its own sections now.
     case tabGeneral, tabSound, tabMovement
+
+    /// The UI language picker. Its options name themselves
+    /// (`AppLanguage.displayName`) rather than going through this table.
+    case languageLabel
 
     case appearanceLabel, appearanceSystem, appearanceLight, appearanceDark
     /// The client (chat) window's own theme, kept in sync with the menu bar
@@ -83,11 +91,29 @@ enum L10nKey: String, CaseIterable, Hashable {
 }
 
 enum Strings {
-    static func text(_ key: L10nKey) -> String {
-        table[key] ?? key.rawValue
+    /// The language defaults to whatever the running process has selected;
+    /// tests pass one explicitly rather than mutating shared state.
+    static func text(_ key: L10nKey, language: AppLanguage = Localization.shared.language) -> String {
+        table(for: language)[key] ?? korean[key] ?? key.rawValue
     }
 
-    private static let table: [L10nKey: String] = [
+    /// Every key the given language has its own text for -- not the Korean
+    /// fallback. `StringsTests` uses this to hold the line that a new key
+    /// lands in both tables at once; nothing in the app reads it, because the
+    /// fallback is what the app should do when one is missing anyway.
+    static func translatedKeys(in language: AppLanguage) -> Set<L10nKey> {
+        Set(table(for: language).keys)
+    }
+
+    private static func table(for language: AppLanguage) -> [L10nKey: String] {
+        switch language {
+        case .korean: return korean
+        case .english: return english
+        }
+    }
+
+    private static let korean: [L10nKey: String] = [
+        .languageLabel: "언어",
         .tabGeneral: "일반",
         .tabSound: "사운드",
         .tabMovement: "이동",
@@ -164,5 +190,86 @@ enum Strings {
         .menuShow: "보이기",
         .menuQuit: "Puck 종료",
         .menuOpenClient: "Puck 채팅 열기",
+    ]
+
+    private static let english: [L10nKey: String] = [
+        .languageLabel: "Language",
+
+        .tabGeneral: "General",
+        .tabSound: "Sound",
+        .tabMovement: "Movement",
+
+        .appearanceLabel: "Theme",
+        .appearanceSystem: "System",
+        .appearanceLight: "Light",
+        .appearanceDark: "Dark",
+        .clientThemeLabel: "Chat theme",
+        .accessibilityLabel: "Accessibility",
+        .accessibilityGranted: "Granted",
+        .accessibilityNotGranted: "Not granted",
+        .openSystemSettingsButton: "Open System Settings…",
+        .accessibilityExplanation: "Needed for global shortcuts, reading other apps' UI, and synthetic clicks.",
+
+        .volumeLabel: "Volume",
+        .muteLabel: "Mute",
+        .autoMuteLabel: "Mute automatically in Focus (best effort, may be inexact)",
+        .muteComplaintLabel: "Grumble when muted",
+
+        .avoidClimbingLabel: "Stay off the focused window",
+        .speedLabel: "Walking speed",
+        .toySizeLabel: "Toy size",
+        .toyPumpkin: "Pumpkin",
+        .toyWand: "Wand",
+
+        .avatarsHeader: "Avatars",
+        .importAvatarButton: "Import avatar package…",
+        .avatarSelectButton: "Select",
+        .avatarPackageFormatExplanation:
+            "An avatar package is a single folder: manifest.json, a transparent PNG per motion (idle required; walk, climb and fall recommended), and optionally a sounds/ folder of .wav files. Around 1024px on the long edge and under about 500KB per file works best.",
+        .importPanelPrompt: "Import",
+        .sizeHeader: "Size",
+        .emotionsHeader: "Emotions",
+        .emotionsExplanation: "Maps socket events (thinking, task failed, task done) to images. Anything unmapped falls back to the idle image.",
+        .mappedLabel: "Mapped",
+        .notMappedLabel: "Not mapped",
+        .chooseImageButton: "Choose image…",
+        .choosePanelPrompt: "Choose",
+        .customEmotionPlaceholder: "Custom emotion name",
+        .addButton: "Add",
+
+        .mappedCountFormat: "%1$@ of %2$@ mapped",
+
+        .permissionNeededBubble: "I need permission for that. Allow it in the window I'm pointing at!",
+
+        .agentHeader: "Agent",
+        .providerLabel: "AI provider",
+        .apiKeyLabelFormat: "%1$@ API key",
+        .apiKeySave: "Save",
+        .apiKeyClear: "Delete",
+        .apiKeySavedFormat: "Saved to %1$@",
+        .apiKeySourceFormat: "In use — from %1$@",
+        .apiKeyMissing: "No key yet — I can't run commands until there is one.",
+        .apiKeySaveFailed: "Couldn't save the key file.",
+        .apiKeyExplanationFormat:
+            "Stored in a .env file only you can read. A %1$@ environment variable, or a .env in the project folder, takes precedence.",
+        .modelLabel: "Model",
+        .modelReset: "Default",
+        .modelExplanationFormat: "Save it empty to use the default, %1$@. A %2$@ environment variable takes precedence.",
+        .codingAgentLabel: "Coding CLI",
+        .cliProviderExplanation:
+            "Uses the selected CLI with a stable setup token or API key. Puck's tools are wired in over MCP, and file work inside the selected project runs in a sandbox.",
+        .installedFormat: "Installed '%1$@'.",
+        .installedMissingRecommendedFormat: "Installed '%1$@' — recommended clips missing (idle image used instead): %2$@",
+        .failedToInstallFormat: "Couldn't install '%1$@': %2$@",
+        .rejectedMissingRequiredFormat: "Rejected — required clip files missing: %1$@",
+        .failedToValidateFormat: "Validation failed: %1$@",
+        .updatedEmotionFormat: "Updated '%1$@'.",
+        .failedToSetEmotionFormat: "Couldn't set '%1$@': %2$@",
+
+        .menuToys: "Toys",
+        .menuHide: "Hide",
+        .menuShow: "Show",
+        .menuQuit: "Quit Puck",
+        .menuOpenClient: "Open Puck Chat",
     ]
 }

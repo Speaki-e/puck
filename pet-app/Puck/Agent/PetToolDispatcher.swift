@@ -102,21 +102,34 @@ final class PetToolDispatcher: @unchecked Sendable {
 
             let deadline = timeoutSeconds(tool)
             DispatchQueue.global().asyncAfter(deadline: .now() + deadline) { [weak self] in
-                self?.resolve(id: id, with: DispatchedToolResult(
+                guard let self else { return }
+                let timedOut = resolve(id: id, with: DispatchedToolResult(
                     ok: false, data: nil, error: "timeout", detail: "\(tool) exceeded \(Int(deadline))s"
                 ))
+                // Protocol 3.1 makes the timeout the sender's, and tool_cancel
+                // is how the sender says so. Giving up quietly leaves pet-app
+                // running a handler whose answer nobody is waiting for --
+                // run_shell would go on holding a process for as long as it
+                // takes. Only when the timeout is what ended the wait: if a
+                // real reply got there first the work is already done, and
+                // cancelling it would be a message about nothing.
+                if timedOut { _ = send(.toolCancel(id: id)) }
             }
         }
     }
 
-    /// Resumes `id`'s continuation if it is still waiting. Safe to call twice
-    /// -- the second caller (usually the timeout firing after a real reply)
-    /// finds nothing and does nothing, which is what keeps a continuation
-    /// from being resumed twice and trapping.
-    private func resolve(id: String, with result: DispatchedToolResult) {
+    /// Resumes `id`'s continuation if it is still waiting, and reports
+    /// whether it was. Safe to call twice -- the second caller (usually the
+    /// timeout firing after a real reply) finds nothing and does nothing,
+    /// which is what keeps a continuation from being resumed twice and
+    /// trapping. The timeout path reads the result to decide whether there is
+    /// still anything worth cancelling.
+    @discardableResult
+    private func resolve(id: String, with result: DispatchedToolResult) -> Bool {
         lock.lock()
         let continuation = pending.removeValue(forKey: id)
         lock.unlock()
         continuation?.resume(returning: result)
+        return continuation != nil
     }
 }

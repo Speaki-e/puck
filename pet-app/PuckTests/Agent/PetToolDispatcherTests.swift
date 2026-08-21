@@ -78,6 +78,35 @@ final class PetToolDispatcherTests: XCTestCase {
         XCTAssertTrue(wire.sent.isEmpty, "an unregistered tool must not be dispatched")
     }
 
+    /// Protocol 3.1 puts the timeout on the sender, so giving up has to be
+    /// said out loud: without tool_cancel pet-app keeps running a handler
+    /// whose answer nobody is waiting for.
+    func test_timeout_tellsPetAppToAbandonTheCall() async {
+        let wire = Wire()
+        let sut = PetToolDispatcher(send: wire.send, timeoutSeconds: { _ in 0.05 })
+
+        let result = await sut.execute(tool: "launch_app", arguments: .object([:]), id: "t9")
+
+        XCTAssertEqual(result.error, "timeout")
+        XCTAssertEqual(wire.sent.last, .toolCancel(id: "t9"))
+    }
+
+    /// ...but only when the timeout is what ended the wait. A reply that
+    /// arrives first means the work finished, and cancelling finished work is
+    /// a message about nothing.
+    func test_aReplyBeforeTheTimeout_isNotFollowedByACancel() async {
+        let wire = Wire()
+        let sut = PetToolDispatcher(send: wire.send, timeoutSeconds: { _ in 0.05 })
+
+        async let pending = sut.execute(tool: "launch_app", arguments: .object([:]), id: "t10")
+        await waitForDispatch(on: wire)
+        sut.handle(ToolResult(id: "t10", ok: true, data: nil, error: nil))
+        _ = await pending
+
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertFalse(wire.sent.contains(.toolCancel(id: "t10")))
+    }
+
     func test_socketDrop_failsEverythingInFlight() async {
         let wire = Wire()
         let sut = PetToolDispatcher(send: wire.send)

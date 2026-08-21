@@ -47,13 +47,13 @@ struct ChatPaneView: View {
                     onCancel: { store.cancelActiveRun() }
                 )
             }
-            .navigationTitle(session.title)
+            .navigationTitle(session.displayTitle)
             .navigationSubtitle(activeWorkspace?.name ?? "")
             .toolbar { toolbarContent }
         } else {
             // Only reachable if the active ids point at a session that no
             // longer exists; the store always seeds one per workspace.
-            ContentUnavailableView("대화를 선택하세요", systemImage: "bubble.left.and.bubble.right")
+            ContentUnavailableView(Strings.text(.chatSelectAConversation), systemImage: "bubble.left.and.bubble.right")
         }
     }
 
@@ -68,16 +68,16 @@ struct ChatPaneView: View {
             Button {
                 store.requestNewSession(title: ChatSession.placeholderTitle, in: store.activeWorkspaceId)
             } label: {
-                Label("새 대화", systemImage: "square.and.pencil")
+                Label(Strings.text(.chatNewSession), systemImage: "square.and.pencil")
             }
-            .help("\(activeWorkspace?.name ?? "이 워크스페이스")에 새 대화")
+            .help(newSessionHelp)
             .keyboardShortcut("n", modifiers: .command)
         }
         ToolbarItem {
             Button {
                 editor = editor.toggled
             } label: {
-                Label("에디터", systemImage: "chevron.left.forwardslash.chevron.right")
+                Label(Strings.text(.chatEditor), systemImage: "chevron.left.forwardslash.chevron.right")
             }
             .disabled(activeWorkspace?.canOpenEditor != true || editor == .detached)
             .help(editorButtonHelp)
@@ -91,28 +91,35 @@ struct ChatPaneView: View {
                 editor = editor == .detached ? .attached : .detached
             } label: {
                 Label(
-                    editor == .detached ? "에디터 붙이기" : "에디터 떼기",
+                    Strings.text(editor == .detached ? .chatAttachEditor : .chatDetachEditor),
                     systemImage: editor == .detached
                         ? "arrow.down.right.and.arrow.up.left"
                         : "macwindow.on.rectangle"
                 )
             }
             .disabled(activeWorkspace?.canOpenEditor != true)
-            .help(editor == .detached ? "에디터를 이 창으로 다시 붙여요" : "에디터를 별도 창으로 떼어내요")
+            .help(Strings.text(editor == .detached ? .chatAttachEditorHelp : .chatDetachEditorHelp))
             .keyboardShortcut("d", modifiers: [.command, .shift])
         }
         ToolbarItem {
             Button {
                 NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
             } label: {
-                Label("설정", systemImage: "gearshape")
+                Label(Strings.text(.chatSettings), systemImage: "gearshape")
             }
         }
     }
 
+    /// Names the workspace the chat would be created in -- "this workspace"
+    /// only when it has no name to give.
+    private var newSessionHelp: String {
+        let workspace = activeWorkspace?.name ?? Strings.text(.chatThisWorkspace)
+        return "\(workspace) · \(Strings.text(.chatNewSession))"
+    }
+
     private var editorButtonHelp: String {
-        guard activeWorkspace?.canOpenEditor == true else { return "이 워크스페이스에는 연결된 프로젝트가 없어요" }
-        return editor == .detached ? "에디터가 별도 창에 열려 있어요" : "에디터"
+        guard activeWorkspace?.canOpenEditor == true else { return Strings.text(.chatNoProjectLinked) }
+        return Strings.text(editor == .detached ? .chatEditorInSeparateWindow : .chatEditor)
     }
 
     private var activeWorkspace: ClientWorkspace? {
@@ -169,7 +176,7 @@ struct ChatInputBar: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Agent에게 메시지를 보내세요…", text: $text, axis: .vertical)
+            TextField(Strings.text(.chatComposerPlaceholder), text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...8)
                 .focused($isFocused)
@@ -189,15 +196,15 @@ struct ChatInputBar: View {
                 Button(role: .cancel, action: onCancel) {
                     ControlGlyph(systemName: "stop.circle.fill")
                 }
-                .accessibilityLabel("중지")
-                .help("중지")
+                .accessibilityLabel(Strings.text(.chatStop))
+                .help(Strings.text(.chatStop))
             } else {
                 Button(action: send) {
                     ControlGlyph(systemName: "arrow.up.circle.fill")
                 }
                 .disabled(trimmed.isEmpty)
-                .accessibilityLabel("보내기")
-                .help("보내기")
+                .accessibilityLabel(Strings.text(.chatSend))
+                .help(Strings.text(.chatSend))
             }
         }
         .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth)
@@ -218,7 +225,7 @@ struct ChatInputBar: View {
     }
 }
 
-/// "새 워크스페이스". The folder itself is chosen with NSOpenPanel -- SwiftUI
+/// The new-workspace sheet. The folder itself is chosen with NSOpenPanel -- SwiftUI
 /// has no directory picker, and the panel is what the web version reached
 /// through the bridge to get anyway.
 struct NewWorkspaceSheet: View {
@@ -230,17 +237,17 @@ struct NewWorkspaceSheet: View {
 
     var body: some View {
         Form {
-            TextField("이름", text: $name)
-            LabeledContent("프로젝트 폴더") {
+            TextField(Strings.text(.chatWorkspaceName), text: $name)
+            LabeledContent(Strings.text(.chatProjectFolder)) {
                 HStack {
-                    Text(projectPath.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? "선택 안 함")
+                    Text(projectPath.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? Strings.text(.chatNoFolderSelected))
                         .foregroundStyle(projectPath == nil ? .secondary : .primary)
                         .truncationMode(.head)
                         .lineLimit(1)
-                    Button("선택…", action: chooseFolder)
+                    Button(Strings.text(.commonChoose), action: chooseFolder)
                 }
             }
-            Text("폴더를 연결하면 에디터와 코드 편집을 쓸 수 있어요. 대화만 할 거면 비워 두세요.")
+            Text(Strings.text(.chatProjectFolderExplanation))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -248,8 +255,8 @@ struct NewWorkspaceSheet: View {
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Spacer()
-                Button("취소", role: .cancel) { dismiss() }
-                Button("만들기") {
+                Button(Strings.text(.commonCancel), role: .cancel) { dismiss() }
+                Button(Strings.text(.commonCreate)) {
                     store.requestNewWorkspace(name: name, projectPath: projectPath)
                     dismiss()
                 }

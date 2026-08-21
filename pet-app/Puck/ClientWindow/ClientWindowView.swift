@@ -27,6 +27,10 @@ import SwiftUI
 
 struct ClientWindowView: View {
     @ObservedObject var store: ClientWindowStore
+    /// Watched here rather than in each view that reads `Strings`: this is
+    /// the window's root, so one observer redraws the whole hierarchy when
+    /// the language changes.
+    @ObservedObject private var localization = Localization.shared
     @State private var editor: EditorPresentation = .hidden
 
     /// The window cannot go narrower than what it is currently showing. Two

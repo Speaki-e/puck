@@ -14,11 +14,9 @@ import Foundation
 final class ClientWindowStore: ObservableObject {
     static let defaultWorkspaceId = "default"
     static let defaultSessionId = "default"
-    /// 02_pet-app.md F13 calls the always-present default session/workspace
-    /// the "일상 대화" (casual conversation) one -- this was the English word
-    /// "Casual" until 2026-08-02, which leaked into the sidebar/topBar UI
-    /// despite the rest of the app being Korean-only.
-    private static let casualSessionTitle = "일상 대화"
+    /// Defined on ChatSession, which is also what matches on it. A stored,
+    /// language-independent value; `ChatSession.displayTitle` translates it.
+    private static let casualSessionTitle = ChatSession.casualTitle
 
     /// Sessions are keyed on (workspaceId, sessionId), not sessionId alone:
     /// every workspace gets its own "default" casual session (see
@@ -121,7 +119,7 @@ final class ClientWindowStore: ObservableObject {
         sessionOrder.removeAll { $0 == key }
     }
 
-    /// Whether the sidebar's "삭제" should be offered for this chat.
+    /// Whether the sidebar's Delete should be offered for this chat.
     ///
     /// Two chats it is never offered for. The workspace's casual session:
     /// protocol 3.4 keeps `session_id: "default"` present under every
@@ -196,7 +194,7 @@ final class ClientWindowStore: ObservableObject {
                 activeWorkspaceId = workspaceId
                 activeSessionId = sessionId
             } else if let waiting = pendingSessionRequests[workspaceId], waiting > 0 {
-                // This is a chat our own "새 대화" button asked for. Spend one
+                // This is a chat our own ChatSession.placeholderTitle button asked for. Spend one
                 // press as we go, so one session follows one press.
                 pendingSessionRequests[workspaceId] = waiting - 1
                 activeWorkspaceId = workspaceId
@@ -276,7 +274,7 @@ final class ClientWindowStore: ObservableObject {
         sender.createWorkspace(name: name, projectPath: projectPath)
     }
 
-    /// How many "새 대화" presses each workspace is still waiting on. The
+    /// How many ChatSession.placeholderTitle presses each workspace is still waiting on. The
     /// session id is minted on the other side, so the button cannot switch to
     /// its chat at press time -- a press arms this, and the matching
     /// session_create spends one. Scoped to our own requests on purpose: a
@@ -320,7 +318,7 @@ final class ClientWindowStore: ObservableObject {
             onUserCommand(text, activeWorkspaceId, activeSessionId)
             target?.markWaitingForAgent()
             // Not `.notDelivered`: the agent is right here, so the
-            // "워크스페이스가 꺼져 있어요" banner would be a lie even though no
+            // offline banner would be a lie even though no
             // workspace is connected.
             return .sent
         }
@@ -347,7 +345,7 @@ final class ClientWindowStore: ObservableObject {
     ///   handleChatEvent).
     /// The sidebar's own selection. Goes through the store rather than setting
     /// the two ids directly so that picking a chat by hand also puts down any
-    /// "새 대화" still armed -- a request whose confirmation never arrived would
+    /// ChatSession.placeholderTitle still armed -- a request whose confirmation never arrived would
     /// otherwise stay armed indefinitely and jump the user away from the chat
     /// they chose the next time any user-origin session turned up.
     func selectSession(workspaceId: String, sessionId: String) {

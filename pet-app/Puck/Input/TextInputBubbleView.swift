@@ -182,7 +182,7 @@ final class TextInputBubbleView: NSView {
     private func configureAttachmentViews() {
         attachButton.bezelStyle = .regularSquare
         attachButton.isBordered = false
-        attachButton.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "화면 영역 캡처")
+        attachButton.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: Strings.text(.bubbleCapturePrompt))
         attachButton.imageScaling = .scaleProportionallyUpOrDown
         attachButton.contentTintColor = .secondaryLabelColor
         attachButton.target = self
@@ -238,9 +238,7 @@ final class TextInputBubbleView: NSView {
         textFieldLeadingWithThumbnail.isActive = image != nil
     }
 
-    /// Hardcoded Korean, like the "워크스페이스가 꺼져 있어요" notice this same
-    /// bubble shows -- bubble copy doesn't go through Strings yet.
-    private static let placeholder = "무엇을 도와드릴까요?"
+    private static var placeholder: String { Strings.text(.bubblePlaceholder) }
 
     /// A rounded rectangle just big enough to hold both corners, stretched
     /// across whatever size the panel ends up -- the cap insets keep the

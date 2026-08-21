@@ -107,7 +107,7 @@ final class ChatSession: ObservableObject, Identifiable {
     var pendingApproval: PendingApproval? { pendingApprovals.first }
 
     /// When this session last saw any agent event. Drives the sidebar's relative
-    /// time ("12분", "어제") -- nothing else in the app tracked time before v3.
+    /// time (see RelativeTime) -- nothing else in the app tracked time before v3.
     @Published private(set) var lastActivityAt: Date?
 
     /// Outcome of the most recent completed run, or nil if none has completed.
@@ -122,7 +122,7 @@ final class ChatSession: ObservableObject, Identifiable {
 
     /// Whether the name is one this app picked for itself, and may therefore
     /// replace. False for a task session the agent named through
-    /// open_task_session and for the casual "일상 대화" -- renaming either out
+    /// open_task_session and for the casual chat -- renaming either out
     /// from under its owner is not a refinement, it is a loss.
     let isAutoTitled: Bool
 
@@ -182,13 +182,33 @@ final class ChatSession: ObservableObject, Identifiable {
     /// state, and a flag could disagree with the title shown in the sidebar.
     static let placeholderTitle = "새 대화"
 
+    /// The always-present entry point under every workspace.
+    ///
+    /// Like `placeholderTitle`, this is a stored, matched-on value rather
+    /// than display text -- `isAutoTitled` and `ClientWindowStore` compare
+    /// against both. Translating what gets stored would strand every chat
+    /// created under the other language, so the language only enters at
+    /// `displayTitle`.
+    static let casualTitle = "일상 대화"
+
+    /// The title to show. The two titles this app assigns itself are
+    /// language-independent on disk (see `casualTitle`), so this is where
+    /// they become words; anything the user or the agent named stands as-is.
+    var displayTitle: String {
+        switch title {
+        case Self.placeholderTitle: return Strings.text(.chatNewSession)
+        case Self.casualTitle: return Strings.text(.chatCasualSession)
+        default: return title
+        }
+    }
+
     /// Local echo of the user's own send -- called by ClientWindowStore, not
     /// folded from a BridgeEvent (protocol never sends the user's own text
     /// back).
     ///
-    /// Also where a chat gets its name: a sidebar of rows all called "새 대화"
-    /// is one you cannot navigate. Only while the title is still the
-    /// placeholder, which leaves alone both the casual session ("일상 대화",
+    /// Also where a chat gets its name: a sidebar of rows all called the
+    /// placeholder is one you cannot navigate. Only while the title is still the
+    /// placeholder, which leaves alone both the casual session (`casualTitle`,
     /// the always-present entry point under every workspace) and a task
     /// session the agent already named through open_task_session -- the latter
     /// matters because moveTurnToTaskSession feeds it the message that started
@@ -220,7 +240,7 @@ final class ChatSession: ObservableObject, Identifiable {
     /// two chats apart, short enough that the row truncates rarely.
     private static let titleLimit = 28
 
-    /// The send landed, so the agent owes an answer -- shown as the "생각 중"
+    /// The send landed, so the agent owes an answer -- shown as the thinking
     /// row until the first text_chunk replaces it -- the user should see that
     /// the agent is working while it generates a reply, not a blank gap.
     ///

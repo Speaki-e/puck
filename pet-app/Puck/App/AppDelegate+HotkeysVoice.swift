@@ -178,7 +178,7 @@ extension AppDelegate {
     /// PuckClient now, not workspace -- it hosts the agent as of 2026-08-15 --
     /// so the wording names the chat window the user would actually open.
     private func showClientOfflineBubble() {
-        showNoticeBubble("채팅 창이 꺼져 있어요", for: 2.5)
+        showNoticeBubble(Strings.text(.bubbleClientOffline), for: 2.5)
     }
 
     /// Puts the bubble over the pet's head, so what it says comes from it

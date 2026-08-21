@@ -149,7 +149,7 @@ func toolFailureLine(ok: Bool?, error: ToolErrorCode?, detail: String?) -> Strin
         .first
         .map { $0.trimmingCharacters(in: .whitespaces) }
     if let firstLine, !firstLine.isEmpty { return firstLine }
-    return error?.rawValue ?? "실패했어요."
+    return error?.rawValue ?? Strings.text(.chatFailed)
 }
 
 // MARK: - Rows
@@ -301,18 +301,18 @@ private struct ApprovalBanner: View {
             Label(summary, systemImage: "hand.raised.fill")
             switch state {
             case .resolved:
-                Text("응답함")
+                Text(Strings.text(.chatApprovalAnswered))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .queued:
-                Text("앞의 요청에 먼저 응답해 주세요.")
+                Text(Strings.text(.chatApprovalRespondToPreviousFirst))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .actionable:
                 HStack {
-                    Button("허용") { onApproval(true) }
+                    Button(Strings.text(.chatApprovalAllow)) { onApproval(true) }
                         .keyboardShortcut(.defaultAction)
-                    Button("거부", role: .cancel) { onApproval(false) }
+                    Button(Strings.text(.chatApprovalDeny), role: .cancel) { onApproval(false) }
                 }
             }
         }
@@ -328,7 +328,7 @@ private struct DoneRow: View {
 
     var body: some View {
         Label {
-            Text(summary.isEmpty ? (ok ? "완료" : "실패") : summary)
+            Text(summary.isEmpty ? (Strings.text(ok ? .chatDone : .chatDoneFailed)) : summary)
         } icon: {
             Image(systemName: ok ? "checkmark.circle" : "xmark.circle")
                 // Orange for a failure, the same signal a failed tool call
@@ -349,9 +349,9 @@ private struct DoneRow: View {
 private struct EmptyTranscript: View {
     var body: some View {
         VStack(spacing: 4) {
-            Text("무엇을 도와드릴까요?")
+            Text(Strings.text(.chatEmptyTitle))
                 .font(.title3.weight(.semibold))
-            Text("코드든 잡담이든, 편하게 말 걸어보세요.")
+            Text(Strings.text(.chatEmptySubtitle))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -363,7 +363,7 @@ private struct RunningStatusLine: View {
     var body: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text("생각 중…")
+            Text(Strings.text(.chatThinking))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

@@ -212,7 +212,7 @@ extension AppDelegate {
         pinCharacter()
         avatar?.showEmotion("angry")
 
-        showNoticeBubble("제 목소리가 시끄러우신거에요?", for: Self.mutedComplaintDuration) { [weak self] in
+        showNoticeBubble(Strings.text(.bubbleMutedComplaint), for: Self.mutedComplaintDuration) { [weak self] in
             // Falling is also what puts the face back: entering Fall plays the
             // fall clip, so the sulk ends without anyone having to remember
             // which expression the pet was wearing before it. The pin

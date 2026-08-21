@@ -59,6 +59,8 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     /// What the pet says when it needs a permission it doesn't have.
     case permissionNeededBubble
+    /// The rest of the pet's own speech-bubble copy.
+    case bubbleClientOffline, bubbleMutedComplaint, bubbleCapturePrompt, bubblePlaceholder
 
     // F15: the agent's API key, entered here rather than in a .env.
     case agentHeader, apiKeySave, apiKeyClear
@@ -80,6 +82,32 @@ enum L10nKey: String, CaseIterable, Hashable {
     case failedToValidateFormat
     case updatedEmotionFormat
     case failedToSetEmotionFormat
+
+
+    // MARK: - Client window (PuckClient)
+
+    /// Shared by more than one surface, so they cannot drift apart.
+    case commonCancel, commonDelete, commonCreate, commonChoose
+
+    case chatSelectAConversation, chatNewSession, chatCasualSession, chatThisWorkspace
+    case chatSettings, chatComposerPlaceholder, chatStop, chatSend
+    case chatEditor, chatAttachEditor, chatDetachEditor
+    case chatAttachEditorHelp, chatDetachEditorHelp
+    case chatNoProjectLinked, chatEditorInSeparateWindow
+    case chatEmptyTitle, chatEmptySubtitle, chatThinking, chatFailed
+    case chatDone, chatDoneFailed
+    case chatApprovalAnswered, chatApprovalRespondToPreviousFirst
+    case chatApprovalAllow, chatApprovalDeny
+    case chatDeleteSessionTitle, chatDeleteSessionMessage
+    case chatNewWorkspace, chatWorkspaceName, chatProjectFolder
+    case chatNoFolderSelected, chatProjectFolderExplanation
+
+    /// The sidebar's relative times. `Format` keys take the number as %1$@ --
+    /// the unit trails it in Korean and in English alike, but the two
+    /// disagree on spacing, so the whole string is translated rather than
+    /// concatenated from a number and a unit.
+    case timeJustNow, timeYesterday
+    case timeMinutesFormat, timeHoursFormat, timeDaysFormat, timeMonthDayFormat
 
     /// The panel's action rows. Settings and Switch Avatar are gone with the
     /// NSMenu: the panel *is* settings, and it opens on the avatar section.
@@ -159,6 +187,10 @@ enum Strings {
         .mappedCountFormat: "%2$@개 중 %1$@개 매핑됨",
 
         .permissionNeededBubble: "그거 하려면 권한이 필요해요. 제가 가리키는 창에서 허용해 주세요!",
+        .bubbleClientOffline: "채팅 창이 꺼져 있어요",
+        .bubbleMutedComplaint: "제 목소리가 시끄러우신거에요?",
+        .bubbleCapturePrompt: "화면 영역 캡처",
+        .bubblePlaceholder: "무엇을 도와드릴까요?",
 
         .agentHeader: "에이전트",
         .providerLabel: "AI 공급자",
@@ -184,6 +216,51 @@ enum Strings {
         .failedToValidateFormat: "유효성 검사 실패: %1$@",
         .updatedEmotionFormat: "'%1$@' 업데이트 완료.",
         .failedToSetEmotionFormat: "'%1$@' 설정 실패: %2$@",
+
+        .commonCancel: "취소",
+        .commonDelete: "삭제",
+        .commonCreate: "만들기",
+        .commonChoose: "선택…",
+
+        .chatSelectAConversation: "대화를 선택하세요",
+        .chatNewSession: "새 대화",
+        .chatCasualSession: "일상 대화",
+        .chatThisWorkspace: "이 워크스페이스",
+        .chatSettings: "설정",
+        .chatComposerPlaceholder: "Agent에게 메시지를 보내세요…",
+        .chatStop: "중지",
+        .chatSend: "보내기",
+        .chatEditor: "에디터",
+        .chatAttachEditor: "에디터 붙이기",
+        .chatDetachEditor: "에디터 떼기",
+        .chatAttachEditorHelp: "에디터를 이 창으로 다시 붙여요",
+        .chatDetachEditorHelp: "에디터를 별도 창으로 떼어내요",
+        .chatNoProjectLinked: "이 워크스페이스에는 연결된 프로젝트가 없어요",
+        .chatEditorInSeparateWindow: "에디터가 별도 창에 열려 있어요",
+        .chatEmptyTitle: "무엇을 도와드릴까요?",
+        .chatEmptySubtitle: "코드든 잡담이든, 편하게 말 걸어보세요.",
+        .chatThinking: "생각 중…",
+        .chatFailed: "실패했어요.",
+        .chatDone: "완료",
+        .chatDoneFailed: "실패",
+        .chatApprovalAnswered: "응답함",
+        .chatApprovalRespondToPreviousFirst: "앞의 요청에 먼저 응답해 주세요.",
+        .chatApprovalAllow: "허용",
+        .chatApprovalDeny: "거부",
+        .chatDeleteSessionTitle: "이 대화를 삭제할까요?",
+        .chatDeleteSessionMessage: "주고받은 내용이 모두 사라지고, 되돌릴 수 없어요.",
+        .chatNewWorkspace: "새 워크스페이스",
+        .chatWorkspaceName: "이름",
+        .chatProjectFolder: "프로젝트 폴더",
+        .chatNoFolderSelected: "선택 안 함",
+        .chatProjectFolderExplanation: "폴더를 연결하면 에디터와 코드 편집을 쓸 수 있어요. 대화만 할 거면 비워 두세요.",
+
+        .timeJustNow: "방금",
+        .timeYesterday: "어제",
+        .timeMinutesFormat: "%1$@분",
+        .timeHoursFormat: "%1$@시간",
+        .timeDaysFormat: "%1$@일",
+        .timeMonthDayFormat: "%1$@월 %2$@일",
 
         .menuToys: "장난감",
         .menuHide: "숨기기",
@@ -240,6 +317,10 @@ enum Strings {
         .mappedCountFormat: "%1$@ of %2$@ mapped",
 
         .permissionNeededBubble: "I need permission for that. Allow it in the window I'm pointing at!",
+        .bubbleClientOffline: "The chat window isn't open",
+        .bubbleMutedComplaint: "Am I being too loud?",
+        .bubbleCapturePrompt: "Capture a screen area",
+        .bubblePlaceholder: "What can I help with?",
 
         .agentHeader: "Agent",
         .providerLabel: "AI provider",
@@ -265,6 +346,51 @@ enum Strings {
         .failedToValidateFormat: "Validation failed: %1$@",
         .updatedEmotionFormat: "Updated '%1$@'.",
         .failedToSetEmotionFormat: "Couldn't set '%1$@': %2$@",
+
+        .commonCancel: "Cancel",
+        .commonDelete: "Delete",
+        .commonCreate: "Create",
+        .commonChoose: "Choose…",
+
+        .chatSelectAConversation: "Select a conversation",
+        .chatNewSession: "New chat",
+        .chatCasualSession: "Everyday chat",
+        .chatThisWorkspace: "This workspace",
+        .chatSettings: "Settings",
+        .chatComposerPlaceholder: "Message the agent…",
+        .chatStop: "Stop",
+        .chatSend: "Send",
+        .chatEditor: "Editor",
+        .chatAttachEditor: "Attach editor",
+        .chatDetachEditor: "Detach editor",
+        .chatAttachEditorHelp: "Put the editor back in this window",
+        .chatDetachEditorHelp: "Open the editor in a window of its own",
+        .chatNoProjectLinked: "No project is linked to this workspace",
+        .chatEditorInSeparateWindow: "The editor is open in its own window",
+        .chatEmptyTitle: "What can I help with?",
+        .chatEmptySubtitle: "Code or small talk — just say something.",
+        .chatThinking: "Thinking…",
+        .chatFailed: "That failed.",
+        .chatDone: "Done",
+        .chatDoneFailed: "Failed",
+        .chatApprovalAnswered: "Answered",
+        .chatApprovalRespondToPreviousFirst: "Answer the earlier request first.",
+        .chatApprovalAllow: "Allow",
+        .chatApprovalDeny: "Deny",
+        .chatDeleteSessionTitle: "Delete this conversation?",
+        .chatDeleteSessionMessage: "Everything said here goes with it, and it cannot be undone.",
+        .chatNewWorkspace: "New workspace",
+        .chatWorkspaceName: "Name",
+        .chatProjectFolder: "Project folder",
+        .chatNoFolderSelected: "None",
+        .chatProjectFolderExplanation: "Link a folder to use the editor and let the agent edit code. Leave it empty for conversation only.",
+
+        .timeJustNow: "just now",
+        .timeYesterday: "Yesterday",
+        .timeMinutesFormat: "%1$@ min",
+        .timeHoursFormat: "%1$@ hr",
+        .timeDaysFormat: "%1$@ d",
+        .timeMonthDayFormat: "%1$@/%2$@",
 
         .menuToys: "Toys",
         .menuHide: "Hide",

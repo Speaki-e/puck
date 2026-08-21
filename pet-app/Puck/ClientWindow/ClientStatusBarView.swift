@@ -42,12 +42,12 @@ struct ClientStatusBarView: View {
         AgentConfiguration.load().model
     }
 
-    // "일상 대화" matches ClientWindowStore.casualSessionTitle -- the
+    // Matches ClientWindowStore.casualSessionTitle -- the
     // default workspace's own name, not an English placeholder (every
     // sibling string here is Korean, e.g. ConflictBannerView's "디스크에서
     // 파일이 변경됐습니다").
     private var projectLabel: String {
-        guard let projectPath = workspace?.projectPath else { return workspace?.name ?? "일상 대화" }
+        guard let projectPath = workspace?.projectPath else { return workspace?.name ?? Strings.text(.chatCasualSession) }
         return abbreviatedPath(projectPath, home: NSHomeDirectory())
     }
 

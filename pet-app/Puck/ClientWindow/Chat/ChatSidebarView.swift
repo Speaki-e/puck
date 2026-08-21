@@ -15,10 +15,10 @@ import SwiftUI
 
 struct ChatSidebarView: View {
     @ObservedObject var store: ClientWindowStore
-    /// Presented by the "새 워크스페이스" button; the folder picker itself is
+    /// Presented by the new-workspace button; the folder picker itself is
     /// AppKit's, since SwiftUI has no directory-choosing equivalent.
     @State private var isAddingWorkspace = false
-    /// The chat whose "삭제" was picked, held until the confirmation is
+    /// The chat whose Delete was picked, held until the confirmation is
     /// answered. Deleting a chat throws away everything said in it and there
     /// is no undo, so the menu item asks rather than acts.
     @State private var pendingDeletion: SessionSelection?
@@ -36,7 +36,7 @@ struct ChatSidebarView: View {
                                 // trash icon on every row is a mis-click
                                 // waiting to happen in a list you navigate by
                                 // clicking.
-                                Button("삭제", role: .destructive) {
+                                Button(Strings.text(.commonDelete), role: .destructive) {
                                     pendingDeletion = SessionSelection(workspaceId: workspace.id, sessionId: session.id)
                                 }
                                 .disabled(!store.canDeleteSession(workspaceId: workspace.id, sessionId: session.id))
@@ -54,7 +54,7 @@ struct ChatSidebarView: View {
                 Button {
                     isAddingWorkspace = true
                 } label: {
-                    Label("새 워크스페이스", systemImage: "plus.circle")
+                    Label(Strings.text(.chatNewWorkspace), systemImage: "plus.circle")
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(.rect)
                 }
@@ -70,16 +70,16 @@ struct ChatSidebarView: View {
             NewWorkspaceSheet(store: store)
         }
         .confirmationDialog(
-            "이 대화를 삭제할까요?",
+            Strings.text(.chatDeleteSessionTitle),
             isPresented: .init(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
             presenting: pendingDeletion
         ) { target in
-            Button("삭제", role: .destructive) {
+            Button(Strings.text(.commonDelete), role: .destructive) {
                 store.deleteSession(workspaceId: target.workspaceId, sessionId: target.sessionId)
             }
-            Button("취소", role: .cancel) {}
+            Button(Strings.text(.commonCancel), role: .cancel) {}
         } message: { _ in
-            Text("주고받은 내용이 모두 사라지고, 되돌릴 수 없어요.")
+            Text(Strings.text(.chatDeleteSessionMessage))
         }
     }
 
@@ -144,7 +144,7 @@ private struct ChatSessionRow: View {
             // Not pulsing: a session row sits on screen indefinitely, and a
             // dot animating for minutes reads as activity that isn't there.
             StatusDotView(status: dotStatus, palette: palette, pulses: session.isRunning)
-            Text(session.title)
+            Text(session.displayTitle)
                 .lineLimit(1)
             Spacer(minLength: 4)
             let relative = RelativeTime.short(since: session.lastActivityAt)

@@ -12,7 +12,13 @@ import XCTest
 final class IdleStateTests: XCTestCase {
     private final class SpyWanderDelegate: IdleWanderDelegate {
         private(set) var received: [WanderScheduler.Outcome] = []
+        private(set) var lostFootingBehind: [WindowInfo] = []
         func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) { received.append(outcome) }
+        func idleStateDidLoseFootingBehind(_ window: WindowInfo) { lostFootingBehind.append(window) }
+    }
+
+    private static func window(_ frame: CGRect, id: CGWindowID = 1) -> WindowInfo {
+        WindowInfo(windowID: id, ownerPID: 1, ownerName: "PuckClient", title: nil, layer: 0, frame: frame)
     }
 
     func test_update_notifiesDelegate_whenWanderTimerFires() {
@@ -66,5 +72,40 @@ final class IdleStateTests: XCTestCase {
         world.run(state, seconds: 5) // below the scheduler's 8s minimum interval
 
         XCTAssertTrue(world.requestedTransitions.isEmpty)
+    }
+
+    /// Clicking the chat window used to drop the pet into the middle of it:
+    /// the window covered the edge the pet was standing on, so the surface
+    /// read as gone, and the floor it fell to was covered by that same window
+    /// -- the pet draws above every window, so it just moved from one hidden
+    /// spot to a more annoying one (2026-08-22).
+    func test_theSurfaceGoingBehindAWindow_asksTheDelegateInsteadOfFalling() {
+        let world = TestStateWorld(position: CGPoint(x: 400, y: 200))
+        world.landingY = 900
+        world.windows = [Self.window(CGRect(x: 0, y: 40, width: 1000, height: 900))]
+        let delegate = SpyWanderDelegate()
+        let state = IdleState()
+        state.wanderDelegate = delegate
+
+        state.update(dt: 0.1, context: world.context)
+
+        XCTAssertTrue(world.requestedTransitions.isEmpty, "falling behind the window helps nobody")
+        XCTAssertEqual(delegate.lostFootingBehind.map(\.windowID), [1])
+    }
+
+    /// The window actually closing is still a fall: nothing covers where the
+    /// pet would land, so landing there is visible and correct.
+    func test_theSurfaceSimplyDisappearing_stillFalls() {
+        let world = TestStateWorld(position: CGPoint(x: 400, y: 200))
+        world.landingY = 900
+        world.windows = [Self.window(CGRect(x: 0, y: 40, width: 100, height: 900))]
+        let delegate = SpyWanderDelegate()
+        let state = IdleState()
+        state.wanderDelegate = delegate
+
+        state.update(dt: 0.1, context: world.context)
+
+        XCTAssertEqual(world.requestedTransitions, [.fall])
+        XCTAssertTrue(delegate.lostFootingBehind.isEmpty)
     }
 }

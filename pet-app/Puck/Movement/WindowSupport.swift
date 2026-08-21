@@ -18,6 +18,35 @@ enum WindowSupport {
     /// How close to a side counts as bumping into it.
     static let edgeTolerance: CGFloat = 4
 
+    /// The frontmost window covering `point`, if any.
+    ///
+    /// What "covering" means for the pet: it draws above every window, so a
+    /// spot inside a window is one where the pet appears to stand *in* that
+    /// window's content rather than on the desktop.
+    static func coveringWindow(at point: CGPoint, in windows: [WindowInfo]) -> WindowInfo? {
+        windows.first { $0.frame.contains(point) }
+    }
+
+    /// Somewhere to stand that `frame` does not cover: the nearer side of it,
+    /// on the floor, far enough out that the pet's whole body clears the
+    /// window. nil when neither side has room -- a window spanning the screen
+    /// leaves nowhere to step aside to, and moving anyway would only pick a
+    /// different spot inside it.
+    static func asideTarget(
+        from position: CGPoint,
+        avoiding frame: CGRect,
+        in area: CGRect,
+        petHalfWidth: CGFloat
+    ) -> CGPoint? {
+        let left = frame.minX - petHalfWidth
+        let right = frame.maxX + petHalfWidth
+        let candidates = [left, right]
+            .filter { $0 - petHalfWidth >= area.minX && $0 + petHalfWidth <= area.maxX }
+            .sorted { abs($0 - position.x) < abs($1 - position.x) }
+        guard let x = candidates.first else { return nil }
+        return CGPoint(x: x, y: area.maxY)
+    }
+
     /// The frontmost window whose top edge the pet is standing on.
     static func supportingWindow(under position: CGPoint, in windows: [WindowInfo]) -> WindowInfo? {
         windows.first { window in

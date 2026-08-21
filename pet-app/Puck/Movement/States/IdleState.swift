@@ -14,6 +14,12 @@ import Foundation
 /// CharacterController (the future App bootstrap wiring).
 protocol IdleWanderDelegate: AnyObject {
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome)
+
+    /// The surface underfoot went behind `window` -- the user brought that
+    /// window to the front. Falling is not the answer here (see the call
+    /// site), so the decision goes up to whoever knows the settings and the
+    /// window list.
+    func idleStateDidLoseFootingBehind(_ window: WindowInfo)
 }
 
 final class IdleState: StateHandler {
@@ -37,7 +43,18 @@ final class IdleState: StateHandler {
         // whatever was there is now gone.
         let surfaceY = context.landingY(context.body.position)
         guard surfaceY <= context.body.position.y + WindowSupport.footTolerance else {
-            context.requestTransition(.fall)
+            // Falling is right when the surface is simply gone, and wrong when
+            // it only went *behind* something: the pet draws above every
+            // window, so dropping to a floor that same window also covers just
+            // relocates it from a hidden edge to the middle of the window the
+            // user is working in -- which is what clicking the chat window
+            // used to do to it (2026-08-22).
+            let landing = CGPoint(x: context.body.position.x, y: surfaceY)
+            if let covering = WindowSupport.coveringWindow(at: landing, in: context.windows) {
+                wanderDelegate?.idleStateDidLoseFootingBehind(covering)
+            } else {
+                context.requestTransition(.fall)
+            }
             return
         }
 

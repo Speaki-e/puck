@@ -40,12 +40,18 @@ final class PetHomeDeciderTests: XCTestCase {
         let decider = PetHomeDecider()
         decider.report(hasTank: true, visible: true, pinned: false)
 
+        // Measured against the hold rather than in fixed frames: how long a
+        // state has to last before the pet acts on it is a number that gets
+        // tuned, and a test with 20 frames written into it starts failing for
+        // a reason that has nothing to do with what it is checking.
+        let tooShort = PetHomeDecider.holdSeconds * 0.6
+
         var move: PetHomeDecider.Move?
-        for _ in 0..<20 { move = decider.tick(dt: 1.0 / 60) ?? move } // ~0.33s
+        for _ in 0..<Int(tooShort * 60) { move = decider.tick(dt: 1.0 / 60) ?? move }
         XCTAssertNil(move, "not held long enough yet")
 
         decider.report(hasTank: true, visible: false, pinned: false)
-        for _ in 0..<20 { move = decider.tick(dt: 1.0 / 60) ?? move }
+        for _ in 0..<Int(tooShort * 60) { move = decider.tick(dt: 1.0 / 60) ?? move }
         XCTAssertNil(move, "the new state has not held either")
     }
 

@@ -30,7 +30,7 @@ final class TravelState: StateHandler {
     var destination: CGPoint?
     /// Short enough not to hold up whatever prompted the move, long enough to
     /// be a movement rather than a jump.
-    var duration: TimeInterval = 0.55
+    var duration: TimeInterval = 0.42
     /// Called every frame with the eased progress, so the caller can carry
     /// anything else across on the same curve -- the pet's size shrinks into
     /// the island this way rather than snapping when it lands.

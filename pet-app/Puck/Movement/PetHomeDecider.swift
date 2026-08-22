@@ -19,8 +19,13 @@ final class PetHomeDecider {
     }
 
     /// How long a state has to hold before the pet acts on it. Alt-tabbing
-    /// past the window would otherwise teleport the pet there and back.
-    static let holdSeconds: TimeInterval = 0.7
+    /// past the window would otherwise send the pet there and back.
+    ///
+    /// Short enough to read as the pet answering the window rather than
+    /// noticing it later: at 0.7 the window was up and being typed in before
+    /// the pet set off. What it has to outlast is a window passing through
+    /// focus, which takes an instant, not most of a second.
+    static let holdSeconds: TimeInterval = 0.25
 
     /// The menu bar's Hide toggle. Outranks everything: a hidden pet is not
     /// somewhere, it is nowhere.

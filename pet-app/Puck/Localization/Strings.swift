@@ -82,6 +82,9 @@ enum L10nKey: String, CaseIterable, Hashable {
     case permissionsToolsOnly, permissionsEdits, permissionsEverything
     /// The skills the coding CLI loads, and where each came from.
     case skillsHeader, skillSourcePersonal, skillSourceProject
+    /// The right sidebar's tabs, and the session list inside one of them.
+    case explorerTabFiles, explorerTabSessions
+    case sessionsHeader, sessionsEmpty, sessionsLoading, sessionsRefresh
     case skillsEmpty, skillsExplanation, skillReveal, skillCountFormat
 
     /// `/effort` and friends.
@@ -299,6 +302,12 @@ enum Strings {
         - `/fast` — 사고량을 가장 낮게 (`/effort low` 와 같아요)
         - `/help` — 이 목록
         """,
+        .explorerTabFiles: "파일",
+        .explorerTabSessions: "세션",
+        .sessionsHeader: "에이전트 세션 기록",
+        .sessionsEmpty: "기록이 없어요.",
+        .sessionsLoading: "읽는 중…",
+        .sessionsRefresh: "새로고침",
         .skillsHeader: "스킬",
         .skillSourcePersonal: "내 계정",
         .skillSourceProject: "프로젝트",
@@ -556,6 +565,12 @@ enum Strings {
         - `/fast` — the lowest effort (same as `/effort low`)
         - `/help` — this list
         """,
+        .explorerTabFiles: "Files",
+        .explorerTabSessions: "Sessions",
+        .sessionsHeader: "Agent session history",
+        .sessionsEmpty: "No history yet.",
+        .sessionsLoading: "Reading…",
+        .sessionsRefresh: "Refresh",
         .skillsHeader: "Skills",
         .skillSourcePersonal: "Your account",
         .skillSourceProject: "This project",

@@ -37,6 +37,20 @@ extension AppDelegate {
         }
         petHomeDecider.isPetHidden = isCharacterHidden
         petHomeDecider.report(hasTank: petTankArea != nil, visible: visible, pinned: pinned)
+
+        // PetHomeDecider only fires on a home<->desktop transition, so a
+        // dragged or resized client window while the pet is already home
+        // would otherwise never reach roamableArea again. The pet isn't
+        // going anywhere -- the room around it moved -- so no fade.
+        if let tank = petTankArea, desktopRoamableArea != nil,
+           let controller = characterController, let body = characterBody {
+            controller.roamableArea = tank
+            body.position = ScreenBounds.contain(
+                CGPoint(x: body.position.x, y: tank.maxY),
+                visualBounds: body.visualBounds,
+                in: tank
+            )
+        }
     }
 
     /// Called every frame. Does nothing until a reported state has held.
@@ -64,9 +78,13 @@ extension AppDelegate {
             desktopRoamableArea = controller.roamableArea
             desktopAvatarScale = currentAvatarScale
         }
-        applyLiveAvatarScale(desktopAvatarScale * Self.tankAvatarScale)
-        controller.roamableArea = tank
+        // Nothing on screen may change before the fade has hidden the pet --
+        // update(dt:) clamps into roamableArea every frame regardless of
+        // state, so a scale or bounds change applied here would show up as a
+        // snap at full opacity before the fade even starts.
         fadePetAcross {
+            self.applyLiveAvatarScale(self.desktopAvatarScale * Self.tankAvatarScale)
+            controller.roamableArea = tank
             self.characterBody?.position = CGPoint(x: tank.midX, y: tank.maxY)
             controller.transition(to: .land)
         }
@@ -76,9 +94,9 @@ extension AppDelegate {
         guard let controller = characterController, let desktop = desktopRoamableArea else { return }
         cancelWander()
         desktopRoamableArea = nil
-        applyLiveAvatarScale(desktopAvatarScale)
-        controller.roamableArea = desktop
         fadePetAcross {
+            self.applyLiveAvatarScale(self.desktopAvatarScale)
+            controller.roamableArea = desktop
             self.characterBody?.position = CGPoint(x: desktop.midX, y: desktop.maxY)
             controller.transition(to: .land)
         }

@@ -107,17 +107,45 @@ enum WindowSupport {
         roamableTop: CGFloat,
         avatarHeight: CGFloat,
         excluding: Set<CGWindowID>
-    ) -> [WindowInfo] {
-        windows
-            .filter { window in
-                !excluding.contains(window.windowID)
-            }
-            .filter { window in
-                position.y >= window.frame.minY && position.y <= window.frame.maxY
-            }
-            .filter { window in
-                window.frame.minY - roamableTop >= avatarHeight
-            }
+    ) -> [ClimbableWindow] {
+        windows.indices.compactMap { index in
+            let window = windows[index]
+            guard !excluding.contains(window.windowID) else { return nil }
+            guard position.y >= window.frame.minY, position.y <= window.frame.maxY else { return nil }
+            guard window.frame.minY - roamableTop >= avatarHeight else { return nil }
+            return ClimbableWindow(index: index, window: window)
+        }
+    }
+
+    /// A climbable window and where it sits in the Z order, which is what
+    /// decides whether an edge of it can be seen.
+    private struct ClimbableWindow {
+        let index: Int
+        let window: WindowInfo
+    }
+
+    /// Whether the side of a window is actually on screen at the pet's
+    /// height, or hidden behind something in front of it.
+    ///
+    /// Landing has always asked this -- a window's top edge under another
+    /// window is not a surface -- and climbing never did. So an edge could be
+    /// completely covered and still be walked to and climbed, which from the
+    /// outside is a pet turning round, walking somewhere for no visible
+    /// reason, and going up thin air.
+    ///
+    /// Asked at the pet's own height, since that is the point on the edge it
+    /// would take hold of. The list is front-to-back, so anything before
+    /// `index` is in front (WindowListWatcher).
+    private static func isEdgeVisible(
+        _ edgeX: CGFloat,
+        at y: CGFloat,
+        inFrontOf index: Int,
+        in windows: [WindowInfo]
+    ) -> Bool {
+        !windows[..<index].contains { front in
+            front.frame.minX <= edgeX && edgeX <= front.frame.maxX
+                && front.frame.minY <= y && y <= front.frame.maxY
+        }
     }
 
     /// A point to walk to that will put the pet against the nearest climbable
@@ -149,7 +177,22 @@ enum WindowSupport {
             at: position, in: windows,
             roamableTop: roamableTop, avatarHeight: avatarHeight, excluding: excluding
         )
-            .flatMap { [$0.frame.minX, $0.frame.maxX] }
+            .flatMap { candidate in
+                // Only the edges this pet could actually take hold of. A
+                // climb happens by crossing a window's left side while
+                // walking right, or its right side while walking left, so an
+                // edge on the far side of the pet is one it would walk to and
+                // stroll straight past. Standing in front of a window, both
+                // of that window's own edges are like that -- which is a pet
+                // setting off, arriving, and doing nothing.
+                let frame = candidate.window.frame
+                return [
+                    position.x < frame.minX ? frame.minX : nil,
+                    position.x > frame.maxX ? frame.maxX : nil,
+                ]
+                .compactMap { $0 }
+                .filter { isEdgeVisible($0, at: position.y, inFrontOf: candidate.index, in: windows) }
+            }
             // Already standing at this edge: pick a different one rather than
             // walking a zero-length path and re-deciding a moment later.
             .filter { abs($0 - position.x) > edgeTolerance }
@@ -184,14 +227,20 @@ enum WindowSupport {
             at: position, in: windows,
             roamableTop: roamableTop, avatarHeight: avatarHeight, excluding: excluding
         )
-            .filter { window in
-                let edge = goingRight ? window.frame.minX : window.frame.maxX
-                return goingRight ? (edge > position.x && edge <= target.x) : (edge < position.x && edge >= target.x)
+            .filter { candidate in
+                let edge = goingRight ? candidate.window.frame.minX : candidate.window.frame.maxX
+                guard goingRight ? (edge > position.x && edge <= target.x) : (edge < position.x && edge >= target.x) else {
+                    return false
+                }
+                // The same rule the aim uses: an edge nobody can see is not a
+                // wall, however the pet arrived at it.
+                return isEdgeVisible(edge, at: position.y, inFrontOf: candidate.index, in: windows)
             }
             .min { a, b in
-                let edgeA = goingRight ? a.frame.minX : a.frame.maxX
-                let edgeB = goingRight ? b.frame.minX : b.frame.maxX
+                let edgeA = goingRight ? a.window.frame.minX : a.window.frame.maxX
+                let edgeB = goingRight ? b.window.frame.minX : b.window.frame.maxX
                 return goingRight ? edgeA < edgeB : edgeA > edgeB
             }
+            .map(\.window)
     }
 }

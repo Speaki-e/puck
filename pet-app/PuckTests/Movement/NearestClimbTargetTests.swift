@@ -102,12 +102,27 @@ final class NearestClimbTargetTests: XCTestCase {
         XCTAssertNil(target(from: 100, windows: [tall]))
     }
 
-    /// Already pressed against an edge: choosing it again would be a
-    /// zero-length walk that re-decides a moment later.
-    func test_skipsTheEdgeThePetIsAlreadyStandingOn() throws {
-        let result = try XCTUnwrap(target(from: 400, windows: [window(x: 400)]))
+    /// Standing at a window's side, with only that window in reach, there is
+    /// nothing to aim at.
+    ///
+    /// This used to walk to the far edge. That walk can never become a climb:
+    /// a climb happens by crossing a window's left side going right or its
+    /// right side going left, and from inside the window's own span neither
+    /// is ahead of the pet -- it arrives and strolls past. Nil sends the
+    /// caller to an ordinary roam, which at least moves the pet somewhere a
+    /// climb can start from.
+    func test_aWindowThePetIsStandingInFrontOfIsNotAClimbTarget() {
+        XCTAssertNil(target(from: 400, windows: [window(x: 400)]))
+        XCTAssertNil(target(from: 550, windows: [window(x: 400)]), "inside its span")
+    }
 
-        XCTAssertEqual(result.x, 700, accuracy: 5, "moves on to the far edge")
+    /// ...and another window's near side still is, so the pet has not stopped
+    /// climbing -- only stopped walking at edges it cannot take.
+    func test_anotherWindowsNearSideIsStillChosen() {
+        let standingIn = window(x: 400)          // 400...700
+        let reachable = window(x: 900)           // 900...1200
+
+        XCTAssertEqual(target(from: 550, windows: [standingIn, reachable])?.x, 900 + 4)
     }
 
     // MARK: - "포커스된 창 위로는 올라가지 않기" (Settings)
@@ -174,5 +189,73 @@ final class NearestClimbTargetTests: XCTestCase {
     func test_focusedWindow_nilWhenNothingIsFrontmost() {
         XCTAssertNil(WindowSupport.focusedWindow(ownedBy: nil, in: [window(id: 1, pid: 10)]))
         XCTAssertNil(WindowSupport.focusedWindow(ownedBy: 99, in: [window(id: 1, pid: 10)]))
+    }
+
+    // MARK: - Edges nobody can see
+
+    /// Both fixtures below sit at y=200 so they clear the avatar-height
+    /// headroom rule; what is being tested is Z order, not headroom.
+    private func climbable(x: CGFloat, width: CGFloat) -> WindowInfo {
+        window(frame: CGRect(x: x, y: 200, width: width, height: 700))
+    }
+
+    /// A window entirely behind another has no edge on screen, and walking to
+    /// one is a pet turning round, crossing the desktop for no visible
+    /// reason, and going up thin air. Landing has always asked this of a
+    /// surface; climbing did not.
+    func test_ignoresAnEdgeHiddenBehindAWindowInFront() {
+        let cover = climbable(x: 300, width: 500)   // 300...800, frontmost
+        let hidden = climbable(x: 400, width: 200)  // 400...600, entirely under it
+
+        let aim = target(from: 100, windows: [cover, hidden])
+        // Past the edge in the direction of travel, which is how the walk
+        // ends up crossing it and handing off to Climb.
+        XCTAssertEqual(aim?.x, 300 + 4, "the cover's own left side is the only edge that shows")
+    }
+
+    /// Only the covered part is out. A window sticking out from behind
+    /// another still has the side you can see.
+    func test_keepsTheEdgeThatStillShows() {
+        let cover = climbable(x: 300, width: 500)   // 300...800, frontmost
+        let behind = climbable(x: 100, width: 400)  // 100...500: left side shows, right side does not
+
+        XCTAssertEqual(target(from: 1000, windows: [cover, behind])?.x, 800 - 4)
+        // From inside `behind`'s span, its own edges are not approachable;
+        // the cover's left side is, and can be seen.
+        XCTAssertEqual(target(from: 150, windows: [cover, behind])?.x, 300 + 4)
+    }
+
+    /// The same rule where a walk actually becomes a climb: an edge the pet
+    /// blunders into is no more of a wall than one it aimed at.
+    func test_walkingIntoAHiddenEdgeDoesNotClimb() {
+        let cover = climbable(x: 300, width: 500)
+        let hidden = climbable(x: 400, width: 200)
+
+        XCTAssertNil(
+            WindowSupport.blockingWindow(
+                walkingFrom: CGPoint(x: 350, y: floor),
+                toward: CGPoint(x: 700, y: floor),
+                in: [cover, hidden],
+                roamableTop: roamableTop,
+                avatarHeight: avatarHeight
+            ),
+            "the hidden window's left edge at 400 is under the cover"
+        )
+    }
+
+    /// Being in front is what matters, not merely overlapping: the same two
+    /// rectangles the other way round leave the edge climbable.
+    func test_aWindowBehindDoesNotHideAnEdgeInFrontOfIt() {
+        let front = climbable(x: 400, width: 200)
+        let back = climbable(x: 300, width: 500)
+
+        let blocked = WindowSupport.blockingWindow(
+            walkingFrom: CGPoint(x: 350, y: floor),
+            toward: CGPoint(x: 700, y: floor),
+            in: [front, back],
+            roamableTop: roamableTop,
+            avatarHeight: avatarHeight
+        )
+        XCTAssertEqual(blocked?.frame.minX, 400)
     }
 }

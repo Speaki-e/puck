@@ -260,7 +260,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
                 systemLines.append(text)
             case .user(let text):
                 transcript.append("User: \(text)")
-            case .assistant(let text, let toolCalls):
+            case .assistant(let text, let toolCalls, _):
                 if let text, !text.isEmpty { transcript.append("Assistant: \(text)") }
                 // Turns taken under another provider can carry real tool
                 // calls. Rendered as history rather than dropped, so a

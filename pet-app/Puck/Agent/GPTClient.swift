@@ -28,7 +28,15 @@ enum GPTMessage {
     case user(String)
     /// What the model said, plus any tool calls it asked for. Both can be
     /// present: a model may narrate and then call.
-    case assistant(text: String?, toolCalls: [GPTToolCall])
+    ///
+    /// `reasoning` carries the provider's own reasoning blocks for that turn,
+    /// verbatim as JSON text rather than parsed. On the Messages API a turn
+    /// that thought *and* called a tool has to be sent back with those blocks
+    /// unchanged -- they carry a signature the server checks -- so this has to
+    /// survive the round trip byte for byte, and nothing here needs to read
+    /// inside it. nil for every provider that produces none, which today is
+    /// everyone except ClaudeClient.
+    case assistant(text: String?, toolCalls: [GPTToolCall], reasoning: String?)
     /// The reply to one tool call, keyed by the id the model gave it.
     case tool(callId: String, content: String)
 }
@@ -46,6 +54,15 @@ struct GPTToolCall: Equatable {
 struct GPTTurn {
     let text: String?
     let toolCalls: [GPTToolCall]
+    /// See `GPTMessage.assistant`. Defaulted in the initializer so the
+    /// providers that never produce one keep constructing turns unchanged.
+    let reasoning: String?
+
+    init(text: String?, toolCalls: [GPTToolCall], reasoning: String? = nil) {
+        self.text = text
+        self.toolCalls = toolCalls
+        self.reasoning = reasoning
+    }
 }
 
 /// A tool as offered to the model: the registry's shape plus the description
@@ -217,7 +234,7 @@ final class GPTClient: AgentLLMClient {
             return ["role": "system", "content": text]
         case .user(let text):
             return ["role": "user", "content": text]
-        case .assistant(let text, let toolCalls):
+        case .assistant(let text, let toolCalls, _):
             var payload: [String: Any] = ["role": "assistant"]
             // Must be present even when nil, and must be null rather than ""
             // -- an assistant turn that only called tools has no content, and

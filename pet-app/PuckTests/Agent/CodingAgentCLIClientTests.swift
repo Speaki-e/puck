@@ -332,7 +332,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         let prompt = CodingAgentCLIClient.prompt(for: [
             .system("system"),
             .user("첫 질문"),
-            .assistant(text: "첫 답변", toolCalls: []),
+            .assistant(text: "첫 답변", toolCalls: [], reasoning: nil),
             .user("둘째 질문"),
         ], toolsAreReachable: true)
 
@@ -356,7 +356,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
             .user("날씨 앱 켜줘"),
             .assistant(text: nil, toolCalls: [
                 GPTToolCall(id: "1", name: "launch_app", argumentsJSON: "{\"app_name\":\"Weather\"}"),
-            ]),
+            ], reasoning: nil),
             .tool(callId: "1", content: "{\"pid\":42}"),
             .user("켜졌어?"),
         ], toolsAreReachable: true)

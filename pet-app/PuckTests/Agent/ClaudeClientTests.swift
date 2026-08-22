@@ -128,7 +128,7 @@ final class ClaudeClientTests: XCTestCase {
     func test_toolResultsSeparatedByOtherMessages_staySeparate() throws {
         let encoded = ClaudeClient.encodeMessages([
             .tool(callId: "toolu_a", content: "first"),
-            .assistant(text: "이어서 확인할게요", toolCalls: []),
+            .assistant(text: "이어서 확인할게요", toolCalls: [], reasoning: nil),
             .tool(callId: "toolu_b", content: "second"),
         ])
 
@@ -160,7 +160,7 @@ final class ClaudeClientTests: XCTestCase {
 
     func test_assistantTurn_withTextAndToolCall_encodesBothBlockTypes() throws {
         let call = GPTToolCall(id: "toolu_1", name: "open_task_session", argumentsJSON: "{\"task\":\"fix bug\"}")
-        let encoded = ClaudeClient.encodeMessages([.assistant(text: "On it.", toolCalls: [call])])
+        let encoded = ClaudeClient.encodeMessages([.assistant(text: "On it.", toolCalls: [call], reasoning: nil)])
 
         let message = try XCTUnwrap(encoded.first)
         let blocks = try XCTUnwrap(message["content"] as? [[String: Any]])
@@ -172,6 +172,77 @@ final class ClaudeClientTests: XCTestCase {
         XCTAssertEqual(blocks[1]["name"] as? String, "open_task_session")
         let input = try XCTUnwrap(blocks[1]["input"] as? [String: Any])
         XCTAssertEqual(input["task"] as? String, "fix bug")
+    }
+
+    // MARK: - request body
+
+    /// The three properties of the body that are invisible at every other
+    /// layer and silently wrong if they regress: no `thinking` field (no value
+    /// is valid across every model Settings accepts), a `system` block that
+    /// carries the cache breakpoint, and `max_tokens` present at all.
+    func test_requestBody_omitsThinking_andCachesTheSystemPrompt() throws {
+        let body = ClaudeClient.requestBody(
+            model: "claude-sonnet-5",
+            messages: [.system("You are a pet."), .user("안녕")],
+            tools: []
+        )
+
+        XCTAssertNil(body["thinking"], "no thinking value is valid on every model this app accepts")
+        XCTAssertEqual(body["model"] as? String, "claude-sonnet-5")
+        XCTAssertNotNil(body["max_tokens"], "the Messages API requires max_tokens on every request")
+
+        let system = try XCTUnwrap(body["system"] as? [[String: Any]])
+        XCTAssertEqual(system.count, 1)
+        XCTAssertEqual(system[0]["text"] as? String, "You are a pet.")
+        let cacheControl = try XCTUnwrap(system[0]["cache_control"] as? [String: Any])
+        XCTAssertEqual(cacheControl["type"] as? String, "ephemeral")
+    }
+
+    func test_requestBody_withoutSystemMessage_omitsSystemEntirely() {
+        let body = ClaudeClient.requestBody(model: "claude-sonnet-5", messages: [.user("안녕")], tools: [])
+
+        XCTAssertNil(body["system"], "an empty system block is not the same as no system field")
+    }
+
+    // MARK: - thinking blocks round-trip
+
+    /// The whole reason `GPTTurn.reasoning` exists: a turn that thought before
+    /// calling a tool is rejected on the next request unless its thinking
+    /// blocks come back unchanged, signature included.
+    func test_thinkingBlocks_surviveDecodeThenEncode() throws {
+        let json = Data("""
+        {"stop_reason":"tool_use","content":[
+          {"type":"thinking","thinking":"","signature":"sig_abc"},
+          {"type":"text","text":"확인할게요"},
+          {"type":"tool_use","id":"toolu_1","name":"list_files","input":{}}
+        ]}
+        """.utf8)
+
+        let turn = try ClaudeClient.decodeTurn(from: json)
+        XCTAssertNotNil(turn.reasoning)
+
+        let encoded = ClaudeClient.encodeMessages([
+            .assistant(text: turn.text, toolCalls: turn.toolCalls, reasoning: turn.reasoning),
+        ])
+        let blocks = try XCTUnwrap(encoded.first?["content"] as? [[String: Any]])
+
+        XCTAssertEqual(blocks.map { $0["type"] as? String }, ["thinking", "text", "tool_use"],
+                       "thinking has to lead the turn, ahead of narration and calls")
+        XCTAssertEqual(blocks[0]["signature"] as? String, "sig_abc")
+    }
+
+    func test_turnWithoutThinking_encodesNoThinkingBlock() throws {
+        let json = Data(#"{"content":[{"type":"text","text":"안녕하세요"}]}"#.utf8)
+
+        let turn = try ClaudeClient.decodeTurn(from: json)
+        XCTAssertNil(turn.reasoning)
+
+        let encoded = ClaudeClient.encodeMessages([
+            .assistant(text: turn.text, toolCalls: [], reasoning: turn.reasoning),
+        ])
+        let blocks = try XCTUnwrap(encoded.first?["content"] as? [[String: Any]])
+        XCTAssertEqual(blocks.count, 1)
+        XCTAssertEqual(blocks[0]["type"] as? String, "text")
     }
 
     // MARK: - non-2xx surfaces the response body

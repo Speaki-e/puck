@@ -380,12 +380,12 @@ final class AgentRunner {
             guard !turn.toolCalls.isEmpty else {
                 // No tools asked for: the model is answering, so the run ends
                 // here. Its own text is the summary.
-                append(.assistant(text: turn.text, toolCalls: []), to: key)
+                append(.assistant(text: turn.text, toolCalls: [], reasoning: turn.reasoning), to: key)
                 emit(.agentDone(ok: true, summary: turn.text ?? ""), to: key)
                 return
             }
 
-            append(.assistant(text: turn.text, toolCalls: turn.toolCalls), to: key)
+            append(.assistant(text: turn.text, toolCalls: turn.toolCalls, reasoning: turn.reasoning), to: key)
             for call in turn.toolCalls {
                 // Between calls, not only between turns: a turn can ask for
                 // several tools, and a stop pressed during the first one

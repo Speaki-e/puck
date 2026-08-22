@@ -44,10 +44,13 @@ final class ClaudeClient: AgentLLMClient {
     /// simpler than plumbing a per-call value through `AgentLLMClient` for a
     /// need that hasn't come up yet.
     ///
-    /// This has to be read together with `thinking` below: `max_tokens` caps
-    /// thinking *plus* visible output, so a budget sized only for the answer
-    /// gets spent on reasoning and the turn comes back truncated.
-    private static let maxTokens = 8192
+    /// This has to be read together with the missing `thinking` field below:
+    /// `max_tokens` caps thinking *plus* visible output, and current models
+    /// think by default, so a budget sized only for the answer gets spent on
+    /// reasoning and the turn comes back truncated. 16000 is the skill's
+    /// non-streaming default -- high enough to leave room for both, low enough
+    /// to stay under URLSession's timeout without streaming.
+    private static let maxTokens = 16000
 
     init(configuration: @escaping () -> AgentConfiguration, session: URLSession = .shared) {
         self.configuration = configuration
@@ -65,26 +68,9 @@ final class ClaudeClient: AgentLLMClient {
         request.setValue(Self.anthropicVersion, forHTTPHeaderField: "anthropic-version")
         request.timeoutInterval = 60
 
-        var body: [String: Any] = [
-            "model": configuration.model,
-            "max_tokens": Self.maxTokens,
-            // Asked for explicitly rather than left to the model's default.
-            // On current Sonnet models an omitted `thinking` means adaptive
-            // thinking runs, and its tokens come out of `max_tokens` -- so
-            // omitting this silently changes both cost and how much budget is
-            // left for the actual answer. It also means thinking blocks come
-            // back in `content`, which this client would have to echo into the
-            // next assistant turn for a multi-turn tool loop to stay valid.
-            // AgentRunner is a short tool-dispatch loop, not a reasoning
-            // workload, so turn it off and keep the whole budget for output.
-            "thinking": ["type": "disabled"],
-            "messages": Self.encodeMessages(messages),
-            "tools": tools.map(Self.encode),
-        ]
-        if let system = Self.system(from: messages) {
-            body["system"] = system
-        }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: Self.requestBody(model: configuration.model, messages: messages, tools: tools)
+        )
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
@@ -101,6 +87,46 @@ final class ClaudeClient: AgentLLMClient {
     }
 
     // MARK: - Wire encoding
+
+    /// Split out of `send` so the request shape can be asserted on without a
+    /// network stub: everything `send` still does around it is auth, headers
+    /// and error mapping, which need a real request.
+    ///
+    /// There is deliberately no `thinking` field. No single value is valid
+    /// across the models someone can name in Settings: `{"type": "disabled"}`
+    /// is a 400 on Fable/Mythos 5 (thinking is always on there), `"adaptive"`
+    /// is a 400 on 4.5-era models, and `output_config.effort` errors on those
+    /// too. Omitting it is accepted everywhere -- current models run adaptive
+    /// thinking, older ones run none -- so the request stays valid whatever
+    /// `model` holds. Disabling it used to be the choice here, on the grounds
+    /// that a tool-dispatch loop is not a reasoning workload; that stopped
+    /// being safe on Opus 5, where a thinking-disabled turn can write its tool
+    /// call into the *visible text* instead of a tool_use block. No error, no
+    /// call, and `decodeTurn` hands back a text-only turn that AgentRunner
+    /// reports as a finished run -- silent, and exactly this loop's shape.
+    /// The cost of letting thinking run is `reasoning` having to round-trip;
+    /// see `encodeAssistantContent`.
+    static func requestBody(model: String, messages: [GPTMessage], tools: [GPTToolSpec]) -> [String: Any] {
+        var body: [String: Any] = [
+            "model": model,
+            "max_tokens": maxTokens,
+            "messages": encodeMessages(messages),
+            "tools": tools.map(encode),
+        ]
+        if let system = system(from: messages) {
+            // A string would do, but the block form takes a `cache_control`
+            // breakpoint and a string does not. The cached prefix is rendered
+            // `tools` -> `system`, so this one breakpoint covers both -- and
+            // both are resent verbatim on every turn of a tool loop, which is
+            // the case caching exists for. Nothing volatile precedes it.
+            body["system"] = [[
+                "type": "text",
+                "text": system,
+                "cache_control": ["type": "ephemeral"],
+            ]]
+        }
+        return body
+    }
 
     /// `system` is a top-level request field on the Messages API, not a
     /// message with `role: "system"`. Concatenates every `.system` case
@@ -150,22 +176,37 @@ final class ClaudeClient: AgentLLMClient {
             case .user(let text):
                 flushToolResults()
                 encoded.append(["role": "user", "content": text])
-            case .assistant(let text, let toolCalls):
+            case .assistant(let text, let toolCalls, let reasoning):
                 flushToolResults()
-                encoded.append(["role": "assistant", "content": encodeAssistantContent(text: text, toolCalls: toolCalls)])
+                encoded.append([
+                    "role": "assistant",
+                    "content": encodeAssistantContent(text: text, toolCalls: toolCalls, reasoning: reasoning),
+                ])
             }
         }
         flushToolResults()
         return encoded
     }
 
-    /// An assistant turn's `content` is an array mixing a text block (if the
-    /// model narrated) with one `tool_use` block per call. At least one
-    /// block is required, so a turn with neither becomes an empty string --
-    /// matches GPTClient's `content ?? NSNull()` in spirit: present but
-    /// empty, not an absent turn.
-    private static func encodeAssistantContent(text: String?, toolCalls: [GPTToolCall]) -> [[String: Any]] {
-        var blocks: [[String: Any]] = []
+    /// An assistant turn's `content` is an array mixing thinking blocks, a
+    /// text block (if the model narrated) and one `tool_use` block per call.
+    /// At least one block is required, so a turn with none of them becomes an
+    /// empty string -- matches GPTClient's `content ?? NSNull()` in spirit:
+    /// present but empty, not an absent turn.
+    ///
+    /// Thinking blocks go back first and byte-identical to what came down.
+    /// They carry a signature the server verifies against the turn they
+    /// belong to, and a turn that thought before calling a tool is rejected
+    /// when they are missing -- which is every turn of this loop once thinking
+    /// is left on (see `requestBody`). Their text is usually empty (current
+    /// models omit the summary by default); the signature is the part that
+    /// matters, so nothing here reads inside a block.
+    private static func encodeAssistantContent(
+        text: String?,
+        toolCalls: [GPTToolCall],
+        reasoning: String?
+    ) -> [[String: Any]] {
+        var blocks: [[String: Any]] = decodeReasoning(reasoning)
         if let text, !text.isEmpty {
             blocks.append(["type": "text", "text": text])
         }
@@ -184,6 +225,30 @@ final class ClaudeClient: AgentLLMClient {
             blocks.append(["type": "text", "text": ""])
         }
         return blocks
+    }
+
+    /// The inverse of `encodeReasoning`. A payload that no longer parses into
+    /// blocks is dropped rather than thrown on: it can only have come from
+    /// this file, so the realistic cause is a turn taken under a provider that
+    /// never wrote one, and refusing to send the turn at all would be a worse
+    /// failure than letting the server object to what it gets.
+    private static func decodeReasoning(_ reasoning: String?) -> [[String: Any]] {
+        guard
+            let reasoning,
+            let blocks = try? JSONSerialization.jsonObject(with: Data(reasoning.utf8)) as? [[String: Any]]
+        else { return [] }
+        return blocks
+    }
+
+    /// Reasoning blocks are stored on `GPTTurn`/`GPTMessage` as JSON text so
+    /// the shared, provider-neutral types don't have to carry an untyped
+    /// `[String: Any]` this is the only file to understand.
+    private static func encodeReasoning(_ blocks: [[String: Any]]) -> String? {
+        guard
+            !blocks.isEmpty,
+            let data = try? JSONSerialization.data(withJSONObject: blocks)
+        else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     private static func encode(_ tool: GPTToolSpec) -> [String: Any] {
@@ -208,8 +273,9 @@ final class ClaudeClient: AgentLLMClient {
 
     /// An assistant reply's `content` is an array of blocks -- `text` and
     /// `tool_use` may both appear, same as GPTClient's turn can carry both
-    /// narration and calls. Anything else (e.g. `thinking`) is ignored: this
-    /// client never asks for it.
+    /// narration and calls. `thinking` and `redacted_thinking` are kept
+    /// verbatim so the next turn can send them back (see
+    /// `encodeAssistantContent`); any other block type is ignored.
     static func decodeTurn(from data: Data) throws -> GPTTurn {
         guard
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -238,6 +304,7 @@ final class ClaudeClient: AgentLLMClient {
 
         var texts: [String] = []
         var calls: [GPTToolCall] = []
+        var reasoning: [[String: Any]] = []
         for block in content {
             guard let type = block["type"] as? String else { continue }
             switch type {
@@ -261,10 +328,16 @@ final class ClaudeClient: AgentLLMClient {
                     argumentsJSON = "{}"
                 }
                 calls.append(GPTToolCall(id: id, name: name, argumentsJSON: argumentsJSON))
+            case "thinking", "redacted_thinking":
+                reasoning.append(block)
             default:
                 continue
             }
         }
-        return GPTTurn(text: texts.isEmpty ? nil : texts.joined(separator: "\n"), toolCalls: calls)
+        return GPTTurn(
+            text: texts.isEmpty ? nil : texts.joined(separator: "\n"),
+            toolCalls: calls,
+            reasoning: encodeReasoning(reasoning)
+        )
     }
 }

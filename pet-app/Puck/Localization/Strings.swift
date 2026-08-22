@@ -96,6 +96,8 @@ enum L10nKey: String, CaseIterable, Hashable {
     case chatEditor, chatAttachEditor, chatDetachEditor
     case chatAttachEditorHelp, chatDetachEditorHelp
     case tankPinHelp
+    case tankBackgroundMenu, tankBackgroundPlain, tankBackgroundNight
+    case tankBackgroundForest, tankBackgroundOcean
     case chatNoProjectLinked, chatEditorInSeparateWindow
     case chatEmptyTitle, chatEmptySubtitle, chatThinking, chatFailed
     case chatDone, chatDoneFailed
@@ -281,6 +283,11 @@ enum Strings {
         .failedToSetEmotionFormat: "'%1$@' 설정 실패: %2$@",
 
         .tankPinHelp: "펫을 수조에 붙잡아 두기",
+        .tankBackgroundMenu: "수조 배경",
+        .tankBackgroundPlain: "기본",
+        .tankBackgroundNight: "밤",
+        .tankBackgroundForest: "숲",
+        .tankBackgroundOcean: "바다",
         .commonCancel: "취소",
         .commonDelete: "삭제",
         .commonCreate: "만들기",
@@ -507,6 +514,11 @@ enum Strings {
         .failedToSetEmotionFormat: "Couldn't set '%1$@': %2$@",
 
         .tankPinHelp: "Keep the pet in its tank",
+        .tankBackgroundMenu: "Tank background",
+        .tankBackgroundPlain: "Plain",
+        .tankBackgroundNight: "Night",
+        .tankBackgroundForest: "Forest",
+        .tankBackgroundOcean: "Ocean",
         .commonCancel: "Cancel",
         .commonDelete: "Delete",
         .commonCreate: "Create",

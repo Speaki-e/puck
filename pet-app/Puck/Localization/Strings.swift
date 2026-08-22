@@ -64,6 +64,8 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     // F15: the agent's API key, entered here rather than in a .env.
     case agentHeader, apiKeySave, apiKeyClear
+    /// Shown for the CLI provider with no key of ours: not a problem there.
+    case apiKeyOptionalForCLI
     case apiKeySavedFormat, apiKeySourceFormat, apiKeyMissing, apiKeySaveFailed
     /// F15 (task 4): which LLM host the agent talks to. `apiKeyLabelFormat`
     /// and `apiKeyExplanationFormat` take the selected `AgentProvider`'s
@@ -259,6 +261,7 @@ enum Strings {
         .apiKeySavedFormat: "%1$@에 저장했어요",
         .apiKeySourceFormat: "사용 중 — 출처: %1$@",
         .apiKeyMissing: "키가 없어요 — 아직 명령을 수행할 수 없습니다.",
+        .apiKeyOptionalForCLI: "비워 두면 CLI에 이미 로그인된 계정을 그대로 씁니다.",
         .apiKeySaveFailed: "키 파일을 저장하지 못했어요.",
         .apiKeyExplanationFormat:
             "본인만 읽을 수 있는 .env 파일에 저장됩니다. 환경변수 %1$@나 프로젝트 폴더의 .env가 있으면 그쪽이 우선합니다.",
@@ -483,6 +486,7 @@ enum Strings {
         .apiKeySavedFormat: "Saved to %1$@",
         .apiKeySourceFormat: "In use — from %1$@",
         .apiKeyMissing: "No key yet — I can't run commands until there is one.",
+        .apiKeyOptionalForCLI: "Leave it empty to use the login the CLI already has.",
         .apiKeySaveFailed: "Couldn't save the key file.",
         .apiKeyExplanationFormat:
             "Stored in a .env file only you can read. A %1$@ environment variable, or a .env in the project folder, takes precedence.",

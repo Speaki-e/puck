@@ -228,15 +228,22 @@ final class AgentConfigurationTests: XCTestCase {
         XCTAssertEqual(config.provider, .cli)
     }
 
-    func test_theCliProviderIsNotConfiguredWithoutAStableCredential() {
+    /// The point of offering a CLI as a provider is that the user already
+    /// logged into it. Holding no token of our own is the ordinary case, not
+    /// a misconfiguration, so a turn still starts -- and if the CLI's own
+    /// login is missing the CLI is the one that says so.
+    func test_theCliProviderIsConfiguredWithoutAKeyOfOurs() {
         let config = AgentConfiguration.load(environment: ["AGENT_PROVIDER": "cli"], searchPaths: [])
 
-        XCTAssertFalse(config.isConfigured)
+        XCTAssertTrue(config.isConfigured)
         XCTAssertNil(config.apiKey)
         XCTAssertNil(config.keySource)
         XCTAssertNil(config.provider.apiKeyEnvironmentVariable)
         XCTAssertFalse(config.provider.requiresAPIKey)
-        XCTAssertTrue(config.requiresCredential)
+        XCTAssertFalse(config.requiresCredential)
+        // ...but Settings still offers the field, since an explicit token
+        // overrides whatever login the CLI would have used.
+        XCTAssertTrue(config.acceptsCredential)
     }
 
     /// A key sitting in the same .env for another provider must not be picked

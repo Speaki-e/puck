@@ -52,10 +52,21 @@ enum CodingAgentKind: String, Codable, CaseIterable {
         }
     }
 
+    /// Where the vendor CLI keeps its own state under HOME. The child runs
+    /// with the user's real HOME so it can find the login they already gave
+    /// the CLI, and the seatbelt profile keeps every other path under it
+    /// read-only -- this is the one directory it may also write.
+    var stateDirectoryName: String {
+        switch self {
+        case .claude: return ".claude"
+        case .codex: return ".codex"
+        }
+    }
+
     /// The environment variables the sandboxed agent reads credentials from.
-    /// Claude's setup-token is intentionally supported alongside an API key;
-    /// unlike copying a short-lived interactive login, it remains valid when
-    /// the child's private HOME is discarded. Codex accepts either key name.
+    /// An explicit token still wins over the CLI's own login; Claude's
+    /// setup-token is supported alongside a plain API key. Codex accepts
+    /// either key name.
     var apiKeyEnvironmentVariables: [String] {
         switch self {
         case .claude: return ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"]
@@ -117,6 +128,10 @@ struct AcpAgentCommand: Equatable {
     /// its vendor CLI. Both shims otherwise resolve that binary out of a
     /// node_modules tree that does not exist inside Puck.app.
     let extraEnvironment: [String: String]
+    /// The directory under HOME the sandbox lets this agent write, so its
+    /// session state and refreshed token land where the user's own runs of
+    /// the same CLI keep them. See `CodingAgentKind.stateDirectoryName`.
+    let stateDirectoryName: String
 }
 
 enum AcpAgentCommandResolver {
@@ -221,7 +236,8 @@ enum AcpAgentCommandResolver {
         return AcpAgentCommand(
             executable: node,
             arguments: [scriptURL.path],
-            extraEnvironment: extraEnvironment
+            extraEnvironment: extraEnvironment,
+            stateDirectoryName: kind.stateDirectoryName
         )
     }
 

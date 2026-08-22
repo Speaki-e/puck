@@ -75,7 +75,8 @@ final class AcpAgentProcess: AcpAgentTransport {
             "-p",
             Self.sandboxProfile(
                 projectRoot: projectRoot,
-                temporaryDirectory: sandboxTemporaryDirectory
+                temporaryDirectory: sandboxTemporaryDirectory,
+                stateDirectoryName: command.stateDirectoryName
             ),
             command.executable.path,
         ] + command.arguments
@@ -87,10 +88,22 @@ final class AcpAgentProcess: AcpAgentTransport {
         var environment = [
             "PATH": Self.childSearchPath(for: command),
             "NODE_ENV": "production",
-            // Vendor CLIs write session state under HOME. Give them a private
-            // home inside the sandbox rather than access to the user's real
-            // config, credentials, shell files, or other projects.
-            "HOME": sandboxTemporaryDirectory.appendingPathComponent("home", isDirectory: true).path,
+            // The user's real home, not a private one. A coding CLI is
+            // offered as a provider precisely because the user already logged
+            // into it, and on macOS that login is a Keychain item reached
+            // through the login keychain -- which is listed in
+            // ~/Library/Preferences. Point HOME elsewhere and
+            // `security list-keychains` returns the System keychain alone, so
+            // the CLI cannot see its own credentials and answers
+            // "Authentication required".
+            //
+            // This gives away less than it looks like. The profile below
+            // already allows reads everywhere, so a private HOME never hid
+            // anything from the child -- it only changed where the CLI
+            // looked. What the sandbox actually enforces is writes, and those
+            // stay limited to the project, a scratch directory, and the CLI's
+            // own state directory.
+            "HOME": NSHomeDirectory(),
             // Some vendor subprocesses use this when naming account-scoped
             // state. It is identity metadata, not a filesystem permission;
             // HOME and the seatbelt profile still determine writable paths.
@@ -112,12 +125,19 @@ final class AcpAgentProcess: AcpAgentTransport {
     /// session state remains writable without opening the user's real home.
     private static func sandboxProfile(
         projectRoot: URL,
-        temporaryDirectory: URL
+        temporaryDirectory: URL,
+        stateDirectoryName: String
     ) -> String {
         let writableSubpaths = [
             canonicalPath(projectRoot.path),
             canonicalPath(temporaryDirectory.deletingLastPathComponent().path)
                 + "/" + temporaryDirectory.lastPathComponent,
+            // The CLI's own state directory under the real HOME. It is the
+            // same one the user's own runs of the CLI write, which is the
+            // point: session state and a refreshed token belong to the login
+            // being reused, not to this app's copy of it. Everything else
+            // under HOME stays read-only.
+            canonicalPath(NSHomeDirectory()) + "/" + stateDirectoryName,
         ]
         let subpathRules = writableSubpaths
             .map { "(subpath \"\(sandboxEscaped($0))\")" }
@@ -131,6 +151,15 @@ final class AcpAgentProcess: AcpAgentTransport {
         (allow network*)
         (allow file-write*
             \(subpathRules))
+        ; The vendor CLI's login is a Keychain item, and reaching the
+        ; Keychain means talking to securityd. Without this, every Security
+        ; call fails before it starts -- `security list-keychains` under this
+        ; profile answers "SecKeychainCopySearchList: One or more parameters
+        ; passed to a function were not valid", and the CLI reports
+        ; "Authentication required" for a login that is present and valid.
+        ; One named service, not `(allow mach-lookup)`: the narrowest rule
+        ; that restores it.
+        (allow mach-lookup (global-name "com.apple.SecurityServer"))
         """
     }
 

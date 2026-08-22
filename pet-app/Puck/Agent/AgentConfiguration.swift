@@ -105,14 +105,27 @@ struct AgentConfiguration {
         self.credentialVariable = credentialVariable
     }
 
-    /// For `.cli`, `apiKey` holds the first stable credential accepted by the
-    /// selected coding agent; interactive login state is not considered.
+    /// For `.cli`, `apiKey` holds an explicit token if one was set. Its
+    /// absence is not a problem there -- see `requiresCredential`.
     var isConfigured: Bool {
         guard requiresCredential else { return true }
         return !(apiKey ?? "").isEmpty
     }
 
-    var requiresCredential: Bool { provider.requiresAPIKey || provider == .cli }
+    /// Whether a turn cannot start without a credential *of ours*.
+    ///
+    /// Not `.cli`. A coding CLI is a program the user has already logged into
+    /// -- that is the whole reason to offer it as a provider -- and it
+    /// authenticates itself. Refusing to spawn it because this app is holding
+    /// no token turns an installed, working `claude` into an error message.
+    /// If its own login is missing or expired, the CLI says so and that
+    /// answer reaches the transcript.
+    var requiresCredential: Bool { provider.requiresAPIKey }
+
+    /// Whether Settings offers a key field. Wider than `requiresCredential`:
+    /// a CLI needs no key from us but still takes one, and an explicit token
+    /// is how someone overrides the login the CLI would otherwise use.
+    var acceptsCredential: Bool { provider.requiresAPIKey || provider == .cli }
 
     var credentialEnvironmentVariables: [String] {
         if provider == .cli { return codingAgent.apiKeyEnvironmentVariables }
@@ -203,8 +216,8 @@ struct AgentConfiguration {
     /// That default is `.cli`, which pairs with `codingAgent()`'s own default
     /// of `.claude`: the coding agent this repo vendors self-contained, so it
     /// is the one already present on a fresh install. It still needs a
-    /// credential -- `requiresCredential` counts `.cli` too, because the ACP
-    /// child gets a private HOME and never inherits an interactive login.
+    /// credential of its own, or none at all: a CLI authenticates itself with
+    /// the login the user already gave it.
     private static func provider(environment: [String: String], searchPaths: [URL]) -> AgentProvider {
         // Any non-blank value resolves here, valid or not: an unrecognized
         // AGENT_PROVIDER is answered by `resolved(fromRawValue:)`'s fallback

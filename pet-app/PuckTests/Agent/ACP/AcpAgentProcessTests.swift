@@ -209,7 +209,7 @@ final class AcpAgentProcessOutputDrainTests: XCTestCase {
         try script.write(to: scriptURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
         return AcpAgentProcess(
-            command: AcpAgentCommand(executable: scriptURL, arguments: [], extraEnvironment: [:]),
+            command: AcpAgentCommand(executable: scriptURL, arguments: [], extraEnvironment: [:], stateDirectoryName: ".claude"),
             projectPath: NSTemporaryDirectory(),
             credentials: [:]
         )
@@ -266,6 +266,43 @@ final class AcpAgentProcessOutputDrainTests: XCTestCase {
 }
 
 final class AcpAgentProcessSandboxTests: XCTestCase {
+    /// The real HOME is what lets the CLI authenticate, so the whole safety
+    /// argument now rests on the write rules. This is that argument, checked:
+    /// a child that can read the user's home still cannot write into it.
+    func testChildCannotWriteIntoTheRealHomeOutsideTheAgentsStateDirectory() async throws {
+        let project = FileManager.default.temporaryDirectory
+            .appendingPathComponent("puck-acp-home-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: project) }
+
+        // Removed either way: if the sandbox lets this through, the failure
+        // should not also leave a file in the user's home.
+        let probe = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("puck-sandbox-probe-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: probe) }
+
+        let agent = AcpAgentProcess(
+            command: AcpAgentCommand(
+                executable: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", "printf probe > \"$1\"", "puck-sandbox-test", probe.path],
+                extraEnvironment: [:],
+                stateDirectoryName: ".claude"
+            ),
+            projectPath: project.path,
+            credentials: [:]
+        )
+        let exited = expectation(description: "the child exits")
+        agent.onExit = { _, _ in exited.fulfill() }
+
+        try agent.start()
+        await fulfillment(of: [exited], timeout: 5)
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: probe.path),
+            "the ACP child wrote into the user's home directory"
+        )
+    }
+
     func testChildCanWriteInsideProjectButNotToASiblingDirectory() async throws {
         let parent = FileManager.default.temporaryDirectory
             .appendingPathComponent("puck-acp-sandbox-\(UUID().uuidString)", isDirectory: true)
@@ -287,7 +324,8 @@ final class AcpAgentProcessSandboxTests: XCTestCase {
                     inside.path,
                     outside.path,
                 ],
-                extraEnvironment: [:]
+                extraEnvironment: [:],
+                stateDirectoryName: ".claude"
             ),
             projectPath: project.path,
             credentials: [:]
@@ -295,12 +333,13 @@ final class AcpAgentProcessSandboxTests: XCTestCase {
         let exited = expectation(description: "the child exits")
         agent.onExit = { _, _ in exited.fulfill() }
 
+        // The real home, so the CLI can find the login the user already gave
+        // it: on macOS that means the login keychain, which is only in the
+        // search list when HOME points at the user's own directory. What
+        // keeps that safe is the write restriction this test goes on to
+        // prove, not a home the CLI cannot authenticate from.
         let childHome = try XCTUnwrap(agent.childEnvironment["HOME"])
-        let childTemp = try XCTUnwrap(agent.childEnvironment["TMPDIR"])
-        XCTAssertTrue(
-            childHome.hasPrefix(childTemp + "/"),
-            "the child must not receive the user's writable home directory"
-        )
+        XCTAssertEqual(childHome, NSHomeDirectory())
 
         try agent.start()
         await fulfillment(of: [exited], timeout: 5)

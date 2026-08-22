@@ -198,7 +198,8 @@ final class AcpAgentEnvironmentTests: XCTestCase {
             command: AcpAgentCommand(
                 executable: URL(fileURLWithPath: "/usr/bin/node"),
                 arguments: ["/x/agent.mjs"],
-                extraEnvironment: [kind.vendorCLIEnvironmentVariable: "/usr/local/bin/\(kind.vendorCLIName)"]
+                extraEnvironment: [kind.vendorCLIEnvironmentVariable: "/usr/local/bin/\(kind.vendorCLIName)"],
+                stateDirectoryName: ".claude"
             ),
             projectPath: NSTemporaryDirectory(),
             credentials: credentials
@@ -233,7 +234,8 @@ final class AcpAgentEnvironmentTests: XCTestCase {
             for: AcpAgentCommand(
                 executable: URL(fileURLWithPath: node),
                 arguments: ["/x/agent.mjs"],
-                extraEnvironment: ["CLAUDE_CODE_EXECUTABLE": vendorCLI]
+                extraEnvironment: ["CLAUDE_CODE_EXECUTABLE": vendorCLI],
+                stateDirectoryName: ".claude"
             ),
             environment: ["PATH": parentPath, "HOME": "/Users/x"]
         ).components(separatedBy: ":")

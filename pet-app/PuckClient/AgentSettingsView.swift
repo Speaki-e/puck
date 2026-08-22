@@ -63,49 +63,57 @@ struct AgentSettingsView: View {
     /// rhythm. Sharing the component instead of the constants means this
     /// can't drift again.
     var body: some View {
-        // The language belongs on this window as much as on Puck's panel:
-        // this is where nearly all of the app's text is, and the toolbar
-        // button that opens it is labelled the same way. It is the one
-        // setting here that is not the agent's, hence its own section.
-        SettingsSection(title: text(.tabGeneral)) {
-            SettingsStackedRow(label: text(.languageLabel)) {
-                Picker("", selection: Binding(
-                    get: { localization.language },
-                    set: { select($0) }
-                )) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.displayName).tag(language)
+        // A container, not two sections one after another in a ViewBuilder:
+        // the modifiers below bind to the last expression, so without this
+        // the padding and the width reached the agent section alone and the
+        // one above it sat flush against the window edge.
+        VStack(alignment: .leading, spacing: ClientTheme.Metrics.sectionSpacing) {
+            // The language belongs on this window as much as on Puck's panel:
+            // this is where nearly all of the app's text is, and the toolbar
+            // button that opens it is labelled the same way. It is the one
+            // setting here that is not the agent's, hence its own section.
+            SettingsSection(title: text(.tabGeneral)) {
+                SettingsStackedRow(label: text(.languageLabel)) {
+                    Picker("", selection: Binding(
+                        get: { localization.language },
+                        set: { select($0) }
+                    )) {
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(language.displayName).tag(language)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-        }
-        SettingsSection(title: text(.agentHeader)) {
-            // Same segmented-Picker-over-CaseIterable-plus-displayName shape
-            // as SettingsView's theme picker, and the same
-            // read-current-value/write-and-reload round trip every field
-            // below it does.
-            SettingsStackedRow(label: text(.providerLabel)) {
-                Picker("", selection: providerBinding) {
-                    ForEach(AgentProvider.allCases, id: \.self) { provider in
-                        Text(provider.displayName).tag(provider)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
             }
 
-            if agentConfiguration.provider == .cli {
-                codingAgentRows
-            }
-            if agentConfiguration.requiresCredential { apiKeyRows }
+            SettingsSection(title: text(.agentHeader)) {
+                // Same segmented-Picker-over-CaseIterable-plus-displayName
+                // shape as SettingsView's theme picker, and the same
+                // read-current-value/write-and-reload round trip every field
+                // below it does.
+                SettingsStackedRow(label: text(.providerLabel)) {
+                    Picker("", selection: providerBinding) {
+                        ForEach(AgentProvider.allCases, id: \.self) { provider in
+                            Text(provider.displayName).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
 
-            if agentConfiguration.provider.supportsModelSelection {
-                modelRows
+                if agentConfiguration.provider == .cli {
+                    codingAgentRows
+                }
+                if agentConfiguration.acceptsCredential { apiKeyRows }
+
+                if agentConfiguration.provider.supportsModelSelection {
+                    modelRows
+                }
             }
         }
-        .padding(ClientTheme.Metrics.spacingLarge)
+        .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
+        .padding(.vertical, ClientTheme.Metrics.windowEdgePadding)
         .frame(width: 420)
     }
 
@@ -122,7 +130,10 @@ struct AgentSettingsView: View {
                 Button(text(.apiKeySave)) { saveAPIKey(apiKeyDraft) }
                     .controlSize(.small)
                     .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if agentConfiguration.isConfigured {
+                // Offered when there is something to clear, which is no
+                // longer the same as "configured" -- a CLI is configured with
+                // no key of ours at all.
+                if agentConfiguration.keySource != nil {
                     Button(text(.apiKeyClear)) { saveAPIKey(nil) }
                         .controlSize(.small)
                 }
@@ -132,6 +143,11 @@ struct AgentSettingsView: View {
         Text(apiKeyStatus)
             .font(.footnote)
             .foregroundStyle(agentConfiguration.isConfigured ? .secondary : Color.orange)
+            // Wrap rather than truncate. Without this the row is as wide as
+            // the widest control above it and a sentence loses its tail --
+            // the same modifier SettingsStackedRow puts on its own label.
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
 
         Text(String(
@@ -140,6 +156,8 @@ struct AgentSettingsView: View {
         ))
         .font(.footnote)
         .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
     }
 
@@ -172,6 +190,8 @@ struct AgentSettingsView: View {
         Text(text(.cliProviderExplanation))
             .font(.footnote)
             .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
     }
 
@@ -243,7 +263,11 @@ struct AgentSettingsView: View {
 
     private var apiKeyStatus: String {
         if let message = apiKeyMessage { return message }
-        guard let source = agentConfiguration.keySource else { return text(.apiKeyMissing) }
+        guard let source = agentConfiguration.keySource else {
+            // Missing is only a problem where a turn needs one. For a CLI it
+            // is the ordinary case: the program is already logged in.
+            return text(agentConfiguration.requiresCredential ? .apiKeyMissing : .apiKeyOptionalForCLI)
+        }
         return String(format: text(.apiKeySourceFormat), source.displayName)
     }
 

@@ -43,6 +43,14 @@ enum ClientTheme {
         static let spacingSmall: CGFloat = 4
         static let spacingMedium: CGFloat = 8
         static let spacingLarge: CGFloat = 12
+        /// Between one settings section and the next. Larger than the spacing
+        /// inside a section, so the grouping is visible without a divider.
+        static let sectionSpacing: CGFloat = 20
+        /// Top and bottom of a settings window. Deliberately more than the
+        /// horizontal padding: a short window reads as cramped long before a
+        /// narrow one does, because the first and last rows sit against the
+        /// title bar and the frame.
+        static let windowEdgePadding: CGFloat = 20
         /// The transcript's text column. Every row in it -- message, tool
         /// card, approval banner -- is capped at this one measure and the
         /// column is centred, so widening the window adds margin instead of

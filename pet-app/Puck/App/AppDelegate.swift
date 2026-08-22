@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     let fallState = FallState()
     let landState = LandState()
     let moveToState = MoveToState()
+    let travelState = TravelState()
     /// The window the pet fell behind, until it has landed and been moved onto
     /// that window's top edge -- see perchAfterLandingIfNeeded().
     var pendingPerchWindowID: CGWindowID?

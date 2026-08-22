@@ -78,28 +78,24 @@ extension AppDelegate {
             desktopRoamableArea = controller.roamableArea
             desktopAvatarScale = currentAvatarScale
         }
-        // Nothing on screen may change before the fade has hidden the pet --
-        // update(dt:) clamps into roamableArea every frame regardless of
-        // state, so a scale or bounds change applied here would show up as a
-        // snap at full opacity before the fade even starts.
-        fadePetAcross {
-            self.applyLiveAvatarScale(self.desktopAvatarScale * Self.tankAvatarScale)
-            controller.roamableArea = tank
-            self.characterBody?.position = CGPoint(x: tank.midX, y: tank.maxY)
-            controller.transition(to: .land)
-        }
+        carryPet(
+            of: controller,
+            to: CGPoint(x: tank.midX, y: tank.maxY),
+            arrivingIn: tank,
+            scale: desktopAvatarScale * Self.tankAvatarScale
+        )
     }
 
     func sendPetToDesktop() {
         guard let controller = characterController, let desktop = desktopRoamableArea else { return }
         cancelWander()
         desktopRoamableArea = nil
-        fadePetAcross {
-            self.applyLiveAvatarScale(self.desktopAvatarScale)
-            controller.roamableArea = desktop
-            self.characterBody?.position = CGPoint(x: desktop.midX, y: desktop.maxY)
-            controller.transition(to: .land)
-        }
+        carryPet(
+            of: controller,
+            to: CGPoint(x: desktop.midX, y: desktop.maxY),
+            arrivingIn: desktop,
+            scale: desktopAvatarScale
+        )
     }
 
     /// What `applyLiveAvatarScale` was last given, derived rather than stored:
@@ -111,13 +107,36 @@ extension AppDelegate {
         return Double(avatarHitboxSize.height / baseHitboxSize.height)
     }
 
-    /// Out at one end, in at the other. Walking between the two would have to
-    /// cross a coordinate space the pet does not live in, and reads as the pet
-    /// clipping through the window frame.
-    private func fadePetAcross(_ move: @escaping () -> Void) {
-        avatar?.setAlpha(0, duration: 0.2) { [weak self] in
-            move()
-            self?.avatar?.setAlpha(1, duration: 0.2, completion: nil)
+    /// Carries the pet across, in view the whole way.
+    ///
+    /// This used to be a cut -- fade out, set the position, fade in -- which
+    /// read as the pet vanishing and a copy appearing elsewhere. Both worlds
+    /// are rectangles in the same space, so the trip between them is an
+    /// ordinary move and there is no reason to hide it.
+    ///
+    /// The roamable area is widened to cover both ends for the duration.
+    /// `update(dt:)` clamps horizontally into it every frame whatever the
+    /// state is doing, so leaving it at the world being left would drag the
+    /// pet back at the first step out of it. TravelState hands it back on
+    /// arrival, before anything else runs.
+    ///
+    /// The scale changes on arrival rather than during: the pet growing or
+    /// shrinking mid-flight reads as it moving toward or away from the
+    /// viewer, which is a different thing happening.
+    private func carryPet(
+        of controller: CharacterController,
+        to destination: CGPoint,
+        arrivingIn area: CGRect,
+        scale: Double
+    ) {
+        guard let body = characterBody else { return }
+        travelState.origin = body.position
+        travelState.destination = destination
+        travelState.onArrival = { [weak self] in
+            self?.applyLiveAvatarScale(scale)
+            controller.roamableArea = area
         }
+        controller.roamableArea = controller.roamableArea.union(area)
+        controller.transition(to: .travel)
     }
 }

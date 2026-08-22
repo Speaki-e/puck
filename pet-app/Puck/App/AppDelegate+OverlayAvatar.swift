@@ -164,6 +164,7 @@ extension AppDelegate {
             (.chaseBall, chaseBallState), (.juggleBall, juggleBallState), (.kickBall, kickBallState),
             (.climbToCeiling, climbToCeilingState), (.ceiling, ceilingState),
             (.pinned, pinnedState),
+            (.travel, travelState),
         ] {
             controller.register(state, as: kind)
         }

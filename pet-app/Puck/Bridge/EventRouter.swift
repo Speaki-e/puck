@@ -51,6 +51,10 @@ enum StateKind: Equatable, CaseIterable {
     /// window is open, same "capture then restore" pattern as Listen (F7).
     /// Never reachable from a socket event.
     case pinned
+    /// Carried between the desktop and the pet's tank. Never reachable from a
+    /// socket event -- see EventRouter.reaction(for:), which has no case
+    /// producing it; AppDelegate+Tank drives it directly.
+    case travel
 }
 
 /// The result of routing one BridgeEvent: an optional state transition, an

@@ -184,6 +184,23 @@ struct AgentSettingsView: View {
             .labelsHidden()
         }
 
+        SettingsStackedRow(label: text(.permissionsLabel)) {
+            Picker("", selection: permissionModeBinding) {
+                ForEach(AgentPermissionMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+
+        Text(text(.permissionsExplanation))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+
         // Stated here rather than discovered when the pet fails to move: this
         // provider genuinely cannot call the pet's tools, and the prompt the
         // CLI receives says the same thing (CodingAgentCLIClient).
@@ -250,6 +267,23 @@ struct AgentSettingsView: View {
     }
 
     /// `CODING_AGENT`, the variable `code_editor` has always read.
+    /// Same write-and-reload round trip as the pickers above: an environment
+    /// variable or a nearer `.env` can outrank what was just written, and the
+    /// picker should show what actually resolved.
+    private var permissionModeBinding: Binding<AgentPermissionMode> {
+        Binding(
+            get: { AgentConfiguration.permissionMode() },
+            set: { mode in
+                DotEnv.write(
+                    key: AgentPermissionMode.environmentVariable,
+                    value: mode.rawValue,
+                    to: AgentConfiguration.writableEnvFile
+                )
+                agentConfiguration = AgentConfiguration.load()
+            }
+        )
+    }
+
     private var codingAgentBinding: Binding<CodingAgentKind> {
         Binding(
             get: { agentConfiguration.codingAgent },

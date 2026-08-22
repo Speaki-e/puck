@@ -77,6 +77,9 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// reachable only through an environment variable.
     case modelLabel, modelExplanationFormat, modelReset
     case codingAgentLabel, cliProviderExplanation
+    /// How much the CLI may do without being asked each time.
+    case permissionsLabel, permissionsExplanation
+    case permissionsToolsOnly, permissionsEdits, permissionsEverything
     case installedFormat
     case installedMissingRecommendedFormat
     case failedToInstallFormat
@@ -269,6 +272,11 @@ enum Strings {
         .modelReset: "기본값",
         .modelExplanationFormat: "비워 두고 저장하면 기본값 %1$@을(를) 씁니다. 환경변수 %2$@가 있으면 그쪽이 우선합니다.",
         .codingAgentLabel: "코딩 CLI",
+        .permissionsLabel: "자동 허용",
+        .permissionsExplanation: "CLI가 스스로 하는 일을 매번 묻지 않고 허용할 범위입니다. 파일 쓰기는 어느 설정에서든 선택한 프로젝트 폴더 밖으로 나가지 못합니다.",
+        .permissionsToolsOnly: "펫 도구만",
+        .permissionsEdits: "파일 수정까지",
+        .permissionsEverything: "명령 실행까지",
         .cliProviderExplanation:
             "선택한 CLI와 안정적인 설정 토큰 또는 API 키를 씁니다. 펫 도구는 MCP로 연결되고, 선택한 프로젝트 안의 파일 작업은 샌드박스 안에서 실행됩니다.",
         .installedFormat: "'%1$@' 설치 완료.",
@@ -494,6 +502,11 @@ enum Strings {
         .modelReset: "Default",
         .modelExplanationFormat: "Save it empty to use the default, %1$@. A %2$@ environment variable takes precedence.",
         .codingAgentLabel: "Coding CLI",
+        .permissionsLabel: "Auto-allow",
+        .permissionsExplanation: "How much the CLI may do without asking each time. File writes stay inside the selected project folder whichever setting is chosen.",
+        .permissionsToolsOnly: "Puck's tools only",
+        .permissionsEdits: "…and file edits",
+        .permissionsEverything: "…and commands",
         .cliProviderExplanation:
             "Uses the selected CLI with a stable setup token or API key. Puck's tools are wired in over MCP, and file work inside the selected project runs in a sandbox.",
         .installedFormat: "Installed '%1$@'.",

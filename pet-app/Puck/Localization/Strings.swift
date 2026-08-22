@@ -115,6 +115,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case tankPinHelp
     case tankBackgroundMenu, tankBackgroundPlain, tankBackgroundNight
     case tankBackgroundForest, tankBackgroundOcean
+    case tankBackgroundWorldTree, tankBackgroundBoundary, tankBackgroundMeadow
     case chatNoProjectLinked, chatEditorInSeparateWindow
     case chatEmptyTitle, chatEmptySubtitle, chatThinking, chatFailed
     case chatDone, chatDoneFailed
@@ -347,6 +348,9 @@ enum Strings {
         .tankBackgroundNight: "밤",
         .tankBackgroundForest: "숲",
         .tankBackgroundOcean: "바다",
+        .tankBackgroundWorldTree: "세계수",
+        .tankBackgroundBoundary: "경계",
+        .tankBackgroundMeadow: "들녘",
         .commonCancel: "취소",
         .commonDelete: "삭제",
         .commonCreate: "만들기",
@@ -622,6 +626,9 @@ enum Strings {
         .tankBackgroundNight: "Night",
         .tankBackgroundForest: "Forest",
         .tankBackgroundOcean: "Ocean",
+        .tankBackgroundWorldTree: "World tree",
+        .tankBackgroundBoundary: "Boundary",
+        .tankBackgroundMeadow: "Meadow",
         .commonCancel: "Cancel",
         .commonDelete: "Delete",
         .commonCreate: "Create",

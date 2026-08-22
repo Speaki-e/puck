@@ -30,9 +30,17 @@ final class ClientWindowStore: ObservableObject {
     private var sessionsByKey: [SessionKey: ChatSession] = [:]
     private var sessionOrder: [SessionKey] = []
 
-    /// isTankPinned arrives in Task 6 as the real persisted toggle; this is a
-    /// placeholder until then.
-    private var isTankPinned = false
+    /// The user pinning the pet home whatever the window is doing. Stored in
+    /// UserDefaults rather than SettingsStore because SettingsStore belongs to
+    /// the Puck target and this window is PuckClient's.
+    @Published var isTankPinned: Bool = UserDefaults.standard.bool(forKey: ClientWindowStore.tankPinnedKey) {
+        didSet {
+            UserDefaults.standard.set(isTankPinned, forKey: Self.tankPinnedKey)
+            reportPetHome()
+        }
+    }
+
+    static let tankPinnedKey = "Puck.tankPinned"
 
     /// The tank is drawn in two pieces -- above the chat column, and above the
     /// editor column when it is open -- because they are siblings in a split

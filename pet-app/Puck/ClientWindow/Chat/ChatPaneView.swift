@@ -82,6 +82,14 @@ struct ChatPaneView: View {
         }
         ToolbarItem {
             Button {
+                store.isTankPinned.toggle()
+            } label: {
+                Image(systemName: store.isTankPinned ? "house.fill" : "house")
+            }
+            .help(Strings.text(.tankPinHelp))
+        }
+        ToolbarItem {
+            Button {
                 editor = editor.toggled
             } label: {
                 Label(Strings.text(.chatEditor), systemImage: "chevron.left.forwardslash.chevron.right")

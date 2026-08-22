@@ -203,9 +203,15 @@ final class EditorPaneStore: ObservableObject {
     }
 
     func close(path: String) {
+        // The neighbour, not the last tab. Closing one in the middle of a
+        // strip jumped focus to the far end, which is nowhere near where the
+        // eye is -- every editor moves to the tab that takes the closed one's
+        // place, or to the one before it when there is none.
+        let closing = openTabs.firstIndex { $0.path == path }
         openTabs.removeAll { $0.path == path }
         if activeTabPath == path {
-            activeTabPath = openTabs.last?.path
+            activeTabPath = closing.map { min($0, openTabs.count - 1) }
+                .flatMap { $0 >= 0 ? openTabs[$0].path : nil }
         }
         if pendingClosePath == path { pendingClosePath = nil }
     }

@@ -81,7 +81,7 @@ final class EditorPaneStoreTests: XCTestCase {
         XCTAssertEqual(onDisk, "hello world")
     }
 
-    func test_close_removesTheTabAndFallsBackToTheLastRemaining() throws {
+    func test_close_removesTheTabAndFallsBackToTheOneBeforeIt() throws {
         try write("a", at: "a.txt")
         try write("b", at: "b.txt")
         let store = try makeStore()
@@ -92,6 +92,42 @@ final class EditorPaneStoreTests: XCTestCase {
 
         XCTAssertEqual(store.openTabs.map(\.path), ["a.txt"])
         XCTAssertEqual(store.activeTabPath, "a.txt")
+    }
+
+    /// Closing one from the middle goes to the tab that took its place, not
+    /// to the far end of the strip -- where the eye is not.
+    func test_close_movesToTheNeighbourRatherThanTheLastTab() throws {
+        for name in ["a", "b", "c"] { try write(name, at: "\(name).txt") }
+        let store = try makeStore()
+        for name in ["a", "b", "c"] { store.open(path: "\(name).txt") }
+        store.select(path: "b.txt")
+
+        store.close(path: "b.txt")
+
+        XCTAssertEqual(store.activeTabPath, "c.txt", "the tab that took its place")
+    }
+
+    /// Closing the last tab has no successor, so focus goes to the one before.
+    func test_close_ofTheLastTabMovesLeft() throws {
+        for name in ["a", "b"] { try write(name, at: "\(name).txt") }
+        let store = try makeStore()
+        for name in ["a", "b"] { store.open(path: "\(name).txt") }
+
+        store.close(path: "b.txt")
+
+        XCTAssertEqual(store.activeTabPath, "a.txt")
+    }
+
+    /// Closing the only tab leaves nothing to focus, and nothing is a valid
+    /// answer -- the code column shows its empty state.
+    func test_close_ofTheOnlyTabLeavesNothingActive() throws {
+        try write("a", at: "a.txt")
+        let store = try makeStore()
+        store.open(path: "a.txt")
+
+        store.close(path: "a.txt")
+
+        XCTAssertNil(store.activeTabPath)
     }
 
     func test_save_onExternalConflict_setsDiskChangedAndDoesNotOverwrite() throws {

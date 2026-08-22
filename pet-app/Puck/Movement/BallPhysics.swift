@@ -139,15 +139,15 @@ enum BallPhysics {
             // bottom of the screen -- which is what "화면 밖으로 나가는데"
             // was: the sides and ceiling were closed, the floor wasn't.
             if next.position.y >= landingY, next.verticalVelocity > 0 {
-                let speed = next.verticalVelocity * ScreenBounds.restitution
-                if speed >= ScreenBounds.minimumBounceSpeed {
-                    next.position.y = 2 * landingY - next.position.y
-                    next.verticalVelocity = -speed
-                } else {
+                // The same reflection every other edge uses, rather than the
+                // copy of its arithmetic that used to live here -- two places
+                // to change and one of them always forgotten.
+                let bounced = ScreenBounds.reflect(next.position.y, at: landingY, velocity: next.verticalVelocity)
+                next.position.y = bounced.coordinate
+                next.verticalVelocity = bounced.velocity
+                if bounced.velocity == 0 {
                     // Out of bounce: settle on the surface. An ordinary kick
                     // ends here, back in play for the pet to chase again.
-                    next.position.y = landingY
-                    next.verticalVelocity = 0
                     next.horizontalVelocity = 0
                     next.phase = .resting
                     return next
@@ -169,12 +169,19 @@ enum BallPhysics {
         }
     }
 
+    /// How hard the pet hits a toy, in points per second. Named like every
+    /// other tuning value here rather than written into the signatures: these
+    /// are the numbers someone comes back to change.
+    static let juggleLiftSpeed: CGFloat = 260
+    static let kickHorizontalSpeed: CGFloat = 260
+    static let kickLiftSpeed: CGFloat = 420
+
     /// Pops a resting ball straight up, back into `.falling` -- it arcs back
     /// down and lands (`.resting`) the same way a drop does, since a
     /// negative (upward) initial velocity just decelerates under gravity,
     /// peaks, and falls back via the exact same math (2026-07-29, more
     /// interaction variety: a juggle before the final kick-away).
-    static func juggle(_ state: BallState, liftSpeed: CGFloat = 260) -> BallState {
+    static func juggle(_ state: BallState, liftSpeed: CGFloat = juggleLiftSpeed) -> BallState {
         var next = state
         next.phase = .falling
         next.verticalVelocity = -liftSpeed
@@ -187,8 +194,8 @@ enum BallPhysics {
     static func kick(
         _ state: BallState,
         direction: AvatarFacing,
-        horizontalSpeed: CGFloat = 260,
-        liftSpeed: CGFloat = 420
+        horizontalSpeed: CGFloat = kickHorizontalSpeed,
+        liftSpeed: CGFloat = kickLiftSpeed
     ) -> BallState {
         var next = state
         next.phase = .kicked

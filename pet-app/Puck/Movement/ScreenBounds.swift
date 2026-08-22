@@ -143,7 +143,11 @@ enum ScreenBounds {
     /// stays free of any left/right/up/down special cases. `restitution`/
     /// `minimumBounceSpeed` default to the wall/ceiling tuning; bounceOffFloor
     /// passes its own, lossier pair.
-    private static func reflect(
+    ///
+    /// A returned velocity of 0 means the bounce ran out of energy and the
+    /// thing has come to rest against the edge -- which is how a caller that
+    /// tracks its own phase (BallPhysics) knows to settle.
+    static func reflect(
         _ coordinate: CGFloat,
         at limit: CGFloat,
         velocity: CGFloat,

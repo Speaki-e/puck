@@ -19,6 +19,7 @@ struct ChatSidebarView: View {
     /// skips a child whose own inputs are unchanged, and a table lookup
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
 
     @ObservedObject var store: ClientWindowStore
     /// Presented by the new-workspace button; the folder picker itself is
@@ -54,6 +55,12 @@ struct ChatSidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        // AppKit's own sidebar material sat two shades lighter than the
+        // island beside it -- (40,39,39) against (16,16,16) -- which read as
+        // two unrelated panels rather than one window. Hidden, and painted
+        // with the same ground the island uses, so the two agree.
+        .scrollContentBackground(.hidden)
+        .background(palette.background)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 Divider()

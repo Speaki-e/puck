@@ -30,6 +30,57 @@ final class ClientWindowStore: ObservableObject {
     private var sessionsByKey: [SessionKey: ChatSession] = [:]
     private var sessionOrder: [SessionKey] = []
 
+    /// isTankPinned arrives in Task 6 as the real persisted toggle; this is a
+    /// placeholder until then.
+    private var isTankPinned = false
+
+    /// The tank is drawn in two pieces -- above the chat column, and above the
+    /// editor column when it is open -- because they are siblings in a split
+    /// and SwiftUI cannot draw one view across that boundary. The pet does not
+    /// care: it is drawn by the overlay, so it walks over the divider.
+    enum TankSegment: Hashable {
+        case chat
+        case editor
+    }
+
+    private var tankSegments: [TankSegment: CGRect] = [:]
+
+    /// The whole tank in AppKit global coordinates, or nil when none of it is
+    /// on screen.
+    var tankFrame: CGRect? {
+        tankSegments.values.reduce(nil) { union, frame in
+            union.map { $0.union(frame) } ?? frame
+        }
+    }
+
+    /// Whether the client window is the one the user is looking at. Reported
+    /// by the window itself; the pet only comes home for a frontmost window.
+    private(set) var windowIsFrontmost = false
+
+    func setTankSegment(_ frame: CGRect?, for segment: TankSegment) {
+        let previous = tankSegments[segment]
+        tankSegments[segment] = frame
+        guard previous != frame else { return }
+        reportPetHome()
+    }
+
+    func setWindowIsFrontmost(_ isFrontmost: Bool) {
+        guard windowIsFrontmost != isFrontmost else { return }
+        windowIsFrontmost = isFrontmost
+        reportPetHome()
+    }
+
+    /// Sent only when something actually moved -- a resize produces a rect per
+    /// layout pass, and an unchanged one carries no news.
+    private func reportPetHome() {
+        guard let space = GlobalScreenSpace.current() else { return }
+        let wire = tankFrame.map { frame -> BridgeRect in
+            let topLeft = space.normalized(fromAppKit: CGPoint(x: frame.minX, y: frame.maxY))
+            return BridgeRect(x: topLeft.x, y: topLeft.y, width: frame.width, height: frame.height)
+        }
+        sender.reportPetHome(rect: wire, visible: windowIsFrontmost && wire != nil, pinned: isTankPinned)
+    }
+
     /// F15 (2026-07-31): set when an agent runs in this process, which it now
     /// does -- see AgentHost. A command then goes straight to it instead of
     /// out as user_input, since user_input exists to hand the command to

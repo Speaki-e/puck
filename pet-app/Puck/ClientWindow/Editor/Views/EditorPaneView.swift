@@ -21,10 +21,22 @@ struct EditorPaneView: View {
     /// re-deriving ClientWorkspace.editorAvailability, this view doesn't own
     /// that decision.
     let onUnavailable: () -> Void
+    /// The tank strip's frame, or nil when it is off screen. This view does
+    /// not hold ClientWindowStore -- see onUnavailable above -- so reporting
+    /// is threaded in the same way.
+    let onTankFrameChange: (CGRect?) -> Void
 
     @State private var store: EditorPaneStore?
 
     var body: some View {
+        VStack(spacing: 0) {
+            PetTankView(onFrameChange: onTankFrameChange)
+            paneContent
+        }
+    }
+
+    @ViewBuilder
+    private var paneContent: some View {
         switch availability {
         case .noProject, .unavailable:
             EditorEmptyStateView(availability: availability)

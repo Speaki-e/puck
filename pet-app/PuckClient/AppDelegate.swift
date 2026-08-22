@@ -96,6 +96,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
+        // The pet only comes home for a frontmost window -- reported here
+        // rather than inferred from the tank's own visibility, since the
+        // window can be fully on screen and still not be the one in front.
+        // `queue: .main` makes the MainActor.assumeIsolated below sound; the
+        // block itself is not isolated in its signature, so the compiler
+        // cannot see that and warns on the main-actor call without it.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.clientWindowStore.setWindowIsFrontmost(true) }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.clientWindowStore.setWindowIsFrontmost(false) }
+        }
+
         showWindow()
     }
 

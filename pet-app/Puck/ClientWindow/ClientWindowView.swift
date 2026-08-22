@@ -65,7 +65,8 @@ struct ClientWindowView: View {
                         EditorPaneView(
                             workspaceId: store.activeWorkspaceId,
                             availability: availability,
-                            onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
+                            onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) },
+                            onTankFrameChange: { store.setTankSegment($0, for: .editor) }
                         )
                         .frame(minWidth: 540)
                     }
@@ -107,6 +108,13 @@ struct ClientWindowView: View {
             // whoever put it where it is.
             guard activeWorkspace?.canOpenEditor == true, editor != .detached else { return }
             editor = .attached
+        }
+        // Hidden or detached, the editor's segment is no longer part of this
+        // window's tank -- a detached editor is a different window, and a
+        // hidden one has no strip on screen at all.
+        .onChange(of: editor) {
+            guard !editor.isAttached else { return }
+            store.setTankSegment(nil, for: .editor)
         }
     }
 }

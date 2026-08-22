@@ -43,6 +43,7 @@ struct ChatPaneView: View {
     private var detail: some View {
         if let session = activeSession {
             VStack(spacing: 0) {
+                PetTankView { store.setTankSegment($0, for: .chat) }
                 ChatTranscriptView(session: session) { approved in
                     store.respondToPendingApproval(in: session, approved: approved)
                 }

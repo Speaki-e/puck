@@ -10,20 +10,24 @@
 extension AppDelegate {
     // MARK: - Permissions
 
-    /// PermissionOnboarding existed but nothing ever called it: launch only
-    /// logged `currentStatus()` and moved on, so the app never asked for
-    /// anything. Microphone and speech recognition stayed `notDetermined`
-    /// forever — VoiceInputController would try to record and fail silently —
-    /// and Accessibility could only be granted by hand, which is exactly the
-    /// flow that breaks on stale System Settings entries.
+    /// Accessibility is asked for here; the microphone and speech recognition
+    /// are not.
+    ///
+    /// They used to be, on the grounds that the app should not fail silently
+    /// the first time push-to-talk is held. What that produced in practice was
+    /// a microphone prompt on the desktop at every launch after a rebuild --
+    /// macOS pins a locally-signed app's privacy grants to the exact binary,
+    /// so every install is a new app to it and everything reverts to
+    /// undecided. Someone who never uses voice was answering that dialog
+    /// forever.
+    ///
+    /// So they are asked for where they are used, which is also where the
+    /// question makes sense: the first time push-to-talk is held
+    /// (VoiceInputController). Accessibility stays here because it cannot be
+    /// requested at the point of use at all -- the key it enables is the one
+    /// that would trigger the request.
     func requestPermissions() {
         AppLogger.shared.log(.info, "Launch permission status: \(PermissionOnboarding.currentStatus())")
-
-        // Only prompts the ones still undecided; already-answered permissions
-        // (granted or denied) are left alone rather than re-asked every launch.
-        PermissionOnboarding.requestUndecidedPermissions { status in
-            AppLogger.shared.log(.info, "Permission status after prompting: \(status)")
-        }
 
         // Accessibility can't be requested silently — the only way to ask is
         // macOS's own modal. Ask once and then stay quiet: prompting on every

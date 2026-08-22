@@ -35,6 +35,25 @@ enum PermissionOnboarding {
     /// an app — only prompted via AccessibilityPermission.isTrusted(prompt:
     /// true) or by sending the user to the System Settings deep link
     /// (AccessibilityPermission.openSystemSettings()).
+    /// Both of the ones voice input needs, as one answer -- transcription
+    /// takes a recording *and* permission to recognise it, so either missing
+    /// means push-to-talk cannot work.
+    static func hasVoicePermissions() -> Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+            && SFSpeechRecognizer.authorizationStatus() == .authorized
+    }
+
+    /// Asks for both, in order. Called the first time push-to-talk is held
+    /// rather than at launch: a locally-signed app's grants are pinned to the
+    /// exact binary, so asking at launch put a microphone dialog on the
+    /// desktop after every rebuild, for everyone, whether or not they ever
+    /// use voice.
+    static func requestVoicePermissions() {
+        MicrophonePermission.requestMicrophoneAccess { _ in
+            MicrophonePermission.requestSpeechRecognitionAccess { _ in }
+        }
+    }
+
     static func requestUndecidedPermissions(completion: @escaping (PermissionStatus) -> Void) {
         MicrophonePermission.requestMicrophoneAccess { _ in
             MicrophonePermission.requestSpeechRecognitionAccess { _ in

@@ -28,6 +28,13 @@ final class VoiceInputController {
 
     private let speechService: SpeechRecognitionServicing
     private let now: () -> TimeInterval
+    /// Whether the microphone and speech recognition have both been granted,
+    /// and how to ask. Injected rather than called directly so this class
+    /// stays testable without AVFoundation and without triggering a real
+    /// system prompt on whoever runs the tests.
+    private let hasVoicePermissions: () -> Bool
+    private let requestVoicePermissions: () -> Void
+    private var hasAskedForVoicePermissions = false
     private var pressStartUptime: TimeInterval?
     private var heldLongEnough = false
     private var isActive = false
@@ -45,9 +52,16 @@ final class VoiceInputController {
     /// stuck in ListenState with no feedback until a manual key release.
     var onError: ((Error) -> Void)?
 
-    init(speechService: SpeechRecognitionServicing, now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+    init(
+        speechService: SpeechRecognitionServicing,
+        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        hasVoicePermissions: @escaping () -> Bool = { PermissionOnboarding.hasVoicePermissions() },
+        requestVoicePermissions: @escaping () -> Void = { PermissionOnboarding.requestVoicePermissions() }
+    ) {
         self.speechService = speechService
         self.now = now
+        self.hasVoicePermissions = hasVoicePermissions
+        self.requestVoicePermissions = requestVoicePermissions
         speechService.onPartialResult = { [weak self] text in self?.onPartialText?(text) }
         speechService.onFinalResult = { [weak self] text in
             guard self?.heldLongEnough == true else { return }
@@ -69,11 +83,30 @@ final class VoiceInputController {
     /// slide the hold-start time forward or restart streaming.
     func pushToTalkDown() {
         guard !isActive else { return }
+        // The first hold is where the microphone is asked for. Asking at
+        // launch instead meant a dialog on the desktop for everyone, every
+        // time the app was rebuilt, whether or not they ever speak to the pet
+        // -- see AppDelegate.requestPermissions.
+        //
+        // The press that triggers the prompt is spent on the prompt: the
+        // stream cannot start until it is answered, and by then the key is
+        // long since up. Every hold after it records.
+        guard requestVoicePermissionsIfNeeded() else { return }
         isActive = true
         pressStartUptime = now()
         heldLongEnough = false
         onListenStart?()
         speechService.startStreaming()
+    }
+
+    /// - Returns: whether recording can start now. False while a prompt is on
+    ///   screen, and false for good once the answer is no.
+    private func requestVoicePermissionsIfNeeded() -> Bool {
+        guard !hasVoicePermissions() else { return true }
+        guard !hasAskedForVoicePermissions else { return false }
+        hasAskedForVoicePermissions = true
+        requestVoicePermissions()
+        return false
     }
 
     func pushToTalkUp() {

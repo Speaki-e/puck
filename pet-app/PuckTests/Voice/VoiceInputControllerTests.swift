@@ -29,7 +29,7 @@ final class VoiceInputControllerTests: XCTestCase {
     func test_pushToTalkDown_startsListeningAndStreaming() {
         let speech = FakeSpeechRecognitionService()
         var listenStarted = false
-        let controller = VoiceInputController(speechService: speech, now: { 0 })
+        let controller = VoiceInputController(speechService: speech, now: { 0 }, hasVoicePermissions: { true })
         controller.onListenStart = { listenStarted = true }
 
         controller.pushToTalkDown()
@@ -42,7 +42,7 @@ final class VoiceInputControllerTests: XCTestCase {
         let speech = FakeSpeechRecognitionService()
         var listenEnded = false
         var uptime: TimeInterval = 0
-        let controller = VoiceInputController(speechService: speech, now: { uptime })
+        let controller = VoiceInputController(speechService: speech, now: { uptime }, hasVoicePermissions: { true })
         controller.onListenEnd = { listenEnded = true }
 
         controller.pushToTalkDown()
@@ -59,7 +59,7 @@ final class VoiceInputControllerTests: XCTestCase {
         // hold-start time forward or restart streaming.
         let speech = FakeSpeechRecognitionService()
         var uptime: TimeInterval = 0
-        let controller = VoiceInputController(speechService: speech, now: { uptime })
+        let controller = VoiceInputController(speechService: speech, now: { uptime }, hasVoicePermissions: { true })
         var receivedFinal: String?
         controller.onFinalText = { receivedFinal = $0 }
 
@@ -78,7 +78,7 @@ final class VoiceInputControllerTests: XCTestCase {
     func test_finalResult_isIgnored_whenHeldShorterThanMinimum() {
         let speech = FakeSpeechRecognitionService()
         var uptime: TimeInterval = 0
-        let controller = VoiceInputController(speechService: speech, now: { uptime })
+        let controller = VoiceInputController(speechService: speech, now: { uptime }, hasVoicePermissions: { true })
         var receivedFinal: String?
         controller.onFinalText = { receivedFinal = $0 }
 
@@ -94,7 +94,7 @@ final class VoiceInputControllerTests: XCTestCase {
     func test_finalResult_isDelivered_whenHeldLongEnough() {
         let speech = FakeSpeechRecognitionService()
         var uptime: TimeInterval = 0
-        let controller = VoiceInputController(speechService: speech, now: { uptime })
+        let controller = VoiceInputController(speechService: speech, now: { uptime }, hasVoicePermissions: { true })
         var receivedFinal: String?
         controller.onFinalText = { receivedFinal = $0 }
 
@@ -112,7 +112,7 @@ final class VoiceInputControllerTests: XCTestCase {
         // recognizer unavailable), onListenStart already fired unconditionally
         // and nothing ever reverted it without a manual key release.
         let speech = FakeSpeechRecognitionService()
-        let controller = VoiceInputController(speechService: speech, now: { 0 })
+        let controller = VoiceInputController(speechService: speech, now: { 0 }, hasVoicePermissions: { true })
         var receivedError: Error?
         var listenEnded = false
         controller.onError = { receivedError = $0 }
@@ -131,7 +131,7 @@ final class VoiceInputControllerTests: XCTestCase {
         // final, submitted text).
         let speech = FakeSpeechRecognitionService()
         let uptime: TimeInterval = 0
-        let controller = VoiceInputController(speechService: speech, now: { uptime })
+        let controller = VoiceInputController(speechService: speech, now: { uptime }, hasVoicePermissions: { true })
         var receivedPartial: String?
         controller.onPartialText = { receivedPartial = $0 }
 
@@ -139,5 +139,63 @@ final class VoiceInputControllerTests: XCTestCase {
         speech.onPartialResult?("테스")
 
         XCTAssertEqual(receivedPartial, "테스")
+    }
+
+    /// The first hold asks for the microphone instead of recording into one
+    /// it does not have. Asking at launch instead is what put a system dialog
+    /// on the desktop after every rebuild.
+    func test_theFirstHoldWithoutPermissionAsksInsteadOfRecording() {
+        let speech = FakeSpeechRecognitionService()
+        var asked = 0
+        let controller = VoiceInputController(
+            speechService: speech,
+            now: { 0 },
+            hasVoicePermissions: { false },
+            requestVoicePermissions: { asked += 1 }
+        )
+
+        controller.pushToTalkDown()
+
+        XCTAssertEqual(asked, 1)
+        XCTAssertEqual(speech.startCallCount, 0, "nothing is recorded until the answer is yes")
+    }
+
+    /// And it asks once. A prompt cannot be answered while the key is held,
+    /// so a second hold that re-asked would stack dialogs on someone who has
+    /// already said no.
+    func test_itAsksOnlyOnce() {
+        let speech = FakeSpeechRecognitionService()
+        var asked = 0
+        let controller = VoiceInputController(
+            speechService: speech,
+            now: { 0 },
+            hasVoicePermissions: { false },
+            requestVoicePermissions: { asked += 1 }
+        )
+
+        controller.pushToTalkDown()
+        controller.pushToTalkUp()
+        controller.pushToTalkDown()
+
+        XCTAssertEqual(asked, 1)
+    }
+
+    /// Once granted, holding records as it always did -- the check is not a
+    /// gate that stays shut after the first refusal.
+    func test_holdingAfterPermissionIsGrantedRecords() {
+        let speech = FakeSpeechRecognitionService()
+        var granted = false
+        let controller = VoiceInputController(
+            speechService: speech,
+            now: { 0 },
+            hasVoicePermissions: { granted },
+            requestVoicePermissions: { granted = true }
+        )
+
+        controller.pushToTalkDown()
+        controller.pushToTalkUp()
+        controller.pushToTalkDown()
+
+        XCTAssertEqual(speech.startCallCount, 1)
     }
 }

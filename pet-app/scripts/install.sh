@@ -6,6 +6,8 @@
 # (Accessibility above all) to the code signature, and an *ad-hoc* signature
 # changes on every build -- so every rebuild silently revoked Accessibility
 # and the global hotkey stopped working until it was re-granted by hand.
+# The other half of keeping those grants is never deleting the installed
+# bundle; see the rsync below.
 # Signing with a real (even free, personal-team) Apple Development identity
 # keeps the signature stable, so the grant survives rebuilds. Grant it once
 # to /Applications/Puck.app and this script can then reinstall as often
@@ -80,9 +82,27 @@ check_resource PuckClient acp-codex.mjs
 check_resource PuckClient FileIcons/icon-map.json
 check_resource Puck Avatars
 
+# Updated in place, never deleted first. macOS drops an app's privacy grants
+# when the app is *removed*, so `rm -rf` followed by a fresh copy handed back
+# the microphone, speech and Accessibility prompts on every single install --
+# even though the signature (a real Apple Development identity, see the header)
+# has been stable the whole time. rsync overwrites what changed and deletes what
+# went away, leaving the bundle itself the same item it was.
 for app in Puck PuckClient; do
-    rm -rf "/Applications/$app.app"
-    cp -R "$DERIVED/Build/Products/Release/$app.app" /Applications/
+    built="$DERIVED/Build/Products/Release/$app.app"
+    if [ -d "/Applications/$app.app" ]; then
+        rsync -a --delete "$built/" "/Applications/$app.app/"
+    else
+        cp -R "$built" /Applications/
+    fi
+    # An in-place update writes into a signed bundle, so the signature is
+    # worth checking rather than assuming: a broken one launches to a
+    # "damaged app" dialog, which is a worse morning than a re-prompt.
+    if ! codesign --verify --strict "/Applications/$app.app" 2>/dev/null; then
+        echo "error: /Applications/$app.app is not correctly signed after the update." >&2
+        echo "       Remove it and run this script again to reinstall from scratch." >&2
+        exit 1
+    fi
 done
 
 # Un-register the copies we just built before deleting them, and any other

@@ -32,6 +32,9 @@ final class BridgeMessageRouter {
     /// Emitted for protocol 3.2 status events, already on the main thread.
     var onEventReaction: ((EventReaction) -> Void)?
 
+    /// The client's tank report (2026-08-22), already on the main thread.
+    var onPetHome: ((BridgeRect?, Bool, Bool) -> Void)?
+
     /// Answers workspace_create_request / session_create_request locally.
     /// Left optional so the many tests that only care about tool dispatch or
     /// event reactions can keep constructing a router with one argument.
@@ -101,8 +104,10 @@ final class BridgeMessageRouter {
             // arriving inbound has no in-process reader.
             break
 
-        case .petHome:
-            break // Task 4 wires this to the pet; the router only needs to compile until then.
+        case .petHome(let rect, let visible, let pinned):
+            dispatchToMain { [weak self] in
+                self?.onPetHome?(rect, visible, pinned)
+            }
 
         case .clientHello:
             break // intercepted by BridgeServer before reaching here (assigns the connection's role)

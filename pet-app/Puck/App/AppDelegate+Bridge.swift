@@ -17,6 +17,9 @@ extension AppDelegate {
 
         let router = BridgeMessageRouter(toolExecutor: toolExecutor)
         router.onEventReaction = { [weak self] reaction in self?.applyEventReaction(reaction) }
+        router.onPetHome = { [weak self] rect, visible, pinned in
+            self?.applyPetHome(rect: rect, visible: visible, pinned: pinned)
+        }
         // Workspace/session creation is answered in-process as of 2026-08-15
         // (was: relayed to workspace, which owned the registries). A registry
         // that can't open its store is not a reason to refuse to launch --
@@ -44,7 +47,14 @@ extension AppDelegate {
             AppLogger.shared.log(.warning, "BridgeServer: dropped a malformed line from a client")
         }
         server.onGUIPresenceChanged = { [weak self] hasGUI in
-            guard hasGUI else { return }
+            guard hasGUI else {
+                // The client's tank went with it -- a rect from a process
+                // that's gone is not somewhere to live. Same main-thread hop
+                // as the branch below: this touches CharacterController/
+                // SpriteAvatar from BridgeServer's own queue otherwise.
+                DispatchQueue.main.async { self?.petHomeConnectionLost() }
+                return
+            }
             // Fires on BridgeServer's own queue, and send() takes that queue
             // synchronously -- hop off it before sending, or it deadlocks.
             DispatchQueue.main.async {

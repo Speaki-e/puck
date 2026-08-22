@@ -335,6 +335,14 @@ final class SpriteAvatar: AvatarPlayable {
         currentMeasurement = (opaque, CGSize(width: image.width, height: image.height))
     }
 
+    func setAlpha(_ alpha: CGFloat, duration: TimeInterval, completion: (() -> Void)?) {
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(duration)
+        CATransaction.setCompletionBlock(completion)
+        spriteLayer.opacity = Float(alpha)
+        CATransaction.commit()
+    }
+
     func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool {
         guard let hitMask, let currentMeasurement else {
             // No artwork measured yet: the layer box is the best answer there is.

@@ -78,6 +78,13 @@ protocol AvatarPlayable: AnyObject {
     /// Default falls back to `visualBounds`, which is what an avatar with no
     /// measurable artwork (usdz, video) can honestly answer.
     func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool
+
+    /// Fades the whole avatar out and back in. Used when the pet moves
+    /// between the desktop and its tank, which is a cut rather than a walk.
+    /// Default is a no-op, and the completion still runs -- a caller that
+    /// moves the pet inside it must not be skipped by an avatar that cannot
+    /// animate.
+    func setAlpha(_ alpha: CGFloat, duration: TimeInterval, completion: (() -> Void)?)
 }
 
 extension AvatarPlayable {
@@ -87,6 +94,10 @@ extension AvatarPlayable {
     func setUpsideDown(_ isUpsideDown: Bool) {}
     func triggerJump() {}
     var visualBounds: CGRect { .zero }
+
+    func setAlpha(_ alpha: CGFloat, duration: TimeInterval, completion: (() -> Void)?) {
+        completion?()
+    }
 
     func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool {
         visualBounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point)

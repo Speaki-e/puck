@@ -58,6 +58,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// The window the pet fell behind, until it has landed and been moved onto
     /// that window's top edge -- see perchAfterLandingIfNeeded().
     var pendingPerchWindowID: CGWindowID?
+    let petHomeDecider = PetHomeDecider()
+    /// The tank the client last reported, in overlay-local coordinates. Nil
+    /// when there is none to go to.
+    var petTankArea: CGRect?
+    /// The roamable area the pet had before it went home, so coming out
+    /// restores the desktop it actually had rather than a recomputed guess.
+    var desktopRoamableArea: CGRect?
+    /// The avatar scale the pet had before it went home. There is no stored
+    /// setting to read it back from -- the size slider passes a scale straight
+    /// to applyLiveAvatarScale and nothing keeps it -- so it is remembered
+    /// here for the trip back out.
+    var desktopAvatarScale: Double = 1
     /// Legs of the current wander still to walk, and the pause before the next
     /// one -- see continueWanderIfNeeded(dt:).
     var pendingWanderLegs = 0

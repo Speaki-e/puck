@@ -29,6 +29,12 @@ struct ChatPaneView: View {
     /// ClientWindowView; this view only splits its detail around it.
     var editorStore: EditorPaneStore?
 
+    /// Where the toolbar's last button ends, measured rather than assumed --
+    /// the island climbs into the empty band past it, and a hard-coded x
+    /// would be wrong the first time a button was added. Nil until the
+    /// toolbar has laid itself out.
+    @State private var toolbarTrailingX: CGFloat?
+
     var body: some View {
         NavigationSplitView {
             ChatSidebarView(store: store)
@@ -51,7 +57,10 @@ struct ChatPaneView: View {
             // code column existed. Putting it inside would shrink the pet's
             // home to the chat's width the moment a file is opened.
             VStack(spacing: 0) {
-                PetTankView { store.setTankSegment($0, for: .chat) }
+                PetTankView(
+                    onFrameChange: { store.setTankSegment($0, for: .chat) },
+                    toolbarTrailingX: toolbarTrailingX
+                )
                 conversation(session)
             }
             .navigationTitle(session.displayTitle)
@@ -161,6 +170,9 @@ struct ChatPaneView: View {
             } label: {
                 Label(Strings.text(.chatSettings), systemImage: "gearshape")
             }
+            // The last button in the group, so its trailing edge is where the
+            // toolbar ends and the island's shoulder may begin.
+            .background(GlobalFrameReporter { toolbarTrailingX = $0.maxX })
         }
     }
 

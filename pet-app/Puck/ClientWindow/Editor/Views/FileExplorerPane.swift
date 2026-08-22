@@ -78,10 +78,7 @@ struct FileExplorerPane: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        // The same glass as the session sidebar opposite it and the island
-        // above: three panels floating on the window's backdrop, lit from the
-        // same place.
-        .liquidSurfacePanel(palette: palette, specularRadius: 420)
+        .background(palette.background)
     }
 
     /// Icons rather than words. The column is 200pt and its job is the list

@@ -57,9 +57,10 @@ struct ChatSidebarView: View {
         .listStyle(.sidebar)
         // AppKit's own sidebar material sat two shades lighter than the
         // island beside it -- (40,39,39) against (16,16,16) -- which read as
-        // two unrelated panels rather than one window. Hidden, so the panel
-        // this list sits on is the one thing painting a ground.
+        // two unrelated panels rather than one window. Hidden, and painted
+        // with the same ground the island uses, so the two agree.
         .scrollContentBackground(.hidden)
+        .background(palette.background)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 Divider()
@@ -74,14 +75,10 @@ struct ChatSidebarView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
             }
-            // No material of its own: `.bar` put a lighter slab across the
-            // bottom of the glass, which is the seam this panel is meant not
-            // to have. The divider is what separates it from the list.
+            // Sits on the sidebar material rather than floating over the list,
+            // so the scrolling content passes behind a real edge.
+            .background(.bar)
         }
-        // The same glass the island is cut from, floating clear of the
-        // window's edges by the same gap. A sidebar drawn flat beside a lit
-        // island read as two windows sharing a frame.
-        .liquidSurfacePanel(palette: palette, specularRadius: 420)
         .sheet(isPresented: $isAddingWorkspace) {
             NewWorkspaceSheet(store: store)
         }

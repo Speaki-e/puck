@@ -22,6 +22,11 @@ struct PetTankView: View {
     /// screen. Reported to the store, which forwards it over the socket.
     let onFrameChange: (CGRect?) -> Void
 
+    /// Sends the pet's height on the island to pet-app, which is the process
+    /// that actually resizes it. Nil in the editor's segment: one pet, one
+    /// control, and two would disagree the moment either moved.
+    var onPetHeightChange: ((CGFloat) -> Void)?
+
     /// Where the toolbar's buttons end, in SwiftUI's global space, or nil
     /// when nothing has measured them. The island rises into the empty band
     /// past this point and stays clear of it before -- see IslandShape.
@@ -158,6 +163,18 @@ struct PetTankView: View {
         .frame(height: islandHeight + Self.shoulderRise + Self.baseLift)
         // The grab area for resizing, on the edge it moves.
         .overlay(alignment: .bottom) { resizeHandle }
+        // Up the left edge, the height of the island it sizes the pet for,
+        // and clear of the toolbar's band -- which takes every click in it.
+        .overlay(alignment: .bottomLeading) {
+            if let onPetHeightChange {
+                PetSizeSlider(
+                    length: max(24, islandHeight - PetSizeSlider.inset * 2),
+                    onChange: onPetHeightChange
+                )
+                .padding(.leading, 6)
+                .padding(.bottom, PetSizeSlider.inset)
+            }
+        }
         // Reported from the island's floor rather than its outline: the pet's
         // world is the part it can stand in, and the raised shoulder is a
         // shape, not a room. A frame taken from the padded box would also let
@@ -165,6 +182,10 @@ struct PetTankView: View {
         .overlay(alignment: .bottom) {
             Color.clear
                 .frame(height: islandHeight)
+                // The size bar's strip is not part of the pet's world: the
+                // pet is drawn by an overlay window above this one, so a pet
+                // standing on the bar takes the drags meant for it.
+                .padding(.leading, onPetHeightChange == nil ? 0 : PetSizeSlider.footprint)
                 .background(PaneFrameReporter(onChange: onFrameChange))
                 .allowsHitTesting(false)
         }

@@ -2,12 +2,17 @@
 //  PetSizeSlider.swift
 //  Puck
 //
-//  How big the pet is, in the toolbar above the island it is standing on.
+//  How big the pet is, as a bar standing up the island's left edge.
 //
-//  It began on the island itself, at its top-right corner, and could not be
-//  clicked: the window's toolbar covers that whole band whether or not
-//  anything is drawn in it, so a control placed there takes no clicks at all.
-//  Moving it up into the toolbar is what puts it where it looked like it was.
+//  It has been three things. A drag handle at the island's top-right corner,
+//  which was a guess until you were already dragging it; a horizontal slider
+//  there, which could not be clicked at all, because the window's toolbar
+//  covers that band whether or not anything is drawn in it; and the same
+//  slider moved up into the toolbar, which worked but sat among buttons that
+//  have nothing to do with the pet.
+//
+//  Upright at the island's left edge it is clear of the toolbar, it is on the
+//  island it changes, and it points the way the pet grows.
 //
 //  The pet's size is in Settings too. Settings is a window you open, look
 //  away from the pet to use, and close; this is the same number with the pet
@@ -25,6 +30,10 @@ struct PetSizeSlider: View {
     @ObservedObject private var localization = Localization.shared
     @Environment(\.clientPalette) private var palette
 
+    /// How tall the bar stands. Given by the island rather than fixed: the
+    /// island is resizable, and a bar that kept one length would be a stub on
+    /// a tall shelf and would overhang a short one.
+    let length: CGFloat
     /// Sends the height to pet-app, which is the process that actually
     /// resizes the pet.
     let onChange: (CGFloat) -> Void
@@ -37,6 +46,19 @@ struct PetSizeSlider: View {
     /// first.
     @AppStorage(PetTankView.heightStorageKey) private var storedIslandHeight = Double(PetTankView.islandHeight)
 
+    /// How much room the bar takes across the island.
+    static let thickness: CGFloat = 20
+
+    /// Left at each end of the island, so the bar does not run into the
+    /// corners it is drawn between.
+    static let inset: CGFloat = 14
+
+    /// How much of the island's width the bar takes, including the gap
+    /// between it and the edge. The pet is kept out of this strip -- it is
+    /// drawn by a window above this one, so a pet standing on the bar takes
+    /// the drags meant for it.
+    static let footprint: CGFloat = thickness + 12
+
     /// The tallest the pet may be right now: its own limit, or what the
     /// island can hold, whichever is lower.
     private var ceiling: Double {
@@ -47,23 +69,14 @@ struct PetSizeSlider: View {
     }
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(palette.textSecondary.opacity(0.55))
-            Slider(
-                value: Binding(
-                    get: { storedHeight },
-                    set: { newValue in
-                        storedHeight = newValue
-                        onChange(CGFloat(newValue))
-                    }
-                ),
-                in: PetTankView.minimumPetHeight...ceiling
-            )
-            .controlSize(.mini)
-            .frame(width: 82)
-        }
+        // Upright, because up is the way the pet grows. AppKit's own
+        // vertical slider rather than a rotated SwiftUI one -- see
+        // VerticalSlider for what that cost.
+        VerticalSlider(
+            value: Binding(get: { storedHeight }, set: { send($0) }),
+            range: PetTankView.minimumPetHeight...ceiling
+        )
+        .frame(width: Self.thickness, height: length)
         // pet-app forgets the size when it quits, so the first window of the
         // next launch is where it finds out again.
         .onAppear { send(min(storedHeight, ceiling)) }

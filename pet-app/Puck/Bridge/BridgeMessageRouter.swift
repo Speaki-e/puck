@@ -101,6 +101,9 @@ final class BridgeMessageRouter {
             // arriving inbound has no in-process reader.
             break
 
+        case .petHome:
+            break // Task 4 wires this to the pet; the router only needs to compile until then.
+
         case .clientHello:
             break // intercepted by BridgeServer before reaching here (assigns the connection's role)
         }

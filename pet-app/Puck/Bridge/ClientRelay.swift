@@ -31,8 +31,10 @@ enum ClientRelay {
         //   as well would mint a competing workspace id for one click.
         // - tool_dispatch/tool_cancel/tool_result: pet-app is one end of each
         //   of those exchanges itself, so there is nobody to forward them to.
+        // - pet_home: pet-app is the other end of this exchange too --
+        //   PuckClient reports it, BridgeMessageRouter reads it directly.
         case .workspaceCreateRequest, .sessionCreateRequest,
-             .clientHello, .toolDispatch, .toolCancel, .toolResult:
+             .clientHello, .toolDispatch, .toolCancel, .toolResult, .petHome:
             return nil
         }
     }

@@ -152,6 +152,16 @@ enum ClientRole: String, Codable {
     case gui
 }
 
+/// A rectangle on the wire. CGRect is not Codable in a shape this protocol
+/// would keep -- `point_at`'s frame is already {x,y,width,height}, and this
+/// is the same space (Quartz global, top-left origin).
+struct BridgeRect: Codable, Equatable {
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+}
+
 /// Top-level type for every JSON Lines message on the socket, discriminated by "type".
 enum BridgeMessage: Equatable {
     /// Either side -> pet-app: identifies which role this connection plays (protocol 3.7).
@@ -168,6 +178,14 @@ enum BridgeMessage: Equatable {
     /// timeline an incoming event belongs to.
     case event(BridgeEvent, workspaceId: String, sessionId: String)
     case userInput(UserInput)
+
+    /// PuckClient -> pet-app: where the pet's tank is on screen, and whether
+    /// the pet should be in it (2026-08-22). `rect` is nil when the client
+    /// has no tank to offer -- the window is closed, or it is too small to
+    /// hold a pet. `visible` is "the client window is frontmost and the tank
+    /// is on screen"; `pinned` is the user's home toggle. What pet-app does
+    /// with the three is PetHomeDecider's business, not the wire's.
+    case petHome(rect: BridgeRect?, visible: Bool, pinned: Bool)
 
     // --- sessions/workspaces (2026-07-29, protocol 3.4) ---
 
@@ -191,6 +209,7 @@ extension BridgeMessage: Codable {
         case toolResult = "tool_result"
         case event = "event"
         case userInput = "user_input"
+        case petHome = "pet_home"
         case workspaceCreateRequest = "workspace_create_request"
         case workspaceCreate = "workspace_create"
         case sessionCreateRequest = "session_create_request"
@@ -212,6 +231,7 @@ extension BridgeMessage: Codable {
         case workspaceId = "workspace_id"
         case sessionId = "session_id"
         case attachments
+        case rect, visible, pinned
         case name
         case projectPath = "project_path"
         case title
@@ -298,6 +318,13 @@ extension BridgeMessage: Codable {
                     sessionId: try container.decodeIfPresent(String.self, forKey: .sessionId),
                     attachments: try container.decodeIfPresent([Attachment].self, forKey: .attachments)
                 )
+            )
+
+        case .petHome:
+            self = .petHome(
+                rect: try container.decodeIfPresent(BridgeRect.self, forKey: .rect),
+                visible: try container.decode(Bool.self, forKey: .visible),
+                pinned: try container.decode(Bool.self, forKey: .pinned)
             )
 
         case .workspaceCreateRequest:
@@ -398,6 +425,12 @@ extension BridgeMessage: Codable {
             try container.encodeIfPresent(input.workspaceId, forKey: .workspaceId)
             try container.encodeIfPresent(input.sessionId, forKey: .sessionId)
             try container.encodeIfPresent(input.attachments, forKey: .attachments)
+
+        case .petHome(let rect, let visible, let pinned):
+            try container.encode(TypeKey.petHome, forKey: .type)
+            try container.encodeIfPresent(rect, forKey: .rect)
+            try container.encode(visible, forKey: .visible)
+            try container.encode(pinned, forKey: .pinned)
 
         case .workspaceCreateRequest(let name, let projectPath):
             try container.encode(TypeKey.workspaceCreateRequest, forKey: .type)

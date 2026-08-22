@@ -73,6 +73,14 @@ final class UserInputSender {
         broadcast(.workspaceCreateRequest(name: name, projectPath: projectPath))
     }
 
+    /// Reports where the pet's tank is, and whether the pet belongs in it
+    /// right now (2026-08-22). Sent on every change rather than on a timer --
+    /// the caller only calls this when something actually moved.
+    @discardableResult
+    func reportPetHome(rect: BridgeRect?, visible: Bool, pinned: Bool) -> UserInputDelivery {
+        broadcast(.petHome(rect: rect, visible: visible, pinned: pinned))
+    }
+
     /// F13 (2026-07-29, protocol 3.4): request a new chat session via the
     /// sidebar's "new chat". Confirmed later by a session_create arriving
     /// back over the socket (origin: .user).

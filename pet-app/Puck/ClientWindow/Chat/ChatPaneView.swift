@@ -34,6 +34,12 @@ struct ChatPaneView: View {
     /// would be wrong the first time a button was added. Nil until the
     /// toolbar has laid itself out.
     @State private var toolbarTrailingX: CGFloat?
+    /// The same key CodeSplitView stores it under. The toggle is in the
+    /// window's toolbar as well as in the code column's own strip, because
+    /// the column is what it opens: a shortcut that only exists once the
+    /// column is showing cannot be the way you show it -- with the column
+    /// closed the key press fell through to the composer as a stray backtick.
+    @AppStorage("Puck.terminalOpen") private var isTerminalOpen = false
 
     var body: some View {
         NavigationSplitView {
@@ -167,6 +173,18 @@ struct ChatPaneView: View {
         }
         ToolbarItem {
             Button {
+                guard activeWorkspace?.canOpenEditor == true else { return }
+                isTerminalOpen.toggle()
+                if isTerminalOpen, editor == .hidden { editor = .attached }
+            } label: {
+                Label(Strings.text(.terminalToggle), systemImage: "terminal")
+            }
+            .disabled(activeWorkspace?.canOpenEditor != true)
+            .keyboardShortcut("`", modifiers: .control)
+            .help(Strings.text(.terminalToggle))
+        }
+        ToolbarItem {
+            Button {
                 NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
             } label: {
                 Label(Strings.text(.chatSettings), systemImage: "gearshape")
@@ -208,6 +226,12 @@ private struct ConversationSplit<Chat: View>: View {
     @ObservedObject var store: EditorPaneStore
     @ViewBuilder var chat: Chat
 
+    /// The shell under the code. Read here rather than only inside
+    /// CodeSplitView because it has to be reachable with no file open: the
+    /// terminal used to live inside the code column, so asking for one before
+    /// opening a file toggled a setting and showed nothing.
+    @AppStorage("Puck.terminalOpen") private var isTerminalOpen = false
+
     /// Put away rather than closed. The tab stays open, so coming back to the
     /// file does not mean finding it again -- and opening another one from
     /// the explorer brings the column back, which is what the click means.
@@ -215,9 +239,9 @@ private struct ConversationSplit<Chat: View>: View {
 
     var body: some View {
         Group {
-            if store.activeTabPath == nil {
+            if store.activeTabPath == nil, !isTerminalOpen {
                 chat
-            } else if isCollapsed {
+            } else if store.activeTabPath != nil, isCollapsed, !isTerminalOpen {
                 HStack(spacing: 0) {
                     chat
                     Divider()
@@ -226,8 +250,30 @@ private struct ConversationSplit<Chat: View>: View {
             } else {
                 HSplitView {
                     chat.frame(minWidth: 320)
-                    CodeSplitView(store: store) { isCollapsed = true }
-                        .frame(minWidth: 300)
+                    VStack(spacing: 0) {
+                        if store.activeTabPath != nil, !isCollapsed {
+                            CodeSplitView(store: store) { isCollapsed = true }
+                                .frame(maxHeight: .infinity)
+                        } else if store.activeTabPath != nil {
+                            // Put away, but the terminal below it is keeping
+                            // the column on screen -- so the way back has to
+                            // stay reachable.
+                            HStack(spacing: 0) {
+                                Spacer(minLength: 0)
+                                reopenHandle
+                            }
+                            .frame(maxHeight: .infinity)
+                        } else {
+                            // Terminal only. The empty space above it is the
+                            // column holding its share of the window rather
+                            // than collapsing to the height of a shell.
+                            Spacer(minLength: 0)
+                        }
+                        if isTerminalOpen {
+                            TerminalSection(root: store.rootPath, isOpen: $isTerminalOpen)
+                        }
+                    }
+                    .frame(minWidth: 300, maxHeight: .infinity)
                 }
             }
         }

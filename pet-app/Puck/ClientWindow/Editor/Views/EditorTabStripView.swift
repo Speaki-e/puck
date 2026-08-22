@@ -69,7 +69,10 @@ struct EditorTabStripView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(isOpen.wrappedValue ? palette.textPrimary : palette.textSecondary)
-        .keyboardShortcut("`", modifiers: .control)
+        // The ⌃` shortcut is declared on the window instead. Declared here it
+        // only existed while the code column was open -- and with the column
+        // closed the key press fell through to whatever had focus, which put
+        // a backtick in the composer instead of opening a terminal.
         .accessibilityLabel(Strings.text(.terminalToggle))
         .help(Strings.text(.terminalToggle))
     }

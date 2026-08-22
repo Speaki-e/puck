@@ -31,6 +31,10 @@ struct CodeSplitView: View {
     /// Whether the shell under the code is showing. Remembered across
     /// launches: someone who works with a terminal open wants it open the
     /// next morning too, and someone who never opens it never sees it.
+    ///
+    /// Only the button lives here; the terminal itself is drawn by
+    /// ConversationSplit, one level up, so that it can be opened with no file
+    /// open at all.
     @AppStorage("Puck.terminalOpen") private var isTerminalOpen = false
 
     var body: some View {
@@ -54,9 +58,6 @@ struct CodeSplitView: View {
                 Divider()
             }
             EditorContentHostView(store: store)
-            if isTerminalOpen {
-                TerminalSection(root: store.rootPath, isOpen: $isTerminalOpen)
-            }
         }
         // Closing a tab with unsaved edits asks instead of dropping them.
         // A prompt rather than a silent save: the tab is a live view of a

@@ -194,4 +194,45 @@ final class EditorPaneStoreTests: XCTestCase {
         let onDisk = try String(contentsOf: root.appendingPathComponent("big.txt"), encoding: .utf8)
         XCTAssertEqual(onDisk, String(repeating: "x", count: 20), "a read-only tab's save must be a no-op")
     }
+
+    /// Renaming the file you are looking at keeps you on it, under its new
+    /// name.
+    func test_rename_followsTheActiveTab() throws {
+        try write("a", at: "a.txt")
+        let store = try makeStore()
+        store.open(path: "a.txt")
+
+        store.rename(path: "a.txt", to: "b.txt")
+
+        XCTAssertEqual(store.openTabs.map(\.path), ["b.txt"])
+        XCTAssertEqual(store.activeTabPath, "b.txt")
+    }
+
+    /// Renaming one you are *not* looking at must not drag you over to it,
+    /// nor to whatever tab happens to be last.
+    func test_rename_ofAnInactiveTabLeavesFocusAlone() throws {
+        for name in ["a", "b", "c"] { try write(name, at: "\(name).txt") }
+        let store = try makeStore()
+        for name in ["a", "b", "c"] { store.open(path: "\(name).txt") }
+        store.select(path: "c.txt")
+
+        store.rename(path: "a.txt", to: "z.txt")
+
+        XCTAssertEqual(store.activeTabPath, "c.txt")
+        XCTAssertTrue(store.openTabs.contains { $0.path == "z.txt" })
+    }
+
+    /// Trashing a directory closes what was open from inside it -- a tab with
+    /// nowhere to save to is worse than no tab.
+    func test_trash_closesTabsUnderTheDeletedDirectory() throws {
+        try write("a", at: "src/a.txt")
+        try write("b", at: "keep.txt")
+        let store = try makeStore()
+        store.open(path: "src/a.txt")
+        store.open(path: "keep.txt")
+
+        store.trash(path: "src")
+
+        XCTAssertEqual(store.openTabs.map(\.path), ["keep.txt"])
+    }
 }

@@ -32,6 +32,20 @@ struct TerminalSection: View {
     /// keyed on it, which is what makes SwiftUI build a fresh terminal rather
     /// than reuse the dead one.
     @State private var generation = 0
+    /// Stops replacing a shell that cannot start.
+    ///
+    /// A shell that exits the moment it is spawned -- a broken `SHELL`, a
+    /// profile that calls `exit`, a project directory that has been deleted
+    /// -- was replaced immediately by another that did the same, forever, as
+    /// fast as the machine could fork. After a few in a row the pane says so
+    /// and stops rather than spinning.
+    @State private var consecutiveEarlyExits = 0
+    @State private var lastStartedAt = Date.distantPast
+    @State private var hasGivenUp = false
+
+    /// A shell that lasted less than this never really started.
+    static let earlyExitSeconds: TimeInterval = 2
+    static let earlyExitLimit = 3
 
     static let defaultHeight: CGFloat = 220
     static let minimumHeight: CGFloat = 90
@@ -47,12 +61,42 @@ struct TerminalSection: View {
             Divider()
             header
             Divider()
-            TerminalPane(root: root, palette: palette) { generation += 1 }
-                .id("\(root)#\(generation)")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if hasGivenUp {
+                message
+            } else {
+                TerminalPane(root: root, palette: palette, onExit: shellExited)
+                    .id("\(root)#\(generation)")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .onAppear { lastStartedAt = Date() }
+            }
         }
         .frame(height: height + Self.headerHeight + 2)
         .background(palette.background)
+    }
+
+    /// Said once, instead of forking shells until someone closes the pane.
+    private var message: some View {
+        Text(Strings.text(.terminalCouldNotStart))
+            .font(ClientTheme.Typography.caption)
+            .foregroundStyle(palette.textSecondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 10)
+    }
+
+    private func shellExited() {
+        // Time, not a count of restarts: a shell someone worked in for an
+        // hour and then typed `exit` into should be replaced, and one that
+        // died at once should not.
+        if Date().timeIntervalSince(lastStartedAt) < Self.earlyExitSeconds {
+            consecutiveEarlyExits += 1
+        } else {
+            consecutiveEarlyExits = 0
+        }
+        guard consecutiveEarlyExits < Self.earlyExitLimit else {
+            hasGivenUp = true
+            return
+        }
+        generation += 1
     }
 
     /// The name of the shell, a close button, and the whole strip doubling as

@@ -114,11 +114,13 @@ final class EditorPaneStore: ObservableObject {
         do {
             let renamed = try service.rename(path, to: newName)
             if let index = openTabs.firstIndex(where: { $0.path == path }) {
-                let wasActive = activeTabPath == path
+                // Renaming a file you are not looking at must not move you to
+                // it, nor to whatever happens to be last.
+                let previouslyActive = activeTabPath == path ? renamed : activeTabPath
                 openTabs.remove(at: index)
                 loadTree()
                 open(path: renamed)
-                if !wasActive { activeTabPath = openTabs.last?.path }
+                activeTabPath = previouslyActive
             } else {
                 loadTree()
             }

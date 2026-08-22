@@ -121,6 +121,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case terminalTitle
     case terminalToggle
     case terminalHide
+    case terminalCouldNotStart
     case chatNoProjectLinked, chatEditorInSeparateWindow
     case chatEmptyTitle, chatEmptySubtitle, chatThinking, chatFailed
     case chatDone, chatDoneFailed
@@ -362,6 +363,7 @@ enum Strings {
         .terminalTitle: "터미널",
         .terminalToggle: "터미널 (⌃`)",
         .terminalHide: "터미널 닫기",
+        .terminalCouldNotStart: "셸이 시작하자마자 끝났습니다. 터미널을 닫았다가 다시 열어보세요.",
         .tankBackgroundWorldTree: "세계수",
         .tankBackgroundBoundary: "경계",
         .tankBackgroundMeadow: "들녘",
@@ -662,6 +664,7 @@ enum Strings {
         .terminalTitle: "Terminal",
         .terminalToggle: "Terminal (⌃`)",
         .terminalHide: "Hide the terminal",
+        .terminalCouldNotStart: "The shell exited as soon as it started. Close the terminal and open it again.",
         .tankBackgroundWorldTree: "World tree",
         .tankBackgroundBoundary: "Boundary",
         .tankBackgroundMeadow: "Meadow",

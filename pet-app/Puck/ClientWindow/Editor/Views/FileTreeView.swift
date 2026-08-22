@@ -175,11 +175,27 @@ struct FileTreeView: View {
     private func badge(for entry: FileTreeEntry) -> Text? {
         guard !changedPaths.isEmpty else { return nil }
         if entry.kind == .directory {
-            let prefix = entry.path + "/"
-            let count = changedPaths.keys.filter { $0.hasPrefix(prefix) }.count
-            return count > 0 ? Text("\(count)") : nil
+            return changedCounts[entry.path].map { Text("\($0)") }
         }
         return changedPaths[entry.path].map { Text($0) }
+    }
+
+    /// How many changed files sit under each directory, counted once per
+    /// change rather than once per row: scanning every changed path for every
+    /// folder on screen is the product of two numbers that both get large in
+    /// exactly the repositories where this is worth showing.
+    private var changedCounts: [String: Int] {
+        var counts: [String: Int] = [:]
+        for path in changedPaths.keys {
+            var components = path.split(separator: "/").dropLast()
+            var directory = ""
+            while let head = components.first {
+                directory = directory.isEmpty ? String(head) : directory + "/" + head
+                counts[directory, default: 0] += 1
+                components = components.dropFirst()
+            }
+        }
+        return counts
     }
 
     private static func entry(at path: String, in entries: [FileTreeEntry]) -> FileTreeEntry? {

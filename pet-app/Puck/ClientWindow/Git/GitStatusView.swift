@@ -19,14 +19,30 @@ final class GitStatusModel: ObservableObject {
     /// same on screen and mean different things.
     @Published private(set) var hasLoaded = false
 
+    /// Set while a read is running, so an ask that arrives during one is
+    /// remembered rather than run alongside it.
+    private var wantsAnotherRead = false
+
     func reload(projectPath: String?) async {
         guard let projectPath else {
             status = nil
             hasLoaded = true
             return
         }
+        // An agent writing a file at a time asks for this once per write, and
+        // each read forks two git processes over the whole worktree. Running
+        // them concurrently is both slower and pointless -- only the last
+        // answer is the true one -- so a read in flight collects the asks
+        // that arrive during it and runs once more at the end.
+        guard !isLoading else {
+            wantsAnotherRead = true
+            return
+        }
         isLoading = true
-        status = await Task.detached(priority: .utility) { GitStatusReader.read(projectPath: projectPath) }.value
+        repeat {
+            wantsAnotherRead = false
+            status = await Task.detached(priority: .utility) { GitStatusReader.read(projectPath: projectPath) }.value
+        } while wantsAnotherRead
         hasLoaded = true
         isLoading = false
     }

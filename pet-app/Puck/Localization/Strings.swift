@@ -83,7 +83,8 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// The skills the coding CLI loads, and where each came from.
     case skillsHeader, skillSourcePersonal, skillSourceProject
     /// The right sidebar's tabs, and the session list inside one of them.
-    case explorerTabFiles, explorerTabSessions
+    case explorerTabFiles, explorerTabSessions, explorerTabGit
+    case gitHeader, gitClean, gitNotARepository, gitDetached
     case sessionsHeader, sessionsEmpty, sessionsLoading, sessionsRefresh
     case skillsEmpty, skillsExplanation, skillReveal, skillCountFormat
 
@@ -308,6 +309,11 @@ enum Strings {
         """,
         .explorerTabFiles: "파일",
         .explorerTabSessions: "세션",
+        .explorerTabGit: "변경사항",
+        .gitHeader: "변경사항",
+        .gitClean: "변경된 파일이 없어요.",
+        .gitNotARepository: "git 저장소가 아니에요.",
+        .gitDetached: "분리된 HEAD",
         .sessionsHeader: "에이전트 세션 기록",
         .sessionsEmpty: "기록이 없어요.",
         .sessionsLoading: "읽는 중…",
@@ -578,6 +584,11 @@ enum Strings {
         """,
         .explorerTabFiles: "Files",
         .explorerTabSessions: "Sessions",
+        .explorerTabGit: "Changes",
+        .gitHeader: "Changes",
+        .gitClean: "Nothing has changed.",
+        .gitNotARepository: "Not a git repository.",
+        .gitDetached: "Detached HEAD",
         .sessionsHeader: "Agent session history",
         .sessionsEmpty: "No history yet.",
         .sessionsLoading: "Reading…",

@@ -46,6 +46,10 @@ final class EditorPaneStore: ObservableObject {
     private var revealToken = 0
 
     private let service: WorkspaceFileService
+
+    /// The project this store is attached to. Exposed for the git view, which
+    /// runs against the same directory the tree reads.
+    var rootPath: String { service.root.path }
     private var watcher: WorkspaceFileWatcher?
 
     /// Called (on the main queue) if the project root itself is moved/

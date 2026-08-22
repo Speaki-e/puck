@@ -17,6 +17,7 @@ import SwiftUI
 enum ExplorerTab: String, CaseIterable, Identifiable {
     case files
     case sessions
+    case git
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum ExplorerTab: String, CaseIterable, Identifiable {
         switch self {
         case .files: return "doc.on.doc"
         case .sessions: return "square.grid.2x2"
+        case .git: return "arrow.triangle.branch"
         }
     }
 
@@ -31,6 +33,7 @@ enum ExplorerTab: String, CaseIterable, Identifiable {
         switch self {
         case .files: return Strings.text(.explorerTabFiles)
         case .sessions: return Strings.text(.explorerTabSessions)
+        case .git: return Strings.text(.explorerTabGit)
         }
     }
 }
@@ -52,6 +55,10 @@ struct FileExplorerPane: View {
     /// forty transcripts' worth of filesystem reads, and rescanning them for
     /// every glance at the file tree is work nobody asked for.
     @StateObject private var sessions = AgentSessionListModel()
+    /// Held here for the same reason as `sessions`: the tab `switch` destroys
+    /// whichever branch is not showing, and re-running git on every glance at
+    /// the file tree is work nobody asked for.
+    @StateObject private var git = GitStatusModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -62,6 +69,12 @@ struct FileExplorerPane: View {
                 filesTab
             case .sessions:
                 AgentSessionListView(model: sessions)
+            case .git:
+                GitStatusView(
+                    model: git,
+                    projectPath: store.rootPath,
+                    onOpen: { store.open(path: $0) }
+                )
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)

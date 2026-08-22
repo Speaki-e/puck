@@ -63,4 +63,96 @@ final class PetTankAreaTests: XCTestCase {
             petSize: pet
         ))
     }
+
+    /// The guard is `>=`, not `>` -- a tank exactly two pet-widths wide and
+    /// exactly one pet tall is the smallest one the pet can still walk in,
+    /// and nothing else in the suite exercises that edge.
+    func test_aTankExactlyAtTheMinimumSizeIsAccepted() {
+        let area = PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 200, y: 39, width: 120, height: 72),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        )
+
+        XCTAssertEqual(area, CGRect(x: 200, y: 39, width: 120, height: 72))
+    }
+
+    /// A client window dragged partway off the overlay reports its full
+    /// on-screen rect, not just the visible slice. The pet can only stand in
+    /// the part that is actually inside the overlay it's rendered on top of.
+    func test_aTankHangingOffTheOverlayIsClippedToIt() {
+        let area = PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 1300, y: 39, width: 300, height: 90),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        )
+
+        XCTAssertEqual(area, CGRect(x: 1300, y: 39, width: 170, height: 90))
+    }
+
+    /// The old check sized up the raw rect before ever clipping it, so a
+    /// tank that only looks roomy because most of it is off screen used to
+    /// be handed to the movement engine whole. What's left after clipping is
+    /// the part the pet could actually stand in, and here that's not enough.
+    func test_aTankBigEnoughOnlyBeforeClippingIsRefused() {
+        XCTAssertNil(PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 1400, y: 39, width: 300, height: 90),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        ))
+    }
+
+    /// CGRect's width/height getters silently return the absolute value of a
+    /// negative size, so without an explicit sign check a malformed wire rect
+    /// (a bad reading, a race during a resize) would sail through the size
+    /// guard as if it were a large, legitimate tank. Zero is refused too --
+    /// there's nothing to stand in.
+    func test_zeroOrNegativeWireDimensionsAreRefused() {
+        XCTAssertNil(PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 200, y: 39, width: 0, height: 90),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        ), "zero width")
+
+        XCTAssertNil(PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 200, y: 39, width: 1200, height: 0),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        ), "zero height")
+
+        XCTAssertNil(PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 200, y: 39, width: -1200, height: 90),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        ), "negative width")
+
+        XCTAssertNil(PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 200, y: 39, width: 1200, height: -90),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        ), "negative height")
+    }
+
+    /// A rect whose far edge lands exactly on the overlay's own edge isn't
+    /// "hanging off" -- it's flush with it, still entirely on screen.
+    /// CGRect's intersection treats touching bounds as fully contained, so
+    /// this is accepted at its full size rather than clipped down or
+    /// refused; that matches reality better than an off-by-one would.
+    func test_aTankFlushAgainstTheOverlaysRightEdgeIsAcceptedWhole() {
+        let area = PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 1350, y: 39, width: 120, height: 72),
+            overlayOriginInQuartz: overlayOrigin,
+            overlaySize: overlaySize,
+            petSize: pet
+        )
+
+        XCTAssertEqual(area, CGRect(x: 1350, y: 39, width: 120, height: 72))
+    }
 }

@@ -33,16 +33,25 @@ enum PetTankArea {
         overlaySize: CGSize,
         petSize: CGSize
     ) -> CGRect? {
+        // CGRect's width/height getters return the *absolute* value of a
+        // negative size, so a malformed wire rect would otherwise sail
+        // through the size guard below as if it were legitimately large.
+        guard wire.width > 0, wire.height > 0 else { return nil }
+
         let local = CGRect(
             x: CGFloat(wire.x) - overlayOriginInQuartz.x,
             y: CGFloat(wire.y) - overlayOriginInQuartz.y,
             width: CGFloat(wire.width),
             height: CGFloat(wire.height)
         )
-        guard local.width >= petSize.width * minimumWidthInPets, local.height >= petSize.height else {
+        // Clip to what the overlay can actually show before sizing it up --
+        // a tank whose far edge hangs off the window (dragged half off
+        // screen, or a resize race) is only as roamable as the part that's
+        // actually inside.
+        let clipped = local.intersection(CGRect(origin: .zero, size: overlaySize))
+        guard clipped.width >= petSize.width * minimumWidthInPets, clipped.height >= petSize.height else {
             return nil
         }
-        guard CGRect(origin: .zero, size: overlaySize).intersects(local) else { return nil }
-        return local
+        return clipped
     }
 }

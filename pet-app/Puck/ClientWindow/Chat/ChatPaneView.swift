@@ -181,15 +181,24 @@ private struct ConversationSplit<Chat: View>: View {
     @ObservedObject var store: EditorPaneStore
     @ViewBuilder var chat: Chat
 
+    /// Put away rather than closed. The tab stays open, so coming back to the
+    /// file does not mean finding it again -- and opening another one from
+    /// the explorer brings the column back, which is what the click means.
+    @State private var isCollapsed = false
+
     var body: some View {
-        if store.activeTabPath == nil {
-            chat
-        } else {
-            HSplitView {
-                chat.frame(minWidth: 320)
-                CodeSplitView(store: store).frame(minWidth: 300)
+        Group {
+            if store.activeTabPath == nil || isCollapsed {
+                chat
+            } else {
+                HSplitView {
+                    chat.frame(minWidth: 320)
+                    CodeSplitView(store: store) { isCollapsed = true }
+                        .frame(minWidth: 300)
+                }
             }
         }
+        .onChange(of: store.activeTabPath) { isCollapsed = false }
     }
 }
 

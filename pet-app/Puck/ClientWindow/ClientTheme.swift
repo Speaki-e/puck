@@ -14,7 +14,10 @@ import SwiftUI
 
 enum ClientTheme {
     enum Typography {
-        static let sectionHeader = Font.system(.caption).weight(.semibold)
+        /// A settings section's title. `.caption` was small enough that
+        /// "일반" and "에이전트" read as captions on the rows below rather
+        /// than as the headings they are.
+        static let sectionHeader = Font.system(.subheadline).weight(.semibold)
         static let workspaceName = Font.system(.callout).weight(.medium)
         static let sessionTitle = Font.system(.footnote)
         static let toolLabel = Font.system(.footnote).weight(.medium)

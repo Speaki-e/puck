@@ -53,10 +53,35 @@ struct ClientPalette {
     var statusIdle: Color { textSecondary }
     var statusActive: Color { accent }
 
+    /// A neutral dark, without a house style. Lighter than Vercel's
+    /// near-black, which is what makes it the one to reach for when the
+    /// screen is not the only thing on the desk.
+    static let dark = ClientPalette(
+        background: Color(hex: 0x1e1e1e),
+        surface: Color(hex: 0x272727),
+        surfaceBorder: Color(hex: 0x3a3a3a),
+        textPrimary: Color(hex: 0xe4e4e4),
+        textSecondary: Color(hex: 0x9d9d9d),
+        accent: Color(hex: 0xed8c33),
+        onAccent: Color(hex: 0x1e1e1e),
+        statusSuccess: Color(hex: 0x3fb950),
+        statusError: Color(hex: 0xf85149),
+        statusWarning: Color(hex: 0xe3b341),
+        syntax: SyntaxPalette(
+            keyword: Color(hex: 0xff7ab2),
+            type: Color(hex: 0x6bdfff),
+            function: Color(hex: 0x7ac2ff),
+            string: Color(hex: 0xff8170),
+            number: Color(hex: 0xd9c97c),
+            comment: Color(hex: 0x7f8c98),
+            variable: Color(hex: 0xe4e4e4)
+        )
+    )
+
     /// Vercel's dark neutrals, which this app shipped on. Secondary text is
     /// #a1a1a1 rather than the #7a7a7a it had: that grey on near-black is
     /// what made whole panes read as switched off.
-    static let dark = ClientPalette(
+    static let vercelDark = ClientPalette(
         background: Color(hex: 0x0a0a0a),
         surface: Color(hex: 0x141414),
         surfaceBorder: Color(hex: 0x2e2e2e),

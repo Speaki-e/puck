@@ -8,7 +8,7 @@ import XCTest
 
 final class ClientThemeStyleTests: XCTestCase {
     func test_listsTheThemesInTheOrderThePickerShowsThem() {
-        XCTAssertEqual(ClientThemeStyle.allCases, [.light, .dark, .tokyoNight])
+        XCTAssertEqual(ClientThemeStyle.allCases, [.light, .dark, .vercelDark, .tokyoNight])
     }
 
     /// A theme is a set of choices about code as well as chrome. Deriving the

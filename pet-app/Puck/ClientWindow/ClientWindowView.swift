@@ -93,11 +93,16 @@ struct ClientWindowView: View {
                         // rather than replacing it.
                         ChatPaneView(store: store, editor: $editor, editorStore: editorStore)
                             .frame(minWidth: 520)
-                        // Narrow on purpose. A file list needs room for names,
-                        // not for a second editor -- the code it opens goes
-                        // beside the conversation instead.
+                            // Free width goes here, not to the file list.
+                            // Without it, collapsing the session sidebar grew
+                            // the explorer -- the one column that gains
+                            // nothing from being wider.
+                            .layoutPriority(1)
+                        // A file list needs room for names, not for a second
+                        // editor: the code it opens goes beside the
+                        // conversation instead.
                         FileExplorerPane(store: editorStore)
-                            .frame(minWidth: 200, idealWidth: 240, maxWidth: 360)
+                            .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else if editor.isAttached, let availability = activeWorkspace?.editorAvailability {
                     // Attached with no store: this workspace has no project,
@@ -105,8 +110,9 @@ struct ClientWindowView: View {
                     HSplitView {
                         ChatPaneView(store: store, editor: $editor, editorStore: nil)
                             .frame(minWidth: 520)
+                            .layoutPriority(1)
                         EditorEmptyStateView(availability: availability)
-                            .frame(minWidth: 200, idealWidth: 240, maxWidth: 360)
+                            .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else {
                     ChatPaneView(store: store, editor: $editor, editorStore: nil)

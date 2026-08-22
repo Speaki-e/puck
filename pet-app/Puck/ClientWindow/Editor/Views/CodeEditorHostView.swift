@@ -38,7 +38,11 @@ struct CodeEditorHostView: View {
                     // snippet quoted in the conversation and the file it came
                     // from are the same text at the same scale.
                     font: .monospacedSystemFont(ofSize: 13, weight: .regular),
-                    wrapLines: false
+                    // Wrapped, because this column is deliberately narrow now
+                    // -- it shares width with the conversation. Horizontal
+                    // scrolling to read the end of a line is what a 300pt
+                    // column would otherwise demand on every long one.
+                    wrapLines: true
                 ),
                 behavior: .init(isEditable: isEditable, indentOption: .spaces(count: 2))
             ),

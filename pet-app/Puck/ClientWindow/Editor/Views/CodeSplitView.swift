@@ -22,6 +22,9 @@ struct CodeSplitView: View {
     @ObservedObject private var localization = Localization.shared
 
     @ObservedObject var store: EditorPaneStore
+    /// A trailing closure at the call site, so the split reads as "code, and
+    /// here is how to put it away".
+    var onCollapse: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,7 +34,8 @@ struct CodeSplitView: View {
                 canSave: store.canSaveActiveTab,
                 onSelect: { store.select(path: $0) },
                 onClose: { store.requestClose(path: $0) },
-                onSave: { store.saveActiveTab() }
+                onSave: { store.saveActiveTab() },
+                onCollapse: onCollapse
             )
             Divider()
             EditorContentHostView(store: store)

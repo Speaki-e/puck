@@ -19,20 +19,24 @@
 import SwiftUI
 
 enum ClientThemeStyle: String, CaseIterable, Identifiable {
-    case light, dark
-    /// Named editor themes, so the conversation and the code come from one
-    /// set of choices instead of each being tuned against the other.
-    case tokyoNight
+    /// Editor themes, so the conversation and the code come from one set of
+    /// choices instead of each being tuned against the other.
+    ///
+    /// `dark` keeps its raw value and is now the neutral one: it is what
+    /// everyone already has persisted, and the Vercel palette it used to mean
+    /// is beside it under its own name.
+    case light, dark, vercelDark, tokyoNight
 
     var id: String { rawValue }
 
     /// Shown in Settings' theme picker.
     var displayName: String {
         switch self {
+        // The two plain ones stay translated; a named theme is a proper
+        // noun and reads worse translated than left alone.
         case .light: return Strings.text(.themeLight)
-        // Named for what it is rather than "dark": with a second dark theme
-        // beside it, "다크" stops telling anyone which one they are picking.
-        case .dark: return "Vercel Dark"
+        case .dark: return Strings.text(.themeDark)
+        case .vercelDark: return "Vercel Dark"
         case .tokyoNight: return "Tokyo Night"
         }
     }
@@ -40,7 +44,7 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
     var colorScheme: ColorScheme {
         switch self {
         case .light: return .light
-        case .dark, .tokyoNight: return .dark
+        case .dark, .vercelDark, .tokyoNight: return .dark
         }
     }
 
@@ -48,6 +52,7 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
         switch self {
         case .light: return .light
         case .dark: return .dark
+        case .vercelDark: return .vercelDark
         case .tokyoNight: return .tokyoNight
         }
     }

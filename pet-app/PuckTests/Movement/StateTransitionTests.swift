@@ -36,6 +36,26 @@ final class SpySFXTriggering: SFXTriggering {
     }
 }
 
+/// Asks for a transition from inside its own update -- what a tool handler
+/// called from a state does, and what used to swap the state out from under
+/// the rest of the frame.
+private final class TransitioningSpyState: StateHandler {
+    let name = "Transitioning"
+    let clipKey = "idle"
+    let loopsClip = true
+    let restartsOnReentry = false
+    var target: StateHandler?
+    var controller: CharacterController?
+    private(set) var updateCount = 0
+
+    func enter() {}
+    func update(dt: TimeInterval, context: StateContext) {
+        updateCount += 1
+        if let target { controller?.transition(to: target) }
+    }
+    func exit() {}
+}
+
 private final class SpyState: StateHandler {
     let name: String
     let clipKey: String
@@ -211,5 +231,49 @@ final class StateTransitionTests: XCTestCase {
 
         XCTAssertEqual(avatar.bounceCalls.map(\.clip), ["idle", "walk"])
         XCTAssertEqual(avatar.bounceCalls.map(\.elapsed), [0.5, 0.1])
+    }
+
+    /// A state that transitions from inside its own `update` does not take
+    /// effect until the frame is over. The rest of `update` -- containment,
+    /// the elapsed clock, the bounce clip -- is written against the state
+    /// that was running when the frame began, so swapping mid-frame runs the
+    /// new state's first frame on the old one's bookkeeping.
+    func test_aTransitionAskedForDuringUpdate_landsAfterTheFrame() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let walk = SpyState(name: "Walk", clipKey: "walk")
+        let asker = TransitioningSpyState()
+        let controller = CharacterController(
+            initialState: asker,
+            body: CharacterBody(avatar: avatar, position: .zero),
+            sfxPlayer: sfx
+        )
+        asker.controller = controller
+        asker.target = walk
+
+        controller.update(dt: 1.0 / 60)
+
+        XCTAssertTrue(controller.currentState === walk, "it still happens, just at the end")
+        XCTAssertEqual(asker.updateCount, 1, "and the old state's frame ran exactly once")
+        XCTAssertEqual(walk.enterCallCount, 1, "the new state is entered once, not once per ask")
+    }
+
+    /// From outside a frame it is immediate, which is what every click, drag
+    /// and tool call depends on.
+    func test_aTransitionAskedForBetweenFramesIsImmediate() {
+        let avatar = SpyAvatarPlayable()
+        let sfx = SpySFXTriggering()
+        let idle = SpyState(name: "Idle", clipKey: "idle")
+        let walk = SpyState(name: "Walk", clipKey: "walk")
+        let controller = CharacterController(
+            initialState: idle,
+            body: CharacterBody(avatar: avatar, position: .zero),
+            sfxPlayer: sfx
+        )
+
+        controller.update(dt: 1.0 / 60)
+        controller.transition(to: walk)
+
+        XCTAssertTrue(controller.currentState === walk)
     }
 }

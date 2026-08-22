@@ -19,8 +19,18 @@ final class TextInputBubbleView: NSView {
     private var isShowingMessage = false
     /// Toggled between the two, depending on whether a thumbnail is showing
     /// -- see configureAttachmentViews().
-    private var textFieldLeadingWithoutThumbnail: NSLayoutConstraint!
-    private var textFieldLeadingWithThumbnail: NSLayoutConstraint!
+    ///
+    /// `lazy` rather than implicitly unwrapped: both are built from views
+    /// this class owns outright, so there is no window in which they are
+    /// legitimately nil, and an unwrapped optional only offers a crash if the
+    /// setup order is ever changed. Made on first use, which is activation --
+    /// after both views have been added, which is what activation requires.
+    private lazy var textFieldLeadingWithoutThumbnail = textField.leadingAnchor.constraint(
+        equalTo: leadingAnchor, constant: Self.horizontalInset
+    )
+    private lazy var textFieldLeadingWithThumbnail = textField.leadingAnchor.constraint(
+        equalTo: thumbnailView.trailingAnchor, constant: Self.horizontalInset / 2
+    )
 
     var onSubmit: ((String) -> Void)?
     var onCancel: (() -> Void)?
@@ -166,9 +176,6 @@ final class TextInputBubbleView: NSView {
         textField.delegate = self
         textField.translatesAutoresizingMaskIntoConstraints = false
         addSubview(textField)
-        textFieldLeadingWithoutThumbnail = textField.leadingAnchor.constraint(
-            equalTo: leadingAnchor, constant: Self.horizontalInset
-        )
         NSLayoutConstraint.activate([
             textFieldLeadingWithoutThumbnail,
             textField.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -199,10 +206,6 @@ final class TextInputBubbleView: NSView {
         let removeGesture = NSClickGestureRecognizer(target: self, action: #selector(handleRemoveAttachment))
         thumbnailView.addGestureRecognizer(removeGesture)
         addSubview(thumbnailView)
-
-        textFieldLeadingWithThumbnail = textField.leadingAnchor.constraint(
-            equalTo: thumbnailView.trailingAnchor, constant: Self.horizontalInset / 2
-        )
 
         NSLayoutConstraint.activate([
             attachButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),

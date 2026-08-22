@@ -60,6 +60,13 @@ final class CharacterController {
     /// A state asking to be replaced. Applied after update() returns so a
     /// state never swaps itself out mid-frame.
     private var pendingTransition: StateKind?
+    /// A state handed straight to `transition(to:)` while an update was
+    /// running, applied at the end of it. Distinct from `pendingTransition`,
+    /// which is the same thing named by kind.
+    private var pendingState: StateHandler?
+    /// True for the duration of `update(dt:)`, so a transition asked for
+    /// inside it is deferred rather than taken mid-frame.
+    private var isUpdating = false
 
     /// Seconds since the current state was entered -- reset on every
     /// transition, fed to AvatarPlayable.updateBounce so the 2D bounce
@@ -97,8 +104,22 @@ final class CharacterController {
 
     /// Allows transitioning from any state to any state (tools/events/PTT/click
     /// can all interrupt at any time — see the section 3 transition table).
+    ///
+    /// A transition asked for *during* `update(dt:)` is deferred to the end of
+    /// that update rather than taken immediately. The rest of update -- screen
+    /// containment, the elapsed-time clock, the bounce clip -- is written
+    /// against the state that was running when the frame began, and swapping
+    /// it out from under them mid-frame runs the new state's first frame with
+    /// the old one's bookkeeping. That was previously true only because every
+    /// caller inside a state happened to go through `requestTransition`;
+    /// anything reaching for this method directly (a tool handler called from
+    /// a state, say) broke it silently. Now the rule holds whoever asks.
     func transition(to newState: StateHandler) {
         guard newState !== currentState || newState.restartsOnReentry else { return }
+        guard !isUpdating else {
+            pendingState = newState
+            return
+        }
         currentState.exit()
         currentState = newState
         enterCurrentState()
@@ -116,6 +137,7 @@ final class CharacterController {
             landingY: landingY,
             requestTransition: { [weak self] kind in self?.pendingTransition = kind }
         )
+        isUpdating = true
         currentState.update(dt: dt, context: context)
 
         // Idle only: a line dropped mid-walk or mid-tool-run reads as the pet
@@ -136,9 +158,14 @@ final class CharacterController {
         stateElapsedTime += dt
         body.updateBounce(clip: currentState.clipKey, elapsed: stateElapsedTime)
 
+        isUpdating = false
         if let kind = pendingTransition {
             pendingTransition = nil
             transition(to: kind)
+        }
+        if let state = pendingState {
+            pendingState = nil
+            transition(to: state)
         }
     }
 

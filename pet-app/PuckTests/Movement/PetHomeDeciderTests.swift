@@ -120,4 +120,21 @@ final class PetHomeDeciderTests: XCTestCase {
 
         XCTAssertEqual(settled(decider), .home)
     }
+
+    /// A code tour sends the pet out at once -- it points at things below the
+    /// tank -- and the run ending is what lets it back in. Nothing new is
+    /// reported in between, so the move must not need one.
+    func test_aTourSendsThePetOutAndTheRunEndingBringsItBack() {
+        let decider = PetHomeDecider()
+        decider.report(hasTank: true, visible: true, pinned: false)
+        XCTAssertEqual(settled(decider), .home)
+
+        decider.forceDesktop()
+        XCTAssertEqual(decider.tick(dt: 1.0 / 60), .desktop, "no hold to wait out")
+        for _ in 0..<120 { XCTAssertNil(decider.tick(dt: 1.0 / 60), "and nothing pulls it back on its own") }
+
+        decider.resumeReportedState()
+
+        XCTAssertEqual(settled(decider), .home)
+    }
 }

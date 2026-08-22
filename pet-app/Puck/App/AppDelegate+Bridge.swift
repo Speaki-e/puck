@@ -93,6 +93,9 @@ extension AppDelegate {
         // hop back to idle.
         if reaction.runFinished {
             releasePointingForFinishedRun()
+            // Whatever the client last said about its tank decides again now
+            // that the tour is over.
+            petHomeDecider.resumeReportedState()
             // The caption goes with the pointing it was describing.
             closeSpeechBubble()
         }

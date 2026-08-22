@@ -42,6 +42,9 @@ extension AppDelegate {
             // Sped up rather than teleported: the pet going there is the
             // feature, so removing the walk removes it.
             if holdSeconds != nil {
+                // A tour points at the editor pane, which is below the tank --
+                // out of reach from inside the glass.
+                self.petHomeDecider.forceDesktop()
                 self.characterController?.walkSpeed = MovementSolver.walkSpeed
                     * self.settingsStore.walkSpeedMultiplier
                     * Self.tourWalkSpeedMultiplier

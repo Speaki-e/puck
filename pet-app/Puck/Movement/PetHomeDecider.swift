@@ -39,8 +39,11 @@ final class PetHomeDecider {
 
     private var current: Move = .desktop
     private var pending: Move?
-    /// What the last report worked out to, kept so an unhide can re-decide.
+    /// What the last report worked out to, kept so an unhide -- or the end of
+    /// a code tour -- can re-decide without waiting to be told again.
     private var lastReported: Move?
+    /// A move that skips the hold entirely, set by forceDesktop().
+    private var forced: Move?
     private var elapsed: TimeInterval = 0
 
     /// The client's latest word on its tank. `hasTank` is false when there is
@@ -62,9 +65,32 @@ final class PetHomeDecider {
         elapsed = 0
     }
 
+    /// Leaves the tank now, without waiting out the hold: a code tour points
+    /// at things below the tank, and the pet cannot reach them from inside it.
+    /// The client's reports decide again as soon as one changes, or when
+    /// `resumeReportedState()` is called at the end of the run.
+    func forceDesktop() {
+        pending = nil
+        elapsed = 0
+        guard current != .desktop else { return }
+        current = .desktop
+        forced = .desktop
+    }
+
+    /// Back to whatever the client last reported, now that the run is over.
+    func resumeReportedState() {
+        elapsed = 0
+        forced = nil
+        pending = lastReported
+    }
+
     /// - Returns: the move to make, once and only once, when a reported state
     ///   has held long enough and differs from where the pet already is.
     func tick(dt: TimeInterval) -> Move? {
+        if let forced {
+            self.forced = nil
+            return forced
+        }
         guard !isPetHidden, let pending else { return nil }
         elapsed += dt
         guard elapsed >= Self.holdSeconds else { return nil }

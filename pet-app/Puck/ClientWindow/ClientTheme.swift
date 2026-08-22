@@ -63,6 +63,13 @@ enum ClientTheme {
         /// chrome or the editor pane's divider. Fixed at every width -- the
         /// column is what gives way when the pane is narrow.
         static let transcriptHorizontalPadding: CGFloat = 24
+        /// A floating panel's corners -- the island, the two sidebars.
+        /// Rounded, not a capsule: a pill turns the ends into arcs and reads
+        /// as a control, while these are panels with their corners taken off.
+        static let panelCornerRadius: CGFloat = 14
+        /// How far a floating panel sits from the window's edges and from its
+        /// neighbours. One number, so the gaps between them all match.
+        static let panelInset: CGFloat = 8
         /// v2: matches chat-web/workspace's shrunk --radius base (Task 6).
         static let cardCornerRadius: CGFloat = 6
         static let rowCornerRadius: CGFloat = 4

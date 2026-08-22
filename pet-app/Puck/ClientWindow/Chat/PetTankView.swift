@@ -74,73 +74,29 @@ struct PetTankView: View {
     /// The strip the island floats in.
     static func stripHeight(island: CGFloat) -> CGFloat { island + verticalInset * 2 }
 
-    /// Rounded, not a capsule. A pill turns the ends into arcs the pet cannot
-    /// stand on and reads as a control; this is a panel with its corners
-    /// taken off.
-    static let cornerRadius: CGFloat = 14
+    /// The same corners every floating panel in this window has.
+    static let cornerRadius: CGFloat = ClientTheme.Metrics.panelCornerRadius
 
     /// The island itself: always the app's own ground, whatever mood is
     /// behind it. A pet standing on a picture reads as standing *in* it, so
     /// the backdrop stays behind the island rather than under the pet.
     private var island: some View {
-        ZStack(alignment: .bottom) {
-            palette.background
-            // Lit from above and pooling toward the bottom: the sheen is what
-            // makes it read as a surface with depth rather than a flat block.
-            LinearGradient(
-                stops: [
-                    .init(color: .white.opacity(0.12), location: 0),
-                    .init(color: .white.opacity(0.04), location: 0.18),
-                    .init(color: .white.opacity(0.01), location: 0.55),
-                    .init(color: .black.opacity(0.16), location: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            // A specular band just under the top edge -- the bright line a
-            // curved glass surface throws. Kept narrow and off-centre so it
-            // reads as a highlight rather than a second gradient.
-            RadialGradient(
-                colors: [.white.opacity(0.14), .clear],
-                center: UnitPoint(x: 0.32, y: -0.15),
-                startRadius: 0,
-                endRadius: 220
-            )
-            .blendMode(.plusLighter)
-            // The floor the pet stands on.
-            Rectangle()
-                .fill(palette.textSecondary.opacity(0.25))
-                .frame(height: 1)
-        }
-        .clipShape(.rect(cornerRadius: Self.cornerRadius))
-        .overlay {
-            // Brightest along the top edge and fading round the sides: one
-            // light source, above. A border of even weight reads as a drawn
-            // outline rather than a lit edge.
-            RoundedRectangle(cornerRadius: Self.cornerRadius)
-                .strokeBorder(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white.opacity(0.26), location: 0),
-                            .init(color: .white.opacity(0.08), location: 0.35),
-                            .init(color: palette.surfaceBorder.opacity(0.55), location: 1),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1
-                )
-        }
-        // Floating, so it needs to sit above its own surroundings rather
-        // than beside them.
-        .shadow(color: .black.opacity(0.35), radius: 12, y: 5)
-        .frame(height: islandHeight)
-        // The grab area for resizing, on the edge it moves.
-        .overlay(alignment: .bottom) { resizeHandle }
-        // Reported from the island, not the padding around it: the pet's
-        // world is the panel, and a frame taken from the padded box would
-        // let it stand in the gap on either side.
-        .background(PaneFrameReporter(onChange: onFrameChange))
+        // The floor the pet stands on, and nothing else: the glass around it
+        // is the same glass the sidebars are cut from (LiquidSurface), so the
+        // island reads as one of the window's panels laid on its side rather
+        // than the only lit thing on screen.
+        Rectangle()
+            .fill(palette.textSecondary.opacity(0.25))
+            .frame(height: 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .liquidSurface(palette: palette, cornerRadius: Self.cornerRadius)
+            .frame(height: islandHeight)
+            // The grab area for resizing, on the edge it moves.
+            .overlay(alignment: .bottom) { resizeHandle }
+            // Reported from the island, not the padding around it: the pet's
+            // world is the panel, and a frame taken from the padded box would
+            // let it stand in the gap on either side.
+            .background(PaneFrameReporter(onChange: onFrameChange))
     }
 
     /// Drag the bottom edge to make the shelf taller or shorter.

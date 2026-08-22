@@ -41,7 +41,9 @@ struct AgentSettingsView: View {
     @State private var modelDraft = ""
     @State private var agentConfiguration = AgentConfiguration.load()
 
-    private func text(_ key: L10nKey) -> String { Strings.text(key) }
+    private func text(_ key: L10nKey) -> String {
+        Strings.text(key, language: localization.language)
+    }
 
     /// Reuses Puck's own SettingsSection/SettingsStackedRow rather than
     /// hand-approximating their padding/typography, which drifted visibly

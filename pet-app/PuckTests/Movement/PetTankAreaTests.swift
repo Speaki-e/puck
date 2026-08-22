@@ -163,16 +163,19 @@ final class PetTankAreaTests: XCTestCase {
     /// This is not hypothetical. Insetting the island vertically to float it
     /// took 90pt down to 74 against an 80pt pet, and opening the window
     /// stopped moving the pet at all.
+    ///
+    /// Asked of the *smallest* the island can be dragged to, since that is
+    /// the one a person can reach and the one the default no longer protects.
     func test_theIslandIsTallEnoughForThePetThatLivesOnIt() {
         let petHeight = AppDelegate.tankPetHeight
         XCTAssertGreaterThanOrEqual(
-            PetTankView.islandHeight,
+            PetTankView.minimumIslandHeight,
             petHeight,
-            "an island shorter than the pet is refused, and the move looks like nothing happening"
+            "an island the pet does not fit in is refused, and that looks like the pet refusing to come home"
         )
 
         let accepted = PetTankArea.roamableArea(
-            fromWire: BridgeRect(x: 0, y: 0, width: 600, height: Double(PetTankView.islandHeight)),
+            fromWire: BridgeRect(x: 0, y: 0, width: 600, height: Double(PetTankView.minimumIslandHeight)),
             overlayOriginInQuartz: .zero,
             overlaySize: CGSize(width: 1440, height: 900),
             // Square-ish is the worst case for the width rule; the bundled
@@ -180,5 +183,22 @@ final class PetTankAreaTests: XCTestCase {
             petSize: CGSize(width: petHeight, height: petHeight)
         )
         XCTAssertNotNil(accepted, "the island as drawn has to be a usable world")
+    }
+
+    /// The handle cannot be dragged past either end into a size that is not a
+    /// shelf: too short and the area is refused, too tall and the island is
+    /// the window.
+    func test_theIslandsLimitsBracketItsDefault() {
+        XCTAssertLessThanOrEqual(PetTankView.minimumIslandHeight, PetTankView.islandHeight)
+        XCTAssertGreaterThan(PetTankView.maximumIslandHeight, PetTankView.islandHeight)
+    }
+
+    /// Whatever height it is dragged to, the strip around it grows with it --
+    /// a fixed strip would clip the island the first time someone made it
+    /// taller.
+    func test_theStripGrowsWithTheIsland() {
+        for island in [PetTankView.minimumIslandHeight, PetTankView.islandHeight, PetTankView.maximumIslandHeight] {
+            XCTAssertGreaterThan(PetTankView.stripHeight(island: island), island)
+        }
     }
 }

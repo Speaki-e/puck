@@ -116,6 +116,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case tankBackgroundMenu, tankBackgroundPlain, tankBackgroundNight
     case tankBackgroundForest, tankBackgroundOcean
     case tankBackgroundWorldTree, tankBackgroundBoundary, tankBackgroundMeadow
+    case islandResize
     case chatNoProjectLinked, chatEditorInSeparateWindow
     case chatEmptyTitle, chatEmptySubtitle, chatThinking, chatFailed
     case chatDone, chatDoneFailed
@@ -348,6 +349,7 @@ enum Strings {
         .tankBackgroundNight: "밤",
         .tankBackgroundForest: "숲",
         .tankBackgroundOcean: "바다",
+        .islandResize: "섬 높이 조절",
         .tankBackgroundWorldTree: "세계수",
         .tankBackgroundBoundary: "경계",
         .tankBackgroundMeadow: "들녘",
@@ -626,6 +628,7 @@ enum Strings {
         .tankBackgroundNight: "Night",
         .tankBackgroundForest: "Forest",
         .tankBackgroundOcean: "Ocean",
+        .islandResize: "Resize the island",
         .tankBackgroundWorldTree: "World tree",
         .tankBackgroundBoundary: "Boundary",
         .tankBackgroundMeadow: "Meadow",

@@ -115,7 +115,7 @@ struct ClientWindowView: View {
                         // minimum: it is what the window is for, and a file
                         // opened from the explorer splits *this* column
                         // rather than replacing it.
-                        ChatPaneView(store: store, editor: $editor, editorStore: editorStore)
+                        ChatPaneView(store: store, editor: $editor, editorStore: editorStore, activeBranch: git.status?.branch)
                             .frame(minWidth: 520)
                             // Free width goes here, not to the file list.
                             // Without it, collapsing the session sidebar grew
@@ -132,14 +132,14 @@ struct ClientWindowView: View {
                     // Attached with no store: this workspace has no project,
                     // or its root went away. The empty state says which.
                     HSplitView {
-                        ChatPaneView(store: store, editor: $editor, editorStore: nil)
+                        ChatPaneView(store: store, editor: $editor, editorStore: nil, activeBranch: git.status?.branch)
                             .frame(minWidth: 520)
                             .layoutPriority(1)
                         EditorEmptyStateView(availability: availability)
                             .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else {
-                    ChatPaneView(store: store, editor: $editor, editorStore: nil)
+                    ChatPaneView(store: store, editor: $editor, editorStore: nil, activeBranch: git.status?.branch)
                 }
             }
             ClientStatusBarView(

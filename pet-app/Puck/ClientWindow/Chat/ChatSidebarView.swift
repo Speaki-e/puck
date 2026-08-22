@@ -22,6 +22,12 @@ struct ChatSidebarView: View {
     @Environment(\.clientPalette) private var palette
 
     @ObservedObject var store: ClientWindowStore
+    /// The branch of the workspace being looked at, from the reader that
+    /// refreshes after every write. Overrides this view's own scan for that
+    /// one row: a checkout run in the window's terminal is picked up by that
+    /// reader, and a sidebar still naming the old branch is worse than no
+    /// branch at all.
+    var activeBranch: String?
     /// Which branch each project is on, shown beside its name. Held here
     /// rather than in the store: nothing outside this list uses it, and it is
     /// read from disk rather than sent over the socket.
@@ -54,7 +60,7 @@ struct ChatSidebarView: View {
                             }
                     }
                 } header: {
-                    WorkspaceHeader(workspace: workspace, branch: branches.branches[workspace.id])
+                    WorkspaceHeader(workspace: workspace, branch: branch(for: workspace))
                 }
             }
         }
@@ -101,6 +107,11 @@ struct ChatSidebarView: View {
         } message: { _ in
             Text(Strings.text(.chatDeleteSessionMessage))
         }
+    }
+
+    private func branch(for workspace: ClientWorkspace) -> String? {
+        if workspace.id == store.activeWorkspaceId, let activeBranch { return activeBranch }
+        return branches.branches[workspace.id]
     }
 
     private var projectsByWorkspace: [String: String] {

@@ -28,6 +28,9 @@ struct ChatPaneView: View {
     /// The project's files, when this workspace has one. Held by
     /// ClientWindowView; this view only splits its detail around it.
     var editorStore: EditorPaneStore?
+    /// The active project's branch, passed through to the sidebar -- see
+    /// ChatSidebarView.activeBranch.
+    var activeBranch: String?
 
     /// Where the toolbar's last button ends, measured rather than assumed --
     /// the island climbs into the empty band past it, and a hard-coded x
@@ -43,7 +46,7 @@ struct ChatPaneView: View {
 
     var body: some View {
         NavigationSplitView {
-            ChatSidebarView(store: store)
+            ChatSidebarView(store: store, activeBranch: activeBranch)
                 // Allowed to compress to 180: at the 960pt window minimum the
                 // three panes (sidebar, chat, editor) are already tight, and a
                 // sidebar that refuses to give any width back is what squeezed

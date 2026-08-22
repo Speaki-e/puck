@@ -116,7 +116,11 @@ enum AgentSessionHistory {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         guard let data = try? handle.read(upToCount: headBytes), !data.isEmpty else { return nil }
-        guard let text = String(data: data, encoding: .utf8) ?? String(data: data.dropLast(3), encoding: .utf8) else {
+        // The cut can land inside a multi-byte character, so up to three
+        // trailing bytes may have to go. Dropping exactly three was a guess
+        // that happened to fix the common case and left a transcript out of
+        // the list entirely whenever an emoji straddled the boundary.
+        guard let text = (0...3).lazy.compactMap({ String(data: data.dropLast($0), encoding: .utf8) }).first else {
             return nil
         }
         guard let lastNewline = text.lastIndex(of: "\n") else { return text }

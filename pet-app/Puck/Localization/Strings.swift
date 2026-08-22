@@ -80,6 +80,10 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// How much the CLI may do without being asked each time.
     case permissionsLabel, permissionsExplanation
     case permissionsToolsOnly, permissionsEdits, permissionsEverything
+    /// The skills the coding CLI loads, and where each came from.
+    case skillsHeader, skillSourcePersonal, skillSourceProject
+    case skillsEmpty, skillsExplanation, skillReveal, skillCountFormat
+
     /// `/effort` and friends.
     case effortLow, effortMedium, effortHigh
     /// What a slash command answers with.
@@ -295,6 +299,13 @@ enum Strings {
         - `/fast` — 사고량을 가장 낮게 (`/effort low` 와 같아요)
         - `/help` — 이 목록
         """,
+        .skillsHeader: "스킬",
+        .skillSourcePersonal: "내 계정",
+        .skillSourceProject: "프로젝트",
+        .skillsEmpty: "설치된 스킬이 없어요.",
+        .skillsExplanation: "코딩 CLI가 불러오는 스킬입니다. 같은 이름이 양쪽에 있으면 프로젝트 쪽이 쓰입니다.",
+        .skillReveal: "Finder에서 보기",
+        .skillCountFormat: "%1$@개",
         .effortLow: "간결",
         .effortMedium: "보통",
         .effortHigh: "꼼꼼",
@@ -545,6 +556,13 @@ enum Strings {
         - `/fast` — the lowest effort (same as `/effort low`)
         - `/help` — this list
         """,
+        .skillsHeader: "Skills",
+        .skillSourcePersonal: "Your account",
+        .skillSourceProject: "This project",
+        .skillsEmpty: "No skills installed.",
+        .skillsExplanation: "Skills the coding CLI loads. When a name is in both places, the project's is the one it uses.",
+        .skillReveal: "Show in Finder",
+        .skillCountFormat: "%1$@",
         .effortLow: "brief",
         .effortMedium: "normal",
         .effortHigh: "thorough",

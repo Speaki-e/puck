@@ -254,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             newWindow.isReleasedWhenClosed = false
             newWindow.applyGlassChrome()
-            newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView())
+            newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView(clientWindowStore: clientWindowStore))
             newWindow.center()
             settingsWindow = newWindow
             return newWindow

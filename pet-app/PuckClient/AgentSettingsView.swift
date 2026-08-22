@@ -28,6 +28,11 @@
 import SwiftUI
 
 struct AgentSettingsView: View {
+    /// Only for the project path the skills list needs. Observed, so
+    /// switching workspaces re-reads that project's own `.claude/skills`
+    /// rather than showing the one the window happened to open on.
+    @ObservedObject var clientWindowStore: ClientWindowStore
+
     /// Redraws this view when the UI language changes. Needed on every
     /// view that resolves a string, not just the window root: SwiftUI
     /// skips a child whose own inputs are unchanged, and a table lookup
@@ -117,6 +122,8 @@ struct AgentSettingsView: View {
                 }
             }
 
+            skillsSection
+
             SettingsSection(title: text(.agentHeader)) {
                 // Same segmented-Picker-over-CaseIterable-plus-displayName
                 // shape as SettingsView's theme picker, and the same
@@ -145,6 +152,71 @@ struct AgentSettingsView: View {
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
         .padding(.vertical, ClientTheme.Metrics.windowEdgePadding)
         .frame(width: 420)
+    }
+
+    // MARK: - Skills
+
+    /// What the CLI will load, and where each came from. Read every time the
+    /// window draws rather than cached: skills are directories a person adds
+    /// with an editor, and a list that needed a relaunch to notice would be
+    /// wrong exactly when someone is adding one.
+    private var skills: [Skill] {
+        SkillCatalog.discover(projectPath: clientWindowStore.workspaces
+            .first { $0.id == clientWindowStore.activeWorkspaceId }?
+            .projectPath)
+    }
+
+    @ViewBuilder
+    private var skillsSection: some View {
+        let installed = skills
+        SettingsSection(title: text(.skillsHeader)) {
+            if installed.isEmpty {
+                Text(text(.skillsEmpty))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            } else {
+                ForEach(installed) { skill in
+                    skillRow(skill)
+                }
+            }
+
+            Text(text(.skillsExplanation))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+        }
+    }
+
+    private func skillRow(_ skill: Skill) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                Text(skill.name)
+                    .font(ClientTheme.Typography.toolLabel)
+                Text(skill.source.displayName)
+                    .font(ClientTheme.Typography.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                // Finder rather than the editor pane: a personal skill lives
+                // outside the project, which is the only thing the editor can
+                // open.
+                Button(text(.skillReveal)) {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: skill.path)])
+                }
+                .controlSize(.small)
+            }
+            if !skill.description.isEmpty {
+                Text(skill.description)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
     }
 
     // MARK: - Rows

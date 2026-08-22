@@ -277,6 +277,9 @@ final class CodingAgentCLIClient: AgentLLMClient {
         }
 
         var parts = systemLines
+        // Read here rather than captured at construction, so `/effort` in the
+        // chat lands on the next turn instead of the next launch.
+        if let effort = AgentConfiguration.effort().promptLine { parts.append(effort) }
         parts.append(toolsAreReachable ? toolAvailabilityOverride : toolsUnavailableOverride)
         parts.append("Conversation so far:\n" + transcript.joined(separator: "\n"))
         parts.append("Reply to the last User message. Output only your reply.")

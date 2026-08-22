@@ -80,6 +80,12 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// How much the CLI may do without being asked each time.
     case permissionsLabel, permissionsExplanation
     case permissionsToolsOnly, permissionsEdits, permissionsEverything
+    /// `/effort` and friends.
+    case effortLow, effortMedium, effortHigh
+    /// What a slash command answers with.
+    case slashModelCurrentFormat, slashModelSetFormat, slashModelUnsupportedFormat
+    case slashEffortCurrentFormat, slashEffortSetFormat
+    case slashUnknownFormat, slashWriteFailed, slashHelp
     case installedFormat
     case installedMissingRecommendedFormat
     case failedToInstallFormat
@@ -274,6 +280,24 @@ enum Strings {
         .codingAgentLabel: "코딩 CLI",
         .permissionsLabel: "자동 허용",
         .permissionsExplanation: "CLI가 스스로 하는 일을 매번 묻지 않고 허용할 범위입니다. 파일 쓰기는 어느 설정에서든 선택한 프로젝트 폴더 밖으로 나가지 못합니다.",
+        .slashModelCurrentFormat: "지금 모델: %1$@. 바꾸려면 /model 이름 을 쓰세요.",
+        .slashModelSetFormat: "모델을 %1$@(으)로 바꿨어요.",
+        .slashModelUnsupportedFormat: "%1$@ 공급자는 모델을 고를 수 없어요 — CLI가 자기 설정을 씁니다.",
+        .slashEffortCurrentFormat: "지금 사고량: '%1$@'. /effort low·medium·high 로 바꿀 수 있어요.",
+        .slashEffortSetFormat: "사고량을 '%1$@'(으)로 바꿨어요. 다음 turn부터 적용됩니다.",
+        .slashUnknownFormat: "%1$@ 은(는) 없는 명령이에요. /help 로 목록을 보세요.",
+        .slashWriteFailed: "설정 파일을 저장하지 못했어요.",
+        .slashHelp: """
+        쓸 수 있는 명령이에요.
+
+        - `/model` — 지금 모델 보기, `/model 이름` 으로 바꾸기
+        - `/effort` — 사고량 보기, `/effort low|medium|high` 로 바꾸기
+        - `/fast` — 사고량을 가장 낮게 (`/effort low` 와 같아요)
+        - `/help` — 이 목록
+        """,
+        .effortLow: "간결",
+        .effortMedium: "보통",
+        .effortHigh: "꼼꼼",
         .permissionsToolsOnly: "펫 도구만",
         .permissionsEdits: "파일 수정까지",
         .permissionsEverything: "명령 실행까지",
@@ -504,6 +528,24 @@ enum Strings {
         .codingAgentLabel: "Coding CLI",
         .permissionsLabel: "Auto-allow",
         .permissionsExplanation: "How much the CLI may do without asking each time. File writes stay inside the selected project folder whichever setting is chosen.",
+        .slashModelCurrentFormat: "The model is %1$@. Use /model <name> to change it.",
+        .slashModelSetFormat: "Model set to %1$@.",
+        .slashModelUnsupportedFormat: "The %1$@ provider has no model to choose -- the CLI uses its own.",
+        .slashEffortCurrentFormat: "Effort is '%1$@'. Use /effort low, medium or high to change it.",
+        .slashEffortSetFormat: "Effort set to '%1$@'. It applies from the next turn.",
+        .slashUnknownFormat: "%1$@ is not a command. Try /help.",
+        .slashWriteFailed: "Couldn't write the settings file.",
+        .slashHelp: """
+        Commands you can type here.
+
+        - `/model` — show the model, `/model <name>` to set it
+        - `/effort` — show effort, `/effort low|medium|high` to set it
+        - `/fast` — the lowest effort (same as `/effort low`)
+        - `/help` — this list
+        """,
+        .effortLow: "brief",
+        .effortMedium: "normal",
+        .effortHigh: "thorough",
         .permissionsToolsOnly: "Puck's tools only",
         .permissionsEdits: "…and file edits",
         .permissionsEverything: "…and commands",

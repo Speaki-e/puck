@@ -24,6 +24,9 @@ struct ChatPaneView: View {
     /// Where the editor is showing, owned by ClientWindowView -- the toggle
     /// lives in this view's toolbar but the split is its parent's.
     @Binding var editor: EditorPresentation
+    /// The project's files, when this workspace has one. Held by
+    /// ClientWindowView; this view only splits its detail around it.
+    var editorStore: EditorPaneStore?
 
     var body: some View {
         NavigationSplitView {
@@ -42,17 +45,7 @@ struct ChatPaneView: View {
     @ViewBuilder
     private var detail: some View {
         if let session = activeSession {
-            VStack(spacing: 0) {
-                ChatTranscriptView(session: session) { approved in
-                    store.respondToPendingApproval(in: session, approved: approved)
-                }
-                Divider()
-                ChatInputBar(
-                    isRunning: session.isRunning,
-                    onSend: { text in store.sendMessage(text, source: .text) },
-                    onCancel: { store.cancelActiveRun() }
-                )
-            }
+            conversation(session)
             .navigationTitle(session.displayTitle)
             .navigationSubtitle(activeWorkspace?.displayName ?? "")
             .toolbar { toolbarContent }
@@ -60,6 +53,38 @@ struct ChatPaneView: View {
             // Only reachable if the active ids point at a session that no
             // longer exists; the store always seeds one per workspace.
             ContentUnavailableView(Strings.text(.chatSelectAConversation), systemImage: "bubble.left.and.bubble.right")
+        }
+    }
+
+    /// The conversation, and beside it the file that was opened from the
+    /// explorer. Split rather than swapped: the reason to look at a file is
+    /// usually what was just said about it, and a layout that shows one by
+    /// hiding the other makes you choose between them.
+    @ViewBuilder
+    private func conversation(_ session: ChatSession) -> some View {
+        if let editorStore {
+            // Through a view that observes the store rather than deciding
+            // here: whether a file is open is one of its published
+            // properties, and a plain `var` is not an input SwiftUI watches.
+            // Read straight from this body, clicking a file in the explorer
+            // highlighted the row and split nothing.
+            ConversationSplit(store: editorStore) { chatColumn(session) }
+        } else {
+            chatColumn(session)
+        }
+    }
+
+    private func chatColumn(_ session: ChatSession) -> some View {
+        VStack(spacing: 0) {
+            ChatTranscriptView(session: session) { approved in
+                store.respondToPendingApproval(in: session, approved: approved)
+            }
+            Divider()
+            ChatInputBar(
+                isRunning: session.isRunning,
+                onSend: { text in store.sendMessage(text, source: .text) },
+                onCancel: { store.cancelActiveRun() }
+            )
         }
     }
 
@@ -134,6 +159,27 @@ struct ChatPaneView: View {
 
     private var activeSession: ChatSession? {
         store.session(workspaceId: store.activeWorkspaceId, sessionId: store.activeSessionId)
+    }
+}
+
+/// The conversation, and beside it the file the explorer opened.
+///
+/// Split rather than swapped: the reason to look at a file is usually what
+/// was just said about it, and a layout that shows one by hiding the other
+/// makes you choose between them.
+private struct ConversationSplit<Chat: View>: View {
+    @ObservedObject var store: EditorPaneStore
+    @ViewBuilder var chat: Chat
+
+    var body: some View {
+        if store.activeTabPath == nil {
+            chat
+        } else {
+            HSplitView {
+                chat.frame(minWidth: 320)
+                CodeSplitView(store: store).frame(minWidth: 300)
+            }
+        }
     }
 }
 

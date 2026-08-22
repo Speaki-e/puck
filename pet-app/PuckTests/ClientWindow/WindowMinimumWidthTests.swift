@@ -16,38 +16,47 @@ import XCTest
 @testable import Puck
 
 final class WindowMinimumWidthTests: XCTestCase {
-    /// What ClientWindowView gives ChatPaneView.
-    private let chatPaneMinimum: CGFloat = 560
-    /// What ClientWindowView gives EditorPaneView.
-    private let editorPaneMinimum: CGFloat = 540
-    /// EditorPaneView's own HSplitView: file tree + code column.
+    /// The detached editor window's own HSplitView: file tree + code column.
     private let fileTreeMinimum: CGFloat = 180
-    private let codeColumnMinimum: CGFloat = 360
+    private let editorPaneMinimum: CGFloat = 540
+    private let codeColumnMinimum: CGFloat = 300
+    /// The file list on the right of the main window.
+    private let explorerMinimum: CGFloat = 200
+    /// The session list inside the chat pane's own split.
+    private let sidebarMinimum: CGFloat = 180
+    /// The conversation beside an open file.
+    private let conversationMinimum: CGFloat = 320
 
-    func testTheEditorPanesFloorCoversWhatIsInsideIt() {
-        // The original defect in one assertion: EditorPaneView declared 360
-        // while its own two columns needed 540 between them, so the pane
-        // could be handed less width than it could actually draw.
+    /// The original defect in one assertion: the pane declared 360 while its
+    /// own two columns needed 540 between them, so it could be handed less
+    /// width than it could actually draw. Only the detached window keeps that
+    /// shape now.
+    func testTheDetachedEditorFloorCoversWhatIsInsideIt() {
         XCTAssertGreaterThanOrEqual(editorPaneMinimum, fileTreeMinimum + codeColumnMinimum)
+        XCTAssertGreaterThanOrEqual(ClientTheme.Metrics.editorWindowMinWidth, editorPaneMinimum)
     }
 
-    func testTheEditorWindowFloorFitsBothPanes() {
+    /// The editor is no longer one pane beside the chat: the file list is a
+    /// column on the right and a file's contents split the conversation.
+    /// Attaching reserves room for both, because the code column arrives on a
+    /// click the floor cannot react to in time.
+    func testTheAttachedFloorFitsEveryColumnAtOnce() {
         XCTAssertGreaterThanOrEqual(
-            ClientTheme.Metrics.windowMinWidthWithEditor,
-            chatPaneMinimum + editorPaneMinimum,
-            "a window that cannot fit both panes squeezes one of them below its own minimum"
+            ClientTheme.Metrics.windowMinWidthWithCode,
+            sidebarMinimum + conversationMinimum + codeColumnMinimum + explorerMinimum,
+            "opening a file must not push one of the four columns under its own minimum"
         )
     }
 
-    func testTheChatOnlyFloorFitsTheChat() {
-        XCTAssertGreaterThanOrEqual(ClientTheme.Metrics.windowMinWidth, chatPaneMinimum)
+    func testTheChatOnlyFloorFitsItsOwnTwoColumns() {
+        XCTAssertGreaterThanOrEqual(ClientTheme.Metrics.windowMinWidth, sidebarMinimum + conversationMinimum)
     }
 
     func testOpeningTheEditorRaisesTheFloorRatherThanSharingOne() {
         // One number for both modes is what forced the compromise: generous
         // for a chat, short for a chat plus an editor.
         XCTAssertGreaterThan(
-            ClientTheme.Metrics.windowMinWidthWithEditor,
+            ClientTheme.Metrics.windowMinWidthWithCode,
             ClientTheme.Metrics.windowMinWidth
         )
     }
@@ -55,6 +64,6 @@ final class WindowMinimumWidthTests: XCTestCase {
     func testTheFloorsAreNotAbsurdlyLargeForATypicalDisplay() {
         // A floor wider than a small laptop's screen is unusable, not safe.
         // 1280 is the narrowest built-in display Apple currently ships.
-        XCTAssertLessThanOrEqual(ClientTheme.Metrics.windowMinWidthWithEditor, 1280)
+        XCTAssertLessThanOrEqual(ClientTheme.Metrics.windowMinWidthWithCode, 1280)
     }
 }

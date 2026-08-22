@@ -36,6 +36,11 @@ struct ClientWindowView: View {
     /// that reason.
     @ObservedObject private var localization = Localization.shared
     @State private var editor: EditorPresentation = .hidden
+    /// Resolved here rather than inside the editor, because the two halves it
+    /// used to hold now live in different parts of the window: the file list
+    /// on the right, a file's contents beside the conversation. One owner
+    /// keeps them looking at the same project.
+    @State private var editorStore: EditorPaneStore?
 
     /// The window cannot go narrower than what it is currently showing. Two
     /// panes need more room than one, so the floor moves with the toggle
@@ -43,7 +48,34 @@ struct ClientWindowView: View {
     private var minimumWindowWidth: CGFloat {
         // Only the split needs the wider floor. Detached, the editor carries
         // its own window and this one goes back to being a chat window.
-        editor.isAttached ? ClientTheme.Metrics.windowMinWidthWithEditor : ClientTheme.Metrics.windowMinWidth
+        // Reserved for the split even before a file is open. Whether one is
+        // open is a published property of a store this view holds in `State`,
+        // which does not invalidate on it -- so a floor that tracked it would
+        // lag exactly when it mattered, and the window would squeeze the
+        // moment the code column appeared.
+        editor.isAttached ? ClientTheme.Metrics.windowMinWidthWithCode : ClientTheme.Metrics.windowMinWidth
+    }
+
+    /// Attaches the store for the active workspace, or clears it when that
+    /// workspace has no project to show. Idempotent for the one already
+    /// attached: the pool keeps a store per workspace alive for the process's
+    /// life, so switching back and forth costs nothing and keeps open tabs.
+    private func syncEditorStore() {
+        guard case .ready(let root) = activeWorkspace?.editorAvailability else {
+            editorStore = nil
+            return
+        }
+        guard editorStore?.workspaceId != store.activeWorkspaceId else { return }
+        do {
+            editorStore = try EditorPaneStorePool.shared.store(
+                forWorkspace: store.activeWorkspaceId,
+                root: root,
+                onRootChanged: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
+            )
+        } catch {
+            editorStore = nil
+            store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId)
+        }
     }
 
     private var activeWorkspace: ClientWorkspace? {
@@ -53,24 +85,31 @@ struct ClientWindowView: View {
     var body: some View {
         VStack(spacing: 0) {
             Group {
-                if editor.isAttached, let availability = activeWorkspace?.editorAvailability {
+                if editor.isAttached, let editorStore {
                     HSplitView {
-                        // Each is the real minimum of what it contains, and
-                        // windowMinWidthWithEditor is their sum -- rather than
-                        // the other way round, which is how the editor came to
-                        // declare 360 while needing 540 and got its file tree
-                        // clipped at the smallest window.
-                        ChatPaneView(store: store, editor: $editor)
-                            .frame(minWidth: 560, idealWidth: 620)
-                        EditorPaneView(
-                            workspaceId: store.activeWorkspaceId,
-                            availability: availability,
-                            onUnavailable: { store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId) }
-                        )
-                        .frame(minWidth: 540)
+                        // The conversation keeps the middle and the widest
+                        // minimum: it is what the window is for, and a file
+                        // opened from the explorer splits *this* column
+                        // rather than replacing it.
+                        ChatPaneView(store: store, editor: $editor, editorStore: editorStore)
+                            .frame(minWidth: 520)
+                        // Narrow on purpose. A file list needs room for names,
+                        // not for a second editor -- the code it opens goes
+                        // beside the conversation instead.
+                        FileExplorerPane(store: editorStore)
+                            .frame(minWidth: 200, idealWidth: 240, maxWidth: 360)
+                    }
+                } else if editor.isAttached, let availability = activeWorkspace?.editorAvailability {
+                    // Attached with no store: this workspace has no project,
+                    // or its root went away. The empty state says which.
+                    HSplitView {
+                        ChatPaneView(store: store, editor: $editor, editorStore: nil)
+                            .frame(minWidth: 520)
+                        EditorEmptyStateView(availability: availability)
+                            .frame(minWidth: 200, idealWidth: 240, maxWidth: 360)
                     }
                 } else {
-                    ChatPaneView(store: store, editor: $editor)
+                    ChatPaneView(store: store, editor: $editor, editorStore: nil)
                 }
             }
             ClientStatusBarView(
@@ -97,7 +136,9 @@ struct ClientWindowView: View {
         // a chat-only workspace would render its empty state for no reason.
         .onChange(of: store.activeWorkspaceId) {
             if activeWorkspace?.canOpenEditor != true { editor = .hidden }
+            syncEditorStore()
         }
+        .onAppear { syncEditorStore() }
         // The agent asked for a file to be on screen. Only obeyed when the
         // workspace can actually show one -- a chat-only workspace would open
         // an empty pane and then have to close it again.

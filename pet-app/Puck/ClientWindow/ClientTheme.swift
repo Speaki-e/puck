@@ -76,9 +76,11 @@ enum ClientTheme {
         /// Sidebar (180) + chat column (380). The chat column's floor is what
         /// keeps the composer's placeholder on one line.
         static let windowMinWidth: CGFloat = 560
-        /// The above, plus the editor pane: file tree (180) + code (360), and
-        /// two splitters.
-        static let windowMinWidthWithEditor: CGFloat = 1120
+        /// The above, plus the file explorer on the right (200) and the code
+        /// column a file click opens, which splits the chat's column
+        /// rather than adding one at the edge: sidebar (180), conversation
+        /// (320), code (300), explorer (200), three splitters.
+        static let windowMinWidthWithCode: CGFloat = 1040
         /// The detached editor window: file tree (180) + code (360), without
         /// the chat's share of the split.
         static let editorWindowMinWidth: CGFloat = 540

@@ -42,19 +42,19 @@ final class EditorPresentationTests: XCTestCase {
         // Detached, the chat window is a chat window again -- the wider floor
         // exists for two panes sharing one window.
         XCTAssertGreaterThan(
-            ClientTheme.Metrics.windowMinWidthWithEditor,
+            ClientTheme.Metrics.windowMinWidthWithCode,
             ClientTheme.Metrics.windowMinWidth
         )
-        // The split's floor is both panes plus the divider between them, so
-        // the detached editor's own floor is what is left after the chat's
-        // share and that allowance -- not a plain subtraction.
-        let splitterAllowance = ClientTheme.Metrics.windowMinWidthWithEditor
-            - ClientTheme.Metrics.windowMinWidth
-            - ClientTheme.Metrics.editorWindowMinWidth
-        XCTAssertEqual(splitterAllowance, 20, "the split reserves a divider's width the detached window doesn't need")
+        // Attaching reserves the explorer column *and* the code column a file
+        // click opens, since the floor cannot react to that click in time.
+        XCTAssertGreaterThan(
+            ClientTheme.Metrics.windowMinWidthWithCode,
+            ClientTheme.Metrics.windowMinWidth,
+            "attaching has to buy room for the columns it can show"
+        )
         XCTAssertLessThan(
             ClientTheme.Metrics.editorWindowMinWidth,
-            ClientTheme.Metrics.windowMinWidthWithEditor,
+            ClientTheme.Metrics.windowMinWidthWithCode,
             "a window showing only the editor cannot need more than one showing both"
         )
     }

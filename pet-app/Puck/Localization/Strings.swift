@@ -176,7 +176,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case themeLight, themeDark
     case workspaceDefaultName, sessionDefaultTitle
-    case editorSelectAFile, editorSearchFiles, editorSaveHint
+    case editorSelectAFile, editorSearchFiles, editorSaveHint, explorerHeader
     case providerRefusedResponse, providerTruncatedFormat, acpProcessExited
 
     /// The panel's action rows. Settings and Switch Avatar are gone with the
@@ -443,7 +443,8 @@ enum Strings {
         .sessionDefaultTitle: "새 세션",
         .themeLight: "화이트",
         .themeDark: "다크",
-        .editorSelectAFile: "왼쪽 탐색기에서 파일을 선택하세요",
+        .explorerHeader: "파일",
+        .editorSelectAFile: "오른쪽 탐색기에서 파일을 선택하세요",
         .editorSearchFiles: "파일 검색",
         .editorSaveHint: "저장 (⌘S)",
         .providerRefusedResponse: "모델이 응답을 거부했습니다 (stop_reason: refusal)",
@@ -691,7 +692,8 @@ enum Strings {
         .sessionDefaultTitle: "New session",
         .themeLight: "Light",
         .themeDark: "Dark",
-        .editorSelectAFile: "Pick a file in the navigator on the left",
+        .explorerHeader: "Files",
+        .editorSelectAFile: "Pick a file in the explorer on the right",
         .editorSearchFiles: "Search files",
         .editorSaveHint: "Save (⌘S)",
         .providerRefusedResponse: "The model refused to answer (stop_reason: refusal)",

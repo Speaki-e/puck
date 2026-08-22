@@ -75,4 +75,28 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         guard let raw = userInfo?[crossProcessUserInfoKey] as? String else { return nil }
         return resolved(fromDefaultsValue: raw)
     }
+
+    /// Announces the change to every process, including the one calling.
+    /// Both apps can change this setting, so both post through here rather
+    /// than each writing the notification out again slightly differently.
+    func broadcast() {
+        DistributedNotificationCenter.default().postNotificationName(
+            Self.crossProcessChangeNotification,
+            object: nil,
+            userInfo: crossProcessUserInfo,
+            deliverImmediately: true
+        )
+    }
+
+    /// The defaults domain the setting lives in -- Puck's, whichever process
+    /// is asking. PuckClient writes here rather than into its own: one
+    /// setting with two stores is two settings that disagree the first time
+    /// only one of them is written.
+    ///
+    /// Puck itself should go through SettingsStore instead, which writes
+    /// `.standard` -- the same domain by another name, and the one place its
+    /// own change callbacks fire from.
+    static var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: AppIdentity.puckBundleID)
+    }
 }

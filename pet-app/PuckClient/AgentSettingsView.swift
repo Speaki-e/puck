@@ -41,6 +41,16 @@ struct AgentSettingsView: View {
     @State private var modelDraft = ""
     @State private var agentConfiguration = AgentConfiguration.load()
 
+    /// Unlike everything else on this window, the language is a UserDefaults
+    /// setting rather than a `.env` one, so it is written into Puck's domain
+    /// -- the one place it lives -- and then announced. Puck listens for that
+    /// announcement, which is what relabels the pet's own menus and bubbles.
+    private func select(_ language: AppLanguage) {
+        AppLanguage.sharedDefaults?.set(language.rawValue, forKey: AppLanguage.defaultsKey)
+        Localization.shared.apply(language)
+        language.broadcast()
+    }
+
     private func text(_ key: L10nKey) -> String {
         Strings.text(key, language: localization.language)
     }
@@ -53,6 +63,24 @@ struct AgentSettingsView: View {
     /// rhythm. Sharing the component instead of the constants means this
     /// can't drift again.
     var body: some View {
+        // The language belongs on this window as much as on Puck's panel:
+        // this is where nearly all of the app's text is, and the toolbar
+        // button that opens it is labelled the same way. It is the one
+        // setting here that is not the agent's, hence its own section.
+        SettingsSection(title: text(.tabGeneral)) {
+            SettingsStackedRow(label: text(.languageLabel)) {
+                Picker("", selection: Binding(
+                    get: { localization.language },
+                    set: { select($0) }
+                )) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+        }
         SettingsSection(title: text(.agentHeader)) {
             // Same segmented-Picker-over-CaseIterable-plus-displayName shape
             // as SettingsView's theme picker, and the same

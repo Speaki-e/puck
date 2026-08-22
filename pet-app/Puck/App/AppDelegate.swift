@@ -24,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// Backs the menu bar's Hide/Show toggle.
     var isCharacterHidden = false
     var spaceChangeObserver: NSObjectProtocol?
+    /// Held for the process's lifetime -- see AppDelegate+Language, which is
+    /// the only thing that sets it.
+    var languageObserver: NSObjectProtocol?
     var avatarHitboxSize: CGSize = .zero
     /// Unscaled manifest.hitbox -- recomputes avatarHitboxSize when Settings'
     /// size slider live-applies a new scale (applyLiveAvatarScale).

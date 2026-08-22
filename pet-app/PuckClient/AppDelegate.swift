@@ -237,9 +237,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Settings (F15 agent config, moved here 2026-08-02)
 
-    /// Wired from ClientMainMenu's "설정…" (Cmd+,) item via the responder
-    /// chain -- the agent's settings belong to this app rather than
-    /// 셰이디에이전트 설정으로 옮기고". `@objc` and this exact selector name
+    /// Wired from ClientMainMenu's Settings item (Cmd+,) via the responder
+    /// chain: the agent's settings belong to this app, since the agent runs
+    /// in this process. `@objc` and this exact selector name
     /// are load-bearing: ClientMainMenu references `Selector(("showSettings:"))`
     /// as a raw string rather than `#selector(AppDelegate.showSettings(_:))`
     /// so that file keeps compiling in PuckTests, which never links this
@@ -252,7 +252,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 backing: .buffered,
                 defer: false
             )
-            newWindow.title = "설정"
             newWindow.isReleasedWhenClosed = false
             newWindow.applyGlassChrome()
             newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView())
@@ -260,6 +259,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settingsWindow = newWindow
             return newWindow
         }()
+        // Set on every show, not once at construction: the window is kept
+        // around after closing, and its title is the one piece of it AppKit
+        // owns rather than SwiftUI -- nothing would relabel it on a language
+        // change otherwise.
+        window.title = Strings.text(.chatSettings)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

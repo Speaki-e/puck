@@ -40,7 +40,6 @@ struct SettingsView: View {
     /// immediately -- every `text(_:)` call below reads through it.
     @ObservedObject private var localization = Localization.shared
 
-    @State private var language: AppLanguage
     @State private var appearance: AppAppearance
     @State private var clientThemeStyle: ClientThemeStyle
     @State private var volume: Double
@@ -74,7 +73,6 @@ struct SettingsView: View {
         self.onOpenClient = onOpenClient
         self.onToggleVisibility = onToggleVisibility
         self.onQuit = onQuit
-        _language = State(initialValue: store.language)
         _appearance = State(initialValue: store.appearance)
         _clientThemeStyle = State(initialValue: store.clientThemeStyle)
         _volume = State(initialValue: Double(store.volume))
@@ -224,14 +222,19 @@ struct SettingsView: View {
             // finding it should not require reading the rest in a language
             // you don't have. Options name themselves for the same reason.
             SettingsStackedRow(label: text(.languageLabel)) {
-                Picker("", selection: $language) {
+                // Bound to the live value rather than a copy taken at init:
+                // PuckClient offers the same picker, and a copy would keep
+                // showing the old choice after a change made over there.
+                Picker("", selection: Binding(
+                    get: { localization.language },
+                    set: { store.language = $0 }
+                )) {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.displayName).tag(language)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .onChange(of: language) { _, newValue in store.language = newValue }
             }
             // An explicit override,
             // not just passively following the system (.system does that).

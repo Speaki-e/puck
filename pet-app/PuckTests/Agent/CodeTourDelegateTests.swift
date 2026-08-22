@@ -140,7 +140,9 @@ final class CodeTourDelegateTests: XCTestCase {
         let result = await sut.showCode(path: "gone.swift", startLine: 1, endLine: 1, workspaceId: UUID().uuidString)
 
         let detail = try XCTUnwrap(result.detail)
-        XCTAssertTrue(detail.contains("상대 경로"), detail)
+        // The key, not the words: the test host is the Puck app, so it comes
+        // up in whatever language the machine has saved.
+        XCTAssertTrue(detail.contains(Strings.text(.toolPathIsRelativeHint)), detail)
         XCTAssertTrue(detail.contains("list_files"), detail)
     }
 

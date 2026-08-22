@@ -19,6 +19,7 @@ struct ChatPaneView: View {
     /// skips a child whose own inputs are unchanged, and a table lookup
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
 
     @ObservedObject var store: ClientWindowStore
     /// Where the editor is showing, owned by ClientWindowView -- the toggle
@@ -75,6 +76,15 @@ struct ChatPaneView: View {
     }
 
     private func chatColumn(_ session: ChatSession) -> some View {
+        chatStack(session)
+            // The same ground the code column and the explorer stand on.
+            // Left to the window's own material, the conversation sat on a
+            // visibly lighter surface than the file beside it -- two halves
+            // of one column that did not look related.
+            .background(palette.background)
+    }
+
+    private func chatStack(_ session: ChatSession) -> some View {
         VStack(spacing: 0) {
             ChatTranscriptView(session: session) { approved in
                 store.respondToPendingApproval(in: session, approved: approved)

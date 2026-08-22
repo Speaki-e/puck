@@ -34,7 +34,10 @@ struct CodeEditorHostView: View {
             configuration: SourceEditorConfiguration(
                 appearance: .init(
                     theme: Self.theme(for: palette),
-                    font: .monospacedSystemFont(ofSize: 12, weight: .regular),
+                    // The size the transcript renders inline code at, so a
+                    // snippet quoted in the conversation and the file it came
+                    // from are the same text at the same scale.
+                    font: .monospacedSystemFont(ofSize: 13, weight: .regular),
                     wrapLines: false
                 ),
                 behavior: .init(isEditable: isEditable, indentOption: .spaces(count: 2))

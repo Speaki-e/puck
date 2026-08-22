@@ -87,6 +87,10 @@ enum ClientTheme {
         /// The detached editor window: file tree (180) + code (360), without
         /// the chat's share of the split.
         static let editorWindowMinWidth: CGFloat = 540
+        /// How much of the window's own colour sits over the blurred desktop.
+        /// Enough that the theme still decides what the app looks like, thin
+        /// enough that what is behind it reads as being behind it.
+        static let windowTint: Double = 0.78
         static let windowMinHeight: CGFloat = 640
     }
 

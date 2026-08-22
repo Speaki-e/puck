@@ -216,12 +216,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // reason Puck's own AppDelegate sets NSApp.appearance alongside
         // its SwiftUI modifier.
         NSApp.appearance = NSAppearance(named: style.colorScheme == .dark ? .darkAqua : .aqua)
-        // The window's own ground, so the strip behind the traffic lights and
-        // any sliver the content does not cover is the theme's colour rather
-        // than AppKit's grey. Opaque, unlike the `isOpaque = false` attempt
-        // this file's own chrome comment warns about: that exposed the native
-        // titlebar's vibrancy, and this only repaints what is already opaque.
-        window?.backgroundColor = NSColor(style.palette.background)
+        // Clear, so WindowBackdrop's blur is what shows. Safe here in a way
+        // the 2026-08-02 attempt was not: that one made the window
+        // see-through with nothing behind the content, so the native
+        // titlebar blended against the desktop. The backdrop now fills the
+        // window, titlebar area included.
+        window?.isOpaque = false
+        window?.backgroundColor = .clear
     }
 
     private func handle(_ message: BridgeMessage) {

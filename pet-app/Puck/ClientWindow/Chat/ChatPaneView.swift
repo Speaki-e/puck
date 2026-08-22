@@ -83,12 +83,10 @@ struct ChatPaneView: View {
     }
 
     private func chatColumn(_ session: ChatSession) -> some View {
+        // No ground of its own: the window's backdrop is the ground, and a
+        // column painting over it would be the one opaque rectangle in a
+        // translucent window.
         chatStack(session)
-            // The same ground the code column and the explorer stand on.
-            // Left to the window's own material, the conversation sat on a
-            // visibly lighter surface than the file beside it -- two halves
-            // of one column that did not look related.
-            .background(palette.background)
     }
 
     private func chatStack(_ session: ChatSession) -> some View {

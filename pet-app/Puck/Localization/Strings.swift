@@ -147,6 +147,10 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// WorkspaceFileService's refusals. The user reads these in the editor
     /// pane, so they are copy, not diagnostics.
     case fileNotAFilePath, fileInvalidPath, fileOutsideProject, fileSymlinkEscapesProject
+    case fileNotADirectoryPath, fileNameTaken, fileInvalidName, fileCannotDeleteRoot, fileCouldNotCreate
+    case explorerNewFile, explorerNewFolder, explorerRename, explorerDelete, explorerRevealInFinder
+    case explorerCopyPath, explorerDeleteTitleFormat, explorerDeleteMessage, explorerRenameTitle
+    case explorerNewFileTitle, explorerNewFolderTitle, explorerNamePlaceholder, explorerCreate
     case fileNotFound, fileBinaryNotEditable, fileBinaryNotSavable, fileOnlyUTF8
     case fileImageTooLargeToPreview, fileImageFormatMismatch
     case fileTooLargeReadOnly, fileChangedOnDisk, fileSaveExceedsLimit, fileInUseByAnotherProcess
@@ -417,6 +421,24 @@ enum Strings {
         .editorKeepMyVersion: "내 내용 유지",
 
         .fileNotAFilePath: "파일 경로가 아닙니다",
+        .fileNotADirectoryPath: "폴더 경로가 아닙니다",
+        .fileNameTaken: "같은 이름이 이미 있습니다",
+        .fileInvalidName: "쓸 수 없는 이름입니다",
+        .fileCannotDeleteRoot: "프로젝트 폴더 자체는 지울 수 없습니다",
+        .fileCouldNotCreate: "만들지 못했습니다",
+        .explorerNewFile: "새 파일",
+        .explorerNewFolder: "새 폴더",
+        .explorerRename: "이름 변경",
+        .explorerDelete: "휴지통으로 이동",
+        .explorerRevealInFinder: "Finder에서 보기",
+        .explorerCopyPath: "경로 복사",
+        .explorerDeleteTitleFormat: "%@을(를) 휴지통으로 옮길까요?",
+        .explorerDeleteMessage: "휴지통에서 되돌릴 수 있습니다.",
+        .explorerRenameTitle: "이름 변경",
+        .explorerNewFileTitle: "새 파일",
+        .explorerNewFolderTitle: "새 폴더",
+        .explorerNamePlaceholder: "이름",
+        .explorerCreate: "만들기",
         .fileInvalidPath: "잘못된 파일 경로입니다",
         .fileOutsideProject: "프로젝트 밖 경로입니다",
         .fileSymlinkEscapesProject: "심볼릭 링크가 프로젝트 밖을 가리킵니다",
@@ -699,6 +721,24 @@ enum Strings {
         .editorKeepMyVersion: "Keep mine",
 
         .fileNotAFilePath: "That is not a file path",
+        .fileNotADirectoryPath: "That is not a folder path",
+        .fileNameTaken: "Something with that name is already there",
+        .fileInvalidName: "That name cannot be used",
+        .fileCannotDeleteRoot: "The project folder itself cannot be deleted",
+        .fileCouldNotCreate: "Could not create it",
+        .explorerNewFile: "New file",
+        .explorerNewFolder: "New folder",
+        .explorerRename: "Rename",
+        .explorerDelete: "Move to Trash",
+        .explorerRevealInFinder: "Reveal in Finder",
+        .explorerCopyPath: "Copy path",
+        .explorerDeleteTitleFormat: "Move %@ to the Trash?",
+        .explorerDeleteMessage: "You can put it back from the Trash.",
+        .explorerRenameTitle: "Rename",
+        .explorerNewFileTitle: "New file",
+        .explorerNewFolderTitle: "New folder",
+        .explorerNamePlaceholder: "Name",
+        .explorerCreate: "Create",
         .fileInvalidPath: "That file path is not valid",
         .fileOutsideProject: "That path is outside the project",
         .fileSymlinkEscapesProject: "That symlink points outside the project",

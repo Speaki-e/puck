@@ -101,6 +101,65 @@ final class EditorPaneStore: ObservableObject {
         }
     }
 
+    /// Renames a file or directory, and follows it: a tab open on the old
+    /// name is now open on a file that no longer exists, and a tree still
+    /// showing it is a tree that lies.
+    func rename(path: String, to newName: String) {
+        do {
+            let renamed = try service.rename(path, to: newName)
+            if let index = openTabs.firstIndex(where: { $0.path == path }) {
+                let wasActive = activeTabPath == path
+                openTabs.remove(at: index)
+                loadTree()
+                open(path: renamed)
+                if !wasActive { activeTabPath = openTabs.last?.path }
+            } else {
+                loadTree()
+            }
+        } catch let error as WorkspaceFileServiceError {
+            lastError = error
+        } catch {
+            lastError = nil
+        }
+    }
+
+    /// Moves a file or directory to the Trash and closes anything open from
+    /// under it -- a tab on a trashed file has nowhere to save to.
+    func trash(path: String) {
+        do {
+            try service.trash(path)
+            for tab in openTabs where tab.path == path || tab.path.hasPrefix(path + "/") {
+                close(path: tab.path)
+            }
+            loadTree()
+        } catch let error as WorkspaceFileServiceError {
+            lastError = error
+        } catch {
+            lastError = nil
+        }
+    }
+
+    /// Creates an empty file or a directory. A new file is opened straight
+    /// away, because the only reason to make one is to put something in it.
+    func create(name: String, directory: Bool, in parent: String?) {
+        do {
+            let created = try service.create(name: name, directory: directory, in: parent)
+            loadTree()
+            if !directory { open(path: created) }
+        } catch let error as WorkspaceFileServiceError {
+            lastError = error
+        } catch {
+            lastError = nil
+        }
+    }
+
+    /// The absolute path of something in the tree, for Finder and the
+    /// pasteboard -- both of which deal in real paths, not the project
+    /// relative ones the tree carries.
+    func absolutePath(for path: String) -> String {
+        path.hasPrefix("/") ? path : service.root.appendingPathComponent(path).path
+    }
+
     func open(path: String) {
         // Counted even when nothing changes. Clicking a file that is already
         // the active tab is still a request to look at it, and a view that

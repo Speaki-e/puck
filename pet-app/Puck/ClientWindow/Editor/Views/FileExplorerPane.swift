@@ -11,6 +11,7 @@
 //  other, and both take the store from ClientWindowView.
 //
 
+import AppKit
 import SwiftUI
 
 /// What the right column is showing.
@@ -117,7 +118,24 @@ struct FileExplorerPane: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
                 .padding(.vertical, ClientTheme.Metrics.spacingMedium)
-            FileTreeView(entries: store.tree, onOpen: { store.open(path: $0) })
+            FileTreeView(
+                entries: store.tree,
+                onOpen: { store.open(path: $0) },
+                actions: FileTreeActions(
+                    rename: { store.rename(path: $0, to: $1) },
+                    trash: { store.trash(path: $0) },
+                    create: { store.create(name: $0, directory: $1, in: $2) },
+                    revealInFinder: {
+                        NSWorkspace.shared.activateFileViewerSelecting([
+                            URL(fileURLWithPath: store.absolutePath(for: $0)),
+                        ])
+                    },
+                    copyPath: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(store.absolutePath(for: $0), forType: .string)
+                    }
+                )
+            )
         }
     }
 }

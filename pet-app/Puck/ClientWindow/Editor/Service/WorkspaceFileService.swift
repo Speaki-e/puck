@@ -140,6 +140,87 @@ final class WorkspaceFileService {
         return SaveFileResult(path: relativeForWire(target), revision: Self.revision(of: next), size: next.count)
     }
 
+    // MARK: - Changing the tree
+
+    /// Renames a file or directory in place. The new name is a name, not a
+    /// path: "rename" in a file tree means the last component, and accepting
+    /// a path here would turn a typo with a slash in it into a move.
+    @discardableResult
+    func rename(_ requestPath: String, to newName: String) throws -> String {
+        let target = try resolveExisting(requestPath)
+        try Self.validate(name: newName)
+        let destination = target.deletingLastPathComponent().appendingPathComponent(newName)
+        guard isInside(destination.path) else {
+            throw WorkspaceFileServiceError(code: .pathOutsideWorkspace, message: Strings.text(.fileOutsideProject))
+        }
+        // Case-only renames are a real rename on a case-insensitive volume
+        // and would otherwise trip the "already exists" check against the
+        // file being renamed.
+        guard destination.path.caseInsensitiveCompare(target.path) == .orderedSame
+            || !FileManager.default.fileExists(atPath: destination.path)
+        else {
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileNameTaken))
+        }
+        try FileManager.default.moveItem(at: target, to: destination)
+        return relativeForWire(destination)
+    }
+
+    /// Moves a file or directory to the Trash rather than unlinking it.
+    ///
+    /// The tree is the user's project, not scratch space: a delete here has
+    /// to be undoable by the same means every other delete on the machine is,
+    /// which is the Trash. `trashItem` also refuses on volumes that have
+    /// none, which is the honest answer in that case.
+    func trash(_ requestPath: String) throws {
+        let target = try resolveExisting(requestPath)
+        guard target.path != root.path else {
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileCannotDeleteRoot))
+        }
+        try FileManager.default.trashItem(at: target, resultingItemURL: nil)
+    }
+
+    /// Creates an empty file, or a directory, inside `parent` -- the project
+    /// root when that is nil.
+    @discardableResult
+    func create(name: String, directory: Bool, in parent: String?) throws -> String {
+        try Self.validate(name: name)
+        let base = try parent.map { try resolveExisting($0) } ?? root
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: base.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileNotADirectoryPath))
+        }
+        let destination = base.appendingPathComponent(name)
+        guard isInside(destination.path) else {
+            throw WorkspaceFileServiceError(code: .pathOutsideWorkspace, message: Strings.text(.fileOutsideProject))
+        }
+        guard !FileManager.default.fileExists(atPath: destination.path) else {
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileNameTaken))
+        }
+        if directory {
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+        } else {
+            guard FileManager.default.createFile(atPath: destination.path, contents: Data()) else {
+                throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileCouldNotCreate))
+            }
+        }
+        return relativeForWire(destination)
+    }
+
+    /// What a single path component may be. Everything here is about the name
+    /// being a name: a separator would make it a path, and the two dot names
+    /// are directories that already exist.
+    static func validate(name: String) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty,
+              !trimmed.contains("/"),
+              !trimmed.contains("\0"),
+              trimmed != ".",
+              trimmed != ".."
+        else {
+            throw WorkspaceFileServiceError(code: .invalidPath, message: Strings.text(.fileInvalidName))
+        }
+    }
+
     // MARK: - Tree listing
 
     private struct DirEntry {

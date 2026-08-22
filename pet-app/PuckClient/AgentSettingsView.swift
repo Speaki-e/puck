@@ -41,6 +41,23 @@ struct AgentSettingsView: View {
     @State private var modelDraft = ""
     @State private var agentConfiguration = AgentConfiguration.load()
 
+    /// Read on every draw rather than held: the other window offers the same
+    /// picker, and a copy taken once would keep showing the theme that was
+    /// current when this window was built.
+    private var themeStyle: ClientThemeStyle {
+        ClientThemeStyle.resolved(fromDefaultsValue: ClientThemeStyle.sharedDefaults?.string(forKey: ClientThemeStyle.defaultsKey))
+    }
+
+    /// Written into Puck's domain and announced, the same path the language
+    /// picker beside it takes.
+    private func select(_ style: ClientThemeStyle) {
+        ClientThemeStyle.sharedDefaults?.set(style.rawValue, forKey: ClientThemeStyle.defaultsKey)
+        // No direct poke at the window's store: this process already listens
+        // for the broadcast, and a distributed notification is delivered to
+        // its own sender too. Setting both would be two paths to keep in step.
+        style.broadcast()
+    }
+
     /// Unlike everything else on this window, the language is a UserDefaults
     /// setting rather than a `.env` one, so it is written into Puck's domain
     /// -- the one place it lives -- and then announced. Puck listens for that
@@ -73,6 +90,19 @@ struct AgentSettingsView: View {
             // button that opens it is labelled the same way. It is the one
             // setting here that is not the agent's, hence its own section.
             SettingsSection(title: text(.tabGeneral)) {
+                SettingsStackedRow(label: text(.clientThemeLabel)) {
+                    Picker("", selection: Binding(
+                        get: { themeStyle },
+                        set: { select($0) }
+                    )) {
+                        ForEach(ClientThemeStyle.allCases) { style in
+                            Text(style.displayName).tag(style)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                }
+
                 SettingsStackedRow(label: text(.languageLabel)) {
                     Picker("", selection: Binding(
                         get: { localization.language },

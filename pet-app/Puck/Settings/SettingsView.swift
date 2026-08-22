@@ -41,7 +41,6 @@ struct SettingsView: View {
     @ObservedObject private var localization = Localization.shared
 
     @State private var appearance: AppAppearance
-    @State private var clientThemeStyle: ClientThemeStyle
     @State private var volume: Double
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
@@ -74,7 +73,6 @@ struct SettingsView: View {
         self.onToggleVisibility = onToggleVisibility
         self.onQuit = onQuit
         _appearance = State(initialValue: store.appearance)
-        _clientThemeStyle = State(initialValue: store.clientThemeStyle)
         _volume = State(initialValue: Double(store.volume))
         _isMuted = State(initialValue: store.isMuted)
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
@@ -254,14 +252,20 @@ struct SettingsView: View {
             // local popover so it's controlled from the same place as every
             // other appearance setting.
             SettingsStackedRow(label: text(.clientThemeLabel)) {
-                Picker("", selection: $clientThemeStyle) {
+                // A menu, not segments: theme names are names now ("Tokyo
+                // Night"), and three of them abbreviate to nothing across a
+                // panel this narrow. A menu also takes a fourth without
+                // being redesigned.
+                Picker("", selection: Binding(
+                    get: { store.clientThemeStyle },
+                    set: { store.clientThemeStyle = $0 }
+                )) {
                     ForEach(ClientThemeStyle.allCases) { style in
                         Text(style.displayName).tag(style)
                     }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
                 .labelsHidden()
-                .onChange(of: clientThemeStyle) { _, newValue in store.clientThemeStyle = newValue }
             }
             SettingsRow(label: text(.accessibilityLabel)) {
                 Text(AccessibilityPermission.isTrusted(prompt: false) ? text(.accessibilityGranted) : text(.accessibilityNotGranted))

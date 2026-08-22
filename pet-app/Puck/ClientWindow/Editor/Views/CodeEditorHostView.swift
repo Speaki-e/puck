@@ -55,30 +55,36 @@ struct CodeEditorHostView: View {
         }
     }
 
+    /// Built from the palette's own syntax colours rather than from three
+    /// interface ones. Derived, every theme's code looked the same however
+    /// different its chrome was -- strings took the accent, keywords a fixed
+    /// violet nobody chose.
     private static func theme(for palette: ClientPalette) -> EditorTheme {
-        let text = EditorTheme.Attribute(color: NSColor(palette.textPrimary))
-        let keyword = EditorTheme.Attribute(color: NSColor(red: 0.78, green: 0.53, blue: 0.90, alpha: 1), bold: true)
-        let type = EditorTheme.Attribute(color: NSColor(red: 0.40, green: 0.75, blue: 0.85, alpha: 1))
-        let literal = EditorTheme.Attribute(color: NSColor(red: 0.60, green: 0.80, blue: 0.50, alpha: 1))
-        let string = EditorTheme.Attribute(color: NSColor(palette.accent))
-        let comment = EditorTheme.Attribute(color: NSColor(palette.textSecondary), italic: true)
+        func attribute(_ color: Color, bold: Bool = false, italic: Bool = false) -> EditorTheme.Attribute {
+            EditorTheme.Attribute(color: NSColor(color), bold: bold, italic: italic)
+        }
+        let syntax = palette.syntax
+        let text = attribute(palette.textPrimary)
+        let variable = attribute(syntax.variable)
+        let number = attribute(syntax.number)
+        let string = attribute(syntax.string)
         return EditorTheme(
             text: text,
             insertionPoint: NSColor(palette.accent),
-            invisibles: EditorTheme.Attribute(color: NSColor(palette.textSecondary)),
+            invisibles: attribute(syntax.comment),
             background: NSColor(palette.background),
             lineHighlight: NSColor(palette.surface),
             selection: NSColor(palette.accent).withAlphaComponent(0.25),
-            keywords: keyword,
-            commands: text,
-            types: type,
-            attributes: text,
-            variables: text,
-            values: literal,
-            numbers: literal,
+            keywords: attribute(syntax.keyword, bold: true),
+            commands: attribute(syntax.function),
+            types: attribute(syntax.type),
+            attributes: attribute(syntax.function),
+            variables: variable,
+            values: number,
+            numbers: number,
             strings: string,
             characters: string,
-            comments: comment
+            comments: attribute(syntax.comment, italic: true)
         )
     }
 }

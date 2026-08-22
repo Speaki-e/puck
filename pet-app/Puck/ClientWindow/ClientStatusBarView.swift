@@ -39,6 +39,10 @@ struct ClientStatusBarView: View {
     let workspace: ClientWorkspace?
     let availability: EditorAvailability
     let palette: ClientPalette
+    /// What the project's repository is doing: the branch, and how much has
+    /// changed on it. nil when there is no project, or it is not a repository
+    /// -- in which case the footer says nothing rather than saying "none".
+    var git: GitStatus?
 
     /// Loaded fresh rather than threaded in from a store: this is the same
     /// config AgentSettingsView reads directly (AgentConfiguration.load()),
@@ -67,6 +71,21 @@ struct ClientStatusBarView: View {
             HStack(spacing: ClientTheme.Metrics.spacingSmall) {
                 StatusDotView(status: dotStatus(for: availability), palette: palette)
                 Text(projectLabel)
+            }
+            if let branch = git?.branch {
+                separator
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 9))
+                    Text(branch)
+                    // Only when there is something to say. A footer that
+                    // reads "0 changed, 0 ahead" on every clean repository is
+                    // a footer people stop reading.
+                    if let summary = changeSummary {
+                        Text(summary)
+                            .foregroundStyle(palette.textSecondary.opacity(0.7))
+                    }
+                }
             }
             separator
             HStack(spacing: 4) {
@@ -98,6 +117,19 @@ struct ClientStatusBarView: View {
                 .fill(palette.surfaceBorder.opacity(0.6))
                 .frame(height: 1)
         }
+    }
+
+    /// "3 files +40 -12", or nothing at all on a clean tree. Written as
+    /// git's own shorthand rather than a sentence: this is a status bar, and
+    /// the people reading it read diffs.
+    private var changeSummary: String? {
+        guard let git, !git.files.isEmpty else { return nil }
+        var parts = ["\(git.files.count)"]
+        if git.addedLines > 0 { parts.append("+\(git.addedLines)") }
+        if git.deletedLines > 0 { parts.append("-\(git.deletedLines)") }
+        if git.ahead > 0 { parts.append("↑\(git.ahead)") }
+        if git.behind > 0 { parts.append("↓\(git.behind)") }
+        return parts.joined(separator: " ")
     }
 
     /// A dot rather than a rule. At 24pt the old 1x10 bar was a third of the

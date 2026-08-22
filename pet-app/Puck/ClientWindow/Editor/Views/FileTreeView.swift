@@ -27,6 +27,13 @@ struct FileTreeView: View {
 
     let entries: [FileTreeEntry]
     let onOpen: (String) -> Void
+    /// Project-relative path to git's single letter for it -- M, A, D. Empty
+    /// when the project is not a repository, or before the first read.
+    ///
+    /// On the tree rather than only in the git tab: which files a turn
+    /// touched is the question the tree is being looked at with, and having
+    /// to switch tabs to answer it means holding two lists in your head.
+    var changedPaths: [String: String] = [:]
     /// What a right-click can do. Nil in a tree that only browses -- the
     /// detached window's, for one -- so the menu is absent rather than
     /// present and inert.
@@ -129,10 +136,15 @@ struct FileTreeView: View {
                 .font(ClientTheme.Typography.caption)
         }
         .padding(.horizontal, 8)
-        .frame(height: 24)
+        .frame(height: 22)
         .background(palette.background)
         .clipShape(Capsule())
-        .padding(8)
+        // Tighter above than below, and tighter than it was on both: this
+        // field is the only chrome left between the tab strip and the first
+        // file, and it was sitting in a band of its own.
+        .padding(.horizontal, 6)
+        .padding(.top, 5)
+        .padding(.bottom, 3)
     }
 
     private func row(for entry: FileTreeEntry) -> some View {
@@ -150,10 +162,24 @@ struct FileTreeView: View {
         } icon: {
             FileIconView(entry: entry)
         }
+        .badge(badge(for: entry))
         .tag(entry.path)
         .contextMenu {
             if let actions { rowMenu(for: entry, actions: actions) }
         }
+    }
+
+    /// Git's letter for a file, or -- for a directory -- how many files under
+    /// it changed. A folder that says nothing while three files inside it did
+    /// is a folder you have to open to learn anything.
+    private func badge(for entry: FileTreeEntry) -> Text? {
+        guard !changedPaths.isEmpty else { return nil }
+        if entry.kind == .directory {
+            let prefix = entry.path + "/"
+            let count = changedPaths.keys.filter { $0.hasPrefix(prefix) }.count
+            return count > 0 ? Text("\(count)") : nil
+        }
+        return changedPaths[entry.path].map { Text($0) }
     }
 
     private static func entry(at path: String, in entries: [FileTreeEntry]) -> FileTreeEntry? {

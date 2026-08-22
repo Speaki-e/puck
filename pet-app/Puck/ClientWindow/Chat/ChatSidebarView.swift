@@ -22,6 +22,10 @@ struct ChatSidebarView: View {
     @Environment(\.clientPalette) private var palette
 
     @ObservedObject var store: ClientWindowStore
+    /// Which branch each project is on, shown beside its name. Held here
+    /// rather than in the store: nothing outside this list uses it, and it is
+    /// read from disk rather than sent over the socket.
+    @StateObject private var branches = WorkspaceBranches()
     /// Presented by the new-workspace button; the folder picker itself is
     /// AppKit's, since SwiftUI has no directory-choosing equivalent.
     @State private var isAddingWorkspace = false
@@ -50,9 +54,12 @@ struct ChatSidebarView: View {
                             }
                     }
                 } header: {
-                    WorkspaceHeader(workspace: workspace)
+                    WorkspaceHeader(workspace: workspace, branch: branches.branches[workspace.id])
                 }
             }
+        }
+        .task(id: store.workspaces.map(\.id).joined()) {
+            await branches.reload(projects: projectsByWorkspace)
         }
         .listStyle(.sidebar)
         // AppKit's own sidebar material sat two shades lighter than the
@@ -96,6 +103,12 @@ struct ChatSidebarView: View {
         }
     }
 
+    private var projectsByWorkspace: [String: String] {
+        store.workspaces.reduce(into: [:]) { result, workspace in
+            result[workspace.id] = workspace.projectPath
+        }
+    }
+
     /// Two ids as one selection value: `List` selects a single tag, and a
     /// session id alone is ambiguous -- every workspace has a session called
     /// "default" (see ClientWindowStore's composite-key note).
@@ -123,6 +136,9 @@ private struct WorkspaceHeader: View {
     @ObservedObject private var localization = Localization.shared
 
     let workspace: ClientWorkspace
+    /// nil when the workspace has no project, when it is not a repository, or
+    /// when HEAD is detached -- none of which is a branch name.
+    let branch: String?
 
     // No new-chat button here. It lived in this header so it could name its
     // own workspace, but a section header styles its contents as small
@@ -143,15 +159,30 @@ private struct WorkspaceHeader: View {
             Text(workspace.displayName)
                 .font(ClientTheme.Typography.workspaceName)
                 .foregroundStyle(.primary)
-            if let label = workspace.projectLabel {
-                Text(label)
-                    .font(ClientTheme.Typography.sessionTitle)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    // The whole path on hover, since the label is two
-                    // components of it.
-                    .help(workspace.projectPath ?? "")
+            if workspace.projectLabel != nil || branch != nil {
+                HStack(spacing: 5) {
+                    if let label = workspace.projectLabel {
+                        Text(label)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            // The whole path on hover, since the label is two
+                            // components of it.
+                            .help(workspace.projectPath ?? "")
+                    }
+                    if let branch {
+                        // The branch belongs next to the project, not in the
+                        // footer alone: the sidebar is where you pick which
+                        // project to talk about, and which branch it is on is
+                        // half of what that choice means.
+                        Label(branch, systemImage: "arrow.triangle.branch")
+                            .labelStyle(.titleAndIcon)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(branch)
+                    }
+                }
+                .font(ClientTheme.Typography.sessionTitle)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)

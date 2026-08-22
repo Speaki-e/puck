@@ -23,11 +23,53 @@ enum GitStatusReader {
     /// nil when the directory is not a repository, or git is not installed --
     /// both are "there is nothing to show here" rather than errors worth
     /// putting on screen.
+    /// Just the branch, for the places that show which one a project is on
+    /// without listing what changed -- the sidebar's workspace rows, the
+    /// window's footer. `git status` walks the worktree; this does not, so it
+    /// is cheap enough to ask once per workspace.
+    static func branch(projectPath: String) -> String? {
+        guard let git = executable() else { return nil }
+        guard let name = run(git, ["-C", projectPath, "rev-parse", "--abbrev-ref", "HEAD"]) else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A repository with no commits yet answers "HEAD"; so does a detached
+        // one, and neither is a branch anybody wants shown as a name.
+        return trimmed.isEmpty || trimmed == "HEAD" ? nil : trimmed
+    }
+
     static func read(projectPath: String) -> GitStatus? {
         guard let git = executable() else { return nil }
         guard let status = run(git, ["-C", projectPath, "status", "--porcelain=v2", "--branch"]) else { return nil }
         let numstat = run(git, ["-C", projectPath, "diff", "--numstat", "HEAD"]) ?? ""
-        return GitStatusParser.parse(status: status, numstat: numstat)
+        let parsed = GitStatusParser.parse(status: status, numstat: numstat)
+        // git answers in paths relative to the repository root; everything
+        // here deals in paths relative to the workspace, and the two are only
+        // the same when the workspace *is* the root. Opening a changed file
+        // from a workspace one directory down looked for it in the wrong
+        // place, and the file tree could not match a single one of them.
+        let prefix = (run(git, ["-C", projectPath, "rev-parse", "--show-prefix"]) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return prefix.isEmpty ? parsed : Self.reroot(parsed, under: prefix)
+    }
+
+    /// Drops what is outside the workspace and makes the rest relative to it.
+    static func reroot(_ status: GitStatus, under prefix: String) -> GitStatus {
+        let files = status.files.compactMap { file -> GitFileChange? in
+            guard file.path.hasPrefix(prefix) else { return nil }
+            return GitFileChange(
+                indexStatus: file.indexStatus,
+                worktreeStatus: file.worktreeStatus,
+                path: String(file.path.dropFirst(prefix.count)),
+                addedLines: file.addedLines,
+                deletedLines: file.deletedLines
+            )
+        }
+        return GitStatus(
+            branch: status.branch,
+            upstream: status.upstream,
+            ahead: status.ahead,
+            behind: status.behind,
+            files: files
+        )
     }
 
     /// nil on a non-zero exit, which for these two means "not a repository".

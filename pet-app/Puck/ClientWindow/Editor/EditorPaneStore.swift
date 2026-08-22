@@ -15,6 +15,11 @@ final class EditorPaneStore: ObservableObject {
     let workspaceId: String
 
     @Published private(set) var tree: [FileTreeEntry] = []
+    /// Bumped every time the tree is re-read. Views that derive something
+    /// from the project's files -- the explorer's git marks -- watch this
+    /// rather than the tree itself, which is a deep array they would have to
+    /// diff to notice.
+    @Published private(set) var treeRevision = 0
     @Published private(set) var openTabs: [EditorTab] = []
     @Published var activeTabPath: String?
     @Published var lastError: WorkspaceFileServiceError?
@@ -96,6 +101,7 @@ final class EditorPaneStore: ObservableObject {
     func loadTree() {
         do {
             tree = try service.listTree()
+            treeRevision += 1
         } catch {
             lastError = error as? WorkspaceFileServiceError
         }

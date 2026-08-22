@@ -80,6 +80,19 @@ struct FileExplorerPane: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(palette.background)
+        // Read for the pane, not for the git tab: the file tree marks changed
+        // files too now, so the status has to be there before anyone opens
+        // that tab -- and after every write the tree hears about.
+        .task(id: store.rootPath) { await git.reload(projectPath: store.rootPath) }
+        .onChange(of: store.treeRevision) {
+            Task { await git.reload(projectPath: store.rootPath) }
+        }
+    }
+
+    /// Git's letter per changed file, keyed by project-relative path.
+    private var changedPaths: [String: String] {
+        guard let files = git.status?.files else { return [:] }
+        return Dictionary(files.map { ($0.path, $0.displayStatus) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Icons rather than words. The column is 200pt and its job is the list
@@ -94,7 +107,7 @@ struct FileExplorerPane: View {
                     Image(systemName: candidate.symbolName)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(tab == candidate ? palette.textPrimary : palette.textSecondary)
-                        .frame(width: 34, height: 28)
+                        .frame(width: 32, height: 24)
                         .contentShape(.rect)
                         .overlay(alignment: .bottom) {
                             Rectangle()
@@ -113,14 +126,14 @@ struct FileExplorerPane: View {
 
     private var filesTab: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(Strings.text(.explorerHeader))
-                .font(ClientTheme.Typography.sectionHeader)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
-                .padding(.vertical, ClientTheme.Metrics.spacingMedium)
+            // No "파일" heading. The tab strip above already says which of the
+            // three this is, and a title repeating it cost a row of the
+            // column's height -- with the search field under it, three rows of
+            // chrome stood between the top of the pane and the first file.
             FileTreeView(
                 entries: store.tree,
                 onOpen: { store.open(path: $0) },
+                changedPaths: changedPaths,
                 actions: FileTreeActions(
                     rename: { store.rename(path: $0, to: $1) },
                     trash: { store.trash(path: $0) },

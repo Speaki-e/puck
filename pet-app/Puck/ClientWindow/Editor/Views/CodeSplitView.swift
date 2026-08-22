@@ -21,6 +21,8 @@ struct CodeSplitView: View {
     /// is not an input.
     @ObservedObject private var localization = Localization.shared
 
+    @Environment(\.clientPalette) private var palette
+
     @ObservedObject var store: EditorPaneStore
     /// A trailing closure at the call site, so the split reads as "code, and
     /// here is how to put it away".
@@ -44,6 +46,13 @@ struct CodeSplitView: View {
                 isTerminalOpen: $isTerminalOpen
             )
             Divider()
+            // Only when it says something the tab does not. A file at the
+            // project root has a one-component path, and drawing it under a
+            // tab with the same name on it is the same word twice.
+            if let path = store.activeTabPath, path.contains("/") {
+                breadcrumb(path)
+                Divider()
+            }
             EditorContentHostView(store: store)
             if isTerminalOpen {
                 TerminalSection(root: store.rootPath, isOpen: $isTerminalOpen)
@@ -68,6 +77,35 @@ struct CodeSplitView: View {
         } message: {
             Text(pendingCloseMessage)
         }
+    }
+
+    /// The path of the file being edited, above it.
+    ///
+    /// The tab shows a file name, which is all that fits and not enough:
+    /// three `index.ts` tabs are three identical labels, and in a project the
+    /// interesting part of a path is the directories. Separators are drawn as
+    /// chevrons so the components read as steps rather than as one long
+    /// string.
+    private func breadcrumb(_ path: String) -> some View {
+        let components = path.split(separator: "/").map(String.init)
+        return HStack(spacing: 3) {
+            ForEach(Array(components.enumerated()), id: \.offset) { index, component in
+                if index > 0 {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 7, weight: .semibold))
+                        .foregroundStyle(palette.textSecondary.opacity(0.5))
+                }
+                Text(component)
+                    .foregroundStyle(index == components.count - 1 ? palette.textPrimary : palette.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .font(ClientTheme.Typography.caption)
+        .lineLimit(1)
+        .truncationMode(.head)
+        .padding(.horizontal, 10)
+        .frame(height: 20)
+        .help(path)
     }
 
     private var pendingCloseMessage: String {

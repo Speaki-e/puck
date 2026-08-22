@@ -41,6 +41,11 @@ struct ClientWindowView: View {
     /// on the right, a file's contents beside the conversation. One owner
     /// keeps them looking at the same project.
     @State private var editorStore: EditorPaneStore?
+    /// The active project's git status, for the footer. Its own reader rather
+    /// than the explorer's: the footer is on screen whether or not the
+    /// explorer is, and a status that only existed while a pane was open
+    /// would be a footer that emptied when you collapsed something unrelated.
+    @StateObject private var git = GitStatusModel()
 
     /// The window cannot go narrower than what it is currently showing. Two
     /// panes need more room than one, so the floor moves with the toggle
@@ -121,7 +126,8 @@ struct ClientWindowView: View {
             ClientStatusBarView(
                 workspace: activeWorkspace,
                 availability: activeWorkspace?.editorAvailability ?? .noProject,
-                palette: store.themeStyle.palette
+                palette: store.themeStyle.palette,
+                git: git.status
             )
         }
         // No .frame(minWidth:) here: sizingOptions = [] on the hosting
@@ -157,6 +163,15 @@ struct ClientWindowView: View {
             syncEditorStore()
         }
         .onAppear { syncEditorStore() }
+        .task(id: activeWorkspace?.projectPath) {
+            await git.reload(projectPath: activeWorkspace?.projectPath)
+        }
+        // After the agent has written something, not only when the project
+        // changes: the count in the footer is the answer to "what did that
+        // turn touch".
+        .onChange(of: editorStore?.treeRevision) {
+            Task { await git.reload(projectPath: activeWorkspace?.projectPath) }
+        }
         // The agent asked for a file to be on screen. Only obeyed when the
         // workspace can actually show one -- a chat-only workspace would open
         // an empty pane and then have to close it again.

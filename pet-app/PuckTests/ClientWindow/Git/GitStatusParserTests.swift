@@ -108,4 +108,27 @@ final class GitStatusParserTests: XCTestCase {
         XCTAssertNil(status.upstream)
         XCTAssertEqual(status.ahead, 0)
     }
+
+    /// git answers in paths relative to the repository root. A workspace one
+    /// directory down deals in its own paths, so the two have to be made to
+    /// agree -- otherwise opening a changed file looks in the wrong place and
+    /// the file tree matches none of them.
+    func test_reroot_makesPathsRelativeToTheWorkspace() {
+        let status = GitStatus(
+            branch: "main",
+            upstream: nil,
+            ahead: 0,
+            behind: 0,
+            files: [
+                GitFileChange(indexStatus: ".", worktreeStatus: "M", path: "app/Sources/a.swift", addedLines: 2, deletedLines: 1),
+                GitFileChange(indexStatus: ".", worktreeStatus: "M", path: "docs/readme.md", addedLines: nil, deletedLines: nil),
+            ]
+        )
+
+        let rerooted = GitStatusReader.reroot(status, under: "app/")
+
+        XCTAssertEqual(rerooted.files.map(\.path), ["Sources/a.swift"], "and what is outside the workspace is dropped")
+        XCTAssertEqual(rerooted.files.first?.addedLines, 2, "the counts come with it")
+        XCTAssertEqual(rerooted.branch, "main")
+    }
 }

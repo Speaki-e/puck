@@ -197,7 +197,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case themeLight, themeDark
     case workspaceDefaultName, sessionDefaultTitle
-    case editorSelectAFile, editorSearchFiles, editorSaveHint, explorerHeader
+    case editorSelectAFile, editorSearchFiles, editorSaveHint
     case editorCollapse, editorExpand
     case providerRefusedResponse, providerTruncatedFormat, acpProcessExited
 
@@ -515,7 +515,6 @@ enum Strings {
         .sessionDefaultTitle: "새 세션",
         .themeLight: "화이트",
         .themeDark: "다크",
-        .explorerHeader: "파일",
         .editorCollapse: "파일 접기",
         .editorExpand: "파일 다시 열기",
         .editorSelectAFile: "오른쪽 탐색기에서 파일을 선택하세요",
@@ -816,7 +815,6 @@ enum Strings {
         .sessionDefaultTitle: "New session",
         .themeLight: "Light",
         .themeDark: "Dark",
-        .explorerHeader: "Files",
         .editorCollapse: "Collapse the file",
         .editorExpand: "Show the file again",
         .editorSelectAFile: "Pick a file in the explorer on the right",

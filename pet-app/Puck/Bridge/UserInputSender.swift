@@ -81,6 +81,13 @@ final class UserInputSender {
         broadcast(.petHome(rect: rect, visible: visible, pinned: pinned))
     }
 
+    /// How tall the pet stands on the island, in points, from the lever on
+    /// the island itself.
+    @discardableResult
+    func setPetIslandHeight(_ height: Double) -> UserInputDelivery {
+        broadcast(.petIslandHeight(height))
+    }
+
     /// F13 (2026-07-29, protocol 3.4): request a new chat session via the
     /// sidebar's "new chat". Confirmed later by a session_create arriving
     /// back over the socket (origin: .user).

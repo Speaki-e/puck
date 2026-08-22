@@ -174,6 +174,11 @@ struct ChatPaneView: View {
             // toolbar ends and the island's shoulder may begin.
             .background(GlobalFrameReporter { toolbarTrailingX = $0.maxX })
         }
+        // At the far end of the toolbar, over the island's raised shoulder:
+        // the size of the pet, where the pet can be seen changing size.
+        ToolbarItem(placement: .primaryAction) {
+            PetSizeSlider { store.setPetIslandHeight($0) }
+        }
     }
 
     /// Names the workspace the chat would be created in -- "this workspace"

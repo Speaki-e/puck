@@ -290,4 +290,15 @@ final class BridgeMessageCodableTests: XCTestCase {
 
         XCTAssertEqual(decoded, message)
     }
+
+    /// The lever on the island sends a height in points, and pet-app is the
+    /// process that resizes the pet.
+    func test_petIslandHeight_roundTrips() throws {
+        let message = BridgeMessage.petIslandHeight(96)
+
+        let data = try JSONEncoder().encode(message)
+        let decoded = try JSONDecoder().decode(BridgeMessage.self, from: data)
+
+        XCTAssertEqual(decoded, message)
+    }
 }

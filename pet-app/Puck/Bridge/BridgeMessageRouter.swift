@@ -34,6 +34,8 @@ final class BridgeMessageRouter {
 
     /// The client's tank report (2026-08-22), already on the main thread.
     var onPetHome: ((BridgeRect?, Bool, Bool) -> Void)?
+    /// How tall the pet should stand on the island, in points.
+    var onPetIslandHeight: ((Double) -> Void)?
 
     /// Answers workspace_create_request / session_create_request locally.
     /// Left optional so the many tests that only care about tool dispatch or
@@ -107,6 +109,11 @@ final class BridgeMessageRouter {
         case .petHome(let rect, let visible, let pinned):
             dispatchToMain { [weak self] in
                 self?.onPetHome?(rect, visible, pinned)
+            }
+
+        case .petIslandHeight(let height):
+            dispatchToMain { [weak self] in
+                self?.onPetIslandHeight?(height)
             }
 
         case .clientHello:

@@ -58,4 +58,22 @@ final class IslandShapeTests: XCTestCase {
         XCTAssertEqual(path.boundingRect.height, bounds.height, accuracy: 0.5)
         XCTAssertEqual(path.boundingRect.width, bounds.width, accuracy: 0.5)
     }
+
+    /// The slider cannot make a pet that does not fit on the island it is
+    /// standing on, nor one so small it cannot be seen. A pet the island
+    /// cannot hold is refused by pet-app, which looks like the pet ignoring
+    /// the window rather than like a size that was too big.
+    func test_theSizeLimitsLeaveThePetOnTheIsland() {
+        XCTAssertGreaterThan(PetTankView.minimumPetHeight, 0)
+        XCTAssertLessThan(
+            PetTankView.minimumPetHeight + PetTankView.petHeadroom,
+            Double(PetTankView.minimumIslandHeight),
+            "the smallest pet still fits on the shortest island the handle can make"
+        )
+        XCTAssertLessThanOrEqual(
+            PetTankView.defaultPetHeight + PetTankView.petHeadroom,
+            Double(PetTankView.islandHeight),
+            "the pet fits the island both of them open at"
+        )
+    }
 }

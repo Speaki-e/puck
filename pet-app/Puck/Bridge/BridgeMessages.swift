@@ -187,6 +187,12 @@ enum BridgeMessage: Equatable {
     /// with the three is PetHomeDecider's business, not the wire's.
     case petHome(rect: BridgeRect?, visible: Bool, pinned: Bool)
 
+    /// PuckClient -> pet-app: how tall the pet should stand on the island, in
+    /// points (2026-08-23). The lever that sends this is on the island itself,
+    /// because that is where you can see what you are changing. On the desktop
+    /// the size slider in Settings still decides.
+    case petIslandHeight(Double)
+
     // --- sessions/workspaces (2026-07-29, protocol 3.4) ---
 
     /// pet-app -> workspace: request a new workspace (project folder or pure-chat).
@@ -210,6 +216,7 @@ extension BridgeMessage: Codable {
         case event = "event"
         case userInput = "user_input"
         case petHome = "pet_home"
+        case petIslandHeight = "pet_island_height"
         case workspaceCreateRequest = "workspace_create_request"
         case workspaceCreate = "workspace_create"
         case sessionCreateRequest = "session_create_request"
@@ -232,6 +239,7 @@ extension BridgeMessage: Codable {
         case sessionId = "session_id"
         case attachments
         case rect, visible, pinned
+        case height
         case name
         case projectPath = "project_path"
         case title
@@ -319,6 +327,9 @@ extension BridgeMessage: Codable {
                     attachments: try container.decodeIfPresent([Attachment].self, forKey: .attachments)
                 )
             )
+
+        case .petIslandHeight:
+            self = .petIslandHeight(try container.decode(Double.self, forKey: .height))
 
         case .petHome:
             self = .petHome(
@@ -425,6 +436,10 @@ extension BridgeMessage: Codable {
             try container.encodeIfPresent(input.workspaceId, forKey: .workspaceId)
             try container.encodeIfPresent(input.sessionId, forKey: .sessionId)
             try container.encodeIfPresent(input.attachments, forKey: .attachments)
+
+        case .petIslandHeight(let height):
+            try container.encode(TypeKey.petIslandHeight, forKey: .type)
+            try container.encode(height, forKey: .height)
 
         case .petHome(let rect, let visible, let pinned):
             try container.encode(TypeKey.petHome, forKey: .type)

@@ -117,6 +117,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case tankBackgroundForest, tankBackgroundOcean
     case tankBackgroundWorldTree, tankBackgroundBoundary, tankBackgroundMeadow
     case islandResize
+    case islandPetSize
     case terminalTitle
     case terminalToggle
     case terminalHide
@@ -357,6 +358,7 @@ enum Strings {
         .tankBackgroundForest: "숲",
         .tankBackgroundOcean: "바다",
         .islandResize: "섬 높이 조절",
+        .islandPetSize: "펫 크기 조절",
         .terminalTitle: "터미널",
         .terminalToggle: "터미널 (⌃`)",
         .terminalHide: "터미널 닫기",
@@ -657,6 +659,7 @@ enum Strings {
         .tankBackgroundForest: "Forest",
         .tankBackgroundOcean: "Ocean",
         .islandResize: "Resize the island",
+        .islandPetSize: "Resize the pet",
         .terminalTitle: "Terminal",
         .terminalToggle: "Terminal (⌃`)",
         .terminalHide: "Hide the terminal",

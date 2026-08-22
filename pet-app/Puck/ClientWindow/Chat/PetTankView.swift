@@ -41,9 +41,21 @@ struct PetTankView: View {
     /// the pet in an island it does not fit in.
     @AppStorage(PetTankView.heightStorageKey) private var storedHeight = Double(PetTankView.islandHeight)
 
-    /// What the drag is working from, so the gesture measures against where
-    /// it started rather than accumulating rounding every frame.
-    @State private var heightAtDragStart: CGFloat?
+    /// What each drag is working from, captured once when the gesture starts
+    /// so it measures against where it began rather than against the value it
+    /// is itself changing.
+    ///
+    /// `@GestureState` rather than `@State`: the gesture system owns it for
+    /// the life of the drag and clears it afterwards. Held in view state it
+    /// was lost mid-drag -- this view is rebuilt when the island's frame is
+    /// reported, which is exactly what dragging it causes -- and every event
+    /// then measured from the value the previous event had just written,
+    /// which ran away to whichever limit the drag was heading for.
+    @GestureState private var heightAtDragStart: CGFloat?
+
+    /// How tall the pet stands here. Remembered on this side because the
+    /// lever has to draw the value it is about to send; pet-app is told on
+    /// every change and on every window that opens.
 
     private var islandHeight: CGFloat {
         min(max(CGFloat(storedHeight), Self.minimumIslandHeight), Self.maximumIslandHeight)
@@ -85,11 +97,25 @@ struct PetTankView: View {
     /// How far the island reaches up into the toolbar's empty band. Short of
     /// filling it: the buttons beside it need air, and an island level with
     /// the traffic lights reads as the titlebar rather than as a panel.
-    static let shoulderRise: CGFloat = 26
+    static let shoulderRise: CGFloat = 36
 
     /// Between the toolbar's last button and where the island starts to
     /// climb.
     static let shoulderGap: CGFloat = 14
+
+    /// The pet's height on the island, and what the slider may set it to.
+    /// Kept in points rather than as a fraction of the island: the island is
+    /// resizable now, and a pet that changed size when the shelf did would
+    /// undo the lever every time.
+    static let defaultPetHeight: Double = 72
+    static let minimumPetHeight: Double = 32
+    static let maximumPetHeight: Double = 200
+
+    /// Left above the pet's head on the island. Not style: pet-app refuses an
+    /// area it cannot stand the pet in, and refusing looks like the pet
+    /// ignoring the window entirely.
+    static let petHeadroom: Double = 10
+    static let petHeightStorageKey = "Puck.petIslandHeight"
 
     /// How far the part *under* the buttons rises too. The step down to it
     /// was the full shoulder, which left the buttons sitting in a trench;
@@ -114,13 +140,16 @@ struct PetTankView: View {
             )
             ZStack(alignment: .bottom) {
                 shape.fill(palette.background)
-                // The floor the pet stands on.
+                // The floor the pet stands on. Clipped by the island as a
+                // whole rather than by itself: a 1pt-tall box has no corners
+                // to round, so clipping it in place left the line running
+                // straight out past both bottom corners.
                 Rectangle()
                     .fill(palette.textSecondary.opacity(0.25))
                     .frame(height: 1)
-                    .clipShape(shape)
-                shape.strokeBorder(palette.surfaceBorder.opacity(0.8), lineWidth: 1)
             }
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(palette.surfaceBorder.opacity(0.8), lineWidth: 1) }
             .compositingGroup()
             // Floating, so it sits above its surroundings rather than beside
             // them. Softer than a card's: the island is a shelf, not a dialog.
@@ -173,16 +202,17 @@ struct PetTankView: View {
             }
             .gesture(
                 DragGesture(minimumDistance: 1)
+                    .updating($heightAtDragStart) { _, start, _ in
+                        if start == nil { start = islandHeight }
+                    }
                     .onChanged { value in
                         let start = heightAtDragStart ?? islandHeight
-                        heightAtDragStart = start
                         // Down grows it: the handle is on the bottom edge, so
                         // the edge follows the pointer.
                         storedHeight = Double(
                             min(max(start + value.translation.height, Self.minimumIslandHeight), Self.maximumIslandHeight)
                         )
                     }
-                    .onEnded { _ in heightAtDragStart = nil }
             )
             .accessibilityLabel(Strings.text(.islandResize))
             .help(Strings.text(.islandResize))

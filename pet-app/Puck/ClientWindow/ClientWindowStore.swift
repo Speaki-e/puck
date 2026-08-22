@@ -72,6 +72,14 @@ final class ClientWindowStore: ObservableObject {
         reportPetHome()
     }
 
+    /// How tall the pet stands on the island, in points, from the lever on
+    /// the island. Kept here rather than read straight from UserDefaults by
+    /// the lever, because unlike the backdrop this one leaves the process --
+    /// pet-app is what actually resizes the pet.
+    func setPetIslandHeight(_ height: CGFloat) {
+        sender.setPetIslandHeight(Double(height))
+    }
+
     func setWindowIsFrontmost(_ isFrontmost: Bool) {
         guard windowIsFrontmost != isFrontmost else { return }
         windowIsFrontmost = isFrontmost

@@ -22,7 +22,12 @@ extension AppDelegate {
     /// the island is a fixed 90pt whoever is looking at it, so a relative
     /// scale made the pet fill it at one setting and rattle around in it at
     /// another. On the desktop the slider still decides.
-    static let tankPetHeight: CGFloat = 72
+    static let defaultTankPetHeight: CGFloat = 72
+
+    /// Where the lever on the island puts it. Written by the client over the
+    /// bridge and kept here rather than in SettingsStore: it is the size of
+    /// the pet in one particular place, which is a property of that place.
+    static var tankPetHeight: CGFloat = defaultTankPetHeight
 
     /// The client reported its tank. Stores the geometry and hands the
     /// in-or-out question to the decider; nothing moves until `tickPetHome`
@@ -66,6 +71,25 @@ extension AppDelegate {
         case .home: movePetHome()
         case .desktop: sendPetToDesktop()
         case nil: break
+        }
+    }
+
+    /// The lever on the island moved. Applied to a pet that is already home,
+    /// so the size follows the drag rather than waiting for the next trip:
+    /// the whole point of putting the lever there is watching what it does.
+    func applyPetIslandHeight(_ height: Double) {
+        Self.tankPetHeight = CGFloat(height)
+        guard desktopRoamableArea != nil, let controller = characterController else { return }
+        applyLiveAvatarScale(tankScale)
+        // The area was measured against the old size; a pet that just grew
+        // would be standing through the floor of it.
+        if let tank = petTankArea, let body = characterBody {
+            controller.roamableArea = tank
+            body.position = ScreenBounds.contain(
+                CGPoint(x: body.position.x, y: tank.maxY),
+                visualBounds: body.visualBounds,
+                in: tank
+            )
         }
     }
 

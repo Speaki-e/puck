@@ -20,6 +20,9 @@ extension AppDelegate {
         router.onPetHome = { [weak self] rect, visible, pinned in
             self?.applyPetHome(rect: rect, visible: visible, pinned: pinned)
         }
+        router.onPetIslandHeight = { [weak self] height in
+            self?.applyPetIslandHeight(height)
+        }
         // Workspace/session creation is answered in-process as of 2026-08-15
         // (was: relayed to workspace, which owned the registries). A registry
         // that can't open its store is not a reason to refuse to launch --

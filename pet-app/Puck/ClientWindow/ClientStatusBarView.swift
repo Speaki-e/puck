@@ -45,7 +45,12 @@ struct ClientStatusBarView: View {
     /// and the model name changing means either a rebuild or an .env edit --
     /// neither of which this view needs to observe live.
     private var model: String {
-        AgentConfiguration.load().model
+        let configuration = AgentConfiguration.load()
+        // The CLI provider has no model of ours to name -- ACP carries no
+        // model field -- so `model` is empty there and the row showed an icon
+        // with nothing beside it. What is actually running is the CLI.
+        guard configuration.model.isEmpty else { return configuration.model }
+        return configuration.codingAgent.displayName
     }
 
     // Matches ClientWindowStore.casualSessionTitle -- the
@@ -58,24 +63,49 @@ struct ClientStatusBarView: View {
     }
 
     var body: some View {
-        HStack(spacing: ClientTheme.Metrics.spacingSmall) {
-            StatusDotView(status: dotStatus(for: availability), palette: palette)
-            Text(projectLabel)
-                .font(ClientTheme.Typography.mono)
-                .foregroundStyle(palette.textSecondary)
-            Rectangle()
-                .fill(palette.surfaceBorder)
-                .frame(width: 1, height: 10)
-            Text(model)
-                .font(ClientTheme.Typography.mono)
-                .foregroundStyle(palette.textSecondary)
-            Spacer()
+        HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+            HStack(spacing: ClientTheme.Metrics.spacingSmall) {
+                StatusDotView(status: dotStatus(for: availability), palette: palette)
+                Text(projectLabel)
+            }
+            separator
+            HStack(spacing: 4) {
+                Image(systemName: "cpu")
+                    .font(.system(size: 9))
+                Text(model)
+            }
+            Spacer(minLength: ClientTheme.Metrics.spacingMedium)
+            // Trailing, the way a status bar puts what is true of the app
+            // rather than of the file: this side is the same whichever
+            // workspace is open.
+            HStack(spacing: 4) {
+                Image(systemName: "globe")
+                    .font(.system(size: 9))
+                Text(Localization.shared.language.rawValue.uppercased())
+            }
         }
-        .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-        .frame(height: 22)
-        .background(palette.surface)
+        .font(ClientTheme.Typography.caption.monospacedDigit())
+        .foregroundStyle(palette.textSecondary)
+        .lineLimit(1)
+        .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
+        .frame(height: 24)
+        // The window's own ground rather than a raised surface: a footer that
+        // is lighter than everything above it reads as a drawer stuck to the
+        // bottom. The hairline is what separates it.
+        .background(palette.background)
         .overlay(alignment: .top) {
-            Rectangle().fill(palette.surfaceBorder).frame(height: 1)
+            Rectangle()
+                .fill(palette.surfaceBorder.opacity(0.6))
+                .frame(height: 1)
         }
+    }
+
+    /// A dot rather than a rule. At 24pt the old 1x10 bar was a third of the
+    /// row's height and read as a divider between two halves; this reads as
+    /// punctuation between two facts.
+    private var separator: some View {
+        Circle()
+            .fill(palette.textSecondary.opacity(0.35))
+            .frame(width: 2, height: 2)
     }
 }

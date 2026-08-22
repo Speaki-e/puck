@@ -128,6 +128,17 @@ struct ClientWindowView: View {
         // controller means SwiftUI's minimum never becomes a real resize
         // limit anyway (see PuckClient's AppDelegate), and stating it twice
         // is how the two drifted apart before. The window owns its floor.
+        // One ground for the whole window, so the toolbar strip and the gap
+        // under the traffic lights are the theme's colour rather than
+        // AppKit's grey material -- which is what kept reading as a band of
+        // unrelated chrome across the top.
+        .background(store.themeStyle.palette.background)
+        .toolbarBackground(store.themeStyle.palette.background, for: .windowToolbar)
+        // Made visible explicitly, since a toolbar left to decide for itself
+        // fades its material in and out with scrolling and takes the colour
+        // with it. Guarded: the deployment target is macOS 14, where the
+        // toolbar simply keeps AppKit's own material.
+        .modifier(VisibleToolbarBackground())
         .background(WindowMinimumSize(width: minimumWindowWidth, height: ClientTheme.Metrics.windowMinHeight))
         .detachedEditorWindow(
             presentation: $editor,
@@ -161,6 +172,19 @@ struct ClientWindowView: View {
         .onChange(of: editor) {
             guard !editor.isAttached else { return }
             store.setTankSegment(nil, for: .editor)
+        }
+    }
+}
+
+/// `toolbarBackgroundVisibility` arrived in macOS 15, and the app still runs
+/// on 14. Split out rather than inlined so the availability check does not
+/// have to be repeated around every modifier that follows it.
+private struct VisibleToolbarBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        } else {
+            content
         }
     }
 }

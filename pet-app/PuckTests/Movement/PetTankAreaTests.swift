@@ -155,4 +155,29 @@ final class PetTankAreaTests: XCTestCase {
 
         XCTAssertEqual(area, CGRect(x: 1350, y: 39, width: 120, height: 72))
     }
+
+    /// The island has to be at least as tall as the pet that lives on it, or
+    /// the area is refused and the pet silently stays on the desktop --
+    /// nothing on screen says why.
+    ///
+    /// This is not hypothetical. Insetting the island vertically to float it
+    /// took 90pt down to 74 against an 80pt pet, and opening the window
+    /// stopped moving the pet at all.
+    func test_theIslandIsTallEnoughForThePetThatLivesOnIt() {
+        // 133pt of avatar (the bundled manifest's hitbox) at tank scale.
+        let petHeight = 133 * AppDelegate.tankAvatarScale
+        XCTAssertGreaterThanOrEqual(
+            PetTankView.islandHeight,
+            CGFloat(petHeight),
+            "an island shorter than the pet is refused, and the move looks like nothing happening"
+        )
+
+        let accepted = PetTankArea.roamableArea(
+            fromWire: BridgeRect(x: 0, y: 0, width: 600, height: Double(PetTankView.islandHeight)),
+            overlayOriginInQuartz: .zero,
+            overlaySize: CGSize(width: 1440, height: 900),
+            petSize: CGSize(width: 130 * AppDelegate.tankAvatarScale, height: petHeight)
+        )
+        XCTAssertNotNil(accepted, "the island as drawn has to be a usable world")
+    }
 }

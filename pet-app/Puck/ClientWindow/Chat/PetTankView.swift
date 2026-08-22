@@ -7,10 +7,10 @@
 //  rendered by Puck.app's overlay window on top of this, which is what keeps
 //  there being exactly one pet. See the 2026-08-22 spec.
 //
-//  A capsule rather than the full-bleed strip it started as: a strip reads as
-//  part of the window's chrome, and the pet standing on it reads as standing
-//  on a toolbar. Inset and rounded, it reads as a thing the pet is on rather
-//  than an edge of the app -- the sidebar laid on its side.
+//  A floating panel rather than the full-bleed strip it started as: a strip
+//  reads as part of the window's chrome, and the pet standing on it reads as
+//  standing on a toolbar. Inset, lightly rounded and lit from above, it reads
+//  as a thing the pet is on -- the sidebar laid on its side.
 //
 //  The backdrop is themed (right-click to pick); see TankBackground.swift.
 //
@@ -30,34 +30,63 @@ struct PetTankView: View {
     /// changing it in one redraws the other.
     @AppStorage(TankBackground.storageKey) private var storedBackground = TankBackground.plain.rawValue
 
-    /// Tall enough for a 0.6-scale pet (about 72pt) with headroom to jump.
-    static let height: CGFloat = 90
+    /// The island itself, and the pet's whole world while it is home. Tall
+    /// enough for a 0.6-scale pet -- 133pt of avatar comes to 80 -- with
+    /// headroom over it.
+    ///
+    /// Insetting *this* is what broke the move: the reported area is refused
+    /// when it is shorter than the pet, so trimming 8pt off each end left 74
+    /// against an 80pt pet and the pet simply stayed on the desktop. The
+    /// padding goes outside instead.
+    static let islandHeight: CGFloat = 90
 
-    /// How far the island floats from the window's own edges. The pet's world
-    /// is the capsule, not this padding, which is why the frame is reported
-    /// from inside it.
+    /// How far the island floats from the window's own edges.
     static let horizontalInset: CGFloat = 20
     static let verticalInset: CGFloat = 8
 
-    /// The capsule itself.
+    /// The strip the island floats in.
+    static let height: CGFloat = islandHeight + verticalInset * 2
+
+    /// Rounded, not a capsule. A pill turns the ends into arcs the pet cannot
+    /// stand on and reads as a control; this is a panel with its corners
+    /// taken off.
+    static let cornerRadius: CGFloat = 14
+
+    /// The island itself.
     private var island: some View {
         ZStack(alignment: .bottom) {
             background.backdrop(palette: palette)
-            // The floor the pet stands on, kept in every theme. Inset from
-            // the rounded ends, where a full-width line would cut the corners.
+            // Lit from above and pooling toward the bottom: the sheen is what
+            // makes it read as a surface with depth rather than a flat block.
+            LinearGradient(
+                colors: [.white.opacity(0.10), .white.opacity(0.02), .black.opacity(0.12)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            // The floor the pet stands on, kept in every theme.
             Rectangle()
                 .fill(palette.textSecondary.opacity(0.25))
                 .frame(height: 1)
-                .padding(.horizontal, Self.height / 2)
         }
-        .clipShape(.capsule)
+        .clipShape(.rect(cornerRadius: Self.cornerRadius))
         .overlay {
-            Capsule()
-                .strokeBorder(palette.surfaceBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: Self.cornerRadius)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.22), palette.surfaceBorder.opacity(0.6)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
         }
         // Floating, so it needs to sit above its own surroundings rather
         // than beside them.
-        .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.35), radius: 12, y: 5)
+        .frame(height: Self.islandHeight)
+        // Reported from the island, not the padding around it: the pet's
+        // world is the panel, and a frame taken from the padded box would
+        // let it stand in the gap on either side.
         .background(PaneFrameReporter(onChange: onFrameChange))
     }
 

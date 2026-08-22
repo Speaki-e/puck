@@ -43,14 +43,15 @@ enum TankBackground: String, CaseIterable {
         }
     }
 
-    /// `plain` follows the app palette; the other three are fixed. A mood is
-    /// the whole point of picking one -- lightening "night" in light mode
-    /// would stop it being night.
+    /// `plain` is the app's own ground, so the island reads as the same
+    /// material as the conversation under it and follows whichever theme is
+    /// on. The named ones are fixed: a mood is the whole point of picking
+    /// one, and lightening "night" in light mode would stop it being night.
     @ViewBuilder
     func backdrop(palette: ClientPalette) -> some View {
         switch self {
         case .plain:
-            palette.surface
+            palette.background
         case .night:
             Self.gradient(top: Color(red: 0.055, green: 0.075, blue: 0.169),
                           bottom: Color(red: 0.169, green: 0.208, blue: 0.373))

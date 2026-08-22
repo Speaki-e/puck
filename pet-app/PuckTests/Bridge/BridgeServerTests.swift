@@ -340,4 +340,26 @@ final class BridgeServerTests: XCTestCase {
         }
         poll()
     }
+
+    /// The socket is created by NWListener with the process umask and only
+    /// tightened once the listener is ready, so the directory has to be shut
+    /// before it is bound -- otherwise there is a window in which another
+    /// local user can connect and dispatch tools.
+    func test_theSocketsDirectoryIsOwnerOnly() throws {
+        let socketURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent("bridge.sock")
+        let server = BridgeServer(socketURL: socketURL)
+        try server.start()
+        defer {
+            server.stop()
+            try? FileManager.default.removeItem(at: socketURL.deletingLastPathComponent())
+        }
+
+        let attributes = try FileManager.default.attributesOfItem(
+            atPath: socketURL.deletingLastPathComponent().path
+        )
+
+        XCTAssertEqual(attributes[.posixPermissions] as? NSNumber, 0o700)
+    }
 }

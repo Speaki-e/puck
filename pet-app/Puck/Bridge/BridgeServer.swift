@@ -79,6 +79,12 @@ final class BridgeServer {
         // writing it earlier meant a throw here left a lock file naming this
         // still-alive process, permanently blocking every later start() call
         // in the same process with a false alreadyRunning.
+        // Before binding, not after: NWListener creates the socket with the
+        // process umask and the mode is only tightened once the listener
+        // reaches .ready, which leaves a window where anything running as
+        // another local user can connect. A directory nobody else can enter
+        // closes the window rather than racing it.
+        restrictSocketDirectoryPermissions()
         let listener = try NWListener(using: parameters)
         Self.writeLockFile(at: lockFileURL, pid: ProcessInfo.processInfo.processIdentifier)
         listener.newConnectionHandler = { [weak self] newConnection in
@@ -120,9 +126,20 @@ final class BridgeServer {
     /// `queue` (i.e. not from inside `onMessage`/`onGUIPresenceChanged`).
     @discardableResult
     func send(_ message: BridgeMessage, to role: ClientRole) -> Bool {
-        let targets = currentConnections().filter { $0.role == role }
+        let targets = connections(playing: role)
         targets.forEach { $0.send(message) }
         return !targets.isEmpty
+    }
+
+    /// Connections playing `role`, chosen on `queue`.
+    ///
+    /// The filtering has to happen inside the lock, not outside it: `role` is
+    /// written on `queue` when a client_hello arrives, so a snapshot of the
+    /// array taken under the lock and then filtered on the caller's thread
+    /// reads that property with no synchronisation at all -- and the answer
+    /// decides which process a message is delivered to.
+    private func connections(playing role: ClientRole) -> [BridgeConnection] {
+        queue.sync { connections.filter { $0.role == role } }
     }
 
     /// Thread-safe snapshot of currently-open connections.
@@ -215,6 +232,15 @@ final class BridgeServer {
     /// dispatch run_shell/run_applescript, bypassing ai-module's upstream
     /// approval UI entirely (found via review). Restricting to owner-only
     /// read/write at least closes it off to every other local account.
+    /// Owner-only on the directory the socket lives in. Belt and braces with
+    /// `restrictSocketPermissions`, and the half that holds during the moment
+    /// between bind and .ready.
+    private func restrictSocketDirectoryPermissions() {
+        let directory = socketURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+    }
+
     private func restrictSocketPermissions() {
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: socketURL.path)
     }
@@ -255,6 +281,6 @@ extension BridgeServer: UserInputTransport {
     /// is left. A connection that has not sent client_hello yet has no role
     /// and does not count: it may never identify itself at all.
     private func agentFacingConnections() -> [BridgeConnection] {
-        currentConnections().filter { $0.role == .gui }
+        connections(playing: .gui)
     }
 }

@@ -339,6 +339,21 @@ private final class HTTPConnection {
             headers[name] = value
         }
 
+        // Authentication before anything else is looked at -- including the
+        // body, which used to be buffered in full first. Reaching the port
+        // must buy nothing, and "nothing" has to include making this process
+        // hold a megabyte for an unauthenticated caller.
+        let presented = headers["authorization"] ?? ""
+        guard LoopbackHTTPServer.constantTimeEquals(presented, "Bearer \(token)") else {
+            respond(
+                status: 401,
+                headers: ["WWW-Authenticate": "Bearer"],
+                body: Data(),
+                thenClose: true
+            )
+            return
+        }
+
         let contentLength = headers["content-length"].flatMap(Int.init) ?? 0
         guard contentLength <= LoopbackHTTPServer.maximumBodyBytes else {
             respond(status: 413, headers: [:], body: Data(), thenClose: true)
@@ -354,19 +369,6 @@ private final class HTTPConnection {
         buffer = Data(buffer[bodyEnd...])
 
         let wantsClose = headers["connection"]?.lowercased() == "close"
-
-        // Authentication before anything else is looked at, including the
-        // method: reaching the port must buy nothing.
-        let presented = headers["authorization"] ?? ""
-        guard LoopbackHTTPServer.constantTimeEquals(presented, "Bearer \(token)") else {
-            respond(
-                status: 401,
-                headers: ["WWW-Authenticate": "Bearer"],
-                body: Data(),
-                thenClose: true
-            )
-            return
-        }
 
         guard method == "POST" else {
             // GET is the client asking to open a server-initiated SSE stream

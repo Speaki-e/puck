@@ -131,6 +131,14 @@ final class GlobalHotkeyManager {
         return true
     }
 
+    /// The tap holds this object unretained -- it has to, or the manager
+    /// could never be released -- so the tap must not outlive it. Without
+    /// this, an owner that simply drops the manager leaves a live tap calling
+    /// into freed memory on the next keystroke.
+    deinit {
+        stop()
+    }
+
     /// Removes the source from the same run loop start() added it to --
     /// CFRunLoopGetCurrent() at stop() time isn't guaranteed to be the same
     /// run loop if this were ever called from a different thread/context.

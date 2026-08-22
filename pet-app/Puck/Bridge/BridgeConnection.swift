@@ -65,11 +65,19 @@ struct JSONLinesDecoder {
 
 enum BridgeConnectionError: Error, Equatable {
     case encodingFailed
+    /// One line over the limit the far side will accept -- see
+    /// `BridgeConnection.maximumMessageBytes`.
+    case messageTooLarge
 }
 
 /// Wraps a single NWConnection (one workspace client) and handles JSON Lines
 /// framing on top of it via JSONLinesDecoder.
 final class BridgeConnection {
+    /// The largest line this will write, matching JSONLinesDecoder's own
+    /// default ceiling for what it will read. One number for both directions,
+    /// because the far side is another copy of this class.
+    static let maximumMessageBytes = 1_048_576
+
     private let connection: NWConnection
     private var linesDecoder = JSONLinesDecoder()
     private var hasClosed = false
@@ -77,6 +85,11 @@ final class BridgeConnection {
     /// Set once, from this connection's client_hello (protocol 3.7) --
     /// nil until then. BridgeServer uses it to decide which connections a
     /// given message relays to (ClientRelay.targetRole).
+    ///
+    /// Confined to BridgeServer's own queue, which is where client_hello is
+    /// handled and where every reader has to do its filtering
+    /// (`connections(playing:)`). Read from anywhere else it is a data race
+    /// over which process gets the message.
     var role: ClientRole?
 
     var onMessage: ((BridgeMessage) -> Void)?
@@ -120,6 +133,15 @@ final class BridgeConnection {
         // same connection could call encode() concurrently on one instance.
         guard var data = try? JSONEncoder().encode(message) else {
             onSendError?(BridgeConnectionError.encodingFailed)
+            return
+        }
+        // The same ceiling the reader enforces, applied to what we write.
+        // Only one direction was capped, so a tool result big enough for the
+        // far side to hang up on was still assembled, sent, and then dropped
+        // there -- an error the sender never saw, on a line it had already
+        // paid to encode.
+        guard data.count <= Self.maximumMessageBytes else {
+            onSendError?(BridgeConnectionError.messageTooLarge)
             return
         }
         data.append(0x0A)

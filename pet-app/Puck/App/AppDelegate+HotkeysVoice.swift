@@ -46,11 +46,43 @@ extension AppDelegate {
         manager.onToySummon1Requested = { [weak self] in self?.summonToy(at: 0) }
         manager.onToySummon2Requested = { [weak self] in self?.summonToy(at: 1) }
 
+        hotkeyManager = manager
         if !manager.start() {
             AppLogger.shared.log(.warning, "GlobalHotkeyManager failed to start (Accessibility permission likely not granted)")
+            waitForAccessibilityThenStartHotkeys()
         }
-        hotkeyManager = manager
     }
+
+    /// Tries again once Accessibility is granted.
+    ///
+    /// The tap can only be created with that permission, and granting it is
+    /// something the user does *after* launching -- in System Settings, in
+    /// another window, minutes later. Without this the shortcuts stayed dead
+    /// until the app was relaunched, with nothing on screen to say so.
+    ///
+    /// Polled rather than observed: there is no notification for this, and a
+    /// check that costs nothing every few seconds is cheaper than a user
+    /// wondering why their push-to-talk key does nothing.
+    private func waitForAccessibilityThenStartHotkeys() {
+        let timer = Timer.scheduledTimer(withTimeInterval: Self.accessibilityRetrySeconds, repeats: true) { [weak self] timer in
+            guard let self, let manager = self.hotkeyManager else {
+                timer.invalidate()
+                return
+            }
+            guard AccessibilityPermission.isTrusted() else { return }
+            if manager.start() {
+                AppLogger.shared.log(.info, "GlobalHotkeyManager started after Accessibility was granted")
+                timer.invalidate()
+            }
+        }
+        // The pet's own frame loop runs in a common mode, and a timer left in
+        // the default mode stops firing while a menu is open.
+        RunLoop.main.add(timer, forMode: .common)
+        accessibilityRetryTimer?.invalidate()
+        accessibilityRetryTimer = timer
+    }
+
+    static let accessibilityRetrySeconds: TimeInterval = 3
 
     /// Hands a command to PuckClient, which hosts the agent that acts on it.
     ///

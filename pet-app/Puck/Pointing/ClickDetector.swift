@@ -50,6 +50,13 @@ final class ClickDetector: ClickDetectorProviding {
         }
     }
 
+    /// Same reason as WindowListWatcher's: AppKit holds the global monitor,
+    /// so dropping the detector without stopping it leaves the monitor
+    /// running for the life of the process.
+    deinit {
+        stopMonitoring()
+    }
+
     func stopMonitoring() {
         if let monitor {
             NSEvent.removeMonitor(monitor)

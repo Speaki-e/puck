@@ -26,8 +26,10 @@
 //      (non-Debug) build can read.
 //
 //  Same order decides `AGENT_PROVIDER` (`openai`, `anthropic` or `cli`,
-//  default `openai`; an unrecognized value falls back to `openai` rather than
-//  crashing -- see `AgentProvider.resolved(fromRawValue:)`). The provider then
+//  default `cli`; an unrecognized value falls back to `cli` rather than
+//  crashing -- see `AgentProvider.resolved(fromRawValue:)`. The comment said
+//  `openai` for both long after the default moved, which is the kind of thing
+//  that gets believed while debugging why a build talks to the wrong place). The provider then
 //  decides which key is read: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, or
 //  none at all for `cli`; the selected coding CLI's stable credential is
 //  resolved separately by `codingAgentCredentials`. Model

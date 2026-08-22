@@ -145,6 +145,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     var bridgeMessageRouter: BridgeMessageRouter?
 
     var hotkeyManager: GlobalHotkeyManager?
+    /// Runs only while the hotkeys are waiting for Accessibility to be
+    /// granted; cleared by the retry itself once the tap is live.
+    var accessibilityRetryTimer: Timer?
     var voiceInputController: VoiceInputController?
     var stateBeforeListen: StateHandler?
 

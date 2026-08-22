@@ -233,6 +233,11 @@ actor CodeEditorRunner {
         run.session?.cancel()
         // Give session/cancel a moment to land before falling back to
         // signals -- the TS adapter used the same two seconds.
+        //
+        // The run's own path shuts the same process down when it returns, and
+        // both firing is normal rather than a bug: a cancel arrives while the
+        // run is still awaiting, and whichever gets there first is the one
+        // that ends the process. `shutDown` is idempotent for that reason.
         if let process = run.process { shutDown(process, cancelGrace: 2) }
         return true
     }

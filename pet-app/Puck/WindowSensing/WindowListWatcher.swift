@@ -53,6 +53,14 @@ final class WindowListWatcher {
         }
     }
 
+    /// A watcher that is simply dropped leaves its timer on the run loop and
+    /// its observers on the workspace centre -- both of which the run loop
+    /// and the centre keep alive, so "nobody refers to it any more" is not
+    /// the same as "it stopped".
+    deinit {
+        stop()
+    }
+
     func stop() {
         pollTimer?.invalidate()
         pollTimer = nil

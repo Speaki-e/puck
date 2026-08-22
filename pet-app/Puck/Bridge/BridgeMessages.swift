@@ -208,6 +208,34 @@ enum BridgeMessage: Equatable {
 }
 
 extension BridgeMessage: Codable {
+    /// A tool result's five fields, in one place.
+    ///
+    /// They are written twice on the wire -- as a top-level `tool_result` and
+    /// inside an `event` -- and were coded twice here to match, which is one
+    /// place to forget the next time a field is added.
+    private static func decodeToolResult(
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> ToolResult {
+        ToolResult(
+            id: try container.decode(String.self, forKey: .id),
+            ok: try container.decode(Bool.self, forKey: .ok),
+            data: try container.decodeIfPresent(JSONValue.self, forKey: .data),
+            error: try container.decodeIfPresent(ToolErrorCode.self, forKey: .error),
+            detail: try container.decodeIfPresent(String.self, forKey: .detail)
+        )
+    }
+
+    private static func encode(
+        _ result: ToolResult,
+        into container: inout KeyedEncodingContainer<CodingKeys>
+    ) throws {
+        try container.encode(result.id, forKey: .id)
+        try container.encode(result.ok, forKey: .ok)
+        try container.encodeIfPresent(result.data, forKey: .data)
+        try container.encodeIfPresent(result.error, forKey: .error)
+        try container.encodeIfPresent(result.detail, forKey: .detail)
+    }
+
     private enum TypeKey: String, Codable {
         case clientHello = "client_hello"
         case toolDispatch = "tool_dispatch"
@@ -268,15 +296,7 @@ extension BridgeMessage: Codable {
             self = .toolCancel(id: try container.decode(String.self, forKey: .id))
 
         case .toolResult:
-            self = .toolResult(
-                ToolResult(
-                    id: try container.decode(String.self, forKey: .id),
-                    ok: try container.decode(Bool.self, forKey: .ok),
-                    data: try container.decodeIfPresent(JSONValue.self, forKey: .data),
-                    error: try container.decodeIfPresent(ToolErrorCode.self, forKey: .error),
-                    detail: try container.decodeIfPresent(String.self, forKey: .detail)
-                )
-            )
+            self = .toolResult(try Self.decodeToolResult(from: container))
 
         case .event:
             let workspaceId = try container.decode(String.self, forKey: .workspaceId)
@@ -295,12 +315,17 @@ extension BridgeMessage: Codable {
                     detail: try container.decodeIfPresent(JSONValue.self, forKey: .detail)
                 )
             case .toolResult:
+                // The same five fields as the top-level tool_result, read the
+                // same way: a result reported inside an event and one sent on
+                // its own are the same thing seen from two places, and they
+                // drifted the first time a field was added to one of them.
+                let result = try Self.decodeToolResult(from: container)
                 event = .toolResult(
-                    id: try container.decode(String.self, forKey: .id),
-                    ok: try container.decode(Bool.self, forKey: .ok),
-                    data: try container.decodeIfPresent(JSONValue.self, forKey: .data),
-                    error: try container.decodeIfPresent(ToolErrorCode.self, forKey: .error),
-                    detail: try container.decodeIfPresent(String.self, forKey: .detail)
+                    id: result.id,
+                    ok: result.ok,
+                    data: result.data,
+                    error: result.error,
+                    detail: result.detail
                 )
             case .awaitApproval:
                 event = .awaitApproval(
@@ -387,11 +412,7 @@ extension BridgeMessage: Codable {
 
         case .toolResult(let result):
             try container.encode(TypeKey.toolResult, forKey: .type)
-            try container.encode(result.id, forKey: .id)
-            try container.encode(result.ok, forKey: .ok)
-            try container.encodeIfPresent(result.data, forKey: .data)
-            try container.encodeIfPresent(result.error, forKey: .error)
-            try container.encodeIfPresent(result.detail, forKey: .detail)
+            try Self.encode(result, into: &container)
 
         case .event(let event, let workspaceId, let sessionId):
             try container.encode(TypeKey.event, forKey: .type)
@@ -411,11 +432,10 @@ extension BridgeMessage: Codable {
                 try container.encodeIfPresent(detail, forKey: .detail)
             case .toolResult(let id, let ok, let data, let error, let detail):
                 try container.encode(EventKey.toolResult, forKey: .event)
-                try container.encode(id, forKey: .id)
-                try container.encode(ok, forKey: .ok)
-                try container.encodeIfPresent(data, forKey: .data)
-                try container.encodeIfPresent(error, forKey: .error)
-                try container.encodeIfPresent(detail, forKey: .detail)
+                try Self.encode(
+                    ToolResult(id: id, ok: ok, data: data, error: error, detail: detail),
+                    into: &container
+                )
             case .awaitApproval(let summary, let approvalId):
                 try container.encode(EventKey.awaitApproval, forKey: .event)
                 try container.encode(summary, forKey: .summary)

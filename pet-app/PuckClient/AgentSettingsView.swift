@@ -38,6 +38,12 @@ struct AgentSettingsView: View {
     /// skips a child whose own inputs are unchanged, and a table lookup
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
+    /// Repainted when the theme changes, wherever it was changed from. The
+    /// window is kept alive after closing, so a value read once would show
+    /// the theme it was built under for the rest of the session.
+    @State private var theme = ClientThemeStyle.resolved(
+        fromDefaultsValue: ClientThemeStyle.sharedDefaults?.string(forKey: ClientThemeStyle.defaultsKey)
+    )
 
     /// What's typed into the key/model fields before they're saved, and the
     /// resolved configuration every status line reports on.
@@ -49,14 +55,13 @@ struct AgentSettingsView: View {
     /// Read on every draw rather than held: the other window offers the same
     /// picker, and a copy taken once would keep showing the theme that was
     /// current when this window was built.
-    private var themeStyle: ClientThemeStyle {
-        ClientThemeStyle.resolved(fromDefaultsValue: ClientThemeStyle.sharedDefaults?.string(forKey: ClientThemeStyle.defaultsKey))
-    }
+    private var themeStyle: ClientThemeStyle { theme }
 
     /// Written into Puck's domain and announced, the same path the language
     /// picker beside it takes.
     private func select(_ style: ClientThemeStyle) {
         ClientThemeStyle.sharedDefaults?.set(style.rawValue, forKey: ClientThemeStyle.defaultsKey)
+        theme = style
         // No direct poke at the window's store: this process already listens
         // for the broadcast, and a distributed notification is delivered to
         // its own sender too. Setting both would be two paths to keep in step.
@@ -152,6 +157,18 @@ struct AgentSettingsView: View {
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
         .padding(.vertical, ClientTheme.Metrics.windowEdgePadding)
         .frame(width: 420)
+        // The settings window is where the theme is chosen, so showing it in
+        // the system's colours instead of the chosen one made the picker the
+        // one control whose effect you could not see.
+        .background(themeStyle.palette.background)
+        .environment(\.clientPalette, themeStyle.palette)
+        .preferredColorScheme(themeStyle.colorScheme)
+        .onReceive(
+            DistributedNotificationCenter.default().publisher(for: ClientThemeStyle.crossProcessChangeNotification)
+        ) { notification in
+            guard let style = ClientThemeStyle.resolved(fromCrossProcessUserInfo: notification.userInfo) else { return }
+            theme = style
+        }
     }
 
     // MARK: - Skills

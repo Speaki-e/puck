@@ -19,22 +19,32 @@
 import SwiftUI
 
 enum ClientThemeStyle: String, CaseIterable, Identifiable {
-    case light, dark
+    /// Editor themes, so the conversation and the code come from one set of
+    /// choices instead of each being tuned against the other.
+    ///
+    /// `dark` keeps its raw value and is now the neutral one: it is what
+    /// everyone already has persisted, and the Vercel palette it used to mean
+    /// is beside it under its own name.
+    case light, dark, vercelDark, tokyoNight
 
     var id: String { rawValue }
 
     /// Shown in Settings' theme picker.
     var displayName: String {
         switch self {
+        // The two plain ones stay translated; a named theme is a proper
+        // noun and reads worse translated than left alone.
         case .light: return Strings.text(.themeLight)
         case .dark: return Strings.text(.themeDark)
+        case .vercelDark: return "Vercel Dark"
+        case .tokyoNight: return "Tokyo Night"
         }
     }
 
     var colorScheme: ColorScheme {
         switch self {
         case .light: return .light
-        case .dark: return .dark
+        case .dark, .vercelDark, .tokyoNight: return .dark
         }
     }
 
@@ -42,6 +52,8 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
         switch self {
         case .light: return .light
         case .dark: return .dark
+        case .vercelDark: return .vercelDark
+        case .tokyoNight: return .tokyoNight
         }
     }
 
@@ -74,6 +86,25 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
     /// rather than PuckClient re-reading UserDefaults on receipt.
     var crossProcessUserInfo: [AnyHashable: Any] {
         [Self.crossProcessUserInfoKey: rawValue]
+    }
+
+    /// Announces the change to every process, including the one calling.
+    /// Both windows offer the picker now, so both post through here rather
+    /// than each writing the notification out again slightly differently.
+    func broadcast() {
+        DistributedNotificationCenter.default().postNotificationName(
+            Self.crossProcessChangeNotification,
+            object: nil,
+            userInfo: crossProcessUserInfo,
+            deliverImmediately: true
+        )
+    }
+
+    /// The defaults domain the setting lives in -- Puck's, whichever process
+    /// is asking. Same reasoning as `AppLanguage.sharedDefaults`: one setting
+    /// with two stores is two settings that disagree.
+    static var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: AppIdentity.puckBundleID)
     }
 
     /// nil if `userInfo` carries no recognizable value at all (missing key,

@@ -25,6 +25,9 @@ struct EditorTabStripView: View {
     let onSelect: (String) -> Void
     let onClose: (String) -> Void
     let onSave: () -> Void
+    /// Hides the code column without closing what is open in it. Nil in the
+    /// detached window, which has nothing to collapse into.
+    var onCollapse: (() -> Void)?
 
     @Environment(\.clientPalette) private var palette
 
@@ -42,9 +45,25 @@ struct EditorTabStripView: View {
                 }
             }
             saveButton
+            if let onCollapse { collapseButton(onCollapse) }
         }
         .frame(height: Self.stripHeight)
         .background(palette.surface)
+    }
+
+    /// Puts the file away and gives the width back to the conversation.
+    /// Distinct from closing the tab: the file stays open, so coming back to
+    /// it does not mean finding it again.
+    private func collapseButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "chevron.right.to.line")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: Self.stripHeight, height: Self.stripHeight)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.text(.editorCollapse))
+        .help(Strings.text(.editorCollapse))
     }
 
     /// Always present, not only while something is dirty: it is where ⌘S is

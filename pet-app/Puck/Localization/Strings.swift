@@ -77,6 +77,22 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// reachable only through an environment variable.
     case modelLabel, modelExplanationFormat, modelReset
     case codingAgentLabel, cliProviderExplanation
+    /// How much the CLI may do without being asked each time.
+    case permissionsLabel, permissionsExplanation
+    case permissionsToolsOnly, permissionsEdits, permissionsEverything
+    /// The skills the coding CLI loads, and where each came from.
+    case skillsHeader, skillSourcePersonal, skillSourceProject
+    /// The right sidebar's tabs, and the session list inside one of them.
+    case explorerTabFiles, explorerTabSessions
+    case sessionsHeader, sessionsEmpty, sessionsLoading, sessionsRefresh
+    case skillsEmpty, skillsExplanation, skillReveal, skillCountFormat
+
+    /// `/effort` and friends.
+    case effortLow, effortMedium, effortHigh
+    /// What a slash command answers with.
+    case slashModelCurrentFormat, slashModelSetFormat, slashModelUnsupportedFormat
+    case slashEffortCurrentFormat, slashEffortSetFormat
+    case slashUnknownFormat, slashWriteFailed, slashHelp
     case installedFormat
     case installedMissingRecommendedFormat
     case failedToInstallFormat
@@ -170,7 +186,8 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case themeLight, themeDark
     case workspaceDefaultName, sessionDefaultTitle
-    case editorSelectAFile, editorSearchFiles, editorSaveHint
+    case editorSelectAFile, editorSearchFiles, editorSaveHint, explorerHeader
+    case editorCollapse, editorExpand
     case providerRefusedResponse, providerTruncatedFormat, acpProcessExited
 
     /// The panel's action rows. Settings and Switch Avatar are gone with the
@@ -272,6 +289,42 @@ enum Strings {
         .modelReset: "기본값",
         .modelExplanationFormat: "비워 두고 저장하면 기본값 %1$@을(를) 씁니다. 환경변수 %2$@가 있으면 그쪽이 우선합니다.",
         .codingAgentLabel: "코딩 CLI",
+        .permissionsLabel: "자동 허용",
+        .permissionsExplanation: "CLI가 스스로 하는 일을 매번 묻지 않고 허용할 범위입니다. 파일 쓰기는 어느 설정에서든 선택한 프로젝트 폴더 밖으로 나가지 못합니다.",
+        .slashModelCurrentFormat: "지금 모델: %1$@. 바꾸려면 /model 이름 을 쓰세요.",
+        .slashModelSetFormat: "모델을 %1$@(으)로 바꿨어요.",
+        .slashModelUnsupportedFormat: "%1$@ 공급자는 모델을 고를 수 없어요 — CLI가 자기 설정을 씁니다.",
+        .slashEffortCurrentFormat: "지금 사고량: '%1$@'. /effort low·medium·high 로 바꿀 수 있어요.",
+        .slashEffortSetFormat: "사고량을 '%1$@'(으)로 바꿨어요. 다음 turn부터 적용됩니다.",
+        .slashUnknownFormat: "%1$@ 은(는) 없는 명령이에요. /help 로 목록을 보세요.",
+        .slashWriteFailed: "설정 파일을 저장하지 못했어요.",
+        .slashHelp: """
+        쓸 수 있는 명령이에요.
+
+        - `/model` — 지금 모델 보기, `/model 이름` 으로 바꾸기
+        - `/effort` — 사고량 보기, `/effort low|medium|high` 로 바꾸기
+        - `/fast` — 사고량을 가장 낮게 (`/effort low` 와 같아요)
+        - `/help` — 이 목록
+        """,
+        .explorerTabFiles: "파일",
+        .explorerTabSessions: "세션",
+        .sessionsHeader: "에이전트 세션 기록",
+        .sessionsEmpty: "기록이 없어요.",
+        .sessionsLoading: "읽는 중…",
+        .sessionsRefresh: "새로고침",
+        .skillsHeader: "스킬",
+        .skillSourcePersonal: "내 계정",
+        .skillSourceProject: "프로젝트",
+        .skillsEmpty: "설치된 스킬이 없어요.",
+        .skillsExplanation: "코딩 CLI가 불러오는 스킬입니다. 같은 이름이 양쪽에 있으면 프로젝트 쪽이 쓰입니다.",
+        .skillReveal: "Finder에서 보기",
+        .skillCountFormat: "%1$@개",
+        .effortLow: "간결",
+        .effortMedium: "보통",
+        .effortHigh: "꼼꼼",
+        .permissionsToolsOnly: "펫 도구만",
+        .permissionsEdits: "파일 수정까지",
+        .permissionsEverything: "명령 실행까지",
         .cliProviderExplanation:
             "선택한 CLI와 안정적인 설정 토큰 또는 API 키를 씁니다. 펫 도구는 MCP로 연결되고, 선택한 프로젝트 안의 파일 작업은 샌드박스 안에서 실행됩니다.",
         .installedFormat: "'%1$@' 설치 완료.",
@@ -420,7 +473,10 @@ enum Strings {
         .sessionDefaultTitle: "새 세션",
         .themeLight: "화이트",
         .themeDark: "다크",
-        .editorSelectAFile: "왼쪽 탐색기에서 파일을 선택하세요",
+        .explorerHeader: "파일",
+        .editorCollapse: "파일 접기",
+        .editorExpand: "파일 다시 열기",
+        .editorSelectAFile: "오른쪽 탐색기에서 파일을 선택하세요",
         .editorSearchFiles: "파일 검색",
         .editorSaveHint: "저장 (⌘S)",
         .providerRefusedResponse: "모델이 응답을 거부했습니다 (stop_reason: refusal)",
@@ -503,6 +559,42 @@ enum Strings {
         .modelReset: "Default",
         .modelExplanationFormat: "Save it empty to use the default, %1$@. A %2$@ environment variable takes precedence.",
         .codingAgentLabel: "Coding CLI",
+        .permissionsLabel: "Auto-allow",
+        .permissionsExplanation: "How much the CLI may do without asking each time. File writes stay inside the selected project folder whichever setting is chosen.",
+        .slashModelCurrentFormat: "The model is %1$@. Use /model <name> to change it.",
+        .slashModelSetFormat: "Model set to %1$@.",
+        .slashModelUnsupportedFormat: "The %1$@ provider has no model to choose -- the CLI uses its own.",
+        .slashEffortCurrentFormat: "Effort is '%1$@'. Use /effort low, medium or high to change it.",
+        .slashEffortSetFormat: "Effort set to '%1$@'. It applies from the next turn.",
+        .slashUnknownFormat: "%1$@ is not a command. Try /help.",
+        .slashWriteFailed: "Couldn't write the settings file.",
+        .slashHelp: """
+        Commands you can type here.
+
+        - `/model` — show the model, `/model <name>` to set it
+        - `/effort` — show effort, `/effort low|medium|high` to set it
+        - `/fast` — the lowest effort (same as `/effort low`)
+        - `/help` — this list
+        """,
+        .explorerTabFiles: "Files",
+        .explorerTabSessions: "Sessions",
+        .sessionsHeader: "Agent session history",
+        .sessionsEmpty: "No history yet.",
+        .sessionsLoading: "Reading…",
+        .sessionsRefresh: "Refresh",
+        .skillsHeader: "Skills",
+        .skillSourcePersonal: "Your account",
+        .skillSourceProject: "This project",
+        .skillsEmpty: "No skills installed.",
+        .skillsExplanation: "Skills the coding CLI loads. When a name is in both places, the project's is the one it uses.",
+        .skillReveal: "Show in Finder",
+        .skillCountFormat: "%1$@",
+        .effortLow: "brief",
+        .effortMedium: "normal",
+        .effortHigh: "thorough",
+        .permissionsToolsOnly: "Puck's tools only",
+        .permissionsEdits: "…and file edits",
+        .permissionsEverything: "…and commands",
         .cliProviderExplanation:
             "Uses the selected CLI with a stable setup token or API key. Puck's tools are wired in over MCP, and file work inside the selected project runs in a sandbox.",
         .installedFormat: "Installed '%1$@'.",
@@ -651,7 +743,10 @@ enum Strings {
         .sessionDefaultTitle: "New session",
         .themeLight: "Light",
         .themeDark: "Dark",
-        .editorSelectAFile: "Pick a file in the navigator on the left",
+        .explorerHeader: "Files",
+        .editorCollapse: "Collapse the file",
+        .editorExpand: "Show the file again",
+        .editorSelectAFile: "Pick a file in the explorer on the right",
         .editorSearchFiles: "Search files",
         .editorSaveHint: "Save (⌘S)",
         .providerRefusedResponse: "The model refused to answer (stop_reason: refusal)",

@@ -363,9 +363,21 @@ final class ClientWindowStore: ObservableObject {
     /// through, so a second send button added later cannot forget to do it.
     /// Only on `.sent` -- a message that never left has no answer coming, and
     /// a spinner for it would never stop.
+    /// Injectable so tests can run a command without touching the real
+    /// `.env`; the app uses the default, which writes the file Settings does.
+    var slashCommands = SlashCommandRunner()
+
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
         let target = session(workspaceId: activeWorkspaceId, sessionId: activeSessionId)
+        // A command changes a setting and is answered here; it never reaches
+        // the agent. Echoed first so the transcript reads as a conversation
+        // rather than an answer to nothing.
+        if let command = SlashCommand.parse(text) {
+            target?.appendUserMessage(text)
+            target?.appendNotice(slashCommands.run(command))
+            return .sent
+        }
         // The user's own text never comes back over the socket, so this echo is
         // the only thing that puts it in the transcript -- and ChatInputBar
         // clears its field the instant it sends, so without it the message is

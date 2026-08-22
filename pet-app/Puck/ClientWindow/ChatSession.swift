@@ -22,6 +22,10 @@ enum ChatTimelineEntry: Equatable {
     /// an event like every other case here.
     case userMessage(id: UUID, text: String)
     case assistantText(id: UUID, text: String)
+    /// The app answering the user directly -- a slash command's reply. Not
+    /// the agent's, and never sent to it, so it is its own case rather than
+    /// an assistant message the transcript would attribute wrongly.
+    case notice(id: UUID, text: String)
     case toolCall(id: String, tool: String, args: JSONValue?)
     case toolResult(id: String, ok: Bool, data: JSONValue?, error: ToolErrorCode?, detail: String?)
     case approvalRequested(id: UUID, approvalId: String, summary: String)
@@ -34,7 +38,7 @@ extension ChatTimelineEntry {
     /// belong to the turn that produced them.
     var startsNewTurn: Bool {
         switch self {
-        case .userMessage, .assistantText: return true
+        case .userMessage, .assistantText, .notice: return true
         case .toolCall, .toolResult, .approvalRequested, .done: return false
         }
     }
@@ -48,6 +52,7 @@ extension ChatTimelineEntry: Identifiable {
         switch self {
         case .userMessage(let id, _): return id
         case .assistantText(let id, _): return id
+        case .notice(let id, _): return id
         case .toolCall(let id, _, _): return "call:\(id)"
         case .toolResult(let id, _, _, _, _): return "result:\(id)"
         case .approvalRequested(let id, _, _): return id
@@ -218,6 +223,13 @@ final class ChatSession: ObservableObject, Identifiable {
     /// session the agent already named through open_task_session -- the latter
     /// matters because moveTurnToTaskSession feeds it the message that started
     /// it, which would otherwise overwrite the agent's title immediately.
+    /// The app's own reply to a slash command. Does not name the chat the way
+    /// `appendUserMessage` does: a session called "/help" tells the sidebar
+    /// nothing about what the conversation is.
+    func appendNotice(_ text: String) {
+        timeline.append(.notice(id: UUID(), text: text))
+    }
+
     func appendUserMessage(_ text: String) {
         if title == Self.placeholderTitle {
             title = Self.title(fromFirstMessage: text)

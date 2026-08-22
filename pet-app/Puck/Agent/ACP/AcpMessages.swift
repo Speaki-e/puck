@@ -169,6 +169,16 @@ struct AcpPermissionRequest: Equatable {
             ?? options.first { $0.kind?.hasPrefix("reject") == true }
     }
 
+    /// What the agent says this call is: "edit", "execute", "read", and so
+    /// on. Absent on agents that do not classify their calls, and an absent
+    /// kind is read as "not an edit" -- the direction that refuses rather
+    /// than the one that writes to a file on a guess.
+    var toolKind: String? {
+        raw.objectValue?["toolCall"]?.objectValue?["kind"]?.stringValue
+    }
+
+    var isFileEdit: Bool { toolKind == "edit" }
+
     /// Whether the permission is for a tool served by the named MCP server.
     /// A CLI namespaces one as `mcp__<server>__<tool>`, and which field of the
     /// request carries that name differs by version, so this looks for it

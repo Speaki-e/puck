@@ -37,7 +37,9 @@ struct EditorContentHostView: View {
                         path: tab.path,
                         reveal: store.pendingReveal
                     )
-                    .id(tab.path)
+                    // Rebuilt when the file changed underneath it, not on
+                    // every keystroke: see EditorTab.adoptions.
+                    .id("\(tab.path)#\(tab.adoptions)")
                 }
             }
             // Behind the content, so the reported rect is the code pane the

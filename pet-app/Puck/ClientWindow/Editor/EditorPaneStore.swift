@@ -36,6 +36,8 @@ final class EditorPaneStore: ObservableObject {
     /// The last range someone asked to be shown, for the editor view to
     /// apply. Consumed by whichever tab's editor matches `path`.
     @Published private(set) var pendingReveal: RevealRequest?
+    /// Bumped on every `open(path:)`, whether or not it changed the tab.
+    @Published private(set) var openRequests = 0
     /// Where the editor pane is, in AppKit global (bottom-left) screen
     /// coordinates, or nil when it is not on screen. Published by the view,
     /// because only the view knows where it ended up -- the pet is sent here.
@@ -96,6 +98,11 @@ final class EditorPaneStore: ObservableObject {
     }
 
     func open(path: String) {
+        // Counted even when nothing changes. Clicking a file that is already
+        // the active tab is still a request to look at it, and a view that
+        // put the code away has no other way to hear it -- keyed on
+        // `activeTabPath` alone, that click did nothing at all.
+        openRequests += 1
         if openTabs.contains(where: { $0.path == path }) {
             activeTabPath = path
             return
@@ -271,13 +278,79 @@ final class EditorPaneStore: ObservableObject {
             if openTabs[index].isDirty {
                 openTabs[index].diskChanged = true
             } else {
+                let before = openTabs[index].content
                 openTabs[index].adopt(fresh)
+                follow(change: before, to: fresh.content, at: relativePath)
             }
         }
     }
 
+    /// Scrolls to what the agent just wrote.
+    ///
+    /// The content already updated -- a clean tab follows the file on its own
+    /// -- but a write below the fold is invisible, and watching an edit land
+    /// is most of the reason to have the file open beside the conversation.
+    ///
+    /// Only the tab on screen. Revealing a background one would scroll it
+    /// where nobody is looking and throw away the reveal the visible tab may
+    /// be waiting for.
+    private func follow(change before: String, to after: String, at path: String) {
+        guard path == activeTabPath, let lines = Self.changedLines(from: before, to: after) else { return }
+        revealToken += 1
+        pendingReveal = RevealRequest(path: path, lines: lines, token: revealToken)
+    }
+
+    /// The lines that differ between two revisions of a file, 1-based and
+    /// inclusive, or nil when nothing did.
+    ///
+    /// Matching prefix and suffix are trimmed and what is left is the answer.
+    /// Not a real diff: this only has to say *where* to look, and an edit in
+    /// the middle of a file is exactly what that finds. A rewrite of
+    /// everything reports the whole file, which is also the truth.
+    static func changedLines(from old: String, to new: String) -> ClosedRange<Int>? {
+        guard old != new else { return nil }
+        let oldLines = old.components(separatedBy: "\n")
+        let newLines = new.components(separatedBy: "\n")
+
+        var prefix = 0
+        while prefix < oldLines.count, prefix < newLines.count, oldLines[prefix] == newLines[prefix] {
+            prefix += 1
+        }
+        var suffix = 0
+        while suffix < oldLines.count - prefix,
+              suffix < newLines.count - prefix,
+              oldLines[oldLines.count - 1 - suffix] == newLines[newLines.count - 1 - suffix] {
+            suffix += 1
+        }
+
+        // Lines the new revision gained or changed, 1-based.
+        let first = prefix + 1
+        let last = newLines.count - suffix
+        // A pure deletion leaves nothing new to point at, so point at the
+        // seam it left behind, clamped into the file that remains.
+        guard last >= first else {
+            let seam = min(max(first, 1), max(newLines.count, 1))
+            return seam...seam
+        }
+        return first...last
+    }
+
+    /// The root with its symlinks resolved, computed once. FSEvents reports
+    /// canonical paths, and the root is stored the way it was chosen.
+    private lazy var canonicalRoot = URL(fileURLWithPath: service.root.path).resolvingSymlinksInPath().path
+
     private func relativePath(for absolutePath: String) -> String? {
-        PathContainment.relativePath(root: service.root.path, candidate: absolutePath)
+        if let direct = PathContainment.relativePath(root: service.root.path, candidate: absolutePath) {
+            return direct
+        }
+        // A project reached through a symlink -- /tmp, or a home directory
+        // behind one -- is stored as the user chose it while its events
+        // arrive canonical: `/tmp/x` against `/private/tmp/x`. Compared as
+        // plain strings no open tab ever matched, so the file on screen never
+        // followed what was written to it. The tree hid this: it reloads on
+        // any event at all, so it looked like the watcher was working.
+        let canonical = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
+        return PathContainment.relativePath(root: canonicalRoot, candidate: canonical)
     }
 
     private static func isImagePath(_ path: String) -> Bool {

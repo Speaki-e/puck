@@ -223,11 +223,14 @@ final class CodingAgentCLIClient: AgentLLMClient {
     /// it here is not the same as skipping approval: the real gate is inside
     /// `AgentRunner.invokeTool`, which the call is about to reach, so an
     /// approval-requiring tool still puts the normal 승인 prompt in the chat and
-    /// still cannot run until the user answers it. Everything else -- the
-    /// CLI's own shell, its file writes -- keeps the conservative refusal a
-    /// chat turn has always given it.
+    /// still cannot run until the user answers it. What the CLI wants to do
+    /// itself -- write a file, run a command -- is `AgentPermissionMode`'s
+    /// call, and its default is still the refusal a chat turn has always
+    /// given. Read per request rather than captured at construction, so
+    /// changing the setting takes effect on the next tool call instead of the
+    /// next launch.
     static func resolvePermission(_ request: AcpPermissionRequest) async -> Bool {
-        request.namesMCPServer(MCPToolCatalog.serverName)
+        AgentConfiguration.permissionMode().allows(request, ownMCPServer: MCPToolCatalog.serverName)
     }
 
     /// SIGTERM, a moment, then SIGKILL -- `terminate()` alone is a request,
@@ -274,6 +277,9 @@ final class CodingAgentCLIClient: AgentLLMClient {
         }
 
         var parts = systemLines
+        // Read here rather than captured at construction, so `/effort` in the
+        // chat lands on the next turn instead of the next launch.
+        if let effort = AgentConfiguration.effort().promptLine { parts.append(effort) }
         parts.append(toolsAreReachable ? toolAvailabilityOverride : toolsUnavailableOverride)
         parts.append("Conversation so far:\n" + transcript.joined(separator: "\n"))
         parts.append("Reply to the last User message. Output only your reply.")

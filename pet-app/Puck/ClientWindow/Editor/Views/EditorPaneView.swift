@@ -69,59 +69,20 @@ struct EditorPaneView: View {
     }
 }
 
+/// The detached window's contents: the file list and the file, side by side.
+///
+/// The attached layout puts these in different columns of the main window --
+/// explorer on the right, code beside the conversation -- but a window of its
+/// own has no conversation to sit beside, so here they stay together.
 private struct EditorPaneContentView: View {
-    /// Redraws this view when the UI language changes. Needed on every
-    /// view that resolves a string, not just the window root: SwiftUI
-    /// skips a child whose own inputs are unchanged, and a table lookup
-    /// inside `body` is not an input.
-    @ObservedObject private var localization = Localization.shared
-
     @ObservedObject var store: EditorPaneStore
 
     var body: some View {
-        // A real resizable split, not a fixed-width HStack -- the navigator
-        // pane in Xcode/CodeEdit/every other native macOS editor drags to
-        // resize, and HSplitView is the system component for exactly that.
         HSplitView {
-            FileTreeView(entries: store.tree, onOpen: { store.open(path: $0) })
+            FileExplorerPane(store: store)
                 .frame(minWidth: 180, idealWidth: 220, maxWidth: 320)
-            VStack(spacing: 0) {
-                EditorTabStripView(
-                    tabs: store.openTabs,
-                    activeTabPath: store.activeTabPath,
-                    canSave: store.canSaveActiveTab,
-                    onSelect: { store.select(path: $0) },
-                    onClose: { store.requestClose(path: $0) },
-                    onSave: { store.saveActiveTab() }
-                )
-                Divider()
-                EditorContentHostView(store: store)
-            }
-            .frame(minWidth: 360)
+            CodeSplitView(store: store)
+                .frame(minWidth: 360)
         }
-        // Closing a tab with unsaved edits asks instead of dropping them.
-        // A prompt rather than a silent save: the tab is a live view of a
-        // file the agent also writes, and quietly committing a half-finished
-        // draft on the way out is its own kind of damage. Three answers, in
-        // the order macOS puts them.
-        .confirmationDialog(
-            Strings.text(.editorUnsavedTitle),
-            isPresented: Binding(
-                get: { store.pendingClosePath != nil },
-                set: { if !$0 { store.cancelPendingClose() } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(Strings.text(.editorSaveAndClose)) { store.confirmPendingCloseSaving() }
-            Button(Strings.text(.editorDiscard), role: .destructive) { store.confirmPendingCloseDiscarding() }
-            Button(Strings.text(.commonCancel), role: .cancel) { store.cancelPendingClose() }
-        } message: {
-            Text(pendingCloseMessage)
-        }
-    }
-
-    private var pendingCloseMessage: String {
-        guard let path = store.pendingClosePath else { return "" }
-        return String(format: Strings.text(.editorUnsavedMessageFormat), (path as NSString).lastPathComponent)
     }
 }

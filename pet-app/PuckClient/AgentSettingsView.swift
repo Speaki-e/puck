@@ -28,11 +28,22 @@
 import SwiftUI
 
 struct AgentSettingsView: View {
+    /// Only for the project path the skills list needs. Observed, so
+    /// switching workspaces re-reads that project's own `.claude/skills`
+    /// rather than showing the one the window happened to open on.
+    @ObservedObject var clientWindowStore: ClientWindowStore
+
     /// Redraws this view when the UI language changes. Needed on every
     /// view that resolves a string, not just the window root: SwiftUI
     /// skips a child whose own inputs are unchanged, and a table lookup
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
+    /// Repainted when the theme changes, wherever it was changed from. The
+    /// window is kept alive after closing, so a value read once would show
+    /// the theme it was built under for the rest of the session.
+    @State private var theme = ClientThemeStyle.resolved(
+        fromDefaultsValue: ClientThemeStyle.sharedDefaults?.string(forKey: ClientThemeStyle.defaultsKey)
+    )
 
     /// What's typed into the key/model fields before they're saved, and the
     /// resolved configuration every status line reports on.
@@ -40,6 +51,17 @@ struct AgentSettingsView: View {
     @State private var apiKeyMessage: String?
     @State private var modelDraft = ""
     @State private var agentConfiguration = AgentConfiguration.load()
+
+    /// Written into Puck's domain and announced, the same path the language
+    /// picker beside it takes.
+    private func select(_ style: ClientThemeStyle) {
+        ClientThemeStyle.sharedDefaults?.set(style.rawValue, forKey: ClientThemeStyle.defaultsKey)
+        theme = style
+        // No direct poke at the window's store: this process already listens
+        // for the broadcast, and a distributed notification is delivered to
+        // its own sender too. Setting both would be two paths to keep in step.
+        style.broadcast()
+    }
 
     /// Unlike everything else on this window, the language is a UserDefaults
     /// setting rather than a `.env` one, so it is written into Puck's domain
@@ -73,6 +95,19 @@ struct AgentSettingsView: View {
             // button that opens it is labelled the same way. It is the one
             // setting here that is not the agent's, hence its own section.
             SettingsSection(title: text(.tabGeneral)) {
+                SettingsStackedRow(label: text(.clientThemeLabel)) {
+                    Picker("", selection: Binding(
+                        get: { theme },
+                        set: { select($0) }
+                    )) {
+                        ForEach(ClientThemeStyle.allCases) { style in
+                            Text(style.displayName).tag(style)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                }
+
                 SettingsStackedRow(label: text(.languageLabel)) {
                     Picker("", selection: Binding(
                         get: { localization.language },
@@ -86,6 +121,8 @@ struct AgentSettingsView: View {
                     .labelsHidden()
                 }
             }
+
+            skillsSection
 
             SettingsSection(title: text(.agentHeader)) {
                 // Same segmented-Picker-over-CaseIterable-plus-displayName
@@ -115,6 +152,83 @@ struct AgentSettingsView: View {
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
         .padding(.vertical, ClientTheme.Metrics.windowEdgePadding)
         .frame(width: 420)
+        // The settings window is where the theme is chosen, so showing it in
+        // the system's colours instead of the chosen one made the picker the
+        // one control whose effect you could not see.
+        .background(theme.palette.background)
+        .environment(\.clientPalette, theme.palette)
+        .preferredColorScheme(theme.colorScheme)
+        .onReceive(
+            DistributedNotificationCenter.default().publisher(for: ClientThemeStyle.crossProcessChangeNotification)
+        ) { notification in
+            guard let style = ClientThemeStyle.resolved(fromCrossProcessUserInfo: notification.userInfo) else { return }
+            theme = style
+        }
+    }
+
+    // MARK: - Skills
+
+    /// What the CLI will load, and where each came from. Read every time the
+    /// window draws rather than cached: skills are directories a person adds
+    /// with an editor, and a list that needed a relaunch to notice would be
+    /// wrong exactly when someone is adding one.
+    private var skills: [Skill] {
+        SkillCatalog.discover(projectPath: clientWindowStore.workspaces
+            .first { $0.id == clientWindowStore.activeWorkspaceId }?
+            .projectPath)
+    }
+
+    @ViewBuilder
+    private var skillsSection: some View {
+        let installed = skills
+        SettingsSection(title: text(.skillsHeader)) {
+            if installed.isEmpty {
+                Text(text(.skillsEmpty))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            } else {
+                ForEach(installed) { skill in
+                    skillRow(skill)
+                }
+            }
+
+            Text(text(.skillsExplanation))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+        }
+    }
+
+    private func skillRow(_ skill: Skill) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                Text(skill.name)
+                    .font(ClientTheme.Typography.toolLabel)
+                Text(skill.source.displayName)
+                    .font(ClientTheme.Typography.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                // Finder rather than the editor pane: a personal skill lives
+                // outside the project, which is the only thing the editor can
+                // open.
+                Button(text(.skillReveal)) {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: skill.path)])
+                }
+                .controlSize(.small)
+            }
+            if !skill.description.isEmpty {
+                Text(skill.description)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
     }
 
     // MARK: - Rows
@@ -184,6 +298,23 @@ struct AgentSettingsView: View {
             .labelsHidden()
         }
 
+        SettingsStackedRow(label: text(.permissionsLabel)) {
+            Picker("", selection: permissionModeBinding) {
+                ForEach(AgentPermissionMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+
+        Text(text(.permissionsExplanation))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+
         // Stated here rather than discovered when the pet fails to move: this
         // provider genuinely cannot call the pet's tools, and the prompt the
         // CLI receives says the same thing (CodingAgentCLIClient).
@@ -250,6 +381,23 @@ struct AgentSettingsView: View {
     }
 
     /// `CODING_AGENT`, the variable `code_editor` has always read.
+    /// Same write-and-reload round trip as the pickers above: an environment
+    /// variable or a nearer `.env` can outrank what was just written, and the
+    /// picker should show what actually resolved.
+    private var permissionModeBinding: Binding<AgentPermissionMode> {
+        Binding(
+            get: { AgentConfiguration.permissionMode() },
+            set: { mode in
+                DotEnv.write(
+                    key: AgentPermissionMode.environmentVariable,
+                    value: mode.rawValue,
+                    to: AgentConfiguration.writableEnvFile
+                )
+                agentConfiguration = AgentConfiguration.load()
+            }
+        )
+    }
+
     private var codingAgentBinding: Binding<CodingAgentKind> {
         Binding(
             get: { agentConfiguration.codingAgent },

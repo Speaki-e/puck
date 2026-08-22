@@ -128,22 +128,27 @@ private struct WorkspaceHeader: View {
     }
 
     private var name: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
+            // Sized explicitly rather than inherited: a sidebar section
+            // header styles its contents as small secondary text, so a
+            // workspace's name arrived already shrunk and anything under it
+            // was smaller still.
             Text(workspace.displayName)
-            if let projectPath = workspace.projectPath {
-                // Same size as the name would shout twice; the path is
-                // context for the name, not a second title.
-                // Abbreviated with the home tilde and truncated at the head:
-                // the leading /Users/<name>/ is the least informative part of
-                // a project path, and the folder name is the part that
-                // identifies it.
-                Text((projectPath as NSString).abbreviatingWithTildeInPath)
-                    .font(.caption)
+                .font(ClientTheme.Typography.workspaceName)
+                .foregroundStyle(.primary)
+            if let label = workspace.projectLabel {
+                Text(label)
+                    .font(ClientTheme.Typography.sessionTitle)
                     .foregroundStyle(.secondary)
-                    .truncationMode(.head)
                     .lineLimit(1)
+                    .truncationMode(.middle)
+                    // The whole path on hover, since the label is two
+                    // components of it.
+                    .help(workspace.projectPath ?? "")
             }
         }
+        .padding(.vertical, 2)
+        .textCase(nil)
     }
 }
 

@@ -19,11 +19,15 @@ struct ChatPaneView: View {
     /// skips a child whose own inputs are unchanged, and a table lookup
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
 
     @ObservedObject var store: ClientWindowStore
     /// Where the editor is showing, owned by ClientWindowView -- the toggle
     /// lives in this view's toolbar but the split is its parent's.
     @Binding var editor: EditorPresentation
+    /// The project's files, when this workspace has one. Held by
+    /// ClientWindowView; this view only splits its detail around it.
+    var editorStore: EditorPaneStore?
 
     var body: some View {
         NavigationSplitView {
@@ -42,17 +46,13 @@ struct ChatPaneView: View {
     @ViewBuilder
     private var detail: some View {
         if let session = activeSession {
+            // Above `conversation`, not inside the chat column: the tank is a
+            // strip across the whole detail area, and it was one before the
+            // code column existed. Putting it inside would shrink the pet's
+            // home to the chat's width the moment a file is opened.
             VStack(spacing: 0) {
                 PetTankView { store.setTankSegment($0, for: .chat) }
-                ChatTranscriptView(session: session) { approved in
-                    store.respondToPendingApproval(in: session, approved: approved)
-                }
-                Divider()
-                ChatInputBar(
-                    isRunning: session.isRunning,
-                    onSend: { text in store.sendMessage(text, source: .text) },
-                    onCancel: { store.cancelActiveRun() }
-                )
+                conversation(session)
             }
             .navigationTitle(session.displayTitle)
             .navigationSubtitle(activeWorkspace?.displayName ?? "")
@@ -61,6 +61,47 @@ struct ChatPaneView: View {
             // Only reachable if the active ids point at a session that no
             // longer exists; the store always seeds one per workspace.
             ContentUnavailableView(Strings.text(.chatSelectAConversation), systemImage: "bubble.left.and.bubble.right")
+        }
+    }
+
+    /// The conversation, and beside it the file that was opened from the
+    /// explorer. Split rather than swapped: the reason to look at a file is
+    /// usually what was just said about it, and a layout that shows one by
+    /// hiding the other makes you choose between them.
+    @ViewBuilder
+    private func conversation(_ session: ChatSession) -> some View {
+        if let editorStore {
+            // Through a view that observes the store rather than deciding
+            // here: whether a file is open is one of its published
+            // properties, and a plain `var` is not an input SwiftUI watches.
+            // Read straight from this body, clicking a file in the explorer
+            // highlighted the row and split nothing.
+            ConversationSplit(store: editorStore) { chatColumn(session) }
+        } else {
+            chatColumn(session)
+        }
+    }
+
+    private func chatColumn(_ session: ChatSession) -> some View {
+        chatStack(session)
+            // The same ground the code column and the explorer stand on.
+            // Left to the window's own material, the conversation sat on a
+            // visibly lighter surface than the file beside it -- two halves
+            // of one column that did not look related.
+            .background(palette.background)
+    }
+
+    private func chatStack(_ session: ChatSession) -> some View {
+        VStack(spacing: 0) {
+            ChatTranscriptView(session: session) { approved in
+                store.respondToPendingApproval(in: session, approved: approved)
+            }
+            Divider()
+            ChatInputBar(
+                isRunning: session.isRunning,
+                onSend: { text in store.sendMessage(text, source: .text) },
+                onCancel: { store.cancelActiveRun() }
+            )
         }
     }
 
@@ -143,6 +184,65 @@ struct ChatPaneView: View {
 
     private var activeSession: ChatSession? {
         store.session(workspaceId: store.activeWorkspaceId, sessionId: store.activeSessionId)
+    }
+}
+
+/// The conversation, and beside it the file the explorer opened.
+///
+/// Split rather than swapped: the reason to look at a file is usually what
+/// was just said about it, and a layout that shows one by hiding the other
+/// makes you choose between them.
+private struct ConversationSplit<Chat: View>: View {
+    @ObservedObject var store: EditorPaneStore
+    @ViewBuilder var chat: Chat
+
+    /// Put away rather than closed. The tab stays open, so coming back to the
+    /// file does not mean finding it again -- and opening another one from
+    /// the explorer brings the column back, which is what the click means.
+    @State private var isCollapsed = false
+
+    var body: some View {
+        Group {
+            if store.activeTabPath == nil {
+                chat
+            } else if isCollapsed {
+                HStack(spacing: 0) {
+                    chat
+                    Divider()
+                    reopenHandle
+                }
+            } else {
+                HSplitView {
+                    chat.frame(minWidth: 320)
+                    CodeSplitView(store: store) { isCollapsed = true }
+                        .frame(minWidth: 300)
+                }
+            }
+        }
+        // Opening anything at all brings the column back, whether or not it
+        // changed the active tab.
+        .onChange(of: store.openRequests) { isCollapsed = false }
+    }
+
+    /// The way back, and the only sign the file is still open.
+    ///
+    /// The file tree cannot be that way: it opens on `List`'s selection
+    /// changing, so clicking the row that is already selected -- exactly what
+    /// someone does to bring a put-away file back -- reports nothing. A
+    /// collapsed column with no handle is a file that has quietly vanished.
+    private var reopenHandle: some View {
+        Button {
+            isCollapsed = false
+        } label: {
+            Image(systemName: "chevron.left.to.line")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 28)
+                .frame(maxHeight: .infinity)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.text(.editorExpand))
+        .help(store.activeTabPath.map { ($0 as NSString).lastPathComponent } ?? Strings.text(.editorExpand))
     }
 }
 

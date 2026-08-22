@@ -46,6 +46,17 @@ struct ClientWorkspace: Identifiable, Equatable {
         name == Self.defaultName ? Strings.text(.workspaceDefaultName) : name
     }
 
+    /// The project as a person names it out loud: the last two path
+    /// components. The head of an absolute path is the least informative part
+    /// of it and the same for every project on the machine, so truncating
+    /// from the front -- which is what a narrow column does -- hides the only
+    /// part that identifies anything.
+    var projectLabel: String? {
+        guard let projectPath else { return nil }
+        let parts = (projectPath as NSString).pathComponents.filter { $0 != "/" }
+        return parts.suffix(2).joined(separator: "/")
+    }
+
     var canOpenEditor: Bool {
         if case .ready = editorAvailability { return true }
         return false

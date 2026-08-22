@@ -226,6 +226,36 @@ struct AgentConfiguration {
         return AgentProvider.resolved(fromRawValue: found?.value)
     }
 
+    /// How much the coding CLI may do on its own. Read the same way every
+    /// other setting is -- environment first, then the nearest `.env`.
+    static func permissionMode(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
+    ) -> AgentPermissionMode {
+        // Any non-blank value resolves: an unrecognized one is answered by
+        // `resolved(fromRawValue:)`'s fallback rather than by looking for a
+        // better one further down, the same as AGENT_PROVIDER.
+        let found = firstValue(
+            of: [AgentPermissionMode.environmentVariable],
+            environment: environment,
+            searchPaths: searchPaths
+        )
+        return AgentPermissionMode.resolved(fromRawValue: found?.value)
+    }
+
+    /// How much thinking the user asked for, read the same way as the rest.
+    static func effort(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        searchPaths: [URL] = AgentConfiguration.defaultSearchPaths
+    ) -> AgentEffort {
+        let found = firstValue(
+            of: [AgentEffort.environmentVariable],
+            environment: environment,
+            searchPaths: searchPaths
+        )
+        return AgentEffort.resolved(fromRawValue: found?.value)
+    }
+
     /// Which ACP coding agent `code_editor` runs. A **different axis** from
     /// `provider` above, which picks the pet's own brain: the pet can think
     /// with OpenAI while handing edits to Claude Code, and that combination is

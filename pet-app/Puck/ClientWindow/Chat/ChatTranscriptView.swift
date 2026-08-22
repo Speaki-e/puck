@@ -98,6 +98,9 @@ struct ChatTranscriptView: View {
         case .assistantText(_, let text):
             AgentMessage(text: text)
 
+        case .notice(_, let text):
+            NoticeMessage(text: text)
+
         case .toolCall(let id, let tool, let args):
             ToolCallRow(tool: tool, args: args, result: result(forCall: id))
 
@@ -193,6 +196,33 @@ private struct AgentMessage: View {
 
 /// A tool call and, once it lands, its result. Collapsed by default: the
 /// arguments matter when something went wrong and are noise otherwise.
+/// The app answering a slash command. Reads as the agent's own prose --
+/// same markdown, same column -- but tinted, because who is speaking matters
+/// when the answer is about the app rather than from the model.
+private struct NoticeMessage: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+
+    let text: String
+
+    var body: some View {
+        MarkdownText(markdown: text)
+            .font(ClientTheme.Typography.transcriptBody)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .padding(.leading, ClientTheme.Metrics.spacingLarge)
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(.tint)
+                    .frame(width: 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct ToolCallRow: View {
     let tool: String
     let args: JSONValue?

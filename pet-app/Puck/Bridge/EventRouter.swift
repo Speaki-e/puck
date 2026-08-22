@@ -154,11 +154,7 @@ enum EventRouter {
     /// bubble is built, so every producer -- local, workspace, whatever comes
     /// next -- is covered by the one rule.
     static func bubbleSummary(from summary: String, limit: Int = 60) -> String? {
-        let firstLine = summary
-            .split(separator: "\n", omittingEmptySubsequences: true)
-            .first?
-            .trimmingCharacters(in: .whitespaces) ?? ""
-        guard !firstLine.isEmpty else { return nil }
+        guard let firstLine = firstSpokenLine(in: summary) else { return nil }
 
         // First sentence, keeping its terminator -- "고쳤어요." reads finished,
         // "고쳤어요" reads cut off. A terminator only ends a sentence when what
@@ -175,6 +171,111 @@ enum EventRouter {
 
         guard sentence.count > limit else { return sentence }
         return sentence.prefix(limit).trimmingCharacters(in: .whitespaces) + "…"
+    }
+
+
+    /// The first line of the answer that is worth saying out loud, with its
+    /// markdown taken off.
+    ///
+    /// Replies are markdown now, and the bubble used to take line one
+    /// whatever it was -- so an answer opening with `## 확인` put the literal
+    /// characters `## 확인` next to the pet: syntax the bubble cannot render,
+    /// wrapped around a heading that is a label rather than a statement.
+    ///
+    /// Prose wins over a heading for that reason. A heading is only used when
+    /// the answer is nothing but headings, where saying its words is still
+    /// better than saying nothing.
+    private static func firstSpokenLine(in summary: String) -> String? {
+        var headingFallback: String?
+        var insideCodeFence = false
+
+        for rawLine in summary.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("```") || line.hasPrefix("~~~") {
+                insideCodeFence.toggle()
+                continue
+            }
+            // Code says nothing a bubble can use, and it is where stray
+            // punctuation would break the sentence split below.
+            if insideCodeFence { continue }
+            if line.isEmpty { continue }
+            // A rule, or a table's divider row: separators, not sentences.
+            if line.allSatisfy({ "-=_*|: ".contains($0) }) { continue }
+
+            if line.hasPrefix("#") {
+                let heading = strippedOfInlineMarkdown(
+                    String(line.drop { $0 == "#" }).trimmingCharacters(in: .whitespaces)
+                )
+                if headingFallback == nil, !heading.isEmpty { headingFallback = heading }
+                continue
+            }
+
+            let spoken = strippedOfInlineMarkdown(strippedOfLeadingMarker(line))
+            if !spoken.isEmpty { return spoken }
+        }
+        return headingFallback
+    }
+
+    /// A bullet, a numbered item or a quote marker. The text after it is
+    /// content; the marker is punctuation the bubble should not read out.
+    private static func strippedOfLeadingMarker(_ line: String) -> String {
+        var rest = Substring(line)
+        while let first = rest.first, "->+*".contains(first) || first == ">" {
+            let afterMarker = rest.dropFirst()
+            // `*emphasis*` is not a bullet -- a marker is followed by a space.
+            guard afterMarker.first == " " else { break }
+            rest = afterMarker.drop { $0 == " " }
+        }
+        // `1.` / `1)` at the start, and only there.
+        let digits = rest.prefix { $0.isNumber }
+        if !digits.isEmpty {
+            let afterDigits = rest.dropFirst(digits.count)
+            if let punctuation = afterDigits.first, punctuation == "." || punctuation == ")",
+               afterDigits.dropFirst().first == " " {
+                rest = afterDigits.dropFirst().drop { $0 == " " }
+            }
+        }
+        return String(rest)
+    }
+
+    /// Emphasis, inline code and link syntax removed, keeping the words.
+    /// Deliberately a character sweep rather than a parser: this feeds a
+    /// 60-character bubble, and MarkdownText already owns real rendering.
+    private static func strippedOfInlineMarkdown(_ line: String) -> String {
+        var result = ""
+        var index = line.startIndex
+        while index < line.endIndex {
+            let character = line[index]
+            switch character {
+            case "*", "_", "`", "~":
+                index = line.index(after: index)
+            case "[":
+                // `[text](url)` keeps text; a bare `[` keeps itself.
+                if let close = line[index...].firstIndex(of: "]"),
+                   line.index(after: close) < line.endIndex,
+                   line[line.index(after: close)] == "(",
+                   let end = line[close...].firstIndex(of: ")") {
+                    result += line[line.index(after: index)..<close]
+                    index = line.index(after: end)
+                } else {
+                    result.append(character)
+                    index = line.index(after: index)
+                }
+            case "\\":
+                // An escape: the next character is literal.
+                let next = line.index(after: index)
+                if next < line.endIndex {
+                    result.append(line[next])
+                    index = line.index(after: next)
+                } else {
+                    index = next
+                }
+            default:
+                result.append(character)
+                index = line.index(after: index)
+            }
+        }
+        return result.trimmingCharacters(in: .whitespaces)
     }
 
     /// Extracts `detail.path` from a code_editor tool_call (protocol 3.2:

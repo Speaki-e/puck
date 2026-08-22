@@ -114,6 +114,50 @@ final class EventRouterTests: XCTestCase {
         XCTAssertEqual(reaction.bubbleText, "hello.ts에 주석을 추가했어요.")
     }
 
+    /// The pet speaks the answer, and the answer is markdown now. A bubble
+    /// that reads out `## 확인` shows syntax it cannot render, wrapped around
+    /// a heading that states nothing.
+    func test_bubbleSummary_skipsAHeadingAndSpeaksTheFirstRealLine() {
+        let reply = """
+        ## 확인
+        - 워크스페이스에 프로젝트 폴더가 연결돼 있지 않습니다.
+        - 빌드를 돌리려면 프로젝트가 필요합니다.
+        """
+
+        XCTAssertEqual(EventRouter.bubbleSummary(from: reply), "워크스페이스에 프로젝트 폴더가 연결돼 있지 않습니다.")
+    }
+
+    /// ...but a heading is better than silence when it is all there is.
+    func test_bubbleSummary_fallsBackToAHeadingWhenNothingElseSpeaks() {
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "# 빌드 실패\n\n---"), "빌드 실패")
+    }
+
+    func test_bubbleSummary_dropsInlineMarkdownButKeepsTheWords() {
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "**다 고쳤어요**"), "다 고쳤어요")
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "`swift build`로 확인했어요."), "swift build로 확인했어요.")
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "[문서](https://example.com)를 봤어요."), "문서를 봤어요.")
+    }
+
+    /// A fenced block is not something to read out, and its punctuation would
+    /// cut the sentence in the wrong place.
+    func test_bubbleSummary_ignoresCodeBlocks() {
+        let reply = """
+        ```swift
+        let x = 1
+        ```
+        고쳤어요.
+        """
+
+        XCTAssertEqual(EventRouter.bubbleSummary(from: reply), "고쳤어요.")
+    }
+
+    /// Emphasis is not a bullet: a marker is followed by a space.
+    func test_bubbleSummary_doesNotMistakeEmphasisForAListMarker() {
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "*강조*만 있는 줄"), "강조만 있는 줄")
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "1. 첫 번째"), "첫 번째")
+        XCTAssertEqual(EventRouter.bubbleSummary(from: "> 인용된 말"), "인용된 말")
+    }
+
     func test_bubbleSummary_edges() {
         // No sentence terminator: capped with an ellipsis rather than cut mid-air.
         let long = String(repeating: "가", count: 80)

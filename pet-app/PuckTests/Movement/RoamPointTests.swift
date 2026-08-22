@@ -82,4 +82,25 @@ final class RoamPointTests: XCTestCase {
         XCTAssertTrue(pauses.allSatisfy { $0 >= 0.4 && $0 <= 1.4 })
         XCTAssertGreaterThan(Set(pauses.map { Int($0 * 10) }).count, 3, "not a fixed beat")
     }
+
+    // MARK: - Wandering at home (2026-08-22)
+
+    /// The window list is the desktop's, not the tank's: a pet at home that
+    /// drew "climb the nearest window" would walk at a window outside its own
+    /// glass, and there is no ceiling in a 90pt strip.
+    func test_atHome_climbingOutcomesBecomeAWalk() {
+        XCTAssertEqual(AppDelegate.wanderOutcome(.climbNearestWindow, atHome: true), .walkToRandomPoint)
+        XCTAssertEqual(AppDelegate.wanderOutcome(.climbToCeiling, atHome: true), .walkToRandomPoint)
+    }
+
+    func test_atHome_everythingElseIsUnchanged() {
+        XCTAssertEqual(AppDelegate.wanderOutcome(.walkToRandomPoint, atHome: true), .walkToRandomPoint)
+        XCTAssertEqual(AppDelegate.wanderOutcome(.playWithToy, atHome: true), .playWithToy)
+        XCTAssertEqual(AppDelegate.wanderOutcome(.stay, atHome: true), .stay)
+    }
+
+    func test_onTheDesktop_nothingIsFilteredAtAll() {
+        XCTAssertEqual(AppDelegate.wanderOutcome(.climbNearestWindow, atHome: false), .climbNearestWindow)
+        XCTAssertEqual(AppDelegate.wanderOutcome(.climbToCeiling, atHome: false), .climbToCeiling)
+    }
 }

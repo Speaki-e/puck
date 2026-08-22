@@ -20,6 +20,7 @@ extension AppDelegate {
     /// the window list), which is bootstrap knowledge, not state knowledge.
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) {
         guard let controller = characterController else { return }
+        let outcome = Self.wanderOutcome(outcome, atHome: desktopRoamableArea != nil)
         // Whatever was half-walked is abandoned: the pet has been given
         // something else to do, and finishing the old route afterwards would
         // read as it changing its mind twice.
@@ -193,6 +194,22 @@ extension AppDelegate {
         if x < low { x = low + (low - x) }
         if x > high { x = high - (x - high) }
         return CGPoint(x: min(max(x, low), high), y: area.maxY)
+    }
+
+    /// What the pet may do where it currently is. Climbing and the ceiling are
+    /// desktop-only: a climb aims at the window list, which is the desktop's
+    /// however small the pet's world is right now, so a pet in its tank would
+    /// set off at a window outside its own glass. A 90pt strip has no ceiling
+    /// worth crawling along either.
+    static func wanderOutcome(
+        _ outcome: WanderScheduler.Outcome,
+        atHome: Bool
+    ) -> WanderScheduler.Outcome {
+        guard atHome else { return outcome }
+        switch outcome {
+        case .climbNearestWindow, .climbToCeiling: return .walkToRandomPoint
+        case .walkToRandomPoint, .playWithToy, .stay: return outcome
+        }
     }
 
     /// One leg of a wander: somewhere nearby, at a slightly different pace

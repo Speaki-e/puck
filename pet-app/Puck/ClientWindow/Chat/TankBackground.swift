@@ -45,15 +45,20 @@ enum TankBackground: String, CaseIterable {
 
     /// Painted behind the island, never on it -- the island is the ground the
     /// pet stands on, and a pet standing on a picture reads as standing in
-    /// it. `plain` follows the app's own palette so the strip disappears into
-    /// the window; the named ones are fixed, since a mood is the whole point
-    /// of picking one and lightening "night" in light mode would stop it
-    /// being night.
+    /// it.
+    ///
+    /// `plain` paints nothing at all rather than the palette's ground: the
+    /// window is translucent now, and an opaque rectangle around the island
+    /// left a black band across the top of an otherwise see-through window.
+    /// Nothing is what "no backdrop" should have meant all along.
+    ///
+    /// The named ones stay opaque and fixed. A mood is the whole point of
+    /// choosing one, and one you can see the desktop through is not a mood.
     @ViewBuilder
     func backdrop(palette: ClientPalette) -> some View {
         switch self {
         case .plain:
-            palette.background
+            Color.clear
         case .night:
             Self.gradient(top: Color(red: 0.055, green: 0.075, blue: 0.169),
                           bottom: Color(red: 0.169, green: 0.208, blue: 0.373))

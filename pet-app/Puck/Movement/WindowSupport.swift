@@ -2,7 +2,7 @@
 //  WindowSupport.swift
 //  Puck
 //
-//  F3/F4 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Which window, if any, the pet is standing on or bumping into.
 //
 //  Pure lookups over the F4 window list so the states above stay free of

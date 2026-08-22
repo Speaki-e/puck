@@ -2,7 +2,7 @@
 //  PermissionPromptPolicy.swift
 //  Puck
 //
-//  Shared · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  When it is acceptable to raise the Accessibility prompt.
 //
 //  Accessibility is the one permission macOS won't let an app request

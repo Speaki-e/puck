@@ -2,7 +2,7 @@
 //  HotkeyBindings.swift
 //  Puck
 //
-//  F6 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Default bindings (PTT/text input/character summon) + user config + conflict detection
 //
 

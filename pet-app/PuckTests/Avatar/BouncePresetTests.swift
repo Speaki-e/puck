@@ -2,7 +2,7 @@
 //  BouncePresetTests.swift
 //  Puck
 //
-//  F2 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Pure math for the 2026-07-29 2D switch's procedural squash-and-stretch
 //  "bounce" motion (02_pet-app.md F2) -- no rendering, no timers, just
 //  elapsed-time-in, transform-out.

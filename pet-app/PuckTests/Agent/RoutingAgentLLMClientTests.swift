@@ -2,7 +2,7 @@
 //  RoutingAgentLLMClientTests.swift
 //  Puck
 //
-//  F15 (task 8, gap 2 fix) test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Proves a provider switch in Settings takes effect on the very next `send`
 //  without reconstructing `AgentRunner`/`AgentHost` -- the property
 //  `makeAgentLLMClient`'s doc comment promises now that provider selection

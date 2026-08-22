@@ -2,7 +2,7 @@
 //  AppDelegate+Tools.swift
 //  Puck
 //
-//  F11 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Registers the tool handlers the bridge server dispatches into.
 //
 

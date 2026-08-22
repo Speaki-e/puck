@@ -2,7 +2,7 @@
 //  CeilingStatesTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  ClimbToCeiling -> Ceiling -> Fall (2026-07-29 ceiling-crawling): climbs
 //  straight up to the roamable area's top edge, then crawls upside-down
 //  along it, bouncing off the horizontal bounds instead of falling off.

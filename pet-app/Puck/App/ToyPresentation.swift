@@ -2,7 +2,7 @@
 //  ToyPresentation.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Toy -> display label/tint, shared by the Settings toy grid and the notch
 //  toy buttons so the two surfaces can't drift apart on what a toy is
 //  called or coloured.

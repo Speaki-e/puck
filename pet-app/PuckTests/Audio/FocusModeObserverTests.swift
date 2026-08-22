@@ -2,7 +2,7 @@
 //  FocusModeObserverTests.swift
 //  Puck
 //
-//  F5 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Only verifies the notification wiring itself (posting the known
 //  notification name flips state and fires onChange). Whether macOS still
 //  posts this notification for real Focus/DND changes on this OS version is

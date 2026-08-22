@@ -2,7 +2,7 @@
 //  FrameClockTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The Timer half — that starting the clock actually delivers ticks on the
 //  main run loop, and that stopping it stops them. Timing bounds are
 //  deliberately loose; the exact dt arithmetic is FrameTickerTests' job.

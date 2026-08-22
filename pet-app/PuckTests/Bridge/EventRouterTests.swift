@@ -2,7 +2,7 @@
 //  EventRouterTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Verifies the event -> reaction mapping table in
 //  plan/02_pet-app.md section 3 F3 ("소켓 이벤트 -> 반응 매핑").
 //

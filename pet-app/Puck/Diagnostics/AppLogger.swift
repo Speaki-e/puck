@@ -2,7 +2,7 @@
 //  AppLogger.swift
 //  Puck
 //
-//  Shared · owner: Sangwoo Kang / Haeyoung Park
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Shared logging utility (~/Library/Application Support/Puck/logs/)
 //
 //  General app diagnostics — distinct from ToolExecutionLogger (F11), which

@@ -2,7 +2,7 @@
 //  AppDelegate+Permissions.swift
 //  Puck
 //
-//  Shared · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Launch-time TCC permission self-check and re-prompt (microphone, speech
 //  recognition, Accessibility).
 //

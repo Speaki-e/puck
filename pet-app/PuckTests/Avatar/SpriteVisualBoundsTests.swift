@@ -2,7 +2,7 @@
 //  SpriteVisualBoundsTests.swift
 //  Puck
 //
-//  F2 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Mapping an image's opaque pixels through .resizeAspect into the rectangle
 //  the pet actually occupies on screen.
 //

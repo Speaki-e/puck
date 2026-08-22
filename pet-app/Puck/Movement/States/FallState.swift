@@ -2,7 +2,7 @@
 //  FallState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Fall state's StateHandler implementation.
 //
 //  The only state with acceleration (plan/02_pet-app.md F3: "물리엔진 없음 …

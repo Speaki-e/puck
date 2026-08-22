@@ -2,7 +2,7 @@
 //  BridgeServer.swift
 //  Puck
 //
-//  F11/socket · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Network.framework NWListener(UDS) at ~/Library/Application Support/Puck/bridge.sock
 //
 

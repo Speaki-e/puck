@@ -2,7 +2,7 @@
 //  SpriteAvatarTests.swift
 //  Puck
 //
-//  F2 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  2026-07-29 2D switch: SpriteAvatar loads PNG clips instead of usdz.
 //
 

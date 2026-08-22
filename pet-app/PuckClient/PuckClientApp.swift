@@ -2,7 +2,7 @@
 //  PuckClientApp.swift
 //  PuckClient
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  @main entry point -- a regular (Dock-resident) app, unlike Puck's
 //  LSUIElement menu-bar lifecycle. This app *is* the Claude-Desktop-style
 //  client window; Puck stays a pure pet + bridge.sock host (2026-07-30).

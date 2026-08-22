@@ -2,7 +2,7 @@
 //  AppDelegate.swift
 //  PuckClient
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The Claude-Desktop-style client window used to live in-process inside
 //  Puck; it moved here (2026-07-30) so it can be a regular, Dock-
 //  resident app rather than sharing Puck's LSUIElement lifecycle

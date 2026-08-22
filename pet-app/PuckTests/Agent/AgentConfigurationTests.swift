@@ -2,7 +2,7 @@
 //  AgentConfigurationTests.swift
 //  Puck
 //
-//  F15 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Reading the key out of a .env, and the precedence between the places one
 //  can live -- getting this wrong looks like "the key I just set is being
 //  ignored", which is a miserable thing to debug.

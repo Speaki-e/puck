@@ -2,7 +2,7 @@
 //  HotkeyDecisionMakerTests.swift
 //  Puck
 //
-//  F6 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Pure decision logic for GlobalHotkeyManager, including the case plan/
 //  02_pet-app.md explicitly calls for by listing flagsChanged alongside
 //  keyDown/keyUp: releasing the modifier (Option) before the key (Space)

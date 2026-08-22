@@ -2,7 +2,7 @@
 //  ToyApproach.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Where the pet should stand to play with the toy, so it stands beside the
 //  toy rather than on top of it.
 //

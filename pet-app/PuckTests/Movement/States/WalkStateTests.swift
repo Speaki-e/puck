@@ -2,7 +2,7 @@
 //  WalkStateTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Walk carries the pet to a target at constant speed and hands back to Idle
 //  on arrival (plan/02_pet-app.md section 3 transition table).
 //

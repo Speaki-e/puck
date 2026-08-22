@@ -2,7 +2,7 @@
 //  GlobalHotkeyManager.swift
 //  Puck
 //
-//  F6 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  CGEvent.tapCreate-based global hotkey capture (requires Accessibility permission)
 //
 //  Requires Accessibility permission (AccessibilityPermission.swift, F4) —

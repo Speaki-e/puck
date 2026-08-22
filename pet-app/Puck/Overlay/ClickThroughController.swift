@@ -2,7 +2,7 @@
 //  ClickThroughController.swift
 //  Puck
 //
-//  F1 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Toggles ignoresMouseEvents based on the manifest hitbox AABB
 //
 //  Precise alpha-pixel hit testing is a later-priority improvement

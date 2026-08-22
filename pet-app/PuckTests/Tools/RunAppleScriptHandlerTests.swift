@@ -2,7 +2,7 @@
 //  RunAppleScriptHandlerTests.swift
 //  Puck
 //
-//  F11 test · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Argument validation + a real (harmless) script execution.
 //
 

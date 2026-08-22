@@ -2,7 +2,7 @@
 //  AgentSettingsView.swift
 //  PuckClient
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Everything the agent needs configured: which provider it talks to, the
 //  API key for the providers that take one, the model where the model is ours
 //  to choose, and which coding CLI backs the CLI provider.

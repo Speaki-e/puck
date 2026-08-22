@@ -2,7 +2,7 @@
 //  BallStatesTests.swift
 //  Puck
 //
-//  F12 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  "Idle/Walk 한정 | 공 던지기(F12) | ChaseBall → JuggleBall → KickBall → Idle"
 //  (plan/02_pet-app.md section 3, optional ball-toy interaction; JuggleBall
 //  added 2026-07-29 for more motion variety on the same interaction).

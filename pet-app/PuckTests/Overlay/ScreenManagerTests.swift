@@ -2,7 +2,7 @@
 //  ScreenManagerTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Smoke coverage only — the interesting coordinate logic already lives in
 //  (and is fully tested by) GlobalScreenSpaceTests. Actually changing display
 //  configuration to exercise didChangeScreenParametersNotification isn't

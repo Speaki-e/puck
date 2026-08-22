@@ -2,7 +2,7 @@
 //  DotEnvWriteTests.swift
 //  Puck
 //
-//  F15 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Saving a key from the settings panel. The two things that would be quietly
 //  destructive if wrong: eating the rest of the file, and leaving an API key
 //  world-readable.

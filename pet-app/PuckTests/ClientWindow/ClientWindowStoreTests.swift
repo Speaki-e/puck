@@ -2,7 +2,7 @@
 //  ClientWindowStoreTests.swift
 //  Puck
 //
-//  F13 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  ClientWindowStore is the sidebar/session-list source of truth: workspace
 //  switching, per-workspace session lists, and routing incoming chat events
 //  to the right session (plan/02_pet-app.md F13, plan/01_protocol.md 3.4/3.5).

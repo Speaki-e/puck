@@ -2,7 +2,7 @@
 //  CompanionAppLauncherTests.swift
 //  Puck
 //
-//  Shared · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //
 
 import XCTest

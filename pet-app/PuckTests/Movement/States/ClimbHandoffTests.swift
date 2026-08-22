@@ -2,7 +2,7 @@
 //  ClimbHandoffTests.swift
 //  Puck
 //
-//  F3/F4 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The Climb -> WalkOnTop handoff, end to end through the real states --
 //  a regression where the pet climbed onto a window and immediately fell
 //  back off.

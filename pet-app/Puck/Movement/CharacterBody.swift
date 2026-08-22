@@ -2,7 +2,7 @@
 //  CharacterBody.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The pet's position and facing, and the one place that pushes them onto the
 //  avatar.
 //

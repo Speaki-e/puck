@@ -2,7 +2,7 @@
 //  ClientWindowView.swift
 //  Puck
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The "Claude Desktop"-style client window (plan/02_pet-app.md F13).
 //
 //  Chat rebuild (2026-08-13): sidebar, top bar and transcript moved into

@@ -2,7 +2,7 @@
 //  ClaudeClientTests.swift
 //  Puck
 //
-//  F15 (task 3) test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Encode/decode as pure functions against fixture data -- no network -- plus
 //  one network-level test for the "surface the body on a non-2xx" behavior,
 //  since that's the one property that only exists once `send` runs.

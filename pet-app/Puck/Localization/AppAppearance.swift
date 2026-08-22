@@ -2,7 +2,7 @@
 //  AppAppearance.swift
 //  Puck
 //
-//  Shared · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  In-app light/dark override.
 //  An explicit user setting (Settings' General tab) rather than only ever
 //  following the system appearance -- .system still exists as the option

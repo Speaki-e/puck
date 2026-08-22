@@ -2,7 +2,7 @@
 //  FlipAnimation.swift
 //  Puck
 //
-//  F2 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  The turn the pet plays when it changes direction — the sprite narrows to
 //  nothing edge-on and opens back out the other way, like a sheet of paper
 //  being turned over.

@@ -2,7 +2,7 @@
 //  BridgeSocketPath.swift
 //  Puck
 //
-//  Shared · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Where bridge.sock lives -- Puck (which hosts it, BridgeServer) and
 //  PuckClient (which connects to it as a client, 2026-07-30) both need
 //  this same path.

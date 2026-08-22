@@ -2,7 +2,7 @@
 //  BridgeMessages.swift
 //  Puck
 //
-//  F11/socket · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Mirrors protocol repo's /swift/BridgeMessages.swift (Codable message types).
 //  Schema source: plan/01_protocol.md section 3. Always update this file together
 //  with the protocol repo's schema.

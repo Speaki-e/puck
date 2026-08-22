@@ -2,7 +2,7 @@
 //  CeilingState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Ceiling state's StateHandler implementation.
 //
 //  F3 ceiling-crawling (2026-07-29): crawls upside-down along the roamable

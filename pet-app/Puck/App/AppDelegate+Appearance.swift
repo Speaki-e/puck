@@ -2,7 +2,7 @@
 //  AppDelegate+Appearance.swift
 //  Puck
 //
-//  Shared · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  System-wide light/dark appearance override, applied to NSApp and kept
 //  live via SettingsStore's onAppearanceChanged callback.
 //

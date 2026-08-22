@@ -2,7 +2,7 @@
 //  OneShotTransition.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Guards a state that must request its transition exactly once.
 //
 //  Nearly every state (arrival at a target, a timer elapsing) used to

@@ -2,7 +2,7 @@
 //  PointAtHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Delegates a MoveTo+Point command to the F3 FSM (tool execution = pet action, a special case)
 //
 //  protocol section 4: point_at is "펫이 좌표로 이동해 가리킴" and returns

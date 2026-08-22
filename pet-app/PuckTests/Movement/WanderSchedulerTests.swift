@@ -2,7 +2,7 @@
 //  WanderSchedulerTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Deterministic timer-accumulation behavior of WanderScheduler (interval/outcome
 //  providers injected so the wander timer is testable).
 //

@@ -2,7 +2,7 @@
 //  AppDelegate+OverlayAvatar.swift
 //  Puck
 //
-//  F1/F2/F3/F5 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Overlay window + avatar lifecycle: initial activation, hot-swapping
 //  presets, click-through wiring, and Space/display-change recovery.
 //

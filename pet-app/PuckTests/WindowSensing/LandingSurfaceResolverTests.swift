@@ -2,7 +2,7 @@
 //  LandingSurfaceResolverTests.swift
 //  Puck
 //
-//  F4 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Landing-surface resolution accounting for Z-order/overlap, per
 //  plan/02_pet-app.md section 3 F4 ("Z순서·겹침 고려해 캐릭터 x좌표에서
 //  실제 보이는 창 상단 엣지 세그먼트만 인정").

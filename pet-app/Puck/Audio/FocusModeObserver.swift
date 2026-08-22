@@ -2,7 +2,7 @@
 //  FocusModeObserver.swift
 //  Puck
 //
-//  F5 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Detects macOS Focus (Do Not Disturb) -> optional auto-mute
 //
 //  macOS has no public, documented API for third-party apps to query Focus

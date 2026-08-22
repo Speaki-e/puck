@@ -2,7 +2,7 @@
 //  MenuBarController.swift
 //  Puck
 //
-//  Shared · owner: Sangwoo Kang / Haeyoung Park
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  The status item, and the panel it drops down.
 //
 //  This used to be an NSMenu whose "설정…" item opened a separate

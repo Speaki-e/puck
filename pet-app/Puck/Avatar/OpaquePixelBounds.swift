@@ -2,7 +2,7 @@
 //  OpaquePixelBounds.swift
 //  Puck
 //
-//  F2 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Finds the tight bounding box of an image's non-transparent pixels.
 //
 //  Avatar PNGs are authored with the character floating in a transparent

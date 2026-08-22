@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  Puck
 //
-//  Shared · owner: Sangwoo Kang / Haeyoung Park
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  The menu bar panel: everything the app can be told to do, in one column.
 //  Laid out as pokoPet's menu bar popover is -- one narrow scrolling column
 //  on a single translucent panel, plain sections, a tinted item grid, action

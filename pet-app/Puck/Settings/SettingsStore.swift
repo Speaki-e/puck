@@ -2,7 +2,7 @@
 //  SettingsStore.swift
 //  Puck
 //
-//  Shared · owner: Sangwoo Kang / Haeyoung Park
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  UserDefaults wrapper: volume, hotkeys, misc options
 //
 

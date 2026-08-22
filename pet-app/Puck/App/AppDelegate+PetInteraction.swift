@@ -2,7 +2,7 @@
 //  AppDelegate+PetInteraction.swift
 //  Puck
 //
-//  F1/F3 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Click/drag gestures on the pet and toys, head petting, and the shared
 //  global-to-window-local coordinate conversion.
 //

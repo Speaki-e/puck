@@ -2,7 +2,7 @@
 //  AvatarManifestEditor.swift
 //  Puck
 //
-//  Settings · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Reads/writes the *currently installed* avatar's manifest.json -- backs
 //  Settings' size slider and per-emotion image mapping (2026-07-29).
 //

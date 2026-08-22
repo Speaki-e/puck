@@ -2,7 +2,7 @@
 //  BridgeConnection.swift
 //  Puck
 //
-//  F11/socket · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  JSON Lines parsing/serialization, connection lifecycle management
 //
 

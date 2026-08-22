@@ -2,7 +2,7 @@
 //  UIElementSearch.swift
 //  Puck
 //
-//  F4 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Depth- and time-limited DFS over an accessibility tree.
 //
 //  Split from the AXUIElement calls themselves so the traversal — the part

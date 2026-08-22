@@ -2,7 +2,7 @@
 //  ToolExecutorTests.swift
 //  Puck
 //
-//  F11 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  tool_dispatch routing + per-call timeout, per protocol/01_protocol.md 3.1/4.
 //
 

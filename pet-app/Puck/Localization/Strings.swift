@@ -2,7 +2,7 @@
 //  Strings.swift
 //  Puck
 //
-//  Shared · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  All user-facing text in the Settings window, the merged Avatar tab, and
 //  the menu bar. A flat key/table lookup rather than Apple's .lproj/
 //  Localizable.strings + Bundle mechanism, because the language here is an
@@ -146,6 +146,11 @@ enum L10nKey: String, CaseIterable, Hashable {
     case toolCouldNotOpenFormat, toolNoSuchLineFormat
     case toolEditorOffscreenShownAnyway
     case toolDuplicateRequest, toolCodeEditTimedOutFormat, toolCodeEditPurpose
+    case toolTaskSessionUnavailable, toolTaskIsEmpty, toolPathIsEmpty, toolShowCodeNeedsEverything
+    /// Appended to a path failure. Aimed at the model -- a person reading the
+    /// editor pane already knows what they clicked -- but the transcript
+    /// shows a tool's detail, so it is read by both.
+    case toolPathIsRelativeHint, toolListFilesHint
 
     case acpAborted, acpTaskFailed, acpWroteOutsideProject, acpTaskDoneFormat
     case acpNeedsNodeFormat, acpCLINotFoundFormat, acpAgentNotBundledFormat, acpCouldNotStart
@@ -368,6 +373,12 @@ enum Strings {
         .toolNoSuchLineFormat: "%1$@에는 %2$@번째 줄이 없어요. (%3$@줄짜리 파일이에요)",
         .toolEditorOffscreenShownAnyway: "에디터가 화면에 없어서 펫은 가지 못했어요. 코드는 표시했습니다.",
         .toolDuplicateRequest: "중복된 요청입니다.",
+        .toolTaskSessionUnavailable: "open_task_session은 이 연결에서 쓸 수 없어요.",
+        .toolTaskIsEmpty: "task가 비어 있어요.",
+        .toolPathIsEmpty: "path가 비어 있어요.",
+        .toolShowCodeNeedsEverything: "show_code는 path, start_line, end_line, caption이 모두 필요해요.",
+        .toolPathIsRelativeHint: " 경로는 프로젝트 루트 기준 상대 경로여야 해요 (예: src/App/main.swift).",
+        .toolListFilesHint: " 정확한 경로를 모르면 list_files로 확인한 뒤 다시 부르세요.",
         .toolCodeEditTimedOutFormat: "코드 편집이 %1$@초 안에 끝나지 않아 중단했어요.",
         .toolCodeEditPurpose: "코드 편집",
 
@@ -586,6 +597,12 @@ enum Strings {
         .toolNoSuchLineFormat: "%1$@ has no line %2$@. (the file is %3$@ lines)",
         .toolEditorOffscreenShownAnyway: "The editor isn't on screen, so the pet couldn't go there. The code is showing.",
         .toolDuplicateRequest: "That request is a duplicate.",
+        .toolTaskSessionUnavailable: "open_task_session is not available on this connection.",
+        .toolTaskIsEmpty: "task is empty.",
+        .toolPathIsEmpty: "path is empty.",
+        .toolShowCodeNeedsEverything: "show_code needs all of path, start_line, end_line and caption.",
+        .toolPathIsRelativeHint: " Paths are relative to the project root (for example src/App/main.swift).",
+        .toolListFilesHint: " If you are unsure of the exact path, check with list_files and call again.",
         .toolCodeEditTimedOutFormat: "Code editing didn't finish within %1$@s, so it was stopped.",
         .toolCodeEditPurpose: "Code editing",
 

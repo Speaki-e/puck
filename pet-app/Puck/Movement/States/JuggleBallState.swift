@@ -2,7 +2,7 @@
 //  JuggleBallState.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  JuggleBall state's StateHandler implementation (optional ball-toy
 //  interaction, 02_pet-app.md F12).
 //

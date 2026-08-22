@@ -2,7 +2,7 @@
 //  UserInputSender.swift
 //  Puck
 //
-//  F6/F7 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Sends protocol 3.3 user_input, and tells the caller when it couldn't.
 //
 //  AppDelegate used to cache the last BridgeConnection handed to it by

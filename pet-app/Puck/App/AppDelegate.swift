@@ -2,7 +2,7 @@
 //  AppDelegate.swift
 //  Puck
 //
-//  Shared · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Coordinates the init order: permission self-check -> overlay -> bridge
 //  server -> global hotkeys.
 //

@@ -2,7 +2,7 @@
 //  AppDelegate+Wander.swift
 //  Puck
 //
-//  F3 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Picks wander destinations for IdleState's scheduler -- roam points,
 //  climbable windows, and toy interest.
 //

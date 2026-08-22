@@ -2,7 +2,7 @@
 //  ScreenBoundsTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Keeping the pet on screen and bouncing it off the edges, measured by the
 //  artwork's own outline rather than the layer's bounding box.
 //

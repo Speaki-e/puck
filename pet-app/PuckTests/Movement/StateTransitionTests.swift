@@ -2,7 +2,7 @@
 //  StateTransitionTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Verifies CharacterController's state transition lifecycle (enter/exit,
 //  avatar clip + SFX trigger) per plan/02_pet-app.md section 3.
 //

@@ -2,7 +2,7 @@
 //  TextInputBubbleView.swift
 //  Puck
 //
-//  F6 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  NSVisualEffectView + NSTextField bubble UI
 //
 //  Enter -> onSubmit (protocol 3.3 user_input(source: "text")); Escape ->

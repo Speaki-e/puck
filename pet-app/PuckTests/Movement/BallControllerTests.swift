@@ -2,7 +2,7 @@
 //  BallControllerTests.swift
 //  Puck
 //
-//  F12 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Glue between BallPhysics and its CALayer -- spawn/tick/kick/reparent.
 //
 

@@ -2,7 +2,7 @@
 //  AppDelegate+Bridge.swift
 //  Puck
 //
-//  F11/F3 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Socket server setup and F11/F3 event-reaction routing into
 //  character/sfx/avatar and notice bubbles.
 //

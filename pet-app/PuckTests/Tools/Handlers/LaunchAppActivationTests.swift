@@ -2,7 +2,7 @@
 //  LaunchAppActivationTests.swift
 //  Puck
 //
-//  F11 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Bringing a launched app to the front. The retry exists because a cold-launched app
 //  has no windows to raise for a moment -- so what has to be pinned is that it
 //  keeps trying, and that it stops.

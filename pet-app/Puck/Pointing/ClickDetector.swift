@@ -2,7 +2,7 @@
 //  ClickDetector.swift
 //  Puck
 //
-//  F10 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Global click monitor, checks whether the click point is within a target's frame
 //
 

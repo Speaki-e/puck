@@ -2,7 +2,7 @@
 //  AvatarImportValidator.swift
 //  Puck
 //
-//  F2 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Import-menu validator: checks manifest schema + clip existence, reports missing items
 //
 //  Checks manifest schema/required-clip-keys (via AvatarLoader) plus the

@@ -2,7 +2,7 @@
 //  PinnedState.swift
 //  Puck
 //
-//  F3/F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Pinned state's StateHandler implementation.
 //
 //  Entered when Option+Shift+Space summons the F13 client window -- the

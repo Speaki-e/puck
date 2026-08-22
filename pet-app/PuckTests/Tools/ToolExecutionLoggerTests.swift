@@ -2,7 +2,7 @@
 //  ToolExecutionLoggerTests.swift
 //  Puck
 //
-//  F11 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  JSON Lines log formatting, per protocol/01_protocol.md section 7
 //  ("로그 포맷 (분산 디버깅 표준)").
 //

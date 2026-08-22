@@ -2,7 +2,7 @@
 //  ScreenBounds.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Keeps the pet inside the screen, and bounces it off the edges.
 //
 //  Every state used to clamp (or not) on its own, against the bare position

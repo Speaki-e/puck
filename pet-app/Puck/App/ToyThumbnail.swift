@@ -2,7 +2,7 @@
 //  ToyThumbnail.swift
 //  Puck
 //
-//  F12 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Menu-bar icons for the toy list, shown alongside each toy's name.
 //
 //  The one thing that actually needs care here is proportions. The wand's art

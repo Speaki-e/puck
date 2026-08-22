@@ -2,7 +2,7 @@
 //  GPTClient.swift
 //  Puck
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A thin OpenAI Chat Completions client with tool calling.
 //
 //  The pet needs to drive the screen -- launching apps, reacting to what's

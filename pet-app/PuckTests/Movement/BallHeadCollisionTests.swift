@@ -2,7 +2,7 @@
 //  BallHeadCollisionTests.swift
 //  Puck
 //
-//  F12 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A ball falling near the character should hit its head instead of
 //  passing straight through to the floor.
 //

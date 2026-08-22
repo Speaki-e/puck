@@ -2,7 +2,7 @@
 //  SpriteHitTest.swift
 //  Puck
 //
-//  F1 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Turns a point on screen into a point inside a sprite's artwork, so it can
 //  be tested against that artwork's AlphaHitMask.
 //

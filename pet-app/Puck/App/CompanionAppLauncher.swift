@@ -2,7 +2,7 @@
 //  CompanionAppLauncher.swift
 //  Puck
 //
-//  Shared · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Puck (the pet) and PuckClient (the Dock-resident chat window,
 //  2026-07-30) are now separate apps that should come up together --
 //  each launches the other on its own

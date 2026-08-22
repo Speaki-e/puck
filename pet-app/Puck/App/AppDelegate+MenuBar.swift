@@ -2,7 +2,7 @@
 //  AppDelegate+MenuBar.swift
 //  Puck
 //
-//  Shared · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Status item wiring: the popover settings panel and the hide/show toggle.
 //
 

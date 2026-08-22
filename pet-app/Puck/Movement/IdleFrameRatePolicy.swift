@@ -2,7 +2,7 @@
 //  IdleFrameRatePolicy.swift
 //  Puck
 //
-//  F1 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Decides when the frame loop may slow down.
 //
 //  The current CALayer renderer still needs ticks for FSM movement, toy

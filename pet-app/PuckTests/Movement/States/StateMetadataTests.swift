@@ -2,7 +2,7 @@
 //  StateMetadataTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Clip-key metadata for the remaining states, per the state transition table
 //  in plan/02_pet-app.md section 3.
 //

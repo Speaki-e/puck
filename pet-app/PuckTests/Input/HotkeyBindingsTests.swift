@@ -2,7 +2,7 @@
 //  HotkeyBindingsTests.swift
 //  Puck
 //
-//  F6 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Default bindings + conflict detection, per plan/02_pet-app.md F6
 //  (PTT = Option+Space hold, text input = Option+Shift+Space,
 //  character summon = Option+Cmd+Space).

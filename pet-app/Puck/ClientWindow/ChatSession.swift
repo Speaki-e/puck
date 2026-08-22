@@ -2,7 +2,7 @@
 //  ChatSession.swift
 //  Puck
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  One chat session's rendered timeline, built by folding the same
 //  BridgeEvent stream EventRouter reads for pet reactions (plan/01_protocol.md
 //  3.2) into something plan/02_pet-app.md F13 can render: streaming assistant

@@ -2,7 +2,7 @@
 //  PendingApprovals.swift
 //  Puck
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The approval requests a run is blocked on, tagged with which run they
 //  belong to.
 //

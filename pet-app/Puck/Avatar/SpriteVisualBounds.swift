@@ -2,7 +2,7 @@
 //  SpriteVisualBounds.swift
 //  Puck
 //
-//  F2 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Where the pet's *visible* pixels actually are, as a rectangle.
 //
 //  Two things stand between the layer's bounds and what the eye sees, and

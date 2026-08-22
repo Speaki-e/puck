@@ -2,7 +2,7 @@
 //  ReactDragState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  ReactDrag state's StateHandler implementation.
 //
 //  The pet hangs off the cursor while being dragged and drops when let go

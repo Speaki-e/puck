@@ -2,7 +2,7 @@
 //  MoveToStateTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  "임의 | 도구/이벤트 목표좌표 | MoveTo → Point 또는 Idle"
 //  (plan/02_pet-app.md section 3).
 //

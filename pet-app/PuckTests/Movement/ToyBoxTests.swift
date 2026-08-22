@@ -2,7 +2,7 @@
 //  ToyBoxTests.swift
 //  Puck
 //
-//  F12 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Several toys out at once: toggling them on/off, which one the cursor
 //  grabs, and which one the pet is currently playing with.
 //

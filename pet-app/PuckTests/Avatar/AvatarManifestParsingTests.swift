@@ -2,7 +2,7 @@
 //  AvatarManifestParsingTests.swift
 //  Puck
 //
-//  F2 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  manifest.json parsing + required-clip fallback verification.
 //
 

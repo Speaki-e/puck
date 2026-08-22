@@ -2,7 +2,7 @@
 //  ClientWindow.swift
 //  Puck
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A regular titled/resizable window (unlike OverlayWindow/TextInputBubbleWindow,
 //  this one is a real app window, not a floating/borderless overlay) -- it's
 //  the persistent "Claude Desktop"-style client, not a transient popup.

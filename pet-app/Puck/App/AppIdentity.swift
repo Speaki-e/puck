@@ -2,7 +2,7 @@
 //  AppIdentity.swift
 //  Puck
 //
-//  Shared · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The one file to edit when the app gets renamed again -- future renames
 //  should be quick, not another manual sweep. The PetAgent -> Shaydi
 //  rename touched ~340 files by hand because nothing was centralized --

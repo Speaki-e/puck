@@ -2,7 +2,7 @@
 //  LaunchAppHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  NSWorkspace.openApplication -> returns pid, triggers the pet's MoveTo
 //
 //  After a successful launch the pet walks over to greet the new window —

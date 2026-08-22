@@ -2,7 +2,7 @@
 //  AvatarCatalogueTests.swift
 //  Puck
 //
-//  Avatar test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A preset picker needs to know what's actually installed. Multiple
 //  differently-named avatar folders already coexist fine on disk
 //  (AvatarInstaller only ever touches its own destination name), so this is

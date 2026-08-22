@@ -2,7 +2,7 @@
 //  AppDelegate+Pointing.swift
 //  Puck
 //
-//  F10/F11 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Walks the pet to a target and holds a point gesture on it, driven by
 //  point_at / tool_cancel.
 //

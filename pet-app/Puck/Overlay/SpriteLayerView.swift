@@ -2,7 +2,7 @@
 //  SpriteLayerView.swift
 //  Puck
 //
-//  F1 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  CALayer-backed NSView replacing PetARView (2026-07-29 2D switch).
 //
 //  RealityKit's ARView, a full 3D render pipeline, is overkill for a static

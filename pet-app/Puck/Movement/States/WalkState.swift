@@ -2,7 +2,7 @@
 //  WalkState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Walk state's StateHandler implementation.
 //
 //  Carries the pet to `target` at constant speed and hands back to Idle on

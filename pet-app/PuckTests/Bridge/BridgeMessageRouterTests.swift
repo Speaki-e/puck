@@ -2,7 +2,7 @@
 //  BridgeMessageRouterTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  BridgeServer delivers messages on its own background queue, but handling
 //  them touches main-thread-only state: EventRouter reactions drive
 //  CharacterController -> USDZAvatar (RealityKit entity mutation), and

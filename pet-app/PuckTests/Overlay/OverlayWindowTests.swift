@@ -2,7 +2,7 @@
 //  OverlayWindowTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Verifies the declared window configuration from plan/02_pet-app.md F1.
 //  Never orders the window on screen, so it doesn't visibly flash during tests.
 //

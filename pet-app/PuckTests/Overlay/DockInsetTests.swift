@@ -2,7 +2,7 @@
 //  DockInsetTests.swift
 //  Puck
 //
-//  F1 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The pet's "ground" (roamableArea's bottom edge) used to be the literal
 //  bottom of the physical screen, which is exactly where the Dock sits --
 //  since the Dock's window level is higher than our overlay's, the pet's

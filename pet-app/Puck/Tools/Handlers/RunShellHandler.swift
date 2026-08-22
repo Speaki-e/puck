@@ -2,7 +2,7 @@
 //  RunShellHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Process + /bin/zsh -lc, returns stdout/stderr/exit code
 //
 

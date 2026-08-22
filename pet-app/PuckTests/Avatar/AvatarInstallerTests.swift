@@ -2,7 +2,7 @@
 //  AvatarInstallerTests.swift
 //  Puck
 //
-//  F2 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  AppDelegate loads the avatar from ~/Library/Application Support/Puck/
 //  Avatars/dummy, but nothing ever put it there — only the user-driven import
 //  in AvatarManagementView copies anything. On a fresh clone the app launched

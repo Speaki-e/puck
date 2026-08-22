@@ -2,7 +2,7 @@
 //  CharacterController.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Drives update(dt) every frame; runs and transitions the current StateHandler.
 //
 

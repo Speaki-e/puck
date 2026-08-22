@@ -2,7 +2,7 @@
 //  PlayerNodePool.swift
 //  Puck
 //
-//  F5 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Manages a pool of 4-8 concurrently playable PlayerNodes
 //
 

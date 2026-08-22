@@ -2,7 +2,7 @@
 //  AppDelegate+HotkeysVoice.swift
 //  Puck
 //
-//  F6/F7 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Global hotkeys, voice input, and the quick-capture text bubble.
 //
 

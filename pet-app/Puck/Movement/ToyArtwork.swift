@@ -2,7 +2,7 @@
 //  ToyArtwork.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Loads a toy's bundled PNG.
 //
 //  Shared because two places need the same file for different reasons: the

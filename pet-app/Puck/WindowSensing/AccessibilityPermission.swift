@@ -2,7 +2,7 @@
 //  AccessibilityPermission.swift
 //  Puck
 //
-//  F4 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  AXIsProcessTrustedWithOptions check + Settings deep link
 //
 //  Thin wrapper around real OS permission APIs — not unit tested, since

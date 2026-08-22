@@ -2,7 +2,7 @@
 //  AgentConfiguration.swift
 //  Puck
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Where the agent's API key and model name come from.
 //
 //  Never the source tree's *tracked* files: plan/04_ai-module.md section 3.1

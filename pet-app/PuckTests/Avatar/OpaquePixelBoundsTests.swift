@@ -2,7 +2,7 @@
 //  OpaquePixelBoundsTests.swift
 //  Puck
 //
-//  F2 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Measuring where an avatar PNG's artwork actually is inside its canvas.
 //
 

@@ -2,7 +2,7 @@
 //  HeadPetDetector.swift
 //  Puck
 //
-//  F1 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Recognises the cursor being rubbed back and forth over the pet's head.
 //
 //  Deliberately NOT a click gesture: stroking something is done with an open

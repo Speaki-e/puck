@@ -2,7 +2,7 @@
 //  JSONValue+ArgExtraction.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Shared tool_dispatch argument extraction, used by multiple handlers.
 //
 

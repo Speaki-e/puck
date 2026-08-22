@@ -2,7 +2,7 @@
 //  AvatarLoader.swift
 //  Puck
 //
-//  F2 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Scans the Avatars directory + parses the manifest + validates required
 //  clips (idle only, as of the 2026-07-29 2D switch).
 //

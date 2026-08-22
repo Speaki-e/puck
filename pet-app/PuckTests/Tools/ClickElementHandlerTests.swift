@@ -2,7 +2,7 @@
 //  ClickElementHandlerTests.swift
 //  Puck
 //
-//  F11 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Args parsing only -- the actual CGEvent click synthesis is real system
 //  input injection and isn't unit tested (same trust level as
 //  AccessibilityPermission/MicrophonePermission).

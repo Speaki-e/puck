@@ -2,7 +2,7 @@
 //  SpriteLayerViewTests.swift
 //  Puck
 //
-//  F1 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Smoke coverage for the 2026-07-29 2D switch's CALayer-backed replacement
 //  for PetARView -- see SpriteLayerView's own doc comment for why this
 //  doesn't need RealityKit's alpha-halo mitigation dance at all.

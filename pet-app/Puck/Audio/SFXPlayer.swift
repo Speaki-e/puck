@@ -2,7 +2,7 @@
 //  SFXPlayer.swift
 //  Puck
 //
-//  F5 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Singleton SFX trigger API, AVAudioEngine-based
 //
 

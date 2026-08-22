@@ -2,7 +2,7 @@
 //  PetToolDispatcher.swift
 //  Puck
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The `petAppProxy` executor of plan/04_ai-module.md section 3.1, in Swift:
 //  turns one tool call into a tool_dispatch on bridge.sock and waits for the
 //  tool_result carrying the same id (protocol 3.1).

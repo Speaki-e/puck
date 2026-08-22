@@ -2,7 +2,7 @@
 //  ToyCatalogue.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The toys the pet can be given, and how big each one is drawn.
 //
 //  Toys live in the app bundle, one directory each under `Resources/Toys/`,

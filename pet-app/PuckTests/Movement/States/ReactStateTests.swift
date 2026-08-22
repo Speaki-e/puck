@@ -2,7 +2,7 @@
 //  ReactStateTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  "임의 | 캐릭터 클릭 | ReactClick → Idle" and "임의 | 캐릭터 드래그/드롭 |
 //  ReactDrag(커서 추종) → Fall" (plan/02_pet-app.md section 3).
 //

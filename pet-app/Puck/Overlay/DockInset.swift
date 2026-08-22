@@ -2,7 +2,7 @@
 //  DockInset.swift
 //  Puck
 //
-//  F1 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  How much of a screen's bottom edge the Dock occupies, from NSScreen's own
 //  frame/visibleFrame difference -- used to keep roamableArea's ground line
 //  above the Dock instead of exactly on top of it (the Dock's window level

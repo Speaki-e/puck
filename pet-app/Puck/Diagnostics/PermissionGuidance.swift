@@ -2,7 +2,7 @@
 //  PermissionGuidance.swift
 //  Puck
 //
-//  F10/F11 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Which permission a tool needs, and whether the pet should go and ask for
 //  it -- surfacing the system permission dialog and having the pet point at
 //  it with a speech bubble telling the user to click it.

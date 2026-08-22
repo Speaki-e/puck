@@ -2,7 +2,7 @@
 //  ClientRelay.swift
 //  Puck
 //
-//  F13/socket · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Which connection role a BridgeMessage should be forwarded to, now that
 //  the client window is its own process (PuckClient) rather than living
 //  in-process with pet-app (2026-07-30, protocol 3.7). Pure and

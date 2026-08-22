@@ -2,7 +2,7 @@
 //  PendingApprovalsTests.swift
 //  Puck
 //
-//  F15 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Approval requests are answered by the run that owns them, not by whichever
 //  run happens to finish.
 //

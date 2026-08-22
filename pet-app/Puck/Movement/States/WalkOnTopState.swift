@@ -2,7 +2,7 @@
 //  WalkOnTopState.swift
 //  Puck
 //
-//  F3 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  WalkOnTop state's StateHandler implementation
 //
 //  Strolls along a window's top edge until the window stops being there —

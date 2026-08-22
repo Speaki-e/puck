@@ -2,7 +2,7 @@
 //  StateHandler.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  protocol: enter() / update(dt:context:) / exit()
 //
 

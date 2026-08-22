@@ -2,7 +2,7 @@
 //  VoiceInputController.swift
 //  Puck
 //
-//  F7 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Single class owning both the PTT key event and the recording lifecycle
 //
 

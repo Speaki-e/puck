@@ -2,7 +2,7 @@
 //  BallPhysics.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Pure physics for the ball-toy interaction (02_pet-app.md F12, optional,
 //  lowest priority). The drop reuses MovementSolver.fallStep's free-fall
 //  arithmetic directly rather than reimplementing it; the kicked-away fling

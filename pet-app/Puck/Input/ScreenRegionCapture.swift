@@ -2,7 +2,7 @@
 //  ScreenRegionCapture.swift
 //  Puck
 //
-//  F14 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Interactive drag-to-select screen-region capture for attaching to a
 //  message. Shells out to /usr/sbin/screencapture -i rather than
 //  reimplementing drag-to-select: it already draws the system's own

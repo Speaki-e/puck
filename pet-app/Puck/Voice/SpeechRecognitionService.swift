@@ -2,7 +2,7 @@
 //  SpeechRecognitionService.swift
 //  Puck
 //
-//  F7 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  SFSpeechAudioBufferRecognitionRequest streaming, on-device first / server fallback
 //
 //  "On-device first, server fallback" is decided upfront via

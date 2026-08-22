@@ -2,7 +2,7 @@
 //  ClickThroughControllerTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  The head region used for petting.
 //
 //  Clicking the pet is no longer a rectangle at all -- it is measured against

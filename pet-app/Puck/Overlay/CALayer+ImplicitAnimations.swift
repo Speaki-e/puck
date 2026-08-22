@@ -2,7 +2,7 @@
 //  CALayer+ImplicitAnimations.swift
 //  Puck
 //
-//  F1 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Turns off Core Animation's implicit animations for layers the FSM drives
 //  by hand, every frame.
 //

@@ -2,7 +2,7 @@
 //  ClientWindowTests.swift
 //  Puck
 //
-//  F13 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Never orders the window on screen, so it doesn't visibly flash during
 //  tests.
 //

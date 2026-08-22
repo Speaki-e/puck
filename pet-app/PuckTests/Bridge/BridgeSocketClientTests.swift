@@ -2,7 +2,7 @@
 //  BridgeSocketClientTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  PuckClient's own bridge.sock client (2026-07-30) -- connects as role
 //  "gui" (protocol 3.7) and doubles as UserInputSender's UserInputTransport.
 //

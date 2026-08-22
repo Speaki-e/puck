@@ -2,7 +2,7 @@
 //  CharacterBodyTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  States had no way to read or write the pet's position — StateHandler only
 //  received `dt` — so MoveToState/WalkState could not move anything even once
 //  a frame loop existed. CharacterBody is the position/facing they act on,

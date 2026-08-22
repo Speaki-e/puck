@@ -2,7 +2,7 @@
 //  DummyAvatarPackageTests.swift
 //  Puck
 //
-//  F2 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  The committed dummy avatar is what a fresh clone runs on, so its manifest
 //  and its PNGs have to agree with each other. Every failure mode here is
 //  silent at runtime -- a typo'd stem, a file that never got copied, or a

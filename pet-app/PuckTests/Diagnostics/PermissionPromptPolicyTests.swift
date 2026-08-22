@@ -2,7 +2,7 @@
 //  PermissionPromptPolicyTests.swift
 //  Puck
 //
-//  Shared test · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Launch used to raise the Accessibility prompt every single time the
 //  permission was missing, so anyone who dismissed it — or who was mid-way
 //  through granting it — got the dialog again on the next launch, forever.

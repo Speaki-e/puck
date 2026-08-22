@@ -2,7 +2,7 @@
 //  ListenState.swift
 //  Puck
 //
-//  F3 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Listen state's StateHandler implementation
 //
 //  Entered on PTT keyDown from any current state; on keyUp, returns to

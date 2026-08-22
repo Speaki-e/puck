@@ -2,7 +2,7 @@
 //  ScreenManager.swift
 //  Puck
 //
-//  F1 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Tracks NSScreen list, responds to didChangeScreenParametersNotification
 //
 

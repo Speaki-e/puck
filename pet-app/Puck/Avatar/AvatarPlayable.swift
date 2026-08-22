@@ -2,7 +2,7 @@
 //  AvatarPlayable.swift
 //  Puck
 //
-//  F2 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  protocol: play(clip:loop:) / stop / setScreenPosition / setFacing
 //
 //  The FSM (Movement/CharacterController) only knows this protocol — it has no

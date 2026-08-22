@@ -2,7 +2,7 @@
 //  AppDelegate+BallToy.swift
 //  Puck
 //
-//  F12 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Ball toy state, spawn, and play/summon logic (menu bar + Option+Shift+1/2).
 //
 

@@ -2,7 +2,7 @@
 //  AppDelegate+ClientTheme.swift
 //  Puck
 //
-//  F13 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Persists the client (chat) window's theme and broadcasts it to
 //  PuckClient over DistributedNotificationCenter.
 //

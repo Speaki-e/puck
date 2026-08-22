@@ -2,7 +2,7 @@
 //  LandState.swift
 //  Puck
 //
-//  F3 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Land state's StateHandler implementation
 //
 //  A brief landing beat so the non-looping land clip is legible, then Idle

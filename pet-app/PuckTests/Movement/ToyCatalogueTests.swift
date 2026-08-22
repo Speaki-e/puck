@@ -2,7 +2,7 @@
 //  ToyCatalogueTests.swift
 //  Puck
 //
-//  F12 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The toy list and its artwork, one directory per toy under Resources/Toys,
 //  keeping each toy's assets organized separately.
 //

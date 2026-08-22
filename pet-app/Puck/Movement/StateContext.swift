@@ -2,7 +2,7 @@
 //  StateContext.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  What a state can see and do during one frame.
 //
 //  States used to receive nothing but `dt`, so they could neither move the

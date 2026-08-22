@@ -2,7 +2,7 @@
 //  CALayerImplicitAnimationsTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  disableImplicitAnimations() must disable every property Puck assigns
 //  by hand every frame -- a property left off the list keeps CALayer's
 //  default ~0.25s implicit fade, which reads as smoothing/lag bugs.

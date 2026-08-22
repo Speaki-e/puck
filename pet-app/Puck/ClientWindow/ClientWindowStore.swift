@@ -2,7 +2,7 @@
 //  ClientWindowStore.swift
 //  Puck
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Source of truth for the client window's sidebar: workspaces, each
 //  workspace's chat sessions, and which one is active. Fed by PuckClient's
 //  BridgeSocketClient for incoming state and UserInputSender for outgoing

@@ -2,7 +2,7 @@
 //  BridgeMessageRouter.swift
 //  Puck
 //
-//  F11/socket · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Routes an incoming BridgeMessage to tool execution or an FSM/SFX reaction,
 //  hopping onto the main thread first.
 //

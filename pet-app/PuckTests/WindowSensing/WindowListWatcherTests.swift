@@ -2,7 +2,7 @@
 //  WindowListWatcherTests.swift
 //  Puck
 //
-//  F4 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Pure filtering logic: layer 0 only, exclude self, exclude below minimum size.
 //  The live CGWindowListCopyWindowInfo fetch and NSWorkspace/Timer polling are
 //  not unit tested here — they depend on real on-screen windows and OS timers.

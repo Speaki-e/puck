@@ -2,7 +2,7 @@
 //  WindowInfo.swift
 //  Puck
 //
-//  F4 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Normalized window info model {role,title,frame,...}
 //
 

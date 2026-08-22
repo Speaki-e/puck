@@ -2,7 +2,7 @@
 //  BallPhysicsTests.swift
 //  Puck
 //
-//  F12 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Pure physics for the ball-toy interaction (02_pet-app.md F12, optional).
 //  Drop reuses MovementSolver.fallStep's free-fall math directly; the kicked
 //  fling is this file's one bit of new arithmetic.

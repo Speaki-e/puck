@@ -2,7 +2,7 @@
 //  ClickElementHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Delegates to F10 SyntheticClick; approval itself is gated by the agent core
 //
 //  TODO(F4 level 2): classifying "is this target a system security dialog"

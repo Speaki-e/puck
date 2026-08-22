@@ -2,7 +2,7 @@
 //  MoveToState.swift
 //  Puck
 //
-//  F3 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  MoveTo state's StateHandler implementation
 //
 //  A directed move ordered by a tool or a socket event ("임의 | 도구/이벤트

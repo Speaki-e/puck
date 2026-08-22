@@ -2,7 +2,7 @@
 //  IdleFrameRatePolicyTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Locks the current 2D heartbeat budget: 30 Hz while active and 15 Hz after
 //  sustained idle, with immediate restoration when activity resumes.
 //

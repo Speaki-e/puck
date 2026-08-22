@@ -2,7 +2,7 @@
 //  ClientMainMenu.swift
 //  PuckClient
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  PuckClient's main menu, built in code.
 //
 //  The standard commands have to work here like anywhere else. An AppKit app

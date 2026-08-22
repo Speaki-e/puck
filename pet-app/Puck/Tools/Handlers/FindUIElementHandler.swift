@@ -2,7 +2,7 @@
 //  FindUIElementHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Returns F4 level-2 lookup results as {role,title,frame}
 //
 //  args: `{"pid": 501, "role": "AXButton", "title_contains": "허용"}`.

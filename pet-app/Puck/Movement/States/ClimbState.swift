@@ -2,7 +2,7 @@
 //  ClimbState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Climb state's StateHandler implementation.
 //
 //  Rides a window's side up to its top edge, then walks along it

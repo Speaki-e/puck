@@ -2,7 +2,7 @@
 //  SettingsComponents.swift
 //  Puck
 //
-//  Shared · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The settings window's building blocks, in pokoPet's vocabulary -- modeled
 //  after that app's menu bar popover.
 //

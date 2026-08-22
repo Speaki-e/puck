@@ -2,7 +2,7 @@
 //  PendingPointTrackerTests.swift
 //  Puck
 //
-//  F10/F11 test · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  A point_at that arrives before a previous one has started walking
 //  supersedes it -- but the superseded caller's tool_result(ok) must still
 //  fire, not be silently dropped until ToolExecutor's 15s timeout.

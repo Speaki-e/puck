@@ -2,7 +2,7 @@
 //  SpriteAvatar.swift
 //  Puck
 //
-//  F2 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  2026-07-29 2D switch: primary AvatarPlayable implementation. Loads one PNG
 //  per clip (same file-stem manifest convention usdz used) and shows it on a
 //  CALayer parented into SpriteLayerView's contentLayer.

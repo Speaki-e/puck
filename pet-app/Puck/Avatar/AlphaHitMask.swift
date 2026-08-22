@@ -2,7 +2,7 @@
 //  AlphaHitMask.swift
 //  Puck
 //
-//  F1 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Which parts of an image are actually drawn, as a bitmask you can hit-test
 //  against.
 //

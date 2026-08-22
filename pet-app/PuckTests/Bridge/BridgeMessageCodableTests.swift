@@ -2,7 +2,7 @@
 //  BridgeMessageCodableTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Verifies BridgeMessages Codable encoding/decoding against the example JSON
 //  in plan/01_protocol.md section 3.
 //

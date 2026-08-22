@@ -2,7 +2,7 @@
 //  PettingState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Petting state's StateHandler implementation.
 //
 //  A double-tap "petting" reaction, distinct from a single ReactClick tap.

@@ -2,7 +2,7 @@
 //  MenuBarClickTests.swift
 //  Puck
 //
-//  Shared test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //
 
 import XCTest

@@ -2,7 +2,7 @@
 //  AvatarImportValidatorTests.swift
 //  Puck
 //
-//  F2 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Validates the file-per-clip package layout from docs/avatar-spec.md:
 //  each clip's {name}.usdz must actually exist on disk (not just as a
 //  manifest key) and fit the per-file size budget. Mesh height/scale and

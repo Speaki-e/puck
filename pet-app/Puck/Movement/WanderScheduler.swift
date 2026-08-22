@@ -2,7 +2,7 @@
 //  WanderScheduler.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Idle's 8-30s random wander timer, weighted next-action selection.
 //
 

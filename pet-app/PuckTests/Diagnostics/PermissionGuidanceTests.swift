@@ -2,7 +2,7 @@
 //  PermissionGuidanceTests.swift
 //  Puck
 //
-//  F10/F11 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  When the pet should go and ask for a permission, and when it should stay
 //  out of the way.
 //

@@ -2,7 +2,7 @@
 //  ToyApproachTests.swift
 //  Puck
 //
-//  F12 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Where the pet stands to play with the toy, so it doesn't stand on top of it.
 //
 

@@ -2,7 +2,7 @@
 //  AvatarManifest.swift
 //  Puck
 //
-//  F2 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  manifest.json Codable model (mirrors protocol repo section 6 schema).
 //
 

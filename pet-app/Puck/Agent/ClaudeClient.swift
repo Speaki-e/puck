@@ -2,7 +2,7 @@
 //  ClaudeClient.swift
 //  Puck
 //
-//  F15 (task 3) · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A thin Anthropic Messages API client with tool calling -- the second
 //  `AgentLLMClient`, sitting next to GPTClient.swift.
 //

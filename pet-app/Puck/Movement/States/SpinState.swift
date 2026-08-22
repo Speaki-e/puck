@@ -2,7 +2,7 @@
 //  SpinState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The happy flips the pet does after being petted, for a while afterward.
 //  It turns about its own vertical axis, like a sheet of paper
 //  being turned over repeatedly -- not an in-plane rotation, which tips the

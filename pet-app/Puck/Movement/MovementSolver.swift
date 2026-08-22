@@ -2,7 +2,7 @@
 //  MovementSolver.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Pure motion arithmetic for MoveTo/Walk/Fall.
 //
 //  plan/02_pet-app.md F3: "물리엔진 없음. MoveTo 등속(px/sec) + 도착 반경,

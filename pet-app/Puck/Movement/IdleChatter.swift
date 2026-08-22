@@ -2,7 +2,7 @@
 //  IdleChatter.swift
 //  Puck
 //
-//  F5 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  The occasional unprompted voice line while the pet is standing around.
 //
 //  Every other sound in the app is a *reaction* -- to a state entry, a click,

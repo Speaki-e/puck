@@ -2,7 +2,7 @@
 //  SFXDecisionMakerTests.swift
 //  Puck
 //
-//  F5 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Pure trigger -> action decision, per plan/02_pet-app.md F5: unmapped keys
 //  are silent, loop sounds keep playing until a *different* loop key arrives
 //  (at which point the old one fades — SFXPlayer's job, not this decision),

@@ -2,7 +2,7 @@
 //  JSONValue+AgentBridging.swift
 //  Puck
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The two conversions between the model's world (JSON *text*, because that
 //  is what OpenAI emits for tool arguments) and the socket's world
 //  (JSONValue, protocol 3.1's `args` / `data`).

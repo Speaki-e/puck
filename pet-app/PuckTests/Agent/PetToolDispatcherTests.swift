@@ -2,7 +2,7 @@
 //  PetToolDispatcherTests.swift
 //  Puck
 //
-//  F15 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Correlating a tool_result back to the call that is waiting for it -- the
 //  dispatcher's whole job, and the part that silently strands a run if it is
 //  wrong.

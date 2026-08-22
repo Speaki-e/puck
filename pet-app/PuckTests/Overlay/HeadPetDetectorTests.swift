@@ -2,7 +2,7 @@
 //  HeadPetDetectorTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Recognising a stroke over the pet's head, and — just as importantly — not
 //  recognising anything else. Petting fires on plain cursor movement with no click to
 //  confirm intent, so the false-positive cases below matter more than the

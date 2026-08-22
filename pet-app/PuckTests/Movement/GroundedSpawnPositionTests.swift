@@ -2,7 +2,7 @@
 //  GroundedSpawnPositionTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The pet used to spawn/reset at the window's vertical center, leaving it
 //  floating in empty space far above the Dock instead of standing on the
 //  ground like every other roaming/landing calculation already assumes

@@ -2,7 +2,7 @@
 //  SyntheticClick.swift
 //  Puck
 //
-//  F10 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  click_element: synthesizes CGEvent mouse down/up, detects not_supported_target
 //
 //  Design premise (plan/02_pet-app.md F10): clicking on behalf of the user

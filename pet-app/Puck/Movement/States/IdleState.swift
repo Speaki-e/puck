@@ -2,7 +2,7 @@
 //  IdleState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Idle state's StateHandler implementation.
 //
 

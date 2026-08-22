@@ -2,7 +2,7 @@
 //  BallController.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Glue between BallPhysics (pure math) and the CALayer it's drawn on
 //  (02_pet-app.md F12, optional ball-toy interaction).
 //

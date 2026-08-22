@@ -2,7 +2,7 @@
 //  ChatSessionTests.swift
 //  Puck
 //
-//  F13 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  ChatSession.apply(_:) folds the same BridgeEvent stream EventRouter reads
 //  for pet reactions into a chat timeline, per plan/02_pet-app.md F13's
 //  "onTextChunk 스트리밍, onToolCallStart/Result를 id로 짝지은 접이식 타임라인".

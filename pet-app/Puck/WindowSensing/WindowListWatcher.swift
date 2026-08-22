@@ -2,7 +2,7 @@
 //  WindowListWatcher.swift
 //  Puck
 //
-//  F4 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  CGWindowListCopyWindowInfo polling (10/15Hz) + NSWorkspace notification handling
 //
 

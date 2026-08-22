@@ -2,7 +2,7 @@
 //  ClimbToCeilingState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  ClimbToCeiling state's StateHandler implementation.
 //
 //  F3 ceiling-crawling (2026-07-29): climbs straight up to the roamable

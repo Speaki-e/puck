@@ -2,7 +2,7 @@
 //  TypeState.swift
 //  Puck
 //
-//  F3 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Type state's StateHandler implementation
 //
 //  Entered directly on a code_editor tool_call event (any current state can

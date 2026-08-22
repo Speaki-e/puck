@@ -2,7 +2,7 @@
 //  PuckApp.swift
 //  Puck
 //
-//  Shared · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  @main entry point; bootstraps the LSUIElement menu-bar-resident lifecycle.
 //
 //  NOTE: the rest of the init order (permission self-check -> Overlay ->

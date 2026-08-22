@@ -2,7 +2,7 @@
 //  PetGestureRecognizer.swift
 //  Puck
 //
-//  F1/F3 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Raw mouse events over the character -> tap or drag.
 //
 //  ClickThroughController already decides *when* the overlay accepts clicks

@@ -2,7 +2,7 @@
 //  RunAppleScriptHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Executes NSAppleScript
 //
 

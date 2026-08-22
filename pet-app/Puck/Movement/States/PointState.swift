@@ -2,7 +2,7 @@
 //  PointState.swift
 //  Puck
 //
-//  F3/F10 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Point state's StateHandler implementation
 //
 //  Holds the point clip while F10's PointingController runs the release

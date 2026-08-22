@@ -2,7 +2,7 @@
 //  OverlayWindowControllerTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Verifies one window is created per real display and positioned using
 //  AppKit frames (not the normalized, Y-down movement-logic space).
 //

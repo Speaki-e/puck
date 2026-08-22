@@ -2,7 +2,7 @@
 //  OverlayWindowController.swift
 //  Puck
 //
-//  F1 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Creates/positions one overlay window per display, orderOut when idle
 //
 //  TODO(perf, plan/02_pet-app.md F1): downshift frame rate 60->15 after 30s

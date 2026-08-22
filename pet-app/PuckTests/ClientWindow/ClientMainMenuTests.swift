@@ -2,7 +2,7 @@
 //  ClientMainMenuTests.swift
 //  Puck
 //
-//  F13 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  PuckClient
 //  shipped with no main menu at all, which on AppKit means no key
 //  equivalents either. These pin the shortcuts that were missing.

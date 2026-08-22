@@ -2,7 +2,7 @@
 //  GlobalScreenSpace.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Normalizes every NSScreen into a single top-left origin space, absorbing
 //  the AppKit/CGWindowList origin difference.
 //

@@ -2,7 +2,7 @@
 //  StateSoundKeyTests.swift
 //  Puck
 //
-//  F5/F12 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Which sound key each state asks the table for, and whether it loops.
 //
 

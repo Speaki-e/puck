@@ -2,7 +2,7 @@
 //  CursorVelocityTrackerTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The shared "how hard was that flick" measurement behind both the pet's
 //  throw and the toy's, since the toy can be grabbed and thrown the same
 //  way the pet can.

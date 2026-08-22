@@ -2,7 +2,7 @@
 //  BouncePreset.swift
 //  Puck
 //
-//  F2 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Procedural squash-and-stretch "bounce" motion for 2D sprite avatars
 //  (02_pet-app.md F2, 2026-07-29 2D switch).
 //

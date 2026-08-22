@@ -2,7 +2,7 @@
 //  JSONLinesDecoderTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Incremental JSON Lines parsing over an arbitrarily-chunked byte stream,
 //  per protocol/01_protocol.md section 2 ("인코딩: JSON Lines"). Also covers
 //  code-review findings on commit 57615a8: unbounded buffer growth and

@@ -2,7 +2,7 @@
 //  TextInputBubbleViewTests.swift
 //  Puck
 //
-//  F6 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Enter -> onSubmit(text) + clears the field; Escape -> onCancel.
 //
 

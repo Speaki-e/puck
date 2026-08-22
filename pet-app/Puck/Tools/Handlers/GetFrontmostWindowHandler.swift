@@ -2,7 +2,7 @@
 //  GetFrontmostWindowHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Returns frontmost window info (via F4)
 //
 

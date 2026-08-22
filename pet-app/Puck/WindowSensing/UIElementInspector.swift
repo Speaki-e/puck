@@ -2,7 +2,7 @@
 //  UIElementInspector.swift
 //  Puck
 //
-//  F4 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  AXUIElement tree DFS (depth-limited/timeout), backs find_ui_element
 //
 //  Thin AXUIElement wrapper: it turns a live app into AXNodes and lets

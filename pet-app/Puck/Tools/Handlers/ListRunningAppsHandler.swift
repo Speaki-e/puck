@@ -2,7 +2,7 @@
 //  ListRunningAppsHandler.swift
 //  Puck
 //
-//  F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Returns the list of running apps (NSWorkspace)
 //
 

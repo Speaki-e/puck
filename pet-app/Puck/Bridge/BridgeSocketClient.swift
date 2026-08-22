@@ -2,7 +2,7 @@
 //  BridgeSocketClient.swift
 //  Puck
 //
-//  F13/socket · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  PuckClient's own connection to bridge.sock (2026-07-30) -- unlike
 //  BridgeServer (which pet-app hosts), this is the client side: it dials
 //  out, announces role .gui (protocol 3.7) once ready, and reconnects with

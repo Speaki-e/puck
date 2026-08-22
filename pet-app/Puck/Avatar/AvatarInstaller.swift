@@ -2,7 +2,7 @@
 //  AvatarInstaller.swift
 //  Puck
 //
-//  F2 · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Seeds the bundled dummy avatar into Application Support on first run.
 //
 //  AvatarLoader reads from ~/Library/Application Support/Puck/Avatars/

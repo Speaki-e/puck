@@ -2,7 +2,7 @@
 //  SpriteHitTestTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Unwinding a sprite's transform and .resizeAspect letterboxing to find
 //  where a click landed inside the artwork.
 //

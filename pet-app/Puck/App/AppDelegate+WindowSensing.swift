@@ -2,7 +2,7 @@
 //  AppDelegate+WindowSensing.swift
 //  Puck
 //
-//  F4 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Starts the window-list watcher (level 1 of window sensing).
 //
 

@@ -2,7 +2,7 @@
 //  TextInputBubbleWindowTests.swift
 //  Puck
 //
-//  F6 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Verifies this is the one overlay-adjacent window that CAN become key.
 //
 

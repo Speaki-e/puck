@@ -2,7 +2,7 @@
 //  AgentRunner.swift
 //  Puck
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The tool-use loop -- plan/04_ai-module.md section 3.2, in Swift.
 //
 //  "날씨 앱 켜줘" reaches here as `run`, the model answers with launch_app,
@@ -584,7 +584,7 @@ final class AgentRunner {
                 ok: false,
                 data: nil,
                 error: "unknown_tool",
-                detail: "open_task_session은 이 연결에서 쓸 수 없어요."
+                detail: Strings.text(.toolTaskSessionUnavailable)
             )
         }
 
@@ -622,17 +622,17 @@ final class AgentRunner {
             // the model sends, so passing it on would only invite the model
             // to think it decides.
             guard case .object(let args) = arguments, case .string(let task)? = args["task"], !task.isEmpty else {
-                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "task가 비어 있어요.")            }
+                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: Strings.text(.toolTaskIsEmpty))            }
             return await delegateCodeEditor(task)
         }
         if name == Self.readFileToolName, let delegateReadFile {
             guard let path = Self.pathArgument(from: arguments) else {
-                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "path가 비어 있어요.")            }
+                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: Strings.text(.toolPathIsEmpty))            }
             return await delegateReadFile(path)
         }
         if name == Self.openInEditorToolName, let delegateOpenInEditor {
             guard let path = Self.pathArgument(from: arguments) else {
-                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: "path가 비어 있어요.")            }
+                return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: Strings.text(.toolPathIsEmpty))            }
             return await delegateOpenInEditor(path)
         }
         if name == Self.showCodeToolName, let delegateShowCode {
@@ -645,7 +645,7 @@ final class AgentRunner {
             else {
                 return DispatchedToolResult(
                     ok: false, data: nil, error: "execution_failed",
-                    detail: "show_code는 path, start_line, end_line, caption이 모두 필요해요."
+                    detail: Strings.text(.toolShowCodeNeedsEverything)
                 )
             }
             return await delegateShowCode(path, Int(start), Int(end), caption)

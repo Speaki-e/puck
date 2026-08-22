@@ -2,7 +2,7 @@
 //  PointAtHandlerTests.swift
 //  Puck
 //
-//  F10/F11 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  protocol section 4: point_at means "펫이 좌표로 이동해 가리킴", and
 //  tool_result(ok) comes back the moment Point *starts* — not when the
 //  command is received, and not when pointing ends.

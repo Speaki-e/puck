@@ -2,7 +2,7 @@
 //  GroundedSpawnPosition.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Where the pet appears on launch/display-rebuild/summon -- horizontally
 //  centered, standing on the ground (bottom edge), not floating at the
 //  window's vertical center. WanderScheduler's walk targets and

@@ -2,7 +2,7 @@
 //  PendingPointTracker.swift
 //  Puck
 //
-//  F10/F11 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Tracks the single in-flight point_at request the pet is walking toward.
 //
 //  A point_at that arrives before a previous one has reached its target

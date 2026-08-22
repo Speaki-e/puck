@@ -2,7 +2,7 @@
 //  MicrophonePermission.swift
 //  Puck
 //
-//  F7 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Microphone/speech recognition permission request wrapper
 //
 //  Thin wrapper around real OS permission APIs — not unit tested, since

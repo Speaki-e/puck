@@ -2,7 +2,7 @@
 //  AlphaHitMaskTests.swift
 //  Puck
 //
-//  F1 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Hit testing against what is actually drawn, not the box around it.
 //
 

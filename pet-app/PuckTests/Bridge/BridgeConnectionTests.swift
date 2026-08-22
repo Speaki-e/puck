@@ -2,7 +2,7 @@
 //  BridgeConnectionTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  PuckClient wraps its own outbound NWConnection to bridge.sock in a
 //  BridgeConnection (2026-07-30) -- it needs to know when that connection is
 //  actually ready so it can send client_hello, which onMessage/onClose alone

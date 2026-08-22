@@ -2,7 +2,7 @@
 //  AgentHost.swift
 //  PuckClient
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Wires the agent loop to this app: the chat sends commands in, tool calls
 //  go out over bridge.sock, and every step comes back as a BridgeEvent.
 //

@@ -2,7 +2,7 @@
 //  FrameTickerTests.swift
 //  Puck
 //
-//  F3 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The pure dt-computation half of the frame loop. FrameClock (Timer + this)
 //  is the thin untested layer, same split as WindowListWatcher.filter vs
 //  fetchRawWindowList.

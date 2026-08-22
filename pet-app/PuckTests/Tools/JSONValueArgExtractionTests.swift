@@ -2,7 +2,7 @@
 //  JSONValueArgExtractionTests.swift
 //  Puck
 //
-//  F11 test · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Shared JSONValue arg-extraction helpers used across tool handlers.
 //
 

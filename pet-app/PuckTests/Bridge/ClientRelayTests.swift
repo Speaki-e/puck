@@ -2,7 +2,7 @@
 //  ClientRelayTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //
 //  Rewritten 2026-08-15: with workspace deleted, `gui` is the only role left
 //  and the interesting question flipped. It used to be "which of the two roles

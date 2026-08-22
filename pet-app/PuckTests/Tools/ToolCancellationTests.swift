@@ -2,7 +2,7 @@
 //  ToolCancellationTests.swift
 //  Puck
 //
-//  F11 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A timed-out tool call replied `timeout` but left whatever it started
 //  running: RunShellHandler's process kept going with nobody to collect it,
 //  and the timeout work item itself stayed queued for the full duration even

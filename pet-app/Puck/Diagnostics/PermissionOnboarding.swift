@@ -2,7 +2,7 @@
 //  PermissionOnboarding.swift
 //  Puck
 //
-//  Shared · owner: Sangwoo Kang / Haeyoung Park
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  TCC permission self-check + re-prompt UI (Accessibility/microphone/speech recognition/screen recording)
 //
 //  Addresses the risk in plan/02_pet-app.md section 6 (CGEvent tap

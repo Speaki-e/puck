@@ -2,7 +2,7 @@
 //  FrameClock.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Drives CharacterController.update(dt:) — the FSM's per-frame heartbeat.
 //
 //  Without this nothing calls update(dt:) at all, which silently disables

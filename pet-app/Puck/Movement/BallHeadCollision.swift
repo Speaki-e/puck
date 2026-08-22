@@ -2,7 +2,7 @@
 //  BallHeadCollision.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Whether a falling ball's X currently overlaps the character's head, and
 //  if so, where it should land. Without this, a thrown ball
 //  falls straight through the character to the floor/window below it,

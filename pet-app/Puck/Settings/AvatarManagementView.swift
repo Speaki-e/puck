@@ -2,7 +2,7 @@
 //  AvatarManagementView.swift
 //  Puck
 //
-//  F2 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  Avatar import/switch UI, wired to AvatarImportValidator. Also hosts the
 //  size slider and per-emotion image mapping (both edit the active avatar's
 //  manifest.json via AvatarManifestEditor). Embedded as the Settings

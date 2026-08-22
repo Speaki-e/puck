@@ -2,7 +2,7 @@
 //  ClientThemeStyle.swift
 //  Puck
 //
-//  F13 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Which of the ClientWindow themes is active. Design system v2
 //  (2026-08-14) dropped the `.glass` theme -- see docs/decisions.md for
 //  the rationale. A distinct setting from Puck's system-wide AppAppearance

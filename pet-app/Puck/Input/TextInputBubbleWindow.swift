@@ -2,7 +2,7 @@
 //  TextInputBubbleWindow.swift
 //  Puck
 //
-//  F6 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  canBecomeKey borderless bubble window, restores frontmost app on close
 //
 //  The one deliberate exception to OverlayWindow's "never take focus" rule

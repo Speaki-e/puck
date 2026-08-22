@@ -2,7 +2,7 @@
 //  PlayerNodePoolTests.swift
 //  Puck
 //
-//  F5 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Pool selection logic (prefer idle, fall back to round-robin) tested
 //  against a fake node instead of a real, engine-attached AVAudioPlayerNode.
 //

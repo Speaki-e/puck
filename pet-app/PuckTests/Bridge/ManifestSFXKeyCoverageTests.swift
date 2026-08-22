@@ -2,7 +2,7 @@
 //  ManifestSFXKeyCoverageTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Every SFX key EventRouter.reaction(for:) can produce must have a matching
 //  entry in the manifest's sounds table (plan/01_protocol.md section 6) —
 //  F5's rule is that an unmapped key is silent, so a schema gap means a

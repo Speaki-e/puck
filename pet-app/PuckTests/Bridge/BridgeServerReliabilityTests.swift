@@ -2,7 +2,7 @@
 //  BridgeServerReliabilityTests.swift
 //  Puck
 //
-//  Socket test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Covers code-review findings on commit 57615a8: listener failures were
 //  silently swallowed (#1), and a stale-socket cleanup could steal a live
 //  instance's socket (#3).

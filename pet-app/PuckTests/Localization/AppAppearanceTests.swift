@@ -2,7 +2,7 @@
 //  AppAppearanceTests.swift
 //  Puck
 //
-//  Shared test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  An explicit in-app appearance
 //  override (Settings' General tab) rather than only ever following the
 //  system appearance.

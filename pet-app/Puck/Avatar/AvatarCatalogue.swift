@@ -2,7 +2,7 @@
 //  AvatarCatalogue.swift
 //  Puck
 //
-//  F2 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Which avatar packages are actually installed -- needed so the avatar can
 //  be switched like flipping between presets. AvatarInstaller
 //  already lets differently-named packages coexist on disk; this just

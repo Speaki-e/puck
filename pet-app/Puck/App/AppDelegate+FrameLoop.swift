@@ -2,7 +2,7 @@
 //  AppDelegate+FrameLoop.swift
 //  Puck
 //
-//  F3 · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  The per-frame clock that drives character/pointing/toy updates, and the
 //  permission-guidance and window-pointing gestures that ride on it.
 //

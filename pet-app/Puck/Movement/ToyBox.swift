@@ -2,7 +2,7 @@
 //  ToyBox.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The toys currently out, and which one the pet is playing with.
 //
 //  Until 2026-07-30 the app had exactly one toy: a single BallController that

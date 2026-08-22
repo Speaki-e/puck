@@ -2,7 +2,7 @@
 //  ToyInterestPolicy.swift
 //  Puck
 //
-//  F12 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Which toy the pet goes for when more than one is lying around.
 //
 //  Several toys can be out at once as of 2026-07-30, via a menu that shows

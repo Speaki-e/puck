@@ -2,7 +2,7 @@
 //  AgentRunHandleTests.swift
 //  Puck
 //
-//  F15 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  The handle AgentHost keeps on the running turn so 중지 can cancel it.
 //  Before it existed the turn was started with a fire-and-forget `Task {}`
 //  and nothing could reach it again.

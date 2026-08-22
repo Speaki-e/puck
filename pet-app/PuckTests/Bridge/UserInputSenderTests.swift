@@ -2,7 +2,7 @@
 //  UserInputSenderTests.swift
 //  Puck
 //
-//  F6/F7 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  AppDelegate cached the last BridgeConnection it saw and never cleared it,
 //  so after workspace disconnected the app still believed it was connected,
 //  sent user_input into a dead socket, and silently dropped it — the

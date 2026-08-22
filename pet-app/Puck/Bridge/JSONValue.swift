@@ -2,7 +2,7 @@
 //  JSONValue.swift
 //  Puck
 //
-//  F11/socket · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A minimal JSON tree for BridgeMessages' free-form fields (args/data/detail).
 //
 

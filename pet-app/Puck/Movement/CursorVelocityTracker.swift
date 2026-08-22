@@ -2,7 +2,7 @@
 //  CursorVelocityTracker.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  How fast the cursor is moving, smoothed enough to throw something with.
 //
 //  Extracted from ReactDragState when the toy became throwable too -- the

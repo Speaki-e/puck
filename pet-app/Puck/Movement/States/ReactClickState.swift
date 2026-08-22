@@ -2,7 +2,7 @@
 //  ReactClickState.swift
 //  Puck
 //
-//  F3 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  ReactClick state's StateHandler implementation.
 //
 //  A short reaction to being clicked, then back to whatever the pet was doing

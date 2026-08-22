@@ -2,7 +2,7 @@
 //  OverlayWindow.swift
 //  Puck
 //
-//  F1 · owner: Sangwoo Kang
+//  owner: 강상우 (Sangwoo Kang)
 //  NSWindow subclass: borderless, transparent, click-through by default, level .floating
 //
 

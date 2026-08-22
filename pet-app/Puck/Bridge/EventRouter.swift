@@ -2,7 +2,7 @@
 //  EventRouter.swift
 //  Puck
 //
-//  F3/socket · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Maps protocol 3.2 state events to FSM/SFX reactions
 //
 //  This is a pure decision function — it does not touch CharacterController or

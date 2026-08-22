@@ -2,7 +2,7 @@
 //  SettingsStoreTests.swift
 //  Puck
 //
-//  Shared test · owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
+//  owner: 강상우 (Sangwoo Kang) / 박해영 (Haeyoung Park)
 //  Uses a dedicated UserDefaults suite (never .standard) so tests can't
 //  pollute or be polluted by the developer's real defaults.
 //

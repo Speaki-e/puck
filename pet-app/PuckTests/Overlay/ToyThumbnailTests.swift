@@ -2,7 +2,7 @@
 //  ToyThumbnailTests.swift
 //  Puck
 //
-//  F12 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Menu-bar thumbnails: the artwork's proportions have to survive.
 //
 

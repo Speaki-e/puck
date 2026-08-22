@@ -2,7 +2,7 @@
 //  AgentRunHandle.swift
 //  Puck
 //
-//  F15 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Holds the Task of the agent turn that is currently running, so the chat's
 //  중지 button has something to cancel.
 //

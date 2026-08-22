@@ -2,7 +2,7 @@
 //  NearestClimbTargetTests.swift
 //  Puck
 //
-//  F3/F4 test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Choosing a window to go and climb, so the pet climbs windows now and then
 //  instead of staying glued to the floor.
 //

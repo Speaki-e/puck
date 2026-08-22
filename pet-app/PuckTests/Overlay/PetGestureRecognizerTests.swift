@@ -2,7 +2,7 @@
 //  PetGestureRecognizerTests.swift
 //  Puck
 //
-//  F1/F3 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  Turns raw mouse events over the character into the two gestures the
 //  transition table cares about: "캐릭터 클릭 -> ReactClick" and "캐릭터
 //  드래그/드롭 -> ReactDrag(커서 추종) -> Fall" (plan/02_pet-app.md section 3).

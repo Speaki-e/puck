@@ -2,7 +2,7 @@
 //  IdleChatterTests.swift
 //  Puck
 //
-//  F5 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  The occasional idle voice line: fires on its own timer, draws from the
 //  avatar's own chatter keys, silent for an avatar that has none.
 //

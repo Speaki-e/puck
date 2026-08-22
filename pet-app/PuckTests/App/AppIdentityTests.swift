@@ -2,7 +2,7 @@
 //  AppIdentityTests.swift
 //  Puck
 //
-//  Shared test · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  A regression guard for exactly the kind of drift a rename risks: if
 //  project.yml's bundle id and AppIdentity.swift's constant ever disagree,
 //  CompanionAppLauncher's cross-process lookups fail silently at runtime,

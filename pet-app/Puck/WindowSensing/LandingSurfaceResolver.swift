@@ -2,7 +2,7 @@
 //  LandingSurfaceResolver.swift
 //  Puck
 //
-//  F4 · owner: Haeyoung Park
+//  owner: 박해영 (Haeyoung Park)
 //  Resolves the landing surface (window top edge) accounting for Z-order/overlap
 //
 

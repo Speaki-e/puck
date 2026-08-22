@@ -2,7 +2,7 @@
 //  SoundTableTests.swift
 //  Puck
 //
-//  F5 test · owner: 강상우 (Sangwoo Kang)
+//  owner: 강상우 (Sangwoo Kang)
 //  manifest sounds table lookup — unmapped key means silence by design
 //  (plan/02_pet-app.md F5: "미매핑 키 무음").
 //

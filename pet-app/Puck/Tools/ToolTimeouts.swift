@@ -2,7 +2,7 @@
 //  ToolTimeouts.swift
 //  Puck
 //
-//  F11 · owner: 박해영 (Haeyoung Park)
+//  owner: 박해영 (Haeyoung Park)
 //  Mirrors protocol repo's /swift/ToolTimeouts.swift -- each tool's
 //  `timeout_sec` from the registry (plan/01_protocol.md section 4). Always
 //  update this file together with the protocol repo's registry.

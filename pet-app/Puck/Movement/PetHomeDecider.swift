@@ -24,12 +24,23 @@ final class PetHomeDecider {
 
     /// The menu bar's Hide toggle. Outranks everything: a hidden pet is not
     /// somewhere, it is nowhere.
+    ///
+    /// Showing it again re-decides from the last thing the client said rather
+    /// than waiting to be told again -- the client only sends when something
+    /// changes, so nothing would arrive, and the pet would stay wherever it
+    /// happened to be when it was hidden.
     var isPetHidden = false {
-        didSet { if isPetHidden != oldValue { pending = nil; elapsed = 0 } }
+        didSet {
+            guard isPetHidden != oldValue else { return }
+            elapsed = 0
+            pending = isPetHidden ? nil : lastReported
+        }
     }
 
     private var current: Move = .desktop
     private var pending: Move?
+    /// What the last report worked out to, kept so an unhide can re-decide.
+    private var lastReported: Move?
     private var elapsed: TimeInterval = 0
 
     /// The client's latest word on its tank. `hasTank` is false when there is
@@ -43,6 +54,9 @@ final class PetHomeDecider {
         } else {
             wanted = visible ? .home : .desktop
         }
+        lastReported = wanted
+        // Repeating the same answer must not restart the hold, or a client
+        // that reports every frame would never leave it.
         guard wanted != pending else { return }
         pending = wanted
         elapsed = 0

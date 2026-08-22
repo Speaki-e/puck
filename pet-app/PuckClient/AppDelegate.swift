@@ -102,15 +102,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `queue: .main` makes the MainActor.assumeIsolated below sound; the
         // block itself is not isolated in its signature, so the compiler
         // cannot see that and warns on the main-actor call without it.
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.clientWindowStore.setWindowIsFrontmost(true) }
-        }
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didResignKeyNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.clientWindowStore.setWindowIsFrontmost(false) }
+        //
+        // Matched against *this* window rather than accepting any window's
+        // notification: Settings and a detached editor live in this same
+        // process, so an unfiltered observer reports "frontmost" while the
+        // chat window is behind one of them, and the pet comes home to a tank
+        // nobody is looking at.
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                MainActor.assumeIsolated {
+                    guard let self, let window = self.window, note.object as AnyObject === window else { return }
+                    self.clientWindowStore.setWindowIsFrontmost(name == NSWindow.didBecomeKeyNotification)
+                }
+            }
         }
 
         showWindow()

@@ -90,4 +90,34 @@ final class PetHomeDeciderTests: XCTestCase {
 
         XCTAssertNil(settled(decider))
     }
+
+    /// A live client reports on every layout pass, so the same answer arrives
+    /// again and again while the pet is still waiting out the hold. If that
+    /// restarted the timer, the pet would never move at all.
+    func test_repeatingTheSameReportDoesNotRestartTheHold() {
+        let decider = PetHomeDecider()
+        decider.report(hasTank: true, visible: true, pinned: false)
+
+        var move: PetHomeDecider.Move?
+        for _ in 0..<60 {
+            decider.report(hasTank: true, visible: true, pinned: false)
+            move = decider.tick(dt: 1.0 / 60) ?? move
+        }
+
+        XCTAssertEqual(move, .home)
+    }
+
+    /// Showing the pet again has to re-decide from what the client last said.
+    /// Nothing will arrive to prompt it: the client sends only on a change,
+    /// and hiding the pet is not one.
+    func test_showingThePetAgainActsOnTheLastReport() {
+        let decider = PetHomeDecider()
+        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.isPetHidden = true
+        XCTAssertNil(settled(decider), "nothing moves while hidden")
+
+        decider.isPetHidden = false
+
+        XCTAssertEqual(settled(decider), .home)
+    }
 }

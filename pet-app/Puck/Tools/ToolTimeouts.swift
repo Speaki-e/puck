@@ -3,9 +3,9 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Mirrors protocol repo's /swift/ToolTimeouts.swift -- each tool's
-//  `timeout_sec` from the registry (plan/01_protocol.md section 4). Always
-//  update this file together with the protocol repo's registry.
+//  Each tool's `timeout_sec`. This began as a mirror of the protocol repo's
+//  own table; that repo was folded away in the native rewrite, so this file
+//  is the registry now rather than a copy of one.
 //
 //  Only the timeouts are mirrored, not the whole registry: `timeout_sec` is
 //  the one registry field a tool_dispatch *receiver* needs but the wire does
@@ -13,9 +13,6 @@
 //  receiver only needs a bound that is not tighter than the registry's).
 //  Executor/approval/params stay TS-only because no Swift-side consumer
 //  reads them.
-//
-//  Update this file together with src/types/tools.ts and docs/tools.md on any
-//  timeout change (see repo root README, change management rules).
 //
 
 import Foundation

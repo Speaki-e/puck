@@ -4,6 +4,26 @@ Cross-cutting product/architecture decisions that don't belong inline in code
 comments. Newest first. Each entry: what changed, why, and where the actual
 implementation lives.
 
+## 2026-08-22: the specs the code cites are historical, not files to open
+
+Comments across `pet-app` cite `plan/01_protocol.md`, `plan/02_pet-app.md`,
+`plan/04_ai-module.md`, `docs/tools.md`, `docs/socket.md`,
+`docs/avatar-spec.md` and `src/types/tools.ts`. None of those are in this
+repository and none ever were: they lived in the `plan` spec repo and in the
+`protocol`/`ai-module`/`workspace` repos the native rewrite folded away.
+
+The citations stay. Most of them quote the rule they are citing -- the state
+table, the timeout, the message schema -- so the substance survives the
+source; stripping 65 of them would risk the prose for no gain, and provenance
+for a decision is worth keeping even when the document is gone.
+
+What was removed is the handful of comments that told a reader to *do*
+something impossible: "always update this file together with
+`src/types/tools.ts`", and the framing of `ToolRegistry`, `ToolTimeouts` and
+`BridgeMessages` as mirrors that some other repo owns. Nothing owns them now
+but this repository, which makes a change to any of the three a change to the
+wire rather than a copy to keep in step.
+
 ## 2026-08-15: the chat UI goes back to native SwiftUI; chat-web is deleted
 
 The chat window is native again, and `pet-app` is now the whole repository.

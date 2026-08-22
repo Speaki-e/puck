@@ -3,9 +3,9 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Mirrors protocol repo's /swift/BridgeMessages.swift (Codable message types).
-//  Schema source: plan/01_protocol.md section 3. Always update this file together
-//  with the protocol repo's schema.
+//  The Codable message types for bridge.sock. Once a mirror of the protocol
+//  repo's own copy, and the schema itself since that repo was folded away --
+//  a change here changes the wire.
 //
 
 /// Standard tool_result error codes that cross the socket (protocol 3.1).

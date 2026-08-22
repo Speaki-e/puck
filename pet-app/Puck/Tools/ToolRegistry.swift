@@ -2,9 +2,9 @@
 //  ToolRegistry.swift
 //  Puck
 //
-//  Tool registry mirror (docs/tools.md, plan/01_protocol.md section 4).
-//  Reference implementation -- consumers copy this file, the way pet-app
-//  already copies BridgeMessages.swift and ToolTimeouts.swift.
+//  The tool registry. It began as a mirror of a TypeScript one for consumers
+//  to copy; the repos that held the original and did the copying are gone
+//  with the native rewrite, so this is the registry itself now.
 //
 //  Why a Swift mirror now: the registry was TS-only because the only Swift
 //  consumer (pet-app's executor) is told which tool to run by the wire and
@@ -18,9 +18,6 @@
 //  material rather than contract -- it changes without the wire changing.
 //  The Swift agent keeps its descriptions next to its prompt for the same
 //  reason.
-//
-//  Update this file together with src/types/tools.ts and docs/tools.md on any
-//  registry change (see repo root README, change management rules).
 //
 
 import Foundation

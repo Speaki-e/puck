@@ -36,6 +36,14 @@ struct ClientWindowView: View {
     /// that reason.
     @ObservedObject private var localization = Localization.shared
     @State private var editor: EditorPresentation = .hidden
+    /// Whether the code column was showing when the window last closed.
+    ///
+    /// Remembered for the same reason the terminal's state is: someone who
+    /// works with the files beside the conversation wants them there the next
+    /// morning, and closing the app is not them putting the pane away. Only
+    /// attached-or-not: a detached editor is a window, and windows are
+    /// restored by whoever opens them, not by a flag.
+    @AppStorage("Puck.editorAttached") private var editorWasAttached = false
     /// Resolved here rather than inside the editor, because the two halves it
     /// used to hold now live in different parts of the window: the file list
     /// on the right, a file's contents beside the conversation. One owner
@@ -81,6 +89,17 @@ struct ClientWindowView: View {
             editorStore = nil
             store.refreshEditorAvailability(forWorkspace: store.activeWorkspaceId)
         }
+    }
+
+    /// Reopens the code column if it was open when the app last quit.
+    ///
+    /// Asked again on every workspace switch, not only at launch: at launch
+    /// the window is showing whichever workspace was active, and the one that
+    /// can open an editor may be a different one -- so a single try on appear
+    /// restored nothing for the case that matters most.
+    private func restoreEditorIfWanted() {
+        guard editorWasAttached, editor == .hidden, activeWorkspace?.canOpenEditor == true else { return }
+        editor = .attached
     }
 
     private var activeWorkspace: ClientWorkspace? {
@@ -161,8 +180,12 @@ struct ClientWindowView: View {
         .onChange(of: store.activeWorkspaceId) {
             if activeWorkspace?.canOpenEditor != true { editor = .hidden }
             syncEditorStore()
+            restoreEditorIfWanted()
         }
-        .onAppear { syncEditorStore() }
+        .onAppear {
+            syncEditorStore()
+            restoreEditorIfWanted()
+        }
         .task(id: activeWorkspace?.projectPath) {
             await git.reload(projectPath: activeWorkspace?.projectPath)
         }
@@ -186,6 +209,9 @@ struct ClientWindowView: View {
         // window's tank -- a detached editor is a different window, and a
         // hidden one has no strip on screen at all.
         .onChange(of: editor) {
+            // Only the two states this remembers. Detaching leaves the flag
+            // where it was, so re-attaching later lands where you left it.
+            if editor != .detached { editorWasAttached = editor.isAttached }
             guard !editor.isAttached else { return }
             store.setTankSegment(nil, for: .editor)
         }

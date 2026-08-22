@@ -17,6 +17,13 @@ packages:
   CodeEditLanguages:
     url: https://github.com/CodeEditApp/CodeEditLanguages
     exactVersion: "0.1.20"
+  # The terminal under the editor. A terminal is a VT emulator, a PTY and a
+  # process, none of which is worth writing again -- SwiftTerm is the one
+  # maintained AppKit implementation of all three.
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    minVersion: "1.2.0"
+    maxVersion: "2.0.0"
 
 settings:
   base:
@@ -82,6 +89,7 @@ targets:
     dependencies:
       - package: CodeEditSourceEditor
       - package: CodeEditLanguages
+      - package: SwiftTerm
     scheme:
       testTargets:
         - PuckTests
@@ -177,6 +185,7 @@ targets:
     dependencies:
       - package: CodeEditSourceEditor
       - package: CodeEditLanguages
+      - package: SwiftTerm
 
   PuckTests:
     type: bundle.unit-test

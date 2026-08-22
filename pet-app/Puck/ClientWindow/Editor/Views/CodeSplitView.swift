@@ -26,6 +26,11 @@ struct CodeSplitView: View {
     /// here is how to put it away".
     var onCollapse: (() -> Void)?
 
+    /// Whether the shell under the code is showing. Remembered across
+    /// launches: someone who works with a terminal open wants it open the
+    /// next morning too, and someone who never opens it never sees it.
+    @AppStorage("Puck.terminalOpen") private var isTerminalOpen = false
+
     var body: some View {
         VStack(spacing: 0) {
             EditorTabStripView(
@@ -35,10 +40,14 @@ struct CodeSplitView: View {
                 onSelect: { store.select(path: $0) },
                 onClose: { store.requestClose(path: $0) },
                 onSave: { store.saveActiveTab() },
-                onCollapse: onCollapse
+                onCollapse: onCollapse,
+                isTerminalOpen: $isTerminalOpen
             )
             Divider()
             EditorContentHostView(store: store)
+            if isTerminalOpen {
+                TerminalSection(root: store.rootPath, isOpen: $isTerminalOpen)
+            }
         }
         // Closing a tab with unsaved edits asks instead of dropping them.
         // A prompt rather than a silent save: the tab is a live view of a

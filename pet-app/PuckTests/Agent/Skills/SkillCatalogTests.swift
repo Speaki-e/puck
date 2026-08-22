@@ -120,6 +120,35 @@ final class SkillCatalogTests: XCTestCase {
         XCTAssertEqual(SkillCatalog.skills(in: root, source: .personal).map(\.name), ["real"])
     }
 
+    /// A name in both places is the project's: that is the one the CLI
+    /// loads, and listing two would say otherwise.
+    func test_theProjectsCopyWinsOverThePersonalOne() throws {
+        let personal = try makeSkills(["shared": "the personal one", "only-mine": "kept"])
+        let projectRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("puck-proj-\(UUID().uuidString)", isDirectory: true)
+        let projectSkills = projectRoot
+            .appendingPathComponent(".claude", isDirectory: true)
+            .appendingPathComponent("skills", isDirectory: true)
+            .appendingPathComponent("shared", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectSkills, withIntermediateDirectories: true)
+        directories.append(projectRoot)
+        try "---\nname: shared\ndescription: the project one\n---\n"
+            .write(to: projectSkills.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+
+        let found = SkillCatalog.discover(projectPath: projectRoot.path, personalDirectory: personal)
+
+        XCTAssertEqual(found.map(\.name), ["shared", "only-mine"], "the project's comes first and is not repeated")
+        XCTAssertEqual(found.first?.description, "the project one")
+        XCTAssertEqual(found.first?.source, .project)
+        XCTAssertEqual(found.last?.source, .personal)
+    }
+
+    func test_aWorkspaceWithNoProjectStillListsThePersonalOnes() throws {
+        let personal = try makeSkills(["only-mine": "kept"])
+        let found = SkillCatalog.discover(projectPath: nil, personalDirectory: personal)
+        XCTAssertEqual(found.map(\.name), ["only-mine"])
+    }
+
     func test_aMissingDirectoryIsNoSkillsRatherThanAnError() {
         let absent = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         XCTAssertTrue(SkillCatalog.skills(in: absent, source: .project).isEmpty)

@@ -52,11 +52,6 @@ struct AgentSettingsView: View {
     @State private var modelDraft = ""
     @State private var agentConfiguration = AgentConfiguration.load()
 
-    /// Read on every draw rather than held: the other window offers the same
-    /// picker, and a copy taken once would keep showing the theme that was
-    /// current when this window was built.
-    private var themeStyle: ClientThemeStyle { theme }
-
     /// Written into Puck's domain and announced, the same path the language
     /// picker beside it takes.
     private func select(_ style: ClientThemeStyle) {
@@ -102,7 +97,7 @@ struct AgentSettingsView: View {
             SettingsSection(title: text(.tabGeneral)) {
                 SettingsStackedRow(label: text(.clientThemeLabel)) {
                     Picker("", selection: Binding(
-                        get: { themeStyle },
+                        get: { theme },
                         set: { select($0) }
                     )) {
                         ForEach(ClientThemeStyle.allCases) { style in
@@ -160,9 +155,9 @@ struct AgentSettingsView: View {
         // The settings window is where the theme is chosen, so showing it in
         // the system's colours instead of the chosen one made the picker the
         // one control whose effect you could not see.
-        .background(themeStyle.palette.background)
-        .environment(\.clientPalette, themeStyle.palette)
-        .preferredColorScheme(themeStyle.colorScheme)
+        .background(theme.palette.background)
+        .environment(\.clientPalette, theme.palette)
+        .preferredColorScheme(theme.colorScheme)
         .onReceive(
             DistributedNotificationCenter.default().publisher(for: ClientThemeStyle.crossProcessChangeNotification)
         ) { notification in

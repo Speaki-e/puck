@@ -36,6 +36,8 @@ final class EditorPaneStore: ObservableObject {
     /// The last range someone asked to be shown, for the editor view to
     /// apply. Consumed by whichever tab's editor matches `path`.
     @Published private(set) var pendingReveal: RevealRequest?
+    /// Bumped on every `open(path:)`, whether or not it changed the tab.
+    @Published private(set) var openRequests = 0
     /// Where the editor pane is, in AppKit global (bottom-left) screen
     /// coordinates, or nil when it is not on screen. Published by the view,
     /// because only the view knows where it ended up -- the pet is sent here.
@@ -96,6 +98,11 @@ final class EditorPaneStore: ObservableObject {
     }
 
     func open(path: String) {
+        // Counted even when nothing changes. Clicking a file that is already
+        // the active tab is still a request to look at it, and a view that
+        // put the code away has no other way to hear it -- keyed on
+        // `activeTabPath` alone, that click did nothing at all.
+        openRequests += 1
         if openTabs.contains(where: { $0.path == path }) {
             activeTabPath = path
             return

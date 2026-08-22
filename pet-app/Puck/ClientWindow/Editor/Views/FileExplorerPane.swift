@@ -48,6 +48,10 @@ struct FileExplorerPane: View {
     /// Kept for the window's life rather than per workspace: which of these
     /// someone wants open is about what they are doing, not which project.
     @State private var tab: ExplorerTab = .files
+    /// Held here so it survives a tab switch: the sessions list is built from
+    /// forty transcripts' worth of filesystem reads, and rescanning them for
+    /// every glance at the file tree is work nobody asked for.
+    @StateObject private var sessions = AgentSessionListModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -57,7 +61,7 @@ struct FileExplorerPane: View {
             case .files:
                 filesTab
             case .sessions:
-                AgentSessionListView()
+                AgentSessionListView(model: sessions)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)

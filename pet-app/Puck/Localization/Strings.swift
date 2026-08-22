@@ -183,7 +183,8 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case themeLight, themeDark
     case workspaceDefaultName, sessionDefaultTitle
-    case editorSelectAFile, editorSearchFiles, editorSaveHint, explorerHeader, editorCollapse
+    case editorSelectAFile, editorSearchFiles, editorSaveHint, explorerHeader
+    case editorCollapse, editorExpand
     case providerRefusedResponse, providerTruncatedFormat, acpProcessExited
 
     /// The panel's action rows. Settings and Switch Avatar are gone with the
@@ -465,6 +466,7 @@ enum Strings {
         .themeDark: "다크",
         .explorerHeader: "파일",
         .editorCollapse: "파일 접기",
+        .editorExpand: "파일 다시 열기",
         .editorSelectAFile: "오른쪽 탐색기에서 파일을 선택하세요",
         .editorSearchFiles: "파일 검색",
         .editorSaveHint: "저장 (⌘S)",
@@ -728,6 +730,7 @@ enum Strings {
         .themeDark: "Dark",
         .explorerHeader: "Files",
         .editorCollapse: "Collapse the file",
+        .editorExpand: "Show the file again",
         .editorSelectAFile: "Pick a file in the explorer on the right",
         .editorSearchFiles: "Search files",
         .editorSaveHint: "Save (⌘S)",

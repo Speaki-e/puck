@@ -41,7 +41,11 @@ struct AgentSessionListView: View {
     /// is not an input.
     @ObservedObject private var localization = Localization.shared
     @Environment(\.clientPalette) private var palette
-    @StateObject private var model = AgentSessionListModel()
+    /// Owned by FileExplorerPane, not by this view. A `switch` on the tab
+    /// destroys whichever branch is not showing, so a model held here would
+    /// be rebuilt -- and rescan every transcript -- each time someone looked
+    /// at the file list and came back.
+    @ObservedObject var model: AgentSessionListModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

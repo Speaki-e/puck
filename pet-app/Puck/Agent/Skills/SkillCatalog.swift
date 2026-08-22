@@ -25,18 +25,22 @@ enum SkillCatalog {
 
     /// Everything found, project first, each list alphabetical -- a list that
     /// reorders itself between reads is one nobody can scan twice.
+    ///
+    /// `personalDirectory` is a parameter so the merge can be tested without
+    /// whatever happens to be installed on the machine running the tests.
     static func discover(
         projectPath: String?,
+        personalDirectory: URL = SkillCatalog.personalDirectory,
         fileManager: FileManager = .default
     ) -> [Skill] {
-        var byName: [String: Skill] = [:]
-        var order: [String] = []
+        var found: [Skill] = []
+        var seen: Set<String> = []
 
+        // Project first, so the project's copy is the one kept: `insert`
+        // reports whether the name was new, which is the whole rule.
         func take(_ skills: [Skill]) {
-            for skill in skills {
-                if byName[skill.name] == nil { order.append(skill.name) }
-                // Project wins: `take` is called with it first.
-                if byName[skill.name] == nil { byName[skill.name] = skill }
+            for skill in skills where seen.insert(skill.name).inserted {
+                found.append(skill)
             }
         }
 
@@ -47,7 +51,7 @@ enum SkillCatalog {
             take(skills(in: directory, source: .project, fileManager: fileManager))
         }
         take(skills(in: personalDirectory, source: .personal, fileManager: fileManager))
-        return order.compactMap { byName[$0] }
+        return found
     }
 
     /// One directory's worth. A directory without a SKILL.md is not a skill

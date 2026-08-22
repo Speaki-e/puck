@@ -188,8 +188,14 @@ private struct ConversationSplit<Chat: View>: View {
 
     var body: some View {
         Group {
-            if store.activeTabPath == nil || isCollapsed {
+            if store.activeTabPath == nil {
                 chat
+            } else if isCollapsed {
+                HStack(spacing: 0) {
+                    chat
+                    Divider()
+                    reopenHandle
+                }
             } else {
                 HSplitView {
                     chat.frame(minWidth: 320)
@@ -198,7 +204,30 @@ private struct ConversationSplit<Chat: View>: View {
                 }
             }
         }
-        .onChange(of: store.activeTabPath) { isCollapsed = false }
+        // Opening anything at all brings the column back, whether or not it
+        // changed the active tab.
+        .onChange(of: store.openRequests) { isCollapsed = false }
+    }
+
+    /// The way back, and the only sign the file is still open.
+    ///
+    /// The file tree cannot be that way: it opens on `List`'s selection
+    /// changing, so clicking the row that is already selected -- exactly what
+    /// someone does to bring a put-away file back -- reports nothing. A
+    /// collapsed column with no handle is a file that has quietly vanished.
+    private var reopenHandle: some View {
+        Button {
+            isCollapsed = false
+        } label: {
+            Image(systemName: "chevron.left.to.line")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 28)
+                .frame(maxHeight: .infinity)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Strings.text(.editorExpand))
+        .help(store.activeTabPath.map { ($0 as NSString).lastPathComponent } ?? Strings.text(.editorExpand))
     }
 }
 

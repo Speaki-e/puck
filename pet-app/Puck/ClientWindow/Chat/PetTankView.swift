@@ -2,7 +2,7 @@
 //  PetTankView.swift
 //  Puck
 //
-//  The pet's island: a capsule floating across the top of the chat (and the
+//  The pet's island: a panel floating across the top of the chat (and the
 //  editor, when it is open). Draws the ground, never the pet -- the pet is
 //  rendered by Puck.app's overlay window on top of this, which is what keeps
 //  there being exactly one pet. See the 2026-08-22 spec.
@@ -52,10 +52,12 @@ struct PetTankView: View {
     /// taken off.
     static let cornerRadius: CGFloat = 14
 
-    /// The island itself.
+    /// The island itself: always the app's own ground, whatever mood is
+    /// behind it. A pet standing on a picture reads as standing *in* it, so
+    /// the backdrop stays behind the island rather than under the pet.
     private var island: some View {
         ZStack(alignment: .bottom) {
-            background.backdrop(palette: palette)
+            palette.background
             // Lit from above and pooling toward the bottom: the sheen is what
             // makes it read as a surface with depth rather than a flat block.
             LinearGradient(
@@ -63,7 +65,7 @@ struct PetTankView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            // The floor the pet stands on, kept in every theme.
+            // The floor the pet stands on.
             Rectangle()
                 .fill(palette.textSecondary.opacity(0.25))
                 .frame(height: 1)
@@ -101,6 +103,9 @@ struct PetTankView: View {
             .padding(.horizontal, Self.horizontalInset)
             .padding(.vertical, Self.verticalInset)
             .frame(height: Self.height)
+            // The chosen mood goes around the island, not on it: the island
+            // is ground, and what it floats in is the view behind it.
+            .background(background.backdrop(palette: palette))
         // Was `.accessibilityHidden(true)` while this was pure decoration. It
         // now carries the background menu, and a hidden element cannot be
         // reached to open one -- so the strip is collapsed into a single

@@ -43,10 +43,12 @@ enum TankBackground: String, CaseIterable {
         }
     }
 
-    /// `plain` is the app's own ground, so the island reads as the same
-    /// material as the conversation under it and follows whichever theme is
-    /// on. The named ones are fixed: a mood is the whole point of picking
-    /// one, and lightening "night" in light mode would stop it being night.
+    /// Painted behind the island, never on it -- the island is the ground the
+    /// pet stands on, and a pet standing on a picture reads as standing in
+    /// it. `plain` follows the app's own palette so the strip disappears into
+    /// the window; the named ones are fixed, since a mood is the whole point
+    /// of picking one and lightening "night" in light mode would stop it
+    /// being night.
     @ViewBuilder
     func backdrop(palette: ClientPalette) -> some View {
         switch self {

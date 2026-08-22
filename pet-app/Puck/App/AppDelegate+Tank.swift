@@ -16,7 +16,13 @@ import CoreGraphics
 extension AppDelegate {
     /// How much smaller the pet is while it is in the tank. A 90pt strip
     /// cannot hold a 120pt pet, and the tank reads as a small glass box.
-    static let tankAvatarScale = 0.6
+    /// How tall the pet stands on the island, in points.
+    ///
+    /// A fixed height, not a fraction of whatever the size slider is set to:
+    /// the island is a fixed 90pt whoever is looking at it, so a relative
+    /// scale made the pet fill it at one setting and rattle around in it at
+    /// another. On the desktop the slider still decides.
+    static let tankPetHeight: CGFloat = 72
 
     /// The client reported its tank. Stores the geometry and hands the
     /// in-or-out question to the decider; nothing moves until `tickPetHome`
@@ -30,8 +36,8 @@ extension AppDelegate {
                 overlayOriginInQuartz: origin,
                 overlaySize: groundAwareSize(of: window),
                 petSize: CGSize(
-                    width: baseHitboxSize.width * Self.tankAvatarScale,
-                    height: baseHitboxSize.height * Self.tankAvatarScale
+                    width: baseHitboxSize.width * self.tankScale,
+                    height: baseHitboxSize.height * self.tankScale
                 )
             )
         }
@@ -82,7 +88,7 @@ extension AppDelegate {
             of: controller,
             to: CGPoint(x: tank.midX, y: tank.maxY),
             arrivingIn: tank,
-            scale: desktopAvatarScale * Self.tankAvatarScale
+            scale: tankScale
         )
     }
 
@@ -96,6 +102,14 @@ extension AppDelegate {
             arrivingIn: desktop,
             scale: desktopAvatarScale
         )
+    }
+
+    /// The scale that puts the pet at `tankPetHeight`, whatever avatar is
+    /// loaded. 1 when there is no avatar yet, which only happens before one
+    /// is installed and never while a move is running.
+    var tankScale: Double {
+        guard baseHitboxSize.height > 0 else { return 1 }
+        return Double(Self.tankPetHeight / baseHitboxSize.height)
     }
 
     /// What `applyLiveAvatarScale` was last given, derived rather than stored:
@@ -120,9 +134,9 @@ extension AppDelegate {
     /// pet back at the first step out of it. TravelState hands it back on
     /// arrival, before anything else runs.
     ///
-    /// The scale changes on arrival rather than during: the pet growing or
-    /// shrinking mid-flight reads as it moving toward or away from the
-    /// viewer, which is a different thing happening.
+    /// The size travels with it, on the same eased curve. It used to change
+    /// on arrival, which read as the pet landing and then being resized --
+    /// two events where there is one.
     private func carryPet(
         of controller: CharacterController,
         to destination: CGPoint,
@@ -130,12 +144,17 @@ extension AppDelegate {
         scale: Double
     ) {
         guard let body = characterBody else { return }
+        let departingScale = currentAvatarScale
         travelState.origin = body.position
         travelState.destination = destination
-        travelState.onArrival = { [weak self] in
-            self?.applyLiveAvatarScale(scale)
-            controller.roamableArea = area
+        // Sized along the way rather than on landing. Snapping at the end
+        // reads as the pet arriving and *then* being resized, which is two
+        // events where the eye expects one -- and going the other way it
+        // popped to full size the instant it touched the desktop.
+        travelState.onProgress = { [weak self] progress in
+            self?.applyLiveAvatarScale(departingScale + (scale - departingScale) * progress)
         }
+        travelState.onArrival = { controller.roamableArea = area }
         controller.roamableArea = controller.roamableArea.union(area)
         controller.transition(to: .travel)
     }

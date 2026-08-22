@@ -164,11 +164,10 @@ final class PetTankAreaTests: XCTestCase {
     /// took 90pt down to 74 against an 80pt pet, and opening the window
     /// stopped moving the pet at all.
     func test_theIslandIsTallEnoughForThePetThatLivesOnIt() {
-        // 133pt of avatar (the bundled manifest's hitbox) at tank scale.
-        let petHeight = 133 * AppDelegate.tankAvatarScale
+        let petHeight = AppDelegate.tankPetHeight
         XCTAssertGreaterThanOrEqual(
             PetTankView.islandHeight,
-            CGFloat(petHeight),
+            petHeight,
             "an island shorter than the pet is refused, and the move looks like nothing happening"
         )
 
@@ -176,7 +175,9 @@ final class PetTankAreaTests: XCTestCase {
             fromWire: BridgeRect(x: 0, y: 0, width: 600, height: Double(PetTankView.islandHeight)),
             overlayOriginInQuartz: .zero,
             overlaySize: CGSize(width: 1440, height: 900),
-            petSize: CGSize(width: 130 * AppDelegate.tankAvatarScale, height: petHeight)
+            // Square-ish is the worst case for the width rule; the bundled
+            // avatar is 130x133, so its width at this height is close to it.
+            petSize: CGSize(width: petHeight, height: petHeight)
         )
         XCTAssertNotNil(accepted, "the island as drawn has to be a usable world")
     }

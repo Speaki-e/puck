@@ -31,6 +31,10 @@ final class TravelState: StateHandler {
     /// Short enough not to hold up whatever prompted the move, long enough to
     /// be a movement rather than a jump.
     var duration: TimeInterval = 0.55
+    /// Called every frame with the eased progress, so the caller can carry
+    /// anything else across on the same curve -- the pet's size shrinks into
+    /// the island this way rather than snapping when it lands.
+    var onProgress: ((Double) -> Void)?
     /// Called on arrival, before the next state is requested -- the caller
     /// uses it to put `roamableArea` back to the world being arrived in.
     var onArrival: (() -> Void)?
@@ -47,6 +51,7 @@ final class TravelState: StateHandler {
         // Cleared so a stale trip cannot be replayed by a later entry.
         origin = nil
         destination = nil
+        onProgress = nil
         onArrival = nil
     }
 
@@ -67,11 +72,15 @@ final class TravelState: StateHandler {
         if let facing = MovementSolver.facing(from: origin, toward: destination) {
             context.body.facing = facing
         }
+        onProgress?(eased)
 
         if progress >= 1 { finish(context) }
     }
 
     private func finish(_ context: StateContext) {
+        // The end of the same curve, so a trip that arrived in one long frame
+        // still lands at the size it was heading for.
+        onProgress?(1)
         onArrival?()
         // Land, not idle: arriving is a landing, and the bounce is what makes
         // the trip end rather than just stop.

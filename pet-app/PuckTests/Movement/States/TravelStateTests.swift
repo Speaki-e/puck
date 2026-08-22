@@ -120,4 +120,54 @@ final class TravelStateTests: XCTestCase {
         XCTAssertNil(state.destination)
         XCTAssertNil(state.onArrival)
     }
+
+    /// The pet shrinks into the island on the way rather than on landing.
+    /// Reported on the eased curve, so the size and the position stay
+    /// together the whole trip.
+    func test_progressIsReportedOnTheSameCurveAsTheMove() {
+        let world = TestStateWorld()
+        let state = TravelState()
+        var reported: [Double] = []
+        state.origin = .zero
+        state.destination = CGPoint(x: 100, y: 0)
+        state.duration = 1
+        state.onProgress = { reported.append($0) }
+        state.enter()
+
+        state.update(dt: 0.25, context: world.context)
+        state.update(dt: 0.25, context: world.context)
+
+        XCTAssertEqual(reported.count, 2)
+        XCTAssertEqual(reported.last ?? 0, TravelState.eased(0.5), accuracy: 0.0001)
+        XCTAssertEqual(
+            world.body.position.x,
+            100 * TravelState.eased(0.5),
+            accuracy: 0.5,
+            "the size follows the same curve as the position, not a second one"
+        )
+    }
+
+    /// A trip that arrives inside one long frame still ends at full size --
+    /// the last report is the end of the curve, not wherever the frame landed.
+    func test_theFinalProgressIsAlwaysTheEndOfTheCurve() {
+        let world = TestStateWorld()
+        let state = TravelState()
+        var reported: [Double] = []
+        state.origin = .zero
+        state.destination = CGPoint(x: 10, y: 0)
+        state.duration = 0.1
+        state.onProgress = { reported.append($0) }
+        state.enter()
+
+        state.update(dt: 5, context: world.context)
+
+        XCTAssertEqual(reported.last, 1)
+    }
+
+    func test_exitForgetsTheProgressHandler() {
+        let state = TravelState()
+        state.onProgress = { _ in }
+        state.exit()
+        XCTAssertNil(state.onProgress)
+    }
 }

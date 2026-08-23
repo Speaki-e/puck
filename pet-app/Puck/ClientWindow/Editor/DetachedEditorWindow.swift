@@ -75,12 +75,7 @@ private struct DetachedEditorWindowHost: NSViewRepresentable {
                 EditorPaneView(
                     workspaceId: host.workspaceId,
                     availability: host.availability,
-                    onUnavailable: host.onUnavailable,
-                    // Detached, this pane is a different window: its strip is
-                    // not part of the client window's tank, so there is
-                    // nothing to report -- ClientWindowView already cleared
-                    // the segment when the editor left the split.
-                    onTankFrameChange: { _ in }
+                    onUnavailable: host.onUnavailable
                 )
                 .environment(\.clientPalette, host.palette)
             )

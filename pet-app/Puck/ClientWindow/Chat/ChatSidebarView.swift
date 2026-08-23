@@ -215,7 +215,7 @@ struct ChatSidebarView: View {
     /// each row by default, which is why the chats sat further from each
     /// other than they did from the heading above them -- exactly backwards,
     /// since the heading is what separates one group from the next.
-    private static let rowInsets = EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2)
+    private static let rowInsets = EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0)
 
     /// A group's name, with whatever acts on the group at its trailing edge.
     private func sectionHeader<Trailing: View>(
@@ -399,8 +399,8 @@ private struct SidebarRowBackground: ViewModifier {
     /// which is backwards -- the highlight is there to say "this one", not to
     /// be the brightest thing in the column.
     private var fill: Color {
-        if isSelected { return palette.surface.opacity(0.68) }
-        return isHovering ? palette.surface.opacity(0.4) : .clear
+        if isSelected { return palette.surface.opacity(0.85) }
+        return isHovering ? palette.surface.opacity(0.55) : .clear
     }
 }
 
@@ -538,7 +538,7 @@ private struct WorkspaceGroup: View {
                         .help(Strings.text(.chatRunning))
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .sidebarRowBackground(isSelected: isActive)
         }
@@ -694,7 +694,7 @@ private struct ChatSessionRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .frame(height: 28)
         .sidebarRowBackground(isSelected: isActive)
     }

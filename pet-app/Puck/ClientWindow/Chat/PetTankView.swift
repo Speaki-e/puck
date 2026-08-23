@@ -157,7 +157,7 @@ struct PetTankView: View {
                 shoulderStart: shoulderStart(in: proxy)
             )
             ZStack(alignment: .bottom) {
-                shape.fill(palette.background)
+                islandFill(shape)
                 // The floor the pet stands on. Clipped by the island as a
                 // whole rather than by itself: a 1pt-tall box has no corners
                 // to round, so clipping it in place left the line running
@@ -203,6 +203,39 @@ struct PetTankView: View {
                 .background(PaneFrameReporter(onChange: onFrameChange))
                 .padding(.leading, onPetHeightChange == nil ? 0 : PetSizeSlider.footprint)
                 .allowsHitTesting(false)
+        }
+    }
+
+    /// What the island is made of: the app's own ground, or -- for the one
+    /// picture background -- the picture, with glass over it.
+    ///
+    /// The glass is the point of putting a picture here at all. What the pet
+    /// stands on has to read as a surface; an illustration under its feet
+    /// reads as a poster it is standing in front of. Frosted, and lit along
+    /// the top edge, it reads as looking down through water.
+    @ViewBuilder
+    private func islandFill(_ shape: IslandShape) -> some View {
+        if let name = background.islandArtworkName, let artwork = TankBackground.artwork(named: name) {
+            Image(nsImage: artwork)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                // Anchored to the floor: the sand and everything standing in
+                // it are the part worth seeing at this height, and the open
+                // water above crops away without losing anything.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .overlay(Rectangle().fill(.ultraThinMaterial).opacity(0.3))
+                .overlay(alignment: .top) {
+                    LinearGradient(
+                        colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 26)
+                }
+                .clipShape(shape)
+                .overlay { shape.strokeBorder(.white.opacity(0.35), lineWidth: 1) }
+        } else {
+            shape.fill(palette.background)
         }
     }
 

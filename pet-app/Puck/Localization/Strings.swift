@@ -128,6 +128,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case tankBackgroundMenu, tankBackgroundPlain, tankBackgroundNight
     case tankBackgroundForest, tankBackgroundOcean
     case tankBackgroundWorldTree, tankBackgroundBoundary, tankBackgroundMeadow
+    case tankBackgroundSeabed
     case islandResize
     case islandPetSize
     case terminalTitle
@@ -395,6 +396,7 @@ enum Strings {
         .tankBackgroundWorldTree: "세계수",
         .tankBackgroundBoundary: "경계",
         .tankBackgroundMeadow: "들녘",
+        .tankBackgroundSeabed: "바다 밑",
         .codeBlockCopy: "복사",
         .codeBlockCopied: "복사했어요",
         .commonCancel: "취소",
@@ -727,6 +729,7 @@ enum Strings {
         .tankBackgroundWorldTree: "World tree",
         .tankBackgroundBoundary: "Boundary",
         .tankBackgroundMeadow: "Meadow",
+        .tankBackgroundSeabed: "Seabed",
         .codeBlockCopy: "Copy",
         .codeBlockCopied: "Copied",
         .commonCancel: "Cancel",

@@ -64,6 +64,11 @@ targets:
       - path: Puck/Resources/FileIcons
         type: folder
         buildPhase: resources
+      # Folder reference for the same reason: TankBackground looks the island's
+      # artwork up by name inside TankBackgrounds/.
+      - path: Puck/Resources/TankBackgrounds
+        type: folder
+        buildPhase: resources
     info:
       path: Puck/Resources/Info.plist
       properties:
@@ -158,6 +163,11 @@ targets:
       # FileIconTheme reads. Folder reference for the same reason as in Puck's
       # own list above.
       - path: Puck/Resources/FileIcons
+        type: folder
+        buildPhase: resources
+      # This is the app that draws the island, so it needs the artwork the
+      # seabed background fills it with.
+      - path: Puck/Resources/TankBackgrounds
         type: folder
         buildPhase: resources
       # And the ACP agents, because this is also the app that runs code_editor

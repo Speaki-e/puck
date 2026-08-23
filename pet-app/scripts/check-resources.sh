@@ -36,5 +36,8 @@ check PuckClient acp-claude.mjs
 check PuckClient acp-codex.mjs
 check PuckClient FileIcons/icon-map.json
 check Puck Avatars
+# The island's one drawn background. PuckClient is the app that shows the
+# island; Puck picks the folder up implicitly.
+check PuckClient TankBackgrounds/seabed.png
 
 exit $failed

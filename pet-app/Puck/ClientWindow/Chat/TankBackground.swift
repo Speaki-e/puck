@@ -18,11 +18,15 @@
 //  picture cut in half at the divider.
 //
 
+import AppKit
 import SwiftUI
 
 enum TankBackground: String, CaseIterable {
     case plain, night, forest, ocean
     case worldTree, boundary, meadow
+    /// The one drawn picture in the set: a seabed the island is filled with
+    /// rather than floated over. See `islandArtworkName`.
+    case seabed
 
     /// Same shape as `ClientWindowStore.tankPinnedKey`. The value is read
     /// straight from UserDefaults by `PetTankView` rather than going through
@@ -40,8 +44,40 @@ enum TankBackground: String, CaseIterable {
         case .worldTree: return Strings.text(.tankBackgroundWorldTree)
         case .boundary: return Strings.text(.tankBackgroundBoundary)
         case .meadow: return Strings.text(.tankBackgroundMeadow)
+        case .seabed: return Strings.text(.tankBackgroundSeabed)
         }
     }
+
+    /// The artwork this background fills the island with, or nil for the ones
+    /// that are a mood behind it.
+    ///
+    /// A picture *on* the island rather than behind it is a deliberate
+    /// exception to the rule stated below -- asked for, and the reason the
+    /// glass goes over it: what the pet stands on has to read as a surface,
+    /// and a photograph under its feet does not. Frosted, it reads as looking
+    /// down into water, which is what a tank is.
+    var islandArtworkName: String? {
+        switch self {
+        case .seabed: return "seabed"
+        default: return nil
+        }
+    }
+
+    /// Loaded once and kept: this is asked for on every frame the island
+    /// draws, and decoding a 1600pt PNG per frame is not a thing to do.
+    static func artwork(named name: String) -> NSImage? {
+        if let cached = artworkCache.object(forKey: name as NSString) { return cached }
+        guard
+            let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "TankBackgrounds"),
+            let image = NSImage(contentsOf: url)
+        else {
+            return nil
+        }
+        artworkCache.setObject(image, forKey: name as NSString)
+        return image
+    }
+
+    private static let artworkCache = NSCache<NSString, NSImage>()
 
     /// Painted behind the island, never on it -- the island is the ground the
     /// pet stands on, and a pet standing on a picture reads as standing in
@@ -87,6 +123,12 @@ enum TankBackground: String, CaseIterable {
         case .meadow:
             Self.gradient(top: Color(red: 0.945, green: 0.804, blue: 0.616),
                           bottom: Color(red: 0.443, green: 0.545, blue: 0.373))
+        // The picture is the island's own fill, so what is left around it is
+        // the water above the scene rather than a second backdrop competing
+        // with it.
+        case .seabed:
+            Self.gradient(top: Color(red: 0.365, green: 0.741, blue: 0.941),
+                          bottom: Color(red: 0.176, green: 0.573, blue: 0.847))
         }
     }
 

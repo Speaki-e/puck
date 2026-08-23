@@ -17,6 +17,14 @@ struct SlashCommandRunner {
     var write: (_ key: String, _ value: String?) -> Bool = { key, value in
         DotEnv.write(key: key, value: value, to: AgentConfiguration.writableEnvFile)
     }
+    var currentPermissions: () -> AgentPermissionMode = { AgentConfiguration.permissionMode() }
+    /// The project the active workspace points at, or nil for a chat-only
+    /// one. `/skills` lists the project's own skills first, and there are
+    /// none to list without it.
+    var projectPath: () -> String? = { nil }
+    var installedSkills: (_ projectPath: String?) -> [Skill] = { path in
+        SkillCatalog.discover(projectPath: path)
+    }
 
     func run(_ command: SlashCommand) -> String {
         switch command {
@@ -49,7 +57,32 @@ struct SlashCommandRunner {
 
         case .fast:
             return set(.low)
+
+        case .permissions(nil):
+            return String(format: Strings.text(.slashPermissionsCurrentFormat), currentPermissions().displayName)
+
+        case .permissions(.some(let mode)):
+            guard write(AgentPermissionMode.environmentVariable, mode.rawValue) else {
+                return Strings.text(.slashWriteFailed)
+            }
+            return String(format: Strings.text(.slashPermissionsSetFormat), currentPermissions().displayName)
+
+        case .skills:
+            return skillList()
         }
+    }
+
+    /// One line per skill: its name, where it came from, and the one-line
+    /// description its manifest carries. Long descriptions are left whole --
+    /// a truncated description is a description nobody can act on.
+    private func skillList() -> String {
+        let skills = installedSkills(projectPath())
+        guard !skills.isEmpty else { return Strings.text(.slashSkillsEmpty) }
+        let lines = skills.map { skill in
+            let description = skill.description.isEmpty ? "" : " — \(skill.description)"
+            return "- `\(skill.name)` (\(skill.source.displayName))\(description)"
+        }
+        return ([Strings.text(.slashSkillsHeader)] + lines).joined(separator: "\n")
     }
 
     private func set(_ effort: AgentEffort) -> String {

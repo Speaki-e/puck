@@ -373,7 +373,18 @@ final class ClientWindowStore: ObservableObject {
     /// a spinner for it would never stop.
     /// Injectable so tests can run a command without touching the real
     /// `.env`; the app uses the default, which writes the file Settings does.
-    var slashCommands = SlashCommandRunner()
+    /// Built lazily so it can be told which project is open: `/skills` lists
+    /// the project's own skills first, and the store is the only thing that
+    /// knows which workspace that is. Still assignable, which is how tests
+    /// run a command without touching the real `.env`.
+    lazy var slashCommands: SlashCommandRunner = {
+        var runner = SlashCommandRunner()
+        runner.projectPath = { [weak self] in
+            guard let self else { return nil }
+            return self.workspaces.first { $0.id == self.activeWorkspaceId }?.projectPath
+        }
+        return runner
+    }()
 
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {

@@ -14,6 +14,16 @@ final class SlashCommandTests: XCTestCase {
         XCTAssertEqual(SlashCommand.parse("/model gpt-5.5"), .model("gpt-5.5"))
         XCTAssertEqual(SlashCommand.parse("/effort"), .effort(nil))
         XCTAssertEqual(SlashCommand.parse("/effort high"), .effort(.high))
+        XCTAssertEqual(SlashCommand.parse("/permissions"), .permissions(nil))
+        XCTAssertEqual(SlashCommand.parse("/permissions all"), .permissions(.everything))
+        XCTAssertEqual(SlashCommand.parse("/skills"), .skills)
+    }
+
+    /// A permission this build does not know is reported, not guessed at:
+    /// picking the nearest mode would be picking how much a CLI may do to
+    /// somebody's machine.
+    func test_anUnknownPermissionIsRefusedRatherThanRounded() {
+        XCTAssertEqual(SlashCommand.parse("/permissions everything"), .unknown("/permissions everything"))
     }
 
     /// Ordinary prose has to go to the agent untouched, or a message that
@@ -60,12 +70,17 @@ final class SlashCommandRunnerTests: XCTestCase {
     private func runner(
         _ writes: Writes,
         provider: AgentProvider = .openai,
-        effort: AgentEffort = .medium
+        effort: AgentEffort = .medium,
+        permissions: AgentPermissionMode = .toolsOnly,
+        skills: [Skill] = []
     ) -> SlashCommandRunner {
         SlashCommandRunner(
             configuration: { AgentConfiguration.load(environment: ["AGENT_PROVIDER": provider.rawValue], searchPaths: []) },
             currentEffort: { effort },
-            write: writes.write
+            write: writes.write,
+            currentPermissions: { permissions },
+            projectPath: { "/tmp/project" },
+            installedSkills: { _ in skills }
         )
     }
 
@@ -104,6 +119,53 @@ final class SlashCommandRunnerTests: XCTestCase {
         let writes = Writes()
         writes.succeeds = false
         XCTAssertEqual(runner(writes).run(.fast), Strings.text(.slashWriteFailed))
+    }
+
+    func test_permissionsWithNoArgumentShowsTheModeWithoutChangingIt() {
+        let writes = Writes()
+        let reply = runner(writes, permissions: .edits).run(.permissions(nil))
+        XCTAssertTrue(writes.pairs.isEmpty, "showing a setting must not change it")
+        XCTAssertTrue(reply.contains(AgentPermissionMode.edits.displayName))
+    }
+
+    func test_permissionsWritesTheModeItWasGiven() {
+        let writes = Writes()
+        _ = runner(writes, permissions: .everything).run(.permissions(.everything))
+        XCTAssertEqual(writes.pairs.map(\.0), [AgentPermissionMode.environmentVariable])
+        XCTAssertEqual(writes.pairs.first?.1, AgentPermissionMode.everything.rawValue)
+    }
+
+    /// The answer is read back rather than assumed: an environment variable
+    /// outranks the file this writes, and reporting a change that did not
+    /// take is the confusion the whole runner exists to avoid.
+    func test_permissionsReportsWhatTookEffectNotWhatWasAsked() {
+        let writes = Writes()
+        let reply = runner(writes, permissions: .toolsOnly).run(.permissions(.everything))
+        XCTAssertTrue(
+            reply.contains(AgentPermissionMode.toolsOnly.displayName),
+            "the mode still in force is what gets reported"
+        )
+    }
+
+    func test_skillsListsWhatIsInstalled() {
+        let writes = Writes()
+        let skills = [
+            Skill(name: "brainstorming", description: "설계 전에 같이 생각해보기", path: "/p/.claude/skills/brainstorming/SKILL.md", source: .project),
+            Skill(name: "computer-use", description: "", path: "/h/.claude/skills/computer-use/SKILL.md", source: .personal),
+        ]
+
+        let reply = runner(writes, skills: skills).run(.skills)
+
+        XCTAssertTrue(reply.contains("brainstorming"))
+        XCTAssertTrue(reply.contains("설계 전에 같이 생각해보기"))
+        XCTAssertTrue(reply.contains("computer-use"), "a skill with no description is still listed")
+        XCTAssertTrue(writes.pairs.isEmpty, "listing changes nothing")
+    }
+
+    /// Saying "none" is the answer; an empty list reads as a broken command.
+    func test_skillsSaysSoWhenThereAreNone() {
+        let reply = runner(Writes(), skills: []).run(.skills)
+        XCTAssertEqual(reply, Strings.text(.slashSkillsEmpty))
     }
 }
 

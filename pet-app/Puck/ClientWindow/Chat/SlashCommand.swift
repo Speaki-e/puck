@@ -18,6 +18,14 @@ enum SlashCommand: Equatable {
     case model(String?)
     /// `/effort`, or `/effort high`.
     case effort(AgentEffort?)
+    /// `/permissions` shows what the coding CLI is allowed to do on its own;
+    /// `/permissions all` changes it. The same setting Settings' picker
+    /// writes, asked where the consequence shows up.
+    case permissions(AgentPermissionMode?)
+    /// `/skills` lists what is installed, project first. Read-only: adding
+    /// one means putting a directory somewhere, which is not a thing to do
+    /// from a chat line.
+    case skills
     /// `/fast` -- the low end of `/effort` under the name people reach for.
     case fast
     case help
@@ -48,6 +56,11 @@ enum SlashCommand: Equatable {
             guard let effort = AgentEffort(rawValue: value.lowercased()) else { return .unknown(trimmed) }
             return .effort(effort)
         case "fast": return .fast
+        case "permissions":
+            guard let value else { return .permissions(nil) }
+            guard let mode = AgentPermissionMode(rawValue: value.lowercased()) else { return .unknown(trimmed) }
+            return .permissions(mode)
+        case "skills": return .skills
         case "help": return .help
         default: return .unknown(trimmed)
         }
@@ -55,5 +68,5 @@ enum SlashCommand: Equatable {
 
     /// Every command, for `/help` and for the test that keeps the two lists
     /// from drifting.
-    static let names = ["model", "effort", "fast", "help"]
+    static let names = ["model", "effort", "fast", "permissions", "skills", "help"]
 }

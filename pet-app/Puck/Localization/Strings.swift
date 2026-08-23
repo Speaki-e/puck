@@ -94,6 +94,8 @@ enum L10nKey: String, CaseIterable, Hashable {
     case slashModelCurrentFormat, slashModelSetFormat, slashModelUnsupportedFormat
     case slashEffortCurrentFormat, slashEffortSetFormat
     case slashUnknownFormat, slashWriteFailed, slashHelp
+    case slashPermissionsCurrentFormat, slashPermissionsSetFormat
+    case slashSkillsHeader, slashSkillsEmpty
     case installedFormat
     case installedMissingRecommendedFormat
     case failedToInstallFormat
@@ -310,12 +312,18 @@ enum Strings {
         .slashEffortSetFormat: "사고량을 '%1$@'(으)로 바꿨어요. 다음 turn부터 적용됩니다.",
         .slashUnknownFormat: "%1$@ 은(는) 없는 명령이에요. /help 로 목록을 보세요.",
         .slashWriteFailed: "설정 파일을 저장하지 못했어요.",
+        .slashPermissionsCurrentFormat: "지금은 '%1$@'예요. `/permissions tools|edits|all` 로 바꿀 수 있어요.",
+        .slashPermissionsSetFormat: "'%1$@'(으)로 바꿨어요. 다음 turn부터 적용됩니다.",
+        .slashSkillsHeader: "설치된 스킬이에요.",
+        .slashSkillsEmpty: "설치된 스킬이 없어요. `~/.claude/skills` 나 프로젝트의 `.claude/skills` 에 폴더를 두면 여기 보여요.",
         .slashHelp: """
         쓸 수 있는 명령이에요.
 
         - `/model` — 지금 모델 보기, `/model 이름` 으로 바꾸기
         - `/effort` — 사고량 보기, `/effort low|medium|high` 로 바꾸기
         - `/fast` — 사고량을 가장 낮게 (`/effort low` 와 같아요)
+        - `/permissions` — CLI가 스스로 할 수 있는 범위 보기, `/permissions tools|edits|all` 로 바꾸기
+        - `/skills` — 설치된 스킬 목록
         - `/help` — 이 목록
         """,
         .explorerTabFiles: "파일",
@@ -611,12 +619,18 @@ enum Strings {
         .slashEffortSetFormat: "Effort set to '%1$@'. It applies from the next turn.",
         .slashUnknownFormat: "%1$@ is not a command. Try /help.",
         .slashWriteFailed: "Couldn't write the settings file.",
+        .slashPermissionsCurrentFormat: "Currently '%1$@'. `/permissions tools|edits|all` changes it.",
+        .slashPermissionsSetFormat: "Changed to '%1$@'. It applies from the next turn.",
+        .slashSkillsHeader: "Installed skills.",
+        .slashSkillsEmpty: "No skills installed. Put a folder in `~/.claude/skills` or the project's `.claude/skills` and it shows up here.",
         .slashHelp: """
         Commands you can type here.
 
         - `/model` — show the model, `/model <name>` to set it
         - `/effort` — show effort, `/effort low|medium|high` to set it
         - `/fast` — the lowest effort (same as `/effort low`)
+        - `/permissions` — what the CLI may do on its own, `/permissions tools|edits|all` to change it
+        - `/skills` — the skills installed here
         - `/help` — this list
         """,
         .explorerTabFiles: "Files",

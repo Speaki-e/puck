@@ -85,31 +85,29 @@ final class EventRouterTests: XCTestCase {
         XCTAssertEqual(reaction, EventReaction(stateTransition: .point, sfxKey: "await_approval", emotion: "thinking"))
     }
 
-    func test_agentDone_success_triggersSuccessSFXJumpAndBubble() {
+    /// The sound, the jump and the face mark the answer; the words do not.
+    /// The reply is already in the transcript, and the pet stands inside the
+    /// island at the top of that same window -- a bubble over its head
+    /// repeated one line of the answer on top of the answer.
+    func test_agentDone_success_marksTheMomentWithoutABubble() {
         let reaction = EventRouter.reaction(for: .agentDone(ok: true, summary: "3 tests passed"))
         XCTAssertEqual(
             reaction,
-            EventReaction(
-                sfxKey: "task_success",
-                jump: true,
-                bubbleText: "3 tests passed",
-                emotion: "happy",
-                runFinished: true
-            )
+            EventReaction(sfxKey: "task_success", jump: true, emotion: "happy", runFinished: true)
         )
+        XCTAssertNil(reaction.bubbleText)
     }
 
-    /// The bubble is one line beside a 100px character, and agent_done's
-    /// summary is whatever the producing agent put there -- for the F15 local
-    /// agent, the entire reply. The bubble should keep only the headline, not
-    /// dump the whole answer. The full text is in the transcript either way.
-    func test_agentDone_bubbleKeepsOnlyTheHeadline() {
+    /// A code tour's caption still speaks, and still keeps only the headline:
+    /// it is said while pointing at code, with nothing else on screen saying
+    /// it, and the bubble is one line beside a 100px character.
+    func test_petSays_keepsOnlyTheHeadline() {
         let wall = """
         hello.ts에 주석을 추가했어요. 파일 맨 위에 한 줄 주석을 넣었고, \
         나머지 코드는 손대지 않았습니다.
         추가로 확인이 필요하면 말씀해 주세요.
         """
-        let reaction = EventRouter.reaction(for: .agentDone(ok: true, summary: wall))
+        let reaction = EventRouter.reaction(for: .petSays(text: wall))
 
         XCTAssertEqual(reaction.bubbleText, "hello.ts에 주석을 추가했어요.")
     }

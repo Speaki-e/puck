@@ -120,17 +120,19 @@ enum EventRouter {
         case .awaitApproval:
             return EventReaction(stateTransition: .point, sfxKey: "await_approval", emotion: "thinking")
 
-        case .agentDone(let ok, let summary):
+        case .agentDone(let ok, _):
             // Only agent_done(ok=true) is specified; a failed run is already
             // signaled via toolResult(ok=false).
+            //
+            // No bubble. The answer is in the transcript, in full, and the pet
+            // now stands inside the island at the top of that same window --
+            // so a bubble over its head repeated a line of the reply on top of
+            // the reply. The sound, the jump and the face still mark the
+            // moment. A code tour's caption (petSays) is a different thing and
+            // keeps its bubble: it is said while pointing at code, and there
+            // is nothing else on screen saying it.
             return ok
-                ? EventReaction(
-                    sfxKey: "task_success",
-                    jump: true,
-                    bubbleText: bubbleSummary(from: summary),
-                    emotion: "happy",
-                    runFinished: true
-                )
+                ? EventReaction(sfxKey: "task_success", jump: true, emotion: "happy", runFinished: true)
                 : EventReaction(runFinished: true)
 
         case .petSays(let text):

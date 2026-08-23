@@ -88,7 +88,11 @@ struct FileExplorerPane: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(palette.background)
+        // The ground reaches up into the toolbar's band, which is empty above
+        // this column. The controls stay below it -- the toolbar takes every
+        // click in that band -- but leaving it unpainted read as a gap
+        // between the window's top and the tabs.
+        .background(palette.background.ignoresSafeArea(edges: .top))
         // Read for the pane, not for the git tab: the file tree marks changed
         // files too now, so the status has to be there before anyone opens
         // that tab -- and after every write the tree hears about.

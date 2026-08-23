@@ -37,6 +37,13 @@ struct CodeSplitView: View {
     /// open at all.
     @AppStorage(TerminalSection.openStorageKey) private var isTerminalOpen = false
 
+    /// ⌘L's field, and what is typed into it. Held here rather than in the
+    /// store: where the caret should go is the store's business, but whether
+    /// a one-line prompt is on screen is this view's.
+    @State private var isGoToLineShowing = false
+    @State private var goToLineDraft = ""
+    @FocusState private var isGoToLineFocused: Bool
+
     var body: some View {
         VStack(spacing: 0) {
             EditorTabStripView(
@@ -46,6 +53,9 @@ struct CodeSplitView: View {
                 onSelect: { store.select(path: $0) },
                 onClose: { store.requestClose(path: $0) },
                 onSave: { store.saveActiveTab() },
+                onPreviousTab: { store.selectPreviousTab() },
+                onNextTab: { store.selectNextTab() },
+                onGoToLine: showGoToLine,
                 onCollapse: onCollapse,
                 isTerminalOpen: $isTerminalOpen
             )
@@ -57,6 +67,7 @@ struct CodeSplitView: View {
                 breadcrumb(path)
                 Divider()
             }
+            if isGoToLineShowing { goToLineBar }
             EditorContentHostView(store: store)
         }
         // Closing a tab with unsaved edits asks instead of dropping them.
@@ -78,6 +89,46 @@ struct CodeSplitView: View {
         } message: {
             Text(pendingCloseMessage)
         }
+    }
+
+    /// One field, above the code. Escape puts it away; return jumps and puts
+    /// it away, because a go-to-line box that stays open is one more thing to
+    /// dismiss before typing again.
+    private var goToLineBar: some View {
+        HStack(spacing: 6) {
+            Text(Strings.text(.editorGoToLine))
+                .font(ClientTheme.Typography.caption)
+                .foregroundStyle(palette.textSecondary)
+            TextField(Strings.text(.editorGoToLinePlaceholder), text: $goToLineDraft)
+                .textFieldStyle(.plain)
+                .font(ClientTheme.Typography.caption)
+                .foregroundStyle(palette.textPrimary)
+                .frame(width: 60)
+                .focused($isGoToLineFocused)
+                .onSubmit(jumpToTypedLine)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 22)
+        .background(palette.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(palette.surfaceBorder).frame(height: 1)
+        }
+        .onExitCommand { isGoToLineShowing = false }
+    }
+
+    private func showGoToLine() {
+        goToLineDraft = ""
+        isGoToLineShowing = true
+        isGoToLineFocused = true
+    }
+
+    private func jumpToTypedLine() {
+        // Nothing typed, or nothing numeric: leave the field alone rather
+        // than closing it, so a typo does not cost the prompt as well.
+        guard let line = Int(goToLineDraft.trimmingCharacters(in: .whitespaces)) else { return }
+        store.goToLine(line)
+        isGoToLineShowing = false
     }
 
     /// The path of the file being edited, above it.

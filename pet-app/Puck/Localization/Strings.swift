@@ -155,6 +155,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case editorUnsavedMessageFormat
     case editorProjectFolderMissing, editorProjectPathNotAFolder, editorProjectFolderUnreadable
     case editorConflictTitle, editorConflictMessage, editorUseDiskVersion, editorKeepMyVersion
+    case editorGoToLine, editorGoToLinePlaceholder, editorNextTab, editorPreviousTab
 
     /// WorkspaceFileService's refusals. The user reads these in the editor
     /// pane, so they are copy, not diagnostics.
@@ -446,6 +447,10 @@ enum Strings {
         .editorProjectFolderUnreadable: "프로젝트 폴더를 읽을 권한이 없어요",
         .editorConflictTitle: "디스크에서 파일이 변경됐습니다",
         .editorConflictMessage: "저장하기 전에 사용할 버전을 선택하세요.",
+        .editorGoToLine: "줄로 이동",
+        .editorGoToLinePlaceholder: "줄 번호",
+        .editorNextTab: "다음 탭",
+        .editorPreviousTab: "이전 탭",
         .editorUseDiskVersion: "디스크 내용 사용",
         .editorKeepMyVersion: "내 내용 유지",
 
@@ -762,6 +767,10 @@ enum Strings {
         .editorProjectFolderUnreadable: "No permission to read the project folder",
         .editorConflictTitle: "The file changed on disk",
         .editorConflictMessage: "Choose which version to keep before saving.",
+        .editorGoToLine: "Go to line",
+        .editorGoToLinePlaceholder: "Line",
+        .editorNextTab: "Next tab",
+        .editorPreviousTab: "Previous tab",
         .editorUseDiskVersion: "Use the disk version",
         .editorKeepMyVersion: "Keep mine",
 

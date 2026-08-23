@@ -230,6 +230,52 @@ final class EditorPaneStore: ObservableObject {
         activeTabPath = path
     }
 
+    /// The tab after the active one, wrapping round at the end. What ⌘⇧] is
+    /// for in every editor with tabs: moving between what is already open
+    /// without reaching for the mouse or the file tree.
+    func selectNextTab() {
+        selectTab(offsetFromActive: 1)
+    }
+
+    func selectPreviousTab() {
+        selectTab(offsetFromActive: -1)
+    }
+
+    private func selectTab(offsetFromActive offset: Int) {
+        guard !openTabs.isEmpty else { return }
+        // From the start when nothing is active, so the shortcut still does
+        // something on a pane that has tabs but no selection.
+        guard let current = activeTabPath.flatMap({ path in openTabs.firstIndex { $0.path == path } }) else {
+            activeTabPath = openTabs.first?.path
+            return
+        }
+        let count = openTabs.count
+        // +count before the modulo: Swift's % keeps the sign of the left
+        // operand, so -1 % count is -1 and would index off the front.
+        activeTabPath = openTabs[(current + offset + count) % count].path
+    }
+
+    /// Puts the caret on `line` of the file already open, the way ⌘L does.
+    ///
+    /// Out-of-range numbers are clamped rather than refused: someone typing a
+    /// line number is aiming, and the end of the file is the honest answer to
+    /// a number past it.
+    func goToLine(_ line: Int) {
+        guard let path = activeTabPath, let tab = openTabs.first(where: { $0.path == path }) else { return }
+        let target = Self.clampedLine(line, in: tab.content)
+        reveal(path: path, lines: target...target)
+    }
+
+    /// The line `line` names in `content`, kept inside it. 1-based, like
+    /// every line number a person reads or types.
+    static func clampedLine(_ line: Int, in content: String) -> Int {
+        // A trailing newline ends the last line rather than starting another,
+        // which is what `split` gets right and `components` does not.
+        let lineCount = max(content.split(separator: "\n", omittingEmptySubsequences: false).count, 1)
+        let lastLine = content.hasSuffix("\n") ? max(lineCount - 1, 1) : lineCount
+        return min(max(line, 1), lastLine)
+    }
+
     func close(path: String) {
         // The neighbour, not the last tab. Closing one in the middle of a
         // strip jumped focus to the far end, which is nowhere near where the

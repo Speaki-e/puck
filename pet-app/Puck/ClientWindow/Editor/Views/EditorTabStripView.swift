@@ -25,6 +25,12 @@ struct EditorTabStripView: View {
     let onSelect: (String) -> Void
     let onClose: (String) -> Void
     let onSave: () -> Void
+    /// Moving between what is already open, and jumping inside it. Optional
+    /// because the detached window builds this strip too and hands them in
+    /// the same way; nil simply leaves the buttons out.
+    var onPreviousTab: (() -> Void)?
+    var onNextTab: (() -> Void)?
+    var onGoToLine: (() -> Void)?
     /// Hides the code column without closing what is open in it. Nil in the
     /// detached window, which has nothing to collapse into.
     var onCollapse: (() -> Void)?
@@ -48,6 +54,8 @@ struct EditorTabStripView: View {
                     }
                 }
             }
+            if let onPreviousTab, let onNextTab { tabNavigationButtons(previous: onPreviousTab, next: onNextTab) }
+            if let onGoToLine { goToLineButton(onGoToLine) }
             saveButton
             if let isTerminalOpen { terminalButton(isTerminalOpen) }
             if let onCollapse { collapseButton(onCollapse) }
@@ -90,6 +98,66 @@ struct EditorTabStripView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Strings.text(.editorCollapse))
         .help(Strings.text(.editorCollapse))
+    }
+
+    /// ⌘⇧[ and ⌘⇧], where every editor with tabs puts them. Buttons rather
+    /// than shortcuts alone for the same reason the save button is one: the
+    /// strip scrolls once a few files are open, and a shortcut nothing shows
+    /// is a shortcut nobody finds.
+    private func tabNavigationButtons(
+        previous: @escaping () -> Void,
+        next: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 0) {
+            stripButton(
+                systemImage: "chevron.left",
+                label: Strings.text(.editorPreviousTab),
+                shortcut: "[",
+                action: previous
+            )
+            stripButton(
+                systemImage: "chevron.right",
+                label: Strings.text(.editorNextTab),
+                shortcut: "]",
+                action: next
+            )
+        }
+        .disabled(tabs.count < 2)
+        .opacity(tabs.count < 2 ? 0.35 : 1)
+    }
+
+    /// ⌘L. Disabled with nothing open, which is also what keeps the shortcut
+    /// a silent no-op there rather than a beep.
+    private func goToLineButton(_ action: @escaping () -> Void) -> some View {
+        stripButton(
+            systemImage: "arrow.right.to.line",
+            label: Strings.text(.editorGoToLine),
+            shortcut: "l",
+            modifiers: .command,
+            action: action
+        )
+        .disabled(activeTabPath == nil)
+        .opacity(activeTabPath == nil ? 0.35 : 1)
+    }
+
+    private func stripButton(
+        systemImage: String,
+        label: String,
+        shortcut: KeyEquivalent,
+        modifiers: EventModifiers = [.command, .shift],
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: 20, height: Self.stripHeight)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(palette.textSecondary)
+        .keyboardShortcut(shortcut, modifiers: modifiers)
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     /// Always present, not only while something is dirty: it is where ⌘S is

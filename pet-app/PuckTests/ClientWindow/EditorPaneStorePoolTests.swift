@@ -73,4 +73,36 @@ final class EditorPaneStorePoolTests: XCTestCase {
         // Why switching away and back is cheap, and why open tabs survive it.
         XCTAssertIdentical(once, twice)
     }
+
+    /// A store keyed on the workspace but watching a different directory
+    /// would show one project's files under another's name, with a file
+    /// watcher on the wrong tree.
+    @MainActor
+    func test_aDifferentRootGetsItsOwnStore() throws {
+        let pool = EditorPaneStorePool.shared
+        let id = "workspace-\(UUID().uuidString)"
+
+        let one = try pool.store(forWorkspace: id, root: first, onRootChanged: {})
+        let two = try pool.store(forWorkspace: id, root: second, onRootChanged: {})
+
+        XCTAssertFalse(one === two)
+        XCTAssertEqual(two.rootPath, (try WorkspaceFileService.realpath(second)).path)
+    }
+
+    /// The same directory reached by another name is the same root, so the
+    /// open tabs and the watcher are kept.
+    @MainActor
+    func test_theSameRootByAnotherNameKeepsTheStore() throws {
+        let pool = EditorPaneStorePool.shared
+        let id = "workspace-\(UUID().uuidString)"
+
+        let one = try pool.store(forWorkspace: id, root: first, onRootChanged: {})
+        let again = try pool.store(
+            forWorkspace: id,
+            root: first.appendingPathComponent("."),
+            onRootChanged: {}
+        )
+
+        XCTAssertTrue(one === again)
+    }
 }

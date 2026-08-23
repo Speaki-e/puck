@@ -59,6 +59,16 @@ final class EditorPaneStore: ObservableObject {
     /// The project this store is attached to. Exposed for the git view, which
     /// runs against the same directory the tree reads.
     var rootPath: String { service.root.path }
+
+    /// Whether this store is watching `candidate`, symlinks and all -- the
+    /// service resolves its root, so a path that points at the same directory
+    /// by another name is the same root.
+    func watches(_ candidate: URL) -> Bool {
+        guard let resolved = try? WorkspaceFileService.realpath(candidate.standardizedFileURL) else {
+            return candidate.standardizedFileURL.path == service.root.path
+        }
+        return resolved.path == service.root.path
+    }
     private var watcher: WorkspaceFileWatcher?
 
     /// Called (on the main queue) if the project root itself is moved/

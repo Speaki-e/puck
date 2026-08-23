@@ -28,11 +28,15 @@ final class EditorPaneStorePool {
     /// whatever validated `root` just before calling this).
     @discardableResult
     func store(forWorkspace workspaceId: String, root: URL, onRootChanged: @escaping () -> Void) throws -> EditorPaneStore {
-        if let existing = storesByWorkspace[workspaceId] {
+        if let existing = storesByWorkspace[workspaceId], existing.watches(root) {
             // The latest caller's callback wins -- see EditorPaneStore.onRootChanged's doc comment.
             existing.onRootChanged = onRootChanged
             return existing
         }
+        // A store keyed on the workspace but watching a different directory
+        // would show one project's files under another's name, with a file
+        // watcher on the wrong tree. Nothing repoints a workspace today; this
+        // is what stops that staying true by accident.
         let created = try EditorPaneStore(workspaceId: workspaceId, root: root, onRootChanged: onRootChanged)
         storesByWorkspace[workspaceId] = created
         return created

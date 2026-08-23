@@ -283,7 +283,7 @@ private struct SidebarActionRow: View {
                 Spacer(minLength: 0)
             }
             .foregroundStyle(palette.textPrimary)
-            .frame(height: 26)
+            .frame(height: 30)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

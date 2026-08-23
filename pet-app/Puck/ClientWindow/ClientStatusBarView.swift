@@ -107,7 +107,7 @@ struct ClientStatusBarView: View {
         .foregroundStyle(palette.textSecondary)
         .lineLimit(1)
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
-        .frame(height: 24)
+        .frame(height: 28)
         // The window's own ground rather than a raised surface: a footer that
         // is lighter than everything above it reads as a drawer stuck to the
         // bottom. The hairline is what separates it.

@@ -14,15 +14,28 @@ import SwiftUI
 
 enum ClientTheme {
     enum Typography {
-        /// A settings section's title. `.caption` was small enough that
-        /// "일반" and "에이전트" read as captions on the rows below rather
-        /// than as the headings they are.
-        static let sectionHeader = Font.system(.subheadline).weight(.semibold)
-        static let workspaceName = Font.system(.callout).weight(.medium)
-        static let sessionTitle = Font.system(.footnote)
-        static let toolLabel = Font.system(.footnote).weight(.medium)
-        static let mono = Font.system(.caption, design: .monospaced)
-        static let caption = Font.system(.caption2)
+        // Fixed sizes rather than text styles, all through.
+        //
+        // macOS's own scale is built for dense inspector panels: `.caption2`
+        // is 10pt, `.footnote` 11, `.callout` 12. A whole window of chrome
+        // built from those reads as something to squint at, which is what
+        // this one did -- every list, tab and status line in it came out a
+        // size or two below the text it was labelling. The numbers below are
+        // that scale lifted a step, and stated outright so the relationships
+        // between them are visible in one place instead of being inherited
+        // from a table that was chosen for a different job.
+
+        /// A settings section's title, and a sidebar group's.
+        static let sectionHeader = Font.system(size: 13, weight: .semibold)
+        /// A row's own name -- a workspace, a chat, a file.
+        static let workspaceName = Font.system(size: 14, weight: .medium)
+        /// What a row says about itself under its name.
+        static let sessionTitle = Font.system(size: 13)
+        static let toolLabel = Font.system(size: 13, weight: .medium)
+        static let mono = Font.system(size: 12.5, design: .monospaced)
+        /// The smallest thing here: a badge, a timestamp, a status letter.
+        /// Not a size to set a list in.
+        static let caption = Font.system(size: 12)
 
         // The agent's reply is read as a document rather than glanced at in a
         // balloon, so it gets its own scale instead of `.body` (13pt): 16pt

@@ -35,7 +35,7 @@ struct OpenQuicklyView: View {
                 .font(ClientTheme.Typography.sessionTitle)
                 .foregroundStyle(palette.textPrimary)
                 .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-                .frame(height: 32)
+                .frame(height: 36)
                 .focused($isFieldFocused)
                 // Return takes the first result, which is the whole point of
                 // ranking them: the answer is already under the cursor.
@@ -70,19 +70,19 @@ struct OpenQuicklyView: View {
         } label: {
             HStack(spacing: ClientTheme.Metrics.spacingSmall) {
                 Text((path as NSString).lastPathComponent)
-                    .font(ClientTheme.Typography.caption)
+                    .font(ClientTheme.Typography.workspaceName)
                     .foregroundStyle(palette.textPrimary)
                 // The directory, dimmer: three files called index.ts are told
                 // apart by where they are, not by what they are called.
                 Text((path as NSString).deletingLastPathComponent)
-                    .font(ClientTheme.Typography.caption)
+                    .font(ClientTheme.Typography.sessionTitle)
                     .foregroundStyle(palette.textSecondary)
                     .lineLimit(1)
                     .truncationMode(.head)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
-            .frame(height: 22)
+            .frame(height: 26)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

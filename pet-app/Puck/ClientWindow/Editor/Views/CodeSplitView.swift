@@ -133,7 +133,7 @@ struct CodeSplitView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
-        .frame(height: 22)
+        .frame(height: 24)
         .background(palette.surface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(palette.surfaceBorder).frame(height: 1)

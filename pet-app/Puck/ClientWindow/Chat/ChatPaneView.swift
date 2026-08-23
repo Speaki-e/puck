@@ -627,12 +627,12 @@ private struct SlashSuggestionList: View {
                             .font(ClientTheme.Typography.mono)
                             .foregroundStyle(palette.textPrimary)
                         Text(suggestion.summary)
-                            .font(ClientTheme.Typography.caption)
+                            .font(ClientTheme.Typography.sessionTitle)
                             .foregroundStyle(palette.textSecondary)
                         Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)

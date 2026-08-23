@@ -36,7 +36,12 @@ struct IslandShape: InsettableShape {
 
     /// How much horizontal run the climb takes. Longer than the rise itself,
     /// so the curve leans rather than turning a corner.
+    ///
+    /// The default; the shape takes the value as a property so it can be
+    /// tuned live -- see `IslandShapeTuning`.
     static let blend: CGFloat = 46
+
+    var blend: CGFloat = IslandShape.blend
 
     /// Animatable so the shoulder slides rather than jumps when the sidebar
     /// is collapsed and the island's own left edge moves under the buttons.
@@ -46,6 +51,12 @@ struct IslandShape: InsettableShape {
             rise = newValue.first
             shoulderStart = newValue.second
         }
+    }
+
+    /// The blend, as the path uses it: never wider than the space between the
+    /// corners, or the climb would start inside one of them.
+    private func run(in rect: CGRect, radius: CGFloat) -> CGFloat {
+        max(1, min(blend, rect.width - radius * 2))
     }
 
     func inset(by amount: CGFloat) -> IslandShape {
@@ -63,7 +74,8 @@ struct IslandShape: InsettableShape {
         // all is asked of the value that came in, not of the clamped one --
         // clamping first turns "starts past the right edge" into "starts just
         // inside it", which is the one case that must not rise.
-        let room = rect.maxX - radius - Self.blend
+        let run = run(in: rect, radius: radius)
+        let room = rect.maxX - radius - run
         let raised = rise > 0 && shoulderStart <= room
         let start = min(max(shoulderStart, rect.minX + radius), room)
         let lowTop = rect.minY + rise
@@ -81,9 +93,9 @@ struct IslandShape: InsettableShape {
             // levels: the top and bottom of the step stay flat right up to
             // where the curve takes over.
             path.addCurve(
-                to: CGPoint(x: start + Self.blend, y: rect.minY),
-                control1: CGPoint(x: start + Self.blend * 0.55, y: lowTop),
-                control2: CGPoint(x: start + Self.blend * 0.45, y: rect.minY)
+                to: CGPoint(x: start + run, y: rect.minY),
+                control1: CGPoint(x: start + run * 0.55, y: lowTop),
+                control2: CGPoint(x: start + run * 0.45, y: rect.minY)
             )
             path.addArc(
                 tangent1End: CGPoint(x: rect.maxX, y: rect.minY),

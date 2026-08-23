@@ -40,6 +40,12 @@ struct PetTankView: View {
     /// changing it in one redraws the other.
     @AppStorage(TankBackground.storageKey) private var storedBackground = TankBackground.plain.rawValue
 
+    /// The shoulder's two numbers, while they are being settled by eye.
+    /// Observed rather than read once so the island redraws as the sliders
+    /// move -- see IslandShapeTuning, which is temporary.
+    @AppStorage(IslandShapeTuning.riseKey) private var tunedRise = Double(PetTankView.shoulderRise)
+    @AppStorage(IslandShapeTuning.blendKey) private var tunedBlend = Double(IslandShape.blend)
+
     /// Dragged from the island's bottom edge, and remembered. Stored as a
     /// Double because that is what @AppStorage keeps; clamped on read, so a
     /// value written by a future version with different limits cannot leave
@@ -150,8 +156,9 @@ struct PetTankView: View {
         GeometryReader { proxy in
             let shape = IslandShape(
                 cornerRadius: Self.cornerRadius,
-                rise: Self.shoulderRise,
-                shoulderStart: shoulderStart(in: proxy)
+                rise: CGFloat(tunedRise),
+                shoulderStart: shoulderStart(in: proxy),
+                blend: CGFloat(tunedBlend)
             )
             ZStack(alignment: .bottom) {
                 shape.fill(palette.background)
@@ -170,7 +177,7 @@ struct PetTankView: View {
             // them. Softer than a card's: the island is a shelf, not a dialog.
             .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
         }
-        .frame(height: islandHeight + Self.shoulderRise + Self.baseLift)
+        .frame(height: islandHeight + CGFloat(tunedRise) + Self.baseLift)
         // The grab area for resizing, on the edge it moves.
         .overlay(alignment: .bottom) { resizeHandle }
         // Up the left edge, the height of the island it sizes the pet for,
@@ -267,10 +274,10 @@ struct PetTankView: View {
             // *inside* the strip would push the conversation down by the
             // height of a decoration.
             .frame(
-                height: Self.stripHeight(island: islandHeight) + Self.shoulderRise + Self.baseLift,
+                height: Self.stripHeight(island: islandHeight) + CGFloat(tunedRise) + Self.baseLift,
                 alignment: .bottom
             )
-            .padding(.top, -(Self.shoulderRise + Self.baseLift))
+            .padding(.top, -(CGFloat(tunedRise) + Self.baseLift))
             // The chosen mood goes around the island, not on it: the island
             // is ground, and what it floats in is the view behind it.
             .background(background.backdrop(palette: palette))

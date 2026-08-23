@@ -132,14 +132,22 @@ final class WorkspaceRegistry {
 
     private static let storeVersion = 1
 
+    /// Set when a store was there and could not be read. The next write
+    /// moves it aside first -- starting empty is survivable, but writing a
+    /// fresh store over one we simply failed to parse destroys the only copy
+    /// of every workspace the user had, including one written by a newer
+    /// build they might go back to.
+    private var unreadableStoreNeedsBackup = false
+
     private func load() {
-        guard let data = try? Data(contentsOf: storageURL),
-              let parsed = try? JSONDecoder().decode(PersistedRegistry.self, from: data),
+        guard let data = try? Data(contentsOf: storageURL) else { return }
+        guard let parsed = try? JSONDecoder().decode(PersistedRegistry.self, from: data),
               parsed.version == Self.storeVersion
         else {
             // Unreadable, malformed, or written by a newer build. Starting
             // empty loses workspace *metadata*, never a project's files, so
             // refusing to launch over it would trade a small loss for a total one.
+            unreadableStoreNeedsBackup = true
             return
         }
         for record in parsed.workspaces where records[record.id] == nil {
@@ -149,6 +157,7 @@ final class WorkspaceRegistry {
     }
 
     private func persist() throws {
+        backUpUnreadableStoreIfNeeded()
         try FileManager.default.createDirectory(
             at: storageURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -159,6 +168,19 @@ final class WorkspaceRegistry {
         // .atomic is the temp-file-then-rename the TS version spelled out by
         // hand; a half-written store would strand every workspace at once.
         try data.write(to: storageURL, options: .atomic)
+    }
+
+    /// Keeps a store we could not parse, once, beside the new one.
+    ///
+    /// Best effort on purpose: if the copy fails there is nothing useful to
+    /// do about it, and refusing to save would mean losing the workspaces the
+    /// user is creating right now on top of the ones already lost.
+    private func backUpUnreadableStoreIfNeeded() {
+        guard unreadableStoreNeedsBackup else { return }
+        unreadableStoreNeedsBackup = false
+        let stamp = Int(Date().timeIntervalSince1970)
+        let backup = storageURL.appendingPathExtension("unreadable-\(stamp)")
+        try? FileManager.default.moveItem(at: storageURL, to: backup)
     }
 
     // MARK: - Helpers

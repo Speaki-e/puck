@@ -169,4 +169,42 @@ final class WorkspaceRegistryTests: XCTestCase {
 
         XCTAssertEqual(record.name, "Workspace")
     }
+
+    /// Starting empty over a store we could not parse is survivable -- it is
+    /// metadata, not files. Writing a fresh one *over* it is not: that is the
+    /// only copy of every workspace the user had, and a store written by a
+    /// newer build they might go back to reads as unparseable here too.
+    func test_anUnreadableStoreIsKeptRatherThanOverwritten() throws {
+        let url = storageURL()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{ this is not the store }".utf8).write(to: url)
+
+        let registry = try WorkspaceRegistry(storageURL: url)
+        _ = try registry.create(name: "New", projectPath: nil)
+
+        let siblings = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+        let kept = siblings.filter { $0.contains("unreadable-") }
+        XCTAssertEqual(kept.count, 1, "the store that could not be read is kept beside the new one")
+        let keptContents = try String(
+            contentsOf: url.deletingLastPathComponent().appendingPathComponent(kept[0]),
+            encoding: .utf8
+        )
+        XCTAssertEqual(keptContents, "{ this is not the store }")
+        XCTAssertTrue(registry.list().map(\.name).contains("New"), "and the new one is usable")
+    }
+
+    /// Only once. A backup per save would fill the folder with copies of the
+    /// same broken file.
+    func test_onlyOneBackupIsKept() throws {
+        let url = storageURL()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("nonsense".utf8).write(to: url)
+
+        let registry = try WorkspaceRegistry(storageURL: url)
+        _ = try registry.create(name: "One", projectPath: nil)
+        _ = try registry.create(name: "Two", projectPath: nil)
+
+        let siblings = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+        XCTAssertEqual(siblings.filter { $0.contains("unreadable-") }.count, 1)
+    }
 }

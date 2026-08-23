@@ -25,6 +25,9 @@ struct CodeEditorHostView: View {
     /// A request to open the find bar. The bar belongs to the text view
     /// itself -- all this does is say when.
     let find: EditorPaneStore.FindRequest?
+    /// Where the caret is, reported upward for the status line. The editor
+    /// owns this state -- nothing outside it knows where the caret went.
+    var onCursorMoved: ((CursorPosition.Position?) -> Void)?
 
     @State private var state = SourceEditorState()
     @State private var revealCoordinator = EditorRevealCoordinator()
@@ -63,6 +66,11 @@ struct CodeEditorHostView: View {
         .task(id: find?.token) {
             guard let find, find.path == path else { return }
             state.findPanelVisible = true
+        }
+        .onChange(of: state.cursorPositions) {
+            // The first, not all of them: the editor supports several carets,
+            // and a status line naming five positions says less than one.
+            onCursorMoved?(state.cursorPositions?.first?.start)
         }
     }
 

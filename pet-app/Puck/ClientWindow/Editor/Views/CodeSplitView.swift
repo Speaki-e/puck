@@ -12,6 +12,7 @@
 //  EditorPaneView, which no longer has a code half.
 //
 
+import CodeEditSourceEditor
 import SwiftUI
 
 struct CodeSplitView: View {
@@ -40,6 +41,9 @@ struct CodeSplitView: View {
     /// ⌘L's field, and what is typed into it. Held here rather than in the
     /// store: where the caret should go is the store's business, but whether
     /// a one-line prompt is on screen is this view's.
+    /// Where the caret is in the file being edited, for the status line.
+    /// Cleared when the tab changes: it belongs to one file.
+    @State private var cursor: CursorPosition.Position?
     @State private var isOpenQuicklyShowing = false
     @State private var isGoToLineShowing = false
     @State private var goToLineDraft = ""
@@ -71,8 +75,13 @@ struct CodeSplitView: View {
                 Divider()
             }
             if isGoToLineShowing { goToLineBar }
-            EditorContentHostView(store: store)
+            EditorContentHostView(store: store) { cursor = $0 }
+            if store.activeTabPath != nil {
+                Divider()
+                statusLine
+            }
         }
+        .onChange(of: store.activeTabPath) { cursor = nil }
         // Over the code rather than in a sheet: a sheet takes the window,
         // and this is a place to glance at the project, not a modal task.
         .overlay(alignment: .top) {
@@ -144,6 +153,28 @@ struct CodeSplitView: View {
         guard let line = Int(goToLineDraft.trimmingCharacters(in: .whitespaces)) else { return }
         store.goToLine(line)
         isGoToLineShowing = false
+    }
+
+    /// Under the code: what language it is being read as, and where the
+    /// caret is. Both were things the pane knew and never said -- the
+    /// language decides the highlighting, and a line number is what an error
+    /// message from anywhere else is expressed in.
+    private var statusLine: some View {
+        HStack(spacing: 8) {
+            if let path = store.activeTabPath, let language = EditorLanguage.displayName(forPath: path) {
+                Text(language)
+            }
+            Spacer(minLength: 0)
+            if let cursor {
+                Text(verbatim: "\(cursor.line):\(cursor.column)")
+                    .monospacedDigit()
+            }
+        }
+        .font(ClientTheme.Typography.caption)
+        .foregroundStyle(palette.textSecondary)
+        .padding(.horizontal, 10)
+        .frame(height: 18)
+        .background(palette.surface)
     }
 
     /// The path of the file being edited, above it.

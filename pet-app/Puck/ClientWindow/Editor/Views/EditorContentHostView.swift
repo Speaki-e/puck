@@ -3,6 +3,7 @@
 //  Puck
 //
 
+import CodeEditSourceEditor
 import SwiftUI
 
 struct EditorContentHostView: View {
@@ -13,6 +14,9 @@ struct EditorContentHostView: View {
     @ObservedObject private var localization = Localization.shared
 
     @ObservedObject var store: EditorPaneStore
+    /// Reported upward rather than drawn here: the status line belongs under
+    /// the whole code column, not inside the scroll view.
+    var onCursorMoved: ((CursorPosition.Position?) -> Void)?
 
     @Environment(\.clientPalette) private var palette
 
@@ -36,7 +40,8 @@ struct EditorContentHostView: View {
                         isEditable: !tab.readOnly,
                         path: tab.path,
                         reveal: store.pendingReveal,
-                        find: store.pendingFind
+                        find: store.pendingFind,
+                        onCursorMoved: onCursorMoved
                     )
                     // Rebuilt when the file changed underneath it, not on
                     // every keystroke: see EditorTab.adoptions.

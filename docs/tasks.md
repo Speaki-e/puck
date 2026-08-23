@@ -9,21 +9,19 @@
 
 ## 대기
 
-1. **캐릭터 교체를 쉽게** — 원래 되는 기능인데 방법이 어디에도 적혀 있지 않다.
- README에 아바타 패키지 만드는 법(폴더 구조, manifest.json, 필요한 클립, 소리)
- 가이드를 넣고, 커스터마이징하기 쉽도록 아바타 쪽 구조를 정리한다. 수조 그림
- (`seabed.png`)도 같은 방식으로 바꿔 끼울 수 있게 해서, 갈아끼우는 것들이 한
- 곳에 모이게 한다.
-2. **Swift 6 언어 모드로 올리기** — 재봤다. `SWIFT_STRICT_CONCURRENCY: complete`
+1. **Swift 6 언어 모드로 올리기** — 재봤다. `SWIFT_STRICT_CONCURRENCY: complete`
  로 Puck·PuckClient에서 경고 220개. 대부분은 AppKit을 만지는 쪽이 메인 액터
  표시가 없어서 나는 것(AppDelegate 확장들, MenuBarController, 창 컨트롤러들)
  이고, 나머지가 `static var` 전역과 non-Sendable 클로저 전달이다. 기계적이지만
  격리를 실제로 바꾸는 변경이라 한 번에 하지 않는다. 파일 단위로 `@MainActor`를
  붙여 나가며 줄이고, 0이 되면 `SWIFT_VERSION`을 6으로 올린다.
-3. **계속 리뷰하고 고치기** — 새로 짠 코드를 같은 방식으로 훑는다.
+2. **계속 리뷰하고 고치기** — 새로 짠 코드를 같은 방식으로 훑는다.
 
 ## 완료
 
+- 갈아끼우는 것들을 한 폴더로, README에 가이드 (`HEAD`) —
+ `~/Library/Application Support/Puck/{Avatars,Tank}`. 수조 그림도
+ `Tank/seabed.png`로 덮어쓸 수 있고, 설정에 그 폴더를 여는 버튼을 뒀다.
 - 수조 배경은 그림 하나로 고정, 이어붙일 때 반전 없음 (`HEAD`) — 고르는 메뉴와
  그라데이션 일곱 개를 걷어냈다.
 - 리뷰·리팩토링 (`8f49228`, `be54420`, `HEAD~1`) — 커진 두 파일을 나누고,

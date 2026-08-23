@@ -12,10 +12,9 @@
 import Foundation
 
 enum AvatarCatalogue {
-    static var avatarsDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("\(AppIdentity.applicationSupportDirectoryName)/Avatars", isDirectory: true)
-    }
+    /// Named in one place -- see Customisation, which is also where the
+    /// tank's picture goes.
+    static var avatarsDirectory: URL { Customisation.avatars }
 
     /// Every folder under `avatarsDirectory` with a manifest.json, sorted by
     /// name. A folder missing one is a half-copied/broken install (the same

@@ -79,6 +79,13 @@ struct AvatarManagementView: View {
                 SettingsActionRow(label: text(.importAvatarButton), systemImage: "square.and.arrow.down") {
                     importAvatar()
                 }
+                // Where the swappable things live. Importing copies a package
+                // in for you; this is for everything else -- editing one that
+                // is already there, dropping in a tank picture, seeing what
+                // the folder is even called.
+                SettingsActionRow(label: text(.openCustomisationFolder), systemImage: "folder") {
+                    Customisation.reveal()
+                }
                 if !reportMessage.isEmpty {
                     Text(reportMessage)
                         .font(.footnote)

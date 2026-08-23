@@ -17,21 +17,28 @@
 import AppKit
 
 enum TankArtwork {
-    /// The file, in the bundle's TankBackgrounds folder.
+    /// The file, both in the bundle's TankBackgrounds folder and in the
+    /// customisation folder that overrides it.
     static let name = "seabed"
 
     /// Loaded once and kept: this is asked for on every frame the island
-    /// draws, and decoding a wide PNG per frame is not a thing to do.
+    /// draws, and decoding a wide PNG per frame is not a thing to do. A
+    /// picture dropped in while the app is running is picked up at its next
+    /// launch, which is what the README says.
     static func image() -> NSImage? {
         if let cached = cache.object(forKey: name as NSString) { return cached }
-        guard
-            let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "TankBackgrounds"),
-            let image = NSImage(contentsOf: url)
-        else {
-            return nil
-        }
+        guard let url = resolvedURL(), let image = NSImage(contentsOf: url) else { return nil }
         cache.setObject(image, forKey: name as NSString)
         return image
+    }
+
+    /// The customisation folder's copy if there is one, otherwise the app's
+    /// own. Yours wins: that is the whole point of the folder.
+    static func resolvedURL(
+        custom: URL = Customisation.tank.appendingPathComponent("\(TankArtwork.name).png"),
+        bundled: URL? = Bundle.main.url(forResource: TankArtwork.name, withExtension: "png", subdirectory: "TankBackgrounds")
+    ) -> URL? {
+        FileManager.default.fileExists(atPath: custom.path) ? custom : bundled
     }
 
     /// How wide one copy is per point of height. Guarded against a

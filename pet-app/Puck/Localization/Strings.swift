@@ -42,6 +42,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case avoidClimbingLabel, speedLabel, toySizeLabel, toyPumpkin, toyWand
 
+    case openCustomisationFolder
     case avatarsHeader, importAvatarButton, importPanelPrompt
     /// Picking a different installed avatar as a preset.
     case avatarSelectButton
@@ -273,6 +274,7 @@ enum Strings {
         .toyPumpkin: "호박",
         .toyWand: "지팡이",
 
+        .openCustomisationFolder: "커스터마이징 폴더 열기",
         .avatarsHeader: "아바타",
         .importAvatarButton: "아바타 패키지 가져오기…",
         .avatarSelectButton: "선택",
@@ -598,6 +600,7 @@ enum Strings {
         .toyPumpkin: "Pumpkin",
         .toyWand: "Wand",
 
+        .openCustomisationFolder: "Open the customisation folder",
         .avatarsHeader: "Avatars",
         .importAvatarButton: "Import avatar package…",
         .avatarSelectButton: "Select",

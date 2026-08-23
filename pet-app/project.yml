@@ -159,6 +159,9 @@ targets:
       - path: Puck/Bridge/UserInputSender.swift
       - path: Puck/App/CompanionAppLauncher.swift
       - path: Puck/App/AppIdentity.swift
+      # The island reads the tank's picture from the folder people drop their
+      # own into, and this app is the one that draws the island.
+      - path: Puck/Customisation/Customisation.swift
       # This is the app that shows the editor pane, so it needs the icon set
       # FileIconTheme reads. Folder reference for the same reason as in Puck's
       # own list above.

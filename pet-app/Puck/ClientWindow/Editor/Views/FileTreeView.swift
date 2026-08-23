@@ -129,14 +129,14 @@ struct FileTreeView: View {
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(palette.textSecondary)
             TextField(Strings.text(.editorSearchFiles), text: $query)
                 .textFieldStyle(.plain)
-                .font(ClientTheme.Typography.caption)
+                .font(ClientTheme.Typography.sessionTitle)
         }
         .padding(.horizontal, 8)
-        .frame(height: 22)
+        .frame(height: 26)
         .background(palette.background)
         .clipShape(Capsule())
         // Tighter above than below, and tighter than it was on both: this
@@ -150,7 +150,7 @@ struct FileTreeView: View {
     private func row(for entry: FileTreeEntry) -> some View {
         Label {
             Text(entry.name)
-                .font(ClientTheme.Typography.caption)
+                .font(ClientTheme.Typography.sessionTitle)
                 .lineLimit(1)
                 // lineLimit alone still lets a long name push the row wider
                 // than the column and get clipped at the edge. Truncating at

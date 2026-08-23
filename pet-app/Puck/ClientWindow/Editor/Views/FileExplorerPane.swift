@@ -48,10 +48,15 @@ struct FileExplorerPane: View {
     @Environment(\.clientPalette) private var palette
 
     @ObservedObject var store: EditorPaneStore
+    /// Driven from the window's toolbar when there is one -- the band above
+    /// this column is otherwise empty, and a switcher up there is where Xcode
+    /// puts its navigator's. nil in the detached editor window, whose toolbar
+    /// is not ours, and then the strip below is used instead.
+    var externalTab: Binding<ExplorerTab>?
 
     /// Kept for the window's life rather than per workspace: which of these
     /// someone wants open is about what they are doing, not which project.
-    @State private var tab: ExplorerTab = .files
+    @State private var internalTab: ExplorerTab = .files
     /// Held here so it survives a tab switch: the sessions list is built from
     /// forty transcripts' worth of filesystem reads, and rescanning them for
     /// every glance at the file tree is work nobody asked for.
@@ -61,11 +66,16 @@ struct FileExplorerPane: View {
     /// the file tree is work nobody asked for.
     @StateObject private var git = GitStatusModel()
 
+    /// The switcher's state, wherever it lives.
+    private var tab: Binding<ExplorerTab> { externalTab ?? $internalTab }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            tabStrip
-            Divider()
-            switch tab {
+            if externalTab == nil {
+                tabStrip
+                Divider()
+            }
+            switch tab.wrappedValue {
             case .files:
                 filesTab
             case .sessions:
@@ -115,16 +125,16 @@ struct FileExplorerPane: View {
         HStack(spacing: 0) {
             ForEach(ExplorerTab.allCases) { candidate in
                 Button {
-                    tab = candidate
+                    tab.wrappedValue = candidate
                 } label: {
                     Image(systemName: candidate.symbolName)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(tab == candidate ? palette.textPrimary : palette.textSecondary)
-                        .frame(width: 32, height: 24)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(tab.wrappedValue == candidate ? palette.textPrimary : palette.textSecondary)
+                        .frame(width: 34, height: 26)
                         .contentShape(.rect)
                         .overlay(alignment: .bottom) {
                             Rectangle()
-                                .fill(tab == candidate ? palette.accent : .clear)
+                                .fill(tab.wrappedValue == candidate ? palette.accent : .clear)
                                 .frame(height: 2)
                         }
                 }

@@ -170,10 +170,10 @@ struct CodeSplitView: View {
                     .monospacedDigit()
             }
         }
-        .font(ClientTheme.Typography.caption)
+        .font(ClientTheme.Typography.sessionTitle)
         .foregroundStyle(palette.textSecondary)
         .padding(.horizontal, 10)
-        .frame(height: 18)
+        .frame(height: 22)
         .background(palette.surface)
     }
 
@@ -198,11 +198,11 @@ struct CodeSplitView: View {
             }
             Spacer(minLength: 0)
         }
-        .font(ClientTheme.Typography.caption)
+        .font(ClientTheme.Typography.sessionTitle)
         .lineLimit(1)
         .truncationMode(.head)
         .padding(.horizontal, 10)
-        .frame(height: 20)
+        .frame(height: 24)
         .help(path)
     }
 

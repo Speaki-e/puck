@@ -107,7 +107,10 @@ final class FileIconTheme {
 /// reads as a tree rather than losing its leading column.
 struct FileIconView: View {
     let entry: FileTreeEntry
-    var size: CGFloat = 14
+    /// 16 rather than 14: this is the only thing in the row that says what
+    /// kind of file it is, and Xcode's navigator draws its icons at the row's
+    /// full text height rather than under it.
+    var size: CGFloat = 16
 
     var body: some View {
         if let icon = FileIconTheme.shared.icon(for: entry) {

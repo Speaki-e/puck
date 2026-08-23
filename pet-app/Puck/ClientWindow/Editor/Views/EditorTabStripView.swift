@@ -43,9 +43,9 @@ struct EditorTabStripView: View {
 
     @Environment(\.clientPalette) private var palette
 
-    private static let stripHeight: CGFloat = 28
+    private static let stripHeight: CGFloat = 32
 
-    private static let tabHeight: CGFloat = 24
+    private static let tabHeight: CGFloat = 28
 
     var body: some View {
         HStack(spacing: 0) {
@@ -177,8 +177,8 @@ struct EditorTabStripView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 10, weight: .semibold))
-                .frame(width: 20, height: Self.stripHeight)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 24, height: Self.stripHeight)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -195,7 +195,7 @@ struct EditorTabStripView: View {
     private var saveButton: some View {
         Button(action: onSave) {
             Image(systemName: "square.and.arrow.down")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
         }
         .buttonStyle(.plain)
         .disabled(!canSave)
@@ -211,7 +211,7 @@ struct EditorTabStripView: View {
         let isActive = tab.path == activeTabPath
         return HStack(spacing: ClientTheme.Metrics.spacingSmall) {
             Text((tab.path as NSString).lastPathComponent)
-                .font(ClientTheme.Typography.caption)
+                .font(ClientTheme.Typography.sessionTitle)
                 .lineLimit(1)
             if tab.isDirty {
                 StatusDotView(status: .active, palette: palette, diameter: 5, pulses: false)

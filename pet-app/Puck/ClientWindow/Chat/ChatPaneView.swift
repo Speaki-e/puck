@@ -32,6 +32,10 @@ struct ChatPaneView: View {
     /// The active project's branch, passed through to the sidebar -- see
     /// ChatSidebarView.activeBranch.
     var activeBranch: String?
+    /// Which of the right column's three lists is showing, when that column
+    /// is on screen. In the toolbar because the band above it was empty --
+    /// the whole width of it, over the one column with no chrome of its own.
+    var explorerTab: Binding<ExplorerTab>?
 
     /// Where the toolbar's last button ends, measured rather than assumed --
     /// the island climbs into the empty band past it, and a hard-coded x
@@ -182,6 +186,24 @@ struct ChatPaneView: View {
             .disabled(activeWorkspace?.canOpenEditor != true)
             .keyboardShortcut("`", modifiers: .control)
             .help(Strings.text(.terminalToggle))
+        }
+        if let explorerTab {
+            ToolbarItem(placement: .primaryAction) {
+                Picker("", selection: explorerTab) {
+                    ForEach(ExplorerTab.allCases) { tab in
+                        Image(systemName: tab.symbolName)
+                            .help(tab.displayName)
+                            .tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                // Rebuilt on a language change: NSSegmentedControl keeps the
+                // titles it was built with, so its accessibility labels would
+                // stay in the old language.
+                .id(localization.language)
+                .help(Strings.text(.explorerTabFiles))
+            }
         }
         ToolbarItem {
             Button {

@@ -54,6 +54,11 @@ struct ClientWindowView: View {
     /// explorer is, and a status that only existed while a pane was open
     /// would be a footer that emptied when you collapsed something unrelated.
     @StateObject private var git = GitStatusModel()
+    /// Which of the right column's lists is showing. Held here because the
+    /// switcher for it sits in the window's toolbar, which belongs to this
+    /// view's chat pane, while the column itself is this view's own child.
+    /// Remembered across launches for the same reason the code column is.
+    @AppStorage("Puck.explorerTab") private var explorerTab: ExplorerTab = .files
 
     /// The window cannot go narrower than what it is currently showing. Two
     /// panes need more room than one, so the floor moves with the toggle
@@ -115,8 +120,14 @@ struct ClientWindowView: View {
                         // minimum: it is what the window is for, and a file
                         // opened from the explorer splits *this* column
                         // rather than replacing it.
-                        ChatPaneView(store: store, editor: $editor, editorStore: editorStore, activeBranch: git.status?.branch)
-                            .frame(minWidth: 520)
+                        ChatPaneView(
+                            store: store,
+                            editor: $editor,
+                            editorStore: editorStore,
+                            activeBranch: git.status?.branch,
+                            explorerTab: $explorerTab
+                        )
+                        .frame(minWidth: 520)
                             // Free width goes here, not to the file list.
                             // Without it, collapsing the session sidebar grew
                             // the explorer -- the one column that gains
@@ -125,7 +136,7 @@ struct ClientWindowView: View {
                         // A file list needs room for names, not for a second
                         // editor: the code it opens goes beside the
                         // conversation instead.
-                        FileExplorerPane(store: editorStore)
+                        FileExplorerPane(store: editorStore, externalTab: $explorerTab)
                             .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else if editor.isAttached, let availability = activeWorkspace?.editorAvailability {

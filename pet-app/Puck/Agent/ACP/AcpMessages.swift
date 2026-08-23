@@ -180,12 +180,38 @@ struct AcpPermissionRequest: Equatable {
     var isFileEdit: Bool { toolKind == "edit" }
 
     /// Whether the permission is for a tool served by the named MCP server.
-    /// A CLI namespaces one as `mcp__<server>__<tool>`, and which field of the
-    /// request carries that name differs by version, so this looks for it
-    /// anywhere in the request rather than betting on a field that may move.
+    ///
+    /// A CLI namespaces one as `mcp__<server>__<tool>`. This used to look for
+    /// that anywhere in the request, which meant anything *quoting* it was
+    /// auto-approved too: `grep -r "mcp__puck__" .` is a shell command whose
+    /// text contains the marker, and in tools-only mode it would have run
+    /// without asking. Only the fields that name the tool are read now, so a
+    /// payload cannot claim to be one of ours.
+    ///
+    /// Which of those fields carries the name differs by CLI version, hence
+    /// several. A version that moves it somewhere else entirely loses the
+    /// auto-approval and asks instead, which is the safe direction to fail.
     func namesMCPServer(_ server: String) -> Bool {
-        guard let text = raw.jsonText else { return false }
-        return text.contains("mcp__\(server)__")
+        let marker = "mcp__\(server)__"
+        return toolIdentifiers.contains { $0.contains(marker) }
+    }
+
+    /// The strings in this request that are meant to *name* the tool -- never
+    /// its arguments, which are written by the model and can say anything.
+    private var toolIdentifiers: [String] {
+        let params = raw.objectValue
+        let call = params?["toolCall"]?.objectValue
+        // The vendored adapter titles an unclassified call with the tool's own
+        // name (`mcp__puck__…` for ours) and repeats it under `_meta`, so both
+        // are read. Neither is written by the model.
+        let meta = call?["_meta"]?.objectValue?["claudeCode"]?.objectValue
+        return [
+            params?["toolName"]?.stringValue,
+            call?["title"]?.stringValue,
+            call?["toolName"]?.stringValue,
+            call?["toolCallId"]?.stringValue,
+            meta?["toolName"]?.stringValue,
+        ].compactMap { $0 }
     }
 
     static func outcome(selecting optionId: String) -> JSONValue {

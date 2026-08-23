@@ -75,4 +75,57 @@ final class AgentPermissionModeTests: XCTestCase {
         )
         XCTAssertEqual(AgentConfiguration.permissionMode(environment: [:], searchPaths: []), .toolsOnly)
     }
+
+    /// The marker only counts where the tool is *named*. It used to be looked
+    /// for anywhere in the request, so a shell command that merely quoted it
+    /// -- `grep -r "mcp__puck__" .` -- was auto-approved in tools-only mode
+    /// and ran without asking.
+    func test_aPayloadQuotingTheMarkerIsNotOneOfOurTools() {
+        let disguised = AcpPermissionRequest(raw: .object([
+            "toolCall": .object([
+                "title": .string("Bash"),
+                "kind": .string("execute"),
+                "rawInput": .object(["command": .string("grep -r \"mcp__puck__\" .")]),
+            ]),
+        ]))
+
+        XCTAssertFalse(
+            AgentPermissionMode.toolsOnly.allows(disguised, ownMCPServer: server),
+            "a command that mentions the marker is still a command"
+        )
+        XCTAssertFalse(AgentPermissionMode.edits.allows(disguised, ownMCPServer: server))
+    }
+
+    /// The name arrives under different keys depending on the CLI version, so
+    /// each of the ones we accept is checked.
+    func test_theMarkerIsFoundWhereverTheToolIsNamed() {
+        let byToolName = AcpPermissionRequest(raw: .object([
+            "toolName": .string("mcp__puck__ping"),
+        ]))
+        let byCallToolName = AcpPermissionRequest(raw: .object([
+            "toolCall": .object(["toolName": .string("mcp__puck__ping")]),
+        ]))
+
+        // What the vendored adapter actually sends: the tool's own name as
+        // the title, and again under _meta.
+        let byMeta = AcpPermissionRequest(raw: .object([
+            "toolCall": .object([
+                "title": .string("Bash"),
+                "_meta": .object(["claudeCode": .object(["toolName": .string("mcp__puck__ping")])]),
+            ]),
+        ]))
+
+        XCTAssertTrue(AgentPermissionMode.toolsOnly.allows(byToolName, ownMCPServer: server))
+        XCTAssertTrue(AgentPermissionMode.toolsOnly.allows(byCallToolName, ownMCPServer: server))
+        XCTAssertTrue(AgentPermissionMode.toolsOnly.allows(byMeta, ownMCPServer: server))
+    }
+
+    /// Another server's tool is not ours, however similar the name.
+    func test_anotherServersToolIsNotOurs() {
+        let other = AcpPermissionRequest(raw: .object([
+            "toolCall": .object(["title": .string("mcp__other__run_shell")]),
+        ]))
+
+        XCTAssertFalse(AgentPermissionMode.toolsOnly.allows(other, ownMCPServer: server))
+    }
 }

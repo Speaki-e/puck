@@ -114,7 +114,8 @@ struct ChatPaneView: View {
             ChatTranscriptView(session: session) { approved in
                 store.respondToPendingApproval(in: session, approved: approved)
             }
-            Divider()
+            // No rule above the composer: the box already has an edge of its
+            // own, and a full-width line over it cut the window in two.
             ChatInputBar(
                 isRunning: session.isRunning,
                 onSend: { text, attachments in
@@ -342,11 +343,10 @@ struct ChatInputBar: View {
     @State private var configuration = AgentConfiguration.load()
     @FocusState private var isFocused: Bool
 
-    /// The height of the small controls along the bottom of the box, and of
-    /// the stop button. 22 rather than the 32 the old free-standing send
-    /// button used: these sit inside the box now, and a row of 32pt controls
-    /// under the text makes the composer taller than the message.
-    static let controlHeight: CGFloat = 22
+    /// The height of the controls along the bottom of the box, and of the
+    /// stop button. Everything here is a hit target at arm's length rather
+    /// than a glyph to squint at.
+    static let controlHeight: CGFloat = 28
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -381,10 +381,10 @@ struct ChatInputBar: View {
             TextField(Strings.text(.chatComposerPlaceholder), text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(ClientTheme.Typography.transcriptBody)
-                // Two lines' worth of room before anything is typed, so the
+                // Three lines' worth of room before anything is typed, so the
                 // box has the presence the reference's does rather than
                 // growing into it.
-                .lineLimit(2...10)
+                .lineLimit(3...12)
                 .focused($isFocused)
                 // Return sends. There is no button to press instead, which is
                 // the point: the arrow was a control the eye had to find for
@@ -392,15 +392,15 @@ struct ChatInputBar: View {
                 .onSubmit(send)
             controlRow
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
         // Rounder and quieter than the old box: the reference's composer is a
         // soft-edged well the controls sit inside, not a bordered field with
         // a button beside it.
-        .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 20))
+        .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 22))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 22)
                 .strokeBorder(isFocused ? AnyShapeStyle(.tint.opacity(0.6)) : AnyShapeStyle(.separator), lineWidth: 1)
         )
     }
@@ -444,11 +444,11 @@ struct ChatInputBar: View {
             micButton
             if isRunning { stopButton }
         }
-        .font(ClientTheme.Typography.caption)
+        .font(ClientTheme.Typography.sessionTitle)
         .foregroundStyle(palette.textSecondary)
     }
 
-    /// "gpt-5.5 medium ∨". The model half is disabled where the model is not
+    /// "Claude Code 보통 ∨". The model half is disabled where the model is not
     /// ours to pick -- the coding CLI chooses its own -- and the effort half
     /// always applies, so the two live in one menu with a section each rather
     /// than in one disabled control.
@@ -470,14 +470,14 @@ struct ChatInputBar: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Text(modelLabel)
                     .foregroundStyle(palette.textPrimary)
                 Text(effort.displayName)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(.system(size: 9, weight: .semibold))
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 8)
             .frame(height: Self.controlHeight)
             .contentShape(.rect)
         }
@@ -486,10 +486,15 @@ struct ChatInputBar: View {
         .fixedSize()
     }
 
-    /// The provider's own name where the model is not ours to choose, so the
-    /// control says something true either way.
+    /// What is actually answering, named the way the reference names it: a
+    /// model, not a category. Where the model is not ours to choose, that is
+    /// the CLI doing the answering -- "Claude Code", not "coding CLI", which
+    /// is a description of a mechanism and tells the reader nothing.
     private var modelLabel: String {
-        configuration.provider.supportsModelSelection ? configuration.model : configuration.provider.displayName
+        guard configuration.provider.supportsModelSelection else {
+            return configuration.codingAgent.displayName
+        }
+        return configuration.model
     }
 
     /// pet-app does the listening. Lit while it is, and drawn as a waveform
@@ -500,7 +505,7 @@ struct ChatInputBar: View {
             onVoiceListening?(isListening)
         } label: {
             Image(systemName: isListening ? "waveform" : "mic")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .frame(width: Self.controlHeight, height: Self.controlHeight)
                 .contentShape(.rect)
         }
@@ -516,7 +521,7 @@ struct ChatInputBar: View {
     private var attachButton: some View {
         Button(action: chooseAttachment) {
             Image(systemName: "plus")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .frame(width: Self.controlHeight, height: Self.controlHeight)
                 .contentShape(.rect)
         }
@@ -527,7 +532,7 @@ struct ChatInputBar: View {
     private var stopButton: some View {
         Button(role: .cancel, action: onCancel) {
             Image(systemName: "stop.fill")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .frame(width: Self.controlHeight, height: Self.controlHeight)
                 .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
                 .contentShape(.rect)

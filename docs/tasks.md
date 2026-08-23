@@ -24,7 +24,10 @@
 7. **코드 에디터와 왼쪽 사이드바의 대대적인 UI 개선** — 위 1~5가 그 구체안이다.
  지금까지 한 것: 사이드바 대화 검색 필드(`6cc845b`), 코드 아래 상태줄
  (언어 · 줄:칸) (`ee1144b`), 탭 이동 · 찾기 · 빠른 열기 버튼.
-8. **Swift 6 언어 모드로 올리기** — 재봤다. `SWIFT_STRICT_CONCURRENCY: complete`
+8. **내가 만드는 UI가 전반적으로 너무 작다** — 글자, 아이콘, 버튼, 여백 전부
+ 한 단계씩 키우는 쪽으로 훑는다. 작게 만드는 습관이 기본값이 되어 있어서
+ 매번 지적받는다. 화면 전체를 한 번에 재보고 기준을 올린다.
+9. **Swift 6 언어 모드로 올리기** — 재봤다. `SWIFT_STRICT_CONCURRENCY: complete`
  로 Puck·PuckClient에서 경고 220개. 대부분은 AppKit을 만지는 쪽이 메인 액터
  표시가 없어서 나는 것(AppDelegate 확장들, MenuBarController, 창 컨트롤러들)
  이고, 나머지가 `static var` 전역과 non-Sendable 클로저 전달이다. 기계적이지만

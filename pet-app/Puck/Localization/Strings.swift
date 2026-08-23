@@ -72,6 +72,12 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// name/env-var so the key field always names the provider it is
     /// actually editing, instead of always saying "OpenAI".
     case providerLabel, apiKeyLabelFormat, apiKeyExplanationFormat
+    case cliCredentialLabelFormat
+    /// Joins the credential variable names in a list. Korean and English do
+    /// not use the same word, and the sentence around it is translated, so
+    /// the joiner has to be too -- it read "CLAUDE_CODE_OAUTH_TOKEN 또는
+    /// ANTHROPIC_API_KEY" in the middle of an English sentence.
+    case listOrJoiner
     /// The model name, for the providers where one is ours to choose, and the
     /// coding-agent CLI, for the provider that runs one. Both were previously
     /// reachable only through an environment variable.
@@ -292,6 +298,8 @@ enum Strings {
         .agentHeader: "에이전트",
         .providerLabel: "AI 공급자",
         .apiKeyLabelFormat: "%1$@ API 키",
+        .cliCredentialLabelFormat: "%1$@ 설정 토큰 / API 키",
+        .listOrJoiner: " 또는 ",
         .apiKeySave: "저장",
         .apiKeyClear: "삭제",
         .apiKeySavedFormat: "%1$@에 저장했어요",
@@ -605,6 +613,8 @@ enum Strings {
         .agentHeader: "Agent",
         .providerLabel: "AI provider",
         .apiKeyLabelFormat: "%1$@ API key",
+        .cliCredentialLabelFormat: "%1$@ setup token / API key",
+        .listOrJoiner: " or ",
         .apiKeySave: "Save",
         .apiKeyClear: "Delete",
         .apiKeySavedFormat: "Saved to %1$@",

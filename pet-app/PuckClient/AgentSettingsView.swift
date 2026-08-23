@@ -137,6 +137,13 @@ struct AgentSettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    // Keyed on the language. A segmented picker is an
+                    // NSSegmentedControl underneath and keeps the titles it
+                    // was built with while the rows' identities are unchanged,
+                    // so switching to English left "코딩 CLI" sitting between
+                    // two English labels. Same trick as the settings window's
+                    // own `.id(appearance)`.
+                    .id(localization.language)
                 }
 
                 if agentConfiguration.provider == .cli {
@@ -266,7 +273,7 @@ struct AgentSettingsView: View {
 
         Text(String(
             format: text(.apiKeyExplanationFormat),
-            agentConfiguration.credentialEnvironmentVariables.joined(separator: " 또는 ")
+            agentConfiguration.credentialEnvironmentVariables.joined(separator: text(.listOrJoiner))
         ))
         .font(.footnote)
         .foregroundStyle(.secondary)
@@ -277,7 +284,7 @@ struct AgentSettingsView: View {
 
     private var credentialFieldLabel: String {
         if agentConfiguration.provider == .cli {
-            return "\(agentConfiguration.codingAgent.displayName) 설정 토큰 / API 키"
+            return String(format: text(.cliCredentialLabelFormat), agentConfiguration.codingAgent.displayName)
         }
         return String(format: text(.apiKeyLabelFormat), agentConfiguration.provider.displayName)
     }
@@ -306,6 +313,9 @@ struct AgentSettingsView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            // Localized titles, so the same keying as the provider picker
+            // above -- see the note there.
+            .id(localization.language)
         }
 
         Text(text(.permissionsExplanation))

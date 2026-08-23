@@ -127,6 +127,36 @@ final class PetToolDispatcherTests: XCTestCase {
             try? await Task.sleep(nanoseconds: 1_000_000)
         }
     }
+
+    /// Ids are UUIDs, so this cannot happen by accident -- but if one ever
+    /// were reused, the first waiter must be told rather than left awaiting a
+    /// continuation nobody holds any more.
+    func test_reusingADispatchIdAnswersTheWaiterItDisplaces() async {
+        // Sequenced on the dispatches themselves rather than on `Task.yield`:
+        // `send` is called from inside `execute`, right after the id is
+        // registered, so counting sends is the only way to know the first
+        // call is actually waiting before the second displaces it.
+        let dispatched = expectation(description: "both dispatched")
+        dispatched.expectedFulfillmentCount = 2
+        let sut = PetToolDispatcher(send: { _ in
+            dispatched.fulfill()
+            return true
+        })
+
+        async let displaced = sut.execute(tool: "launch_app", arguments: .object([:]), id: "same")
+        async let survivor = sut.execute(tool: "launch_app", arguments: .object([:]), id: "same")
+        await fulfillment(of: [dispatched], timeout: 2)
+        sut.handle(ToolResult(id: "same", ok: true, data: nil, error: nil, detail: nil))
+
+        let first = await displaced
+        let second = await survivor
+        // Whichever registered first is the displaced one; the test does not
+        // depend on which of the two `async let`s that was.
+        let answers = [first, second]
+        XCTAssertEqual(answers.filter(\.ok).count, 1, "one of them is answered by the reply")
+        let refused = try? XCTUnwrap(answers.first { !$0.ok })
+        XCTAssertEqual(refused?.detail, "dispatch id reused: same")
+    }
 }
 
 final class AgentJSONBridgingTests: XCTestCase {
@@ -187,22 +217,4 @@ final class AgentToolRegistryTests: XCTestCase {
         }
     }
 
-    /// Ids are UUIDs, so this cannot happen by accident -- but if it ever
-    /// did, the first waiter must be told rather than left awaiting a
-    /// continuation nobody holds any more.
-    func test_reusingADispatchIdAnswersTheWaiterItDisplaces() async {
-        let sut = PetToolDispatcher(send: { _ in true })
-
-        async let first = sut.execute(tool: "launch_app", arguments: .object([:]), id: "same")
-        await Task.yield()
-        async let second = sut.execute(tool: "launch_app", arguments: .object([:]), id: "same")
-        await Task.yield()
-        sut.handle(ToolResult(id: "same", ok: true, data: nil, error: nil, detail: nil))
-
-        let displaced = await first
-        let answered = await second
-        XCTAssertFalse(displaced.ok)
-        XCTAssertEqual(displaced.detail, "dispatch id reused: same")
-        XCTAssertTrue(answered.ok)
-    }
 }

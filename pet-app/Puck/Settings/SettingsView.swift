@@ -244,6 +244,10 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                // Keyed on the language: a segmented picker keeps the titles
+                // it was built with while its rows' identities are unchanged,
+                // so these three stayed in the old language after a switch.
+                .id(localization.language)
                 .onChange(of: appearance) { _, newValue in store.appearance = newValue }
             }
             // The client theme should stay in sync with the menu bar

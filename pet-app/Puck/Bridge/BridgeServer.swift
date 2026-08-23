@@ -211,11 +211,13 @@ final class BridgeServer {
     /// (PuckClient) from workspace.
     private func relay(_ message: BridgeMessage, from origin: BridgeConnection) {
         guard let targetRole = ClientRelay.targetRole(for: message) else { return }
-        // Never back to the sender. Both sides of the bridge can play the gui
-        // role, so a gui-addressed message from a gui connection would
-        // otherwise arrive back at the process that just sent it.
+        // Back to the sender too, deliberately. PuckClient hosts the agent and
+        // draws the chat, and the two halves talk to each other through here:
+        // a run's events are broadcast once and arrive back at the same
+        // process, which is what moves the transcript on. Excluding the origin
+        // left every turn running to completion with the chat still spinning.
         for connection in connections
-        where connection !== origin && connection.isAuthenticated && connection.role == targetRole {
+        where connection.isAuthenticated && connection.role == targetRole {
             connection.send(message)
         }
     }

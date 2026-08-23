@@ -85,12 +85,19 @@ final class BridgeServerTests: XCTestCase {
             }
         }
 
+        // Line by line, and looking for one message among several: the relay
+        // sends this connection's own user_input back to it (see
+        // test_event_comesBackToTheGUIConnectionThatSentIt), so the reply is
+        // not the only thing on the wire and the buffer is not one message.
         func receiveLoop() {
             client.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, _, _ in
                 if let data { buffer.append(data) }
-                if let message = try? JSONDecoder().decode(BridgeMessage.self, from: buffer.dropLast()),
-                    case .toolResult(let result) = message
-                {
+                while let newlineIndex = buffer.firstIndex(of: 0x0A) {
+                    let line = buffer[..<newlineIndex]
+                    buffer.removeSubrange(...newlineIndex)
+                    guard let message = try? JSONDecoder().decode(BridgeMessage.self, from: line),
+                          case .toolResult(let result) = message
+                    else { continue }
                     XCTAssertTrue(result.ok)
                     clientReceived.fulfill()
                     return
@@ -279,6 +286,36 @@ final class BridgeServerTests: XCTestCase {
 
         wait(for: [guiReceived], timeout: 5)
         workspaceClient.cancel()
+        guiClient.cancel()
+    }
+
+    /// PuckClient hosts the agent *and* draws the chat, and the two halves
+    /// only meet through here: a run broadcasts its events once and the
+    /// transcript moves when they come back. So the relay has to deliver a
+    /// gui-addressed message to the gui connection that sent it. Excluding
+    /// the origin -- which looks harmless, and is what a relay usually does
+    /// -- left every turn finishing with the chat still spinning.
+    func test_event_comesBackToTheGUIConnectionThatSentIt() {
+        let bounced = expectation(description: "the sending gui connection received its own event back")
+
+        let guiClient = makeClient()
+        let guiBuffer = ReceiveBuffer()
+        guiClient.stateUpdateHandler = { state in
+            if case .ready = state {
+                self.sendAuthenticatedHello(on: guiClient)
+                self.send(.event(.agentDone(ok: true, summary: "done"), workspaceId: "w1", sessionId: "s1"), on: guiClient)
+            }
+        }
+        receiveOne(on: guiClient, into: guiBuffer) { message in
+            guard case .event(let event, _, let sessionId) = message else { return }
+            XCTAssertEqual(event, .agentDone(ok: true, summary: "done"))
+            XCTAssertEqual(sessionId, "s1")
+            bounced.fulfill()
+        }
+
+        guiClient.start(queue: .main)
+
+        wait(for: [bounced], timeout: 5)
         guiClient.cancel()
     }
 

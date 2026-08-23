@@ -37,9 +37,16 @@ struct FileTreeView: View {
     /// What a right-click can do. Nil in a tree that only browses -- the
     /// detached window's, for one -- so the menu is absent rather than
     /// present and inert.
+    /// The file the editor is showing, so the tree points at it. Xcode keeps
+    /// its navigator on the file in the editor; a tree that stays where you
+    /// last clicked makes you find the current file by reading.
+    var activePath: String?
     var actions: FileTreeActions?
 
     @State private var query = ""
+    /// Xcode's "modified" filter: with a git status in hand, the useful
+    /// question in a big project is usually "what did this turn touch".
+    @State private var changedOnly = false
     @State private var selection: String?
     /// The row a name is being typed for, and what kind of thing the typing
     /// will produce. One prompt for renaming and both kinds of creation:
@@ -51,13 +58,16 @@ struct FileTreeView: View {
     @Environment(\.clientPalette) private var palette
 
     private var filtered: [FileTreeEntry] {
-        guard !query.isEmpty else { return entries }
-        return Self.filter(entries, query: query.lowercased())
+        var result = entries
+        if changedOnly {
+            result = Self.keepingChanged(result, changedPaths: changedPaths)
+        }
+        guard !query.isEmpty else { return result }
+        return Self.filter(result, query: query.lowercased())
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            searchField
             List(filtered, children: \.children, selection: $selection) { entry in
                 row(for: entry)
             }
@@ -67,8 +77,20 @@ struct FileTreeView: View {
                 guard let newValue, Self.entry(at: newValue, in: filtered)?.kind != .directory else { return }
                 onOpen(newValue)
             }
+            // Under the tree, where Xcode keeps its navigator's filter: the
+            // list is what the column is for, and chrome above it is chrome
+            // between you and the first file.
+            Divider()
+            filterBar
         }
         .background(palette.surface)
+        // Follows the editor rather than the last click. Guarded on being
+        // different, or this would fight the user's own selection every time
+        // the tree redrew.
+        .onChange(of: activePath) { _, newValue in
+            guard let newValue, newValue != selection else { return }
+            selection = newValue
+        }
         // On the whole tree, not only on a row: making a file at the top
         // level means right-clicking where there are no rows.
         .contextMenu {
@@ -126,7 +148,7 @@ struct FileTreeView: View {
         Button(Strings.text(.explorerCopyPath)) { actions.copyPath(entry.path) }
     }
 
-    private var searchField: some View {
+    private var filterBar: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12))
@@ -134,17 +156,26 @@ struct FileTreeView: View {
             TextField(Strings.text(.editorSearchFiles), text: $query)
                 .textFieldStyle(.plain)
                 .font(ClientTheme.Typography.sessionTitle)
+            Button {
+                changedOnly.toggle()
+            } label: {
+                Image(systemName: "pencil.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(changedOnly ? palette.accent : palette.textSecondary)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .disabled(changedPaths.isEmpty)
+            .opacity(changedPaths.isEmpty ? 0.35 : 1)
+            .accessibilityLabel(Strings.text(.editorChangedOnly))
+            .help(Strings.text(.editorChangedOnly))
         }
         .padding(.horizontal, 8)
-        .frame(height: 26)
+        .frame(height: 30)
         .background(palette.background)
         .clipShape(Capsule())
-        // Tighter above than below, and tighter than it was on both: this
-        // field is the only chrome left between the tab strip and the first
-        // file, and it was sitting in a band of its own.
         .padding(.horizontal, 6)
-        .padding(.top, 5)
-        .padding(.bottom, 3)
+        .padding(.vertical, 5)
     }
 
     private func row(for entry: FileTreeEntry) -> some View {
@@ -204,6 +235,21 @@ struct FileTreeView: View {
             if let children = candidate.children, let found = entry(at: path, in: children) { return found }
         }
         return nil
+    }
+
+    /// The tree with only the changed files left in it, and only the
+    /// directories that lead to one.
+    static func keepingChanged(_ entries: [FileTreeEntry], changedPaths: [String: String]) -> [FileTreeEntry] {
+        entries.compactMap { entry -> FileTreeEntry? in
+            guard let children = entry.children else {
+                return changedPaths[entry.path] == nil ? nil : entry
+            }
+            let kept = keepingChanged(children, changedPaths: changedPaths)
+            guard !kept.isEmpty else { return nil }
+            var copy = entry
+            copy.children = kept
+            return copy
+        }
     }
 
     private static func filter(_ entries: [FileTreeEntry], query: String) -> [FileTreeEntry] {

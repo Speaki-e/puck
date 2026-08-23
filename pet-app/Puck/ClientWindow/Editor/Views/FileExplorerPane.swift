@@ -157,6 +157,7 @@ struct FileExplorerPane: View {
                 entries: store.tree,
                 onOpen: { store.open(path: $0) },
                 changedPaths: changedPaths,
+                activePath: store.activeTabPath,
                 actions: FileTreeActions(
                     rename: { store.rename(path: $0, to: $1) },
                     trash: { store.trash(path: $0) },

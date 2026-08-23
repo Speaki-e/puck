@@ -87,6 +87,13 @@ final class ClickThroughController {
         }
     }
 
+    /// AppKit keeps both monitors, so dropping this object is not the same as
+    /// stopping it -- the same reason WindowListWatcher and FocusModeObserver
+    /// stop themselves.
+    deinit {
+        stopMonitoring()
+    }
+
     func stopMonitoring() {
         if let globalMonitor {
             NSEvent.removeMonitor(globalMonitor)

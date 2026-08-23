@@ -63,7 +63,17 @@ struct PetTankView: View {
     /// every change and on every window that opens.
 
     private var islandHeight: CGFloat {
-        min(max(CGFloat(storedHeight), Self.minimumIslandHeight), Self.maximumIslandHeight)
+        Self.clamped(storedHeight, from: Self.minimumIslandHeight, to: Self.maximumIslandHeight)
+    }
+
+    /// Clamps a stored number into its limits, and treats one that is not a
+    /// number at all as the smallest allowed. A `Double` read back from
+    /// UserDefaults can be anything -- a hand-edited plist, a value written by
+    /// a version with different limits -- and NaN passes straight through
+    /// `min`/`max` into a SwiftUI frame, which is a window that will not draw.
+    static func clamped(_ value: Double, from lower: CGFloat, to upper: CGFloat) -> CGFloat {
+        guard value.isFinite else { return lower }
+        return min(max(CGFloat(value), lower), upper)
     }
 
     /// How tall the island opens at, and the pet's whole world while it is

@@ -51,7 +51,7 @@ struct TerminalSection: View {
     static let headerHeight: CGFloat = 26
 
     private var height: CGFloat {
-        min(max(CGFloat(storedHeight), Self.minimumHeight), Self.maximumHeight)
+        PetTankView.clamped(storedHeight, from: Self.minimumHeight, to: Self.maximumHeight)
     }
 
     var body: some View {

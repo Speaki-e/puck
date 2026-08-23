@@ -62,10 +62,19 @@ struct PetSizeSlider: View {
     /// The tallest the pet may be right now: its own limit, or what the
     /// island can hold, whichever is lower.
     private var ceiling: Double {
-        max(
+        // A slider with an empty or inverted range traps, and the island's
+        // height comes from UserDefaults, so the floor is enforced first.
+        let island = storedIslandHeight.isFinite ? storedIslandHeight : Double(PetTankView.islandHeight)
+        return max(
             PetTankView.minimumPetHeight + 1,
-            min(PetTankView.maximumPetHeight, storedIslandHeight - PetTankView.petHeadroom)
+            min(PetTankView.maximumPetHeight, island - PetTankView.petHeadroom)
         )
+    }
+
+    /// The stored height, as a number the slider can actually take.
+    private var safeHeight: Double {
+        guard storedHeight.isFinite else { return PetTankView.defaultPetHeight }
+        return min(max(storedHeight, PetTankView.minimumPetHeight), ceiling)
     }
 
     var body: some View {
@@ -73,7 +82,7 @@ struct PetSizeSlider: View {
         // vertical slider rather than a rotated SwiftUI one -- see
         // VerticalSlider for what that cost.
         VerticalSlider(
-            value: Binding(get: { storedHeight }, set: { send($0) }),
+            value: Binding(get: { safeHeight }, set: { send($0) }),
             range: PetTankView.minimumPetHeight...ceiling
         )
         .frame(width: Self.thickness, height: length)

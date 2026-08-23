@@ -76,4 +76,20 @@ final class IslandShapeTests: XCTestCase {
             "the pet fits the island both of them open at"
         )
     }
+
+    /// A number read back from UserDefaults can be anything -- a hand-edited
+    /// plist, a value from a version with different limits. NaN passes
+    /// straight through min/max and into a SwiftUI frame, which is a window
+    /// that will not draw.
+    func test_aStoredHeightThatIsNotANumberFallsBackToTheFloor() {
+        XCTAssertEqual(PetTankView.clamped(.nan, from: 84, to: 260), 84)
+        XCTAssertEqual(PetTankView.clamped(.infinity, from: 84, to: 260), 84)
+        XCTAssertEqual(PetTankView.clamped(-.infinity, from: 84, to: 260), 84)
+    }
+
+    func test_aStoredHeightOutsideTheLimitsIsBroughtBackInside() {
+        XCTAssertEqual(PetTankView.clamped(10, from: 84, to: 260), 84)
+        XCTAssertEqual(PetTankView.clamped(10_000, from: 84, to: 260), 260)
+        XCTAssertEqual(PetTankView.clamped(120, from: 84, to: 260), 120)
+    }
 }

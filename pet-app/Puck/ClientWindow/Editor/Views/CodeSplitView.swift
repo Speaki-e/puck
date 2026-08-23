@@ -40,6 +40,7 @@ struct CodeSplitView: View {
     /// ⌘L's field, and what is typed into it. Held here rather than in the
     /// store: where the caret should go is the store's business, but whether
     /// a one-line prompt is on screen is this view's.
+    @State private var isOpenQuicklyShowing = false
     @State private var isGoToLineShowing = false
     @State private var goToLineDraft = ""
     @FocusState private var isGoToLineFocused: Bool
@@ -57,6 +58,7 @@ struct CodeSplitView: View {
                 onNextTab: { store.selectNextTab() },
                 onGoToLine: showGoToLine,
                 onFind: { store.showFind() },
+                onOpenQuickly: { isOpenQuicklyShowing = true },
                 onCollapse: onCollapse,
                 isTerminalOpen: $isTerminalOpen
             )
@@ -70,6 +72,18 @@ struct CodeSplitView: View {
             }
             if isGoToLineShowing { goToLineBar }
             EditorContentHostView(store: store)
+        }
+        // Over the code rather than in a sheet: a sheet takes the window,
+        // and this is a place to glance at the project, not a modal task.
+        .overlay(alignment: .top) {
+            if isOpenQuicklyShowing {
+                OpenQuicklyView(
+                    paths: FileTreeEntry.flattenedPaths(store.tree),
+                    onOpen: { store.open(path: $0) },
+                    onDismiss: { isOpenQuicklyShowing = false }
+                )
+                .padding(.top, 40)
+            }
         }
         // Closing a tab with unsaved edits asks instead of dropping them.
         // A prompt rather than a silent save: the tab is a live view of a

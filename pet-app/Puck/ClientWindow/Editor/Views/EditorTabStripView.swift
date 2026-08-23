@@ -32,6 +32,7 @@ struct EditorTabStripView: View {
     var onNextTab: (() -> Void)?
     var onGoToLine: (() -> Void)?
     var onFind: (() -> Void)?
+    var onOpenQuickly: (() -> Void)?
     /// Hides the code column without closing what is open in it. Nil in the
     /// detached window, which has nothing to collapse into.
     var onCollapse: (() -> Void)?
@@ -56,6 +57,7 @@ struct EditorTabStripView: View {
                 }
             }
             if let onPreviousTab, let onNextTab { tabNavigationButtons(previous: onPreviousTab, next: onNextTab) }
+            if let onOpenQuickly { openQuicklyButton(onOpenQuickly) }
             if let onFind { findButton(onFind) }
             if let onGoToLine { goToLineButton(onGoToLine) }
             saveButton
@@ -126,6 +128,17 @@ struct EditorTabStripView: View {
         }
         .disabled(tabs.count < 2)
         .opacity(tabs.count < 2 ? 0.35 : 1)
+    }
+
+    /// ⌘⇧O. Not disabled with nothing open: reaching a file is exactly what
+    /// this is for when nothing is.
+    private func openQuicklyButton(_ action: @escaping () -> Void) -> some View {
+        stripButton(
+            systemImage: "text.magnifyingglass",
+            label: Strings.text(.editorOpenQuickly),
+            shortcut: "o",
+            action: action
+        )
     }
 
     /// ⌘F, into the editor's own find bar.

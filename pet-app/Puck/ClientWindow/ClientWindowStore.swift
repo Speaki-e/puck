@@ -65,6 +65,15 @@ final class ClientWindowStore: ObservableObject {
     /// by the window itself; the pet only comes home for a frontmost window.
     private(set) var windowIsFrontmost = false
 
+    /// Whether there is a window at all.
+    ///
+    /// Distinct from frontmost on purpose: pinning is what keeps the pet home
+    /// while the window sits behind something else, and pinning must not keep
+    /// it home when the window has been closed. The pet was left standing on
+    /// a tank that no longer existed -- floating in the space where the window
+    /// had been.
+    private(set) var windowIsOpen = true
+
     func setTankSegment(_ frame: CGRect?, for segment: TankSegment) {
         let previous = tankSegments[segment]
         tankSegments[segment] = frame
@@ -86,11 +95,19 @@ final class ClientWindowStore: ObservableObject {
         reportPetHome()
     }
 
+    func setWindowIsOpen(_ isOpen: Bool) {
+        guard windowIsOpen != isOpen else { return }
+        windowIsOpen = isOpen
+        if !isOpen { windowIsFrontmost = false }
+        reportPetHome()
+    }
+
     /// Sent only when something actually moved -- a resize produces a rect per
     /// layout pass, and an unchanged one carries no news.
     private func reportPetHome() {
         guard let space = GlobalScreenSpace.current() else { return }
-        let wire = tankFrame.map { frame -> BridgeRect in
+        // A closed window has no tank whatever its last reported frame was.
+        let wire = (windowIsOpen ? tankFrame : nil).map { frame -> BridgeRect in
             let topLeft = space.normalized(fromAppKit: CGPoint(x: frame.minX, y: frame.maxY))
             return BridgeRect(x: topLeft.x, y: topLeft.y, width: frame.width, height: frame.height)
         }

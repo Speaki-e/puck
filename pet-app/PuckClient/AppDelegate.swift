@@ -108,6 +108,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // process, so an unfiltered observer reports "frontmost" while the
         // chat window is behind one of them, and the pet comes home to a tank
         // nobody is looking at.
+        // Closing the window takes the tank with it. Without this the pet
+        // stayed in it whenever it was pinned -- pinning is for a window
+        // behind something else, not for one that is gone.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            MainActor.assumeIsolated {
+                guard let self, let window = self.window, note.object as AnyObject === window else { return }
+                self.clientWindowStore.setWindowIsOpen(false)
+            }
+        }
         for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
                 MainActor.assumeIsolated {
@@ -316,6 +329,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showWindow() {
+        clientWindowStore.setWindowIsOpen(true)
         let window = window ?? {
             // Sidebar + file tree + Monaco + chat all fighting for width once
             // the editor pane opens. At origin (0,0) it opens in the

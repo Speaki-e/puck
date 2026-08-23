@@ -12,7 +12,7 @@
 //  standing on a toolbar. Inset, lightly rounded and lit from above, it reads
 //  as a thing the pet is on -- the sidebar laid on its side.
 //
-//  The backdrop is themed (right-click to pick); see TankBackground.swift.
+//  The island is filled with one picture; see TankArtwork.swift.
 //
 
 import SwiftUI
@@ -34,11 +34,6 @@ struct PetTankView: View {
 
     @Environment(\.clientPalette) private var palette
 
-    /// Read straight from UserDefaults rather than through ClientWindowStore:
-    /// nothing about the choice leaves this app (see TankBackground). It also
-    /// keeps the two segments in step for free -- both read the same key, so
-    /// changing it in one redraws the other.
-    @AppStorage(TankBackground.storageKey) private var storedBackground = TankBackground.plain.rawValue
 
 
     /// Dragged from the island's bottom edge, and remembered. Stored as a
@@ -215,29 +210,27 @@ struct PetTankView: View {
     /// the top edge, it reads as looking down through water.
     @ViewBuilder
     private func islandFill(_ shape: IslandShape) -> some View {
-        if let name = background.islandArtworkName, let artwork = TankBackground.artwork(named: name) {
+        if let artwork = TankArtwork.image() {
             GeometryReader { proxy in
                 // Scaled by height, never by width: the whole scene from the
                 // water down to the sand is the picture, and a strip that
                 // filled by width showed a horizontal slice of it -- sand, or
                 // open water, depending on how tall the island was that day.
                 // The sides are allowed to run off the end instead.
-                let unit = max(proxy.size.height * Self.artworkAspect(artwork), 1)
-                // A wide island takes more than one copy, and every other one
-                // is mirrored. Repeated as-is there is a hard cut where the
-                // right edge of the scene meets its own left edge -- sand
-                // stopping against water. Mirrored, the seam is sand meeting
-                // sand and sky meeting sky, and only the lighthouse gives it
-                // away.
+                let unit = max(proxy.size.height * TankArtwork.aspect(artwork), 1)
+                // A wide island takes more than one copy, laid end to end as
+                // drawn. They were mirrored for a while to hide the seam,
+                // which hid it by turning the scene round -- two lighthouses
+                // facing each other reads as a mistake in a way a repeat does
+                // not.
                 let copies = max(Int(ceil(proxy.size.width / unit)), 1)
                 HStack(spacing: 0) {
-                    ForEach(0..<copies, id: \.self) { index in
+                    ForEach(0..<copies, id: \.self) { _ in
                         Image(nsImage: artwork)
                             .resizable()
                             .interpolation(.high)
                             .antialiased(true)
                             .frame(width: unit, height: proxy.size.height)
-                            .scaleEffect(x: index.isMultiple(of: 2) ? 1 : -1, y: 1)
                     }
                 }
                 // Centred: what is worth seeing in a scene is in the middle
@@ -288,13 +281,6 @@ struct PetTankView: View {
         }
     }
 
-    /// How wide one copy of the artwork is per point of height. Guarded
-    /// against a zero-height image, which would make the layout divide by it.
-    private static func artworkAspect(_ image: NSImage) -> CGFloat {
-        guard image.size.height > 0 else { return 1 }
-        return image.size.width / image.size.height
-    }
-
     /// Where the shoulder begins in the island's own space: just past the
     /// toolbar's last button, with a gap so the two do not touch.
     ///
@@ -343,12 +329,6 @@ struct PetTankView: View {
             .help(Strings.text(.islandResize))
     }
 
-    /// An unknown value means a key written by a future version, or a hand-
-    /// edited default -- falling back beats refusing to draw the tank.
-    private var background: TankBackground {
-        TankBackground(rawValue: storedBackground) ?? .plain
-    }
-
     var body: some View {
         island
             .padding(.horizontal, Self.horizontalInset)
@@ -363,26 +343,13 @@ struct PetTankView: View {
                 alignment: .bottom
             )
             .padding(.top, -(Self.shoulderRise + Self.baseLift))
-            // The chosen mood goes around the island, not on it: the island
-            // is ground, and what it floats in is the view behind it.
-            .background(background.backdrop(palette: palette))
-        // Was `.accessibilityHidden(true)` while this was pure decoration. It
-        // now carries the background menu, and a hidden element cannot be
-        // reached to open one -- so the strip is collapsed into a single
-        // labelled element instead, which keeps the decoration inside it
-        // unannounced without making the menu unreachable.
+        // Nothing behind the island: it floats in the window's own ground.
+        // A backdrop the colour of the picture filled the strip edge to edge
+        // and the island lost its outline in it.
+        //
+        // One element, so the decoration inside it is not announced piece by
+        // piece -- there is nothing in here to operate any more.
         .accessibilityElement()
-        .accessibilityLabel(Strings.text(.tankBackgroundMenu))
-        .contextMenu {
-            // Inline picker rather than a row of buttons: it renders the
-            // checkmark for the current choice itself, and a plain (non-inline)
-            // Picker would bury four flat options behind a submenu.
-            Picker(Strings.text(.tankBackgroundMenu), selection: $storedBackground) {
-                ForEach(TankBackground.allCases, id: \.self) { option in
-                    Text(option.name).tag(option.rawValue)
-                }
-            }
-            .pickerStyle(.inline)
-        }
+        .accessibilityLabel(Strings.text(.islandPetSize))
     }
 }

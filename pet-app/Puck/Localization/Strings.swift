@@ -125,10 +125,6 @@ enum L10nKey: String, CaseIterable, Hashable {
     case chatChatsAndTasks, chatWorkspaces, chatNoSessionsHere
     case chatEditor, chatAttachEditor, chatDetachEditor
     case chatAttachEditorHelp, chatDetachEditorHelp
-    case tankBackgroundMenu, tankBackgroundPlain, tankBackgroundNight
-    case tankBackgroundForest, tankBackgroundOcean
-    case tankBackgroundWorldTree, tankBackgroundBoundary, tankBackgroundMeadow
-    case tankBackgroundSeabed
     case islandResize
     case islandPetSize
     case terminalTitle
@@ -381,22 +377,12 @@ enum Strings {
         .failedToValidateFormat: "유효성 검사 실패: %1$@",
         .updatedEmotionFormat: "'%1$@' 업데이트 완료.",
         .failedToSetEmotionFormat: "'%1$@' 설정 실패: %2$@",
-
-        .tankBackgroundMenu: "수조 배경",
-        .tankBackgroundPlain: "기본",
-        .tankBackgroundNight: "밤",
-        .tankBackgroundForest: "숲",
-        .tankBackgroundOcean: "바다",
         .islandResize: "섬 높이 조절",
         .islandPetSize: "펫 크기 조절",
         .terminalTitle: "터미널",
         .terminalToggle: "터미널 (⌃`)",
         .terminalHide: "터미널 닫기",
         .terminalCouldNotStart: "셸이 시작하자마자 끝났습니다. 터미널을 닫았다가 다시 열어보세요.",
-        .tankBackgroundWorldTree: "세계수",
-        .tankBackgroundBoundary: "경계",
-        .tankBackgroundMeadow: "들녘",
-        .tankBackgroundSeabed: "바다 밑",
         .codeBlockCopy: "복사",
         .codeBlockCopied: "복사했어요",
         .commonClose: "닫기",
@@ -716,22 +702,12 @@ enum Strings {
         .failedToValidateFormat: "Validation failed: %1$@",
         .updatedEmotionFormat: "Updated '%1$@'.",
         .failedToSetEmotionFormat: "Couldn't set '%1$@': %2$@",
-
-        .tankBackgroundMenu: "Tank background",
-        .tankBackgroundPlain: "Plain",
-        .tankBackgroundNight: "Night",
-        .tankBackgroundForest: "Forest",
-        .tankBackgroundOcean: "Ocean",
         .islandResize: "Resize the island",
         .islandPetSize: "Resize the pet",
         .terminalTitle: "Terminal",
         .terminalToggle: "Terminal (⌃`)",
         .terminalHide: "Hide the terminal",
         .terminalCouldNotStart: "The shell exited as soon as it started. Close the terminal and open it again.",
-        .tankBackgroundWorldTree: "World tree",
-        .tankBackgroundBoundary: "Boundary",
-        .tankBackgroundMeadow: "Meadow",
-        .tankBackgroundSeabed: "Seabed",
         .codeBlockCopy: "Copy",
         .codeBlockCopied: "Copied",
         .commonClose: "Close",

@@ -63,6 +63,11 @@ struct WorkspaceGroup: View {
     let activeSessionId: String
     @Binding var isExpanded: Bool
     let onSelectSession: (ChatSession) -> Void
+    /// Chosen without a chat to land in. The list can hand this group no
+    /// chats at all -- a filter that a workspace's *name* answers while none
+    /// of its chats do -- and clicking it then opened the group and left the
+    /// window in the workspace it was already in.
+    let onSelectWorkspace: () -> Void
     let onDeleteSession: (ChatSession) -> Void
     let canDeleteSession: (ChatSession) -> Bool
 
@@ -104,8 +109,12 @@ struct WorkspaceGroup: View {
             // is what you came for, and leaving the window on another
             // workspace while its chats are on screen is the confusion this
             // list is being rebuilt to remove.
-            if isExpanded, let first = sessions.first, !isActive {
-                onSelectSession(first)
+            if isExpanded, !isActive {
+                if let first = sessions.first {
+                    onSelectSession(first)
+                } else {
+                    onSelectWorkspace()
+                }
             }
         } label: {
             HStack(spacing: 6) {

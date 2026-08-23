@@ -86,6 +86,7 @@ struct ChatSidebarView: View {
                         onSelectSession: { session in
                             store.selectSession(workspaceId: workspace.id, sessionId: session.id)
                         },
+                        onSelectWorkspace: { store.activeWorkspaceId = workspace.id },
                         onDeleteSession: { session in
                             pendingDeletion = SessionSelection(
                                 workspaceId: workspace.id,

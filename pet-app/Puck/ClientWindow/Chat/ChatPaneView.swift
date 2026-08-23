@@ -120,7 +120,8 @@ struct ChatPaneView: View {
                 onSend: { text, attachments in
                     store.sendMessage(text, source: .text, attachments: attachments.isEmpty ? nil : attachments)
                 },
-                onCancel: { store.cancelActiveRun() }
+                onCancel: { store.cancelActiveRun() },
+                onVoiceListening: { store.setVoiceListening($0) }
             )
         }
     }
@@ -324,9 +325,16 @@ struct ChatInputBar: View {
     let isRunning: Bool
     let onSend: (String, [Attachment]) -> Void
     let onCancel: () -> Void
+    /// Asks pet-app to hold its push-to-talk down or let it up. The chat
+    /// window has no microphone; see BridgeMessage.voiceListen.
+    var onVoiceListening: ((Bool) -> Void)?
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
+    /// Whether pet-app is holding its push-to-talk down for us. A hold, not a
+    /// press: speech is finalised on release, so the button stays lit until
+    /// it is clicked again.
+    @State private var isListening = false
     /// Read once and after every change rather than on each render: both come
     /// off disk (a `.env` and the environment), and `body` runs on every
     /// keystroke.
@@ -372,8 +380,11 @@ struct ChatInputBar: View {
             if !attachments.isEmpty { attachmentRow }
             TextField(Strings.text(.chatComposerPlaceholder), text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.title3)
-                .lineLimit(1...8)
+                .font(ClientTheme.Typography.transcriptBody)
+                // Two lines' worth of room before anything is typed, so the
+                // box has the presence the reference's does rather than
+                // growing into it.
+                .lineLimit(2...10)
                 .focused($isFocused)
                 // Return sends. There is no button to press instead, which is
                 // the point: the arrow was a control the eye had to find for
@@ -381,12 +392,16 @@ struct ChatInputBar: View {
                 .onSubmit(send)
             controlRow
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 14))
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+        // Rounder and quieter than the old box: the reference's composer is a
+        // soft-edged well the controls sit inside, not a bordered field with
+        // a button beside it.
+        .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 20))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(isFocused ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(isFocused ? AnyShapeStyle(.tint.opacity(0.6)) : AnyShapeStyle(.separator), lineWidth: 1)
         )
     }
 
@@ -422,12 +437,77 @@ struct ChatInputBar: View {
         HStack(spacing: 6) {
             attachButton
             Spacer(minLength: 0)
-            modelMenu
-            effortMenu
+            // Model and effort as one control, the way the reference has it:
+            // they are one question -- what should answer this -- and two
+            // adjacent menus of two words each read as clutter.
+            settingsMenu
+            micButton
             if isRunning { stopButton }
         }
         .font(ClientTheme.Typography.caption)
         .foregroundStyle(palette.textSecondary)
+    }
+
+    /// "gpt-5.5 medium ∨". The model half is disabled where the model is not
+    /// ours to pick -- the coding CLI chooses its own -- and the effort half
+    /// always applies, so the two live in one menu with a section each rather
+    /// than in one disabled control.
+    private var settingsMenu: some View {
+        Menu {
+            if configuration.provider.supportsModelSelection {
+                Section(Strings.text(.chatModel)) {
+                    ForEach(
+                        AgentProvider.selectableModels(for: configuration.provider, configured: configuration.model),
+                        id: \.self
+                    ) { model in
+                        Button(model) { run("/model \(model)") }
+                    }
+                }
+            }
+            Section(Strings.text(.chatEffort)) {
+                ForEach(AgentEffort.allCases) { level in
+                    Button(level.displayName) { run("/effort \(level.rawValue)") }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(modelLabel)
+                    .foregroundStyle(palette.textPrimary)
+                Text(effort.displayName)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .padding(.horizontal, 6)
+            .frame(height: Self.controlHeight)
+            .contentShape(.rect)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+    }
+
+    /// The provider's own name where the model is not ours to choose, so the
+    /// control says something true either way.
+    private var modelLabel: String {
+        configuration.provider.supportsModelSelection ? configuration.model : configuration.provider.displayName
+    }
+
+    /// pet-app does the listening. Lit while it is, and drawn as a waveform
+    /// then -- the same two glyphs the reference shows, one state each.
+    private var micButton: some View {
+        Button {
+            isListening.toggle()
+            onVoiceListening?(isListening)
+        } label: {
+            Image(systemName: isListening ? "waveform" : "mic")
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: Self.controlHeight, height: Self.controlHeight)
+                .contentShape(.rect)
+        }
+        .foregroundStyle(isListening ? AnyShapeStyle(.tint) : AnyShapeStyle(palette.textSecondary))
+        .disabled(onVoiceListening == nil)
+        .accessibilityLabel(Strings.text(.chatVoice))
+        .help(Strings.text(.chatVoice))
     }
 
     /// Images only: an attachment travels as `type: "image"` on the wire, and
@@ -442,50 +522,6 @@ struct ChatInputBar: View {
         }
         .accessibilityLabel(Strings.text(.chatAttach))
         .help(Strings.text(.chatAttach))
-    }
-
-    /// The same `/model` the chat already understands, so there is one path
-    /// that writes this setting and one that reports it. Disabled where the
-    /// model is not ours to pick: the coding CLI chooses its own, and a menu
-    /// offering names it ignores would be a lie.
-    private var modelMenu: some View {
-        Menu {
-            ForEach(
-                AgentProvider.selectableModels(for: configuration.provider, configured: configuration.model),
-                id: \.self
-            ) { model in
-                Button(model) { run("/model \(model)") }
-            }
-        } label: {
-            menuLabel(configuration.provider.supportsModelSelection ? configuration.model : configuration.provider.displayName)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .disabled(!configuration.provider.supportsModelSelection)
-        .help(Strings.text(.chatModel))
-    }
-
-    private var effortMenu: some View {
-        Menu {
-            ForEach(AgentEffort.allCases) { level in
-                Button(level.displayName) { run("/effort \(level.rawValue)") }
-            }
-        } label: {
-            menuLabel(effort.displayName)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help(Strings.text(.chatEffort))
-    }
-
-    private func menuLabel(_ title: String) -> some View {
-        Text(title)
-            .font(ClientTheme.Typography.caption)
-            .padding(.horizontal, 6)
-            .frame(height: Self.controlHeight)
-            .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
     }
 
     private var stopButton: some View {

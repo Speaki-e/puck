@@ -88,6 +88,14 @@ final class UserInputSender {
         broadcast(.petIslandHeight(height))
     }
 
+    /// The chat window's mic button: pet-app owns the microphone, so this
+    /// asks it to hold the push-to-talk key down (`true`) or let it up
+    /// (`false`), and the transcript arrives as an ordinary voice user_input.
+    @discardableResult
+    func setVoiceListening(_ listening: Bool) -> UserInputDelivery {
+        broadcast(.voiceListen(listening))
+    }
+
     /// F13 (2026-07-29, protocol 3.4): request a new chat session via the
     /// sidebar's "new chat". Confirmed later by a session_create arriving
     /// back over the socket (origin: .user).

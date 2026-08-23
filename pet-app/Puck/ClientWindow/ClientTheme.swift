@@ -25,19 +25,22 @@ enum ClientTheme {
         static let caption = Font.system(.caption2)
 
         // The agent's reply is read as a document rather than glanced at in a
-        // balloon, so it gets its own scale instead of `.body` (13pt): 15pt is
-        // one step up, the size the composer already types at, and it keeps a
-        // ~75-character line inside the transcript column. Fixed sizes rather
+        // balloon, so it gets its own scale instead of `.body` (13pt): 16pt
+        // reads comfortably at arm's length on a Retina display, and the
+        // transcript column was widened with it to keep the line ~75
+        // characters. Fixed sizes rather
         // than text styles because the headings have to stay *above* the body
         // -- `.headline` is 13pt on macOS, i.e. smaller than this body.
-        static let transcriptBody = Font.system(size: 15)
-        static let transcriptCode = Font.system(size: 13, design: .monospaced)
+        static let transcriptBody = Font.system(size: 16)
+        static let transcriptCode = Font.system(size: 13.5, design: .monospaced)
 
         static func transcriptHeading(level: Int) -> Font {
             switch level {
-            case 1: return .system(size: 22, weight: .semibold)
-            case 2: return .system(size: 19, weight: .semibold)
-            default: return .system(size: 16, weight: .semibold)
+            case 1: return .system(size: 23, weight: .semibold)
+            case 2: return .system(size: 20, weight: .semibold)
+            // Above the body, which is the whole point of the fixed sizes --
+            // a heading at the body's own size is not a heading.
+            default: return .system(size: 17, weight: .semibold)
             }
         }
     }
@@ -58,11 +61,17 @@ enum ClientTheme {
         /// card, approval banner -- is capped at this one measure and the
         /// column is centred, so widening the window adds margin instead of
         /// stretching the lines. ~75 characters at `transcriptBody`.
-        static let transcriptColumnWidth: CGFloat = 640
+        ///
+        /// Widened with the text: at 16pt the old 640 held about seventy
+        /// characters, and the conversation is what the window is for.
+        static let transcriptColumnWidth: CGFloat = 680
         /// Kept outside the column, so the text never sits against the window
         /// chrome or the editor pane's divider. Fixed at every width -- the
         /// column is what gives way when the pane is narrow.
-        static let transcriptHorizontalPadding: CGFloat = 24
+        ///
+        /// 16 rather than 24: with the code column open the conversation is
+        /// already narrow, and this was the padding on both sides of it.
+        static let transcriptHorizontalPadding: CGFloat = 16
         /// A floating panel's corners -- the island, the two sidebars.
         /// Rounded, not a capsule: a pill turns the ends into arcs and reads
         /// as a control, while these are panels with their corners taken off.

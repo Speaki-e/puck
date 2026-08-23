@@ -31,12 +31,12 @@ enum ClientRelay {
         //   as well would mint a competing workspace id for one click.
         // - tool_dispatch/tool_cancel/tool_result: pet-app is one end of each
         //   of those exchanges itself, so there is nobody to forward them to.
-        // - pet_home/pet_island_height: pet-app is the other end of these
-        //   exchanges too -- PuckClient reports them, BridgeMessageRouter
-        //   reads them directly.
+        // - pet_home/pet_island_height/voice_listen: pet-app is the other end
+        //   of these exchanges too -- PuckClient reports or asks,
+        //   BridgeMessageRouter reads them directly.
         case .workspaceCreateRequest, .sessionCreateRequest,
              .clientHello, .toolDispatch, .toolCancel, .toolResult,
-             .petHome, .petIslandHeight:
+             .petHome, .petIslandHeight, .voiceListen:
             return nil
         }
     }

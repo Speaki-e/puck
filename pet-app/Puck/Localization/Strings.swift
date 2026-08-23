@@ -121,7 +121,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case chatSelectAConversation, chatNewSession, chatCasualSession, chatThisWorkspace
     case chatSettings, chatComposerPlaceholder, chatStop, chatSend
-    case chatAttach, chatModel, chatEffort, chatFilterPlaceholder
+    case chatAttach, chatModel, chatEffort, chatFilterPlaceholder, chatRunning, chatVoice
     case chatEditor, chatAttachEditor, chatDetachEditor
     case chatAttachEditorHelp, chatDetachEditorHelp
     case tankBackgroundMenu, tankBackgroundPlain, tankBackgroundNight
@@ -409,6 +409,8 @@ enum Strings {
         .chatStop: "중지",
         .chatAttach: "이미지 첨부",
         .chatFilterPlaceholder: "대화 찾기",
+        .chatRunning: "처리 중",
+        .chatVoice: "음성으로 말하기",
         .chatModel: "모델",
         .chatEffort: "사고량",
         .chatSend: "보내기",
@@ -736,6 +738,8 @@ enum Strings {
         .chatStop: "Stop",
         .chatAttach: "Attach an image",
         .chatFilterPlaceholder: "Filter chats",
+        .chatRunning: "Working",
+        .chatVoice: "Speak",
         .chatModel: "Model",
         .chatEffort: "Thinking",
         .chatSend: "Send",

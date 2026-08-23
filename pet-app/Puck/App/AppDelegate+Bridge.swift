@@ -23,6 +23,18 @@ extension AppDelegate {
         router.onPetIslandHeight = { [weak self] height in
             self?.applyPetIslandHeight(height)
         }
+        // The chat window has no microphone of its own -- the recogniser and
+        // the permission for it are here. Same entry points the hotkey uses,
+        // so a turn started from the window and one started from the keyboard
+        // are the same turn.
+        router.onVoiceListen = { [weak self] listening in
+            guard let controller = self?.voiceInputController else { return }
+            if listening {
+                controller.pushToTalkDown()
+            } else {
+                controller.pushToTalkUp()
+            }
+        }
         // Workspace/session creation is answered in-process as of 2026-08-15
         // (was: relayed to workspace, which owned the registries). A registry
         // that can't open its store is not a reason to refuse to launch --

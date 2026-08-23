@@ -36,6 +36,8 @@ final class BridgeMessageRouter {
     var onPetHome: ((BridgeRect?, Bool) -> Void)?
     /// How tall the pet should stand on the island, in points.
     var onPetIslandHeight: ((Double) -> Void)?
+    /// The chat window's mic button, which has no microphone of its own.
+    var onVoiceListen: ((Bool) -> Void)?
 
     /// Answers workspace_create_request / session_create_request locally.
     /// Left optional so the many tests that only care about tool dispatch or
@@ -114,6 +116,11 @@ final class BridgeMessageRouter {
         case .petIslandHeight(let height):
             dispatchToMain { [weak self] in
                 self?.onPetIslandHeight?(height)
+            }
+
+        case .voiceListen(let listening):
+            dispatchToMain { [weak self] in
+                self?.onVoiceListen?(listening)
             }
 
         case .clientHello:

@@ -402,6 +402,13 @@ final class ClientWindowStore: ObservableObject {
         return runner
     }()
 
+    /// Asks pet-app to listen. Held rather than pressed: recognition
+    /// finalises when it is released, and what it heard arrives as an
+    /// ordinary voice message in whichever session is active.
+    func setVoiceListening(_ listening: Bool) {
+        sender.setVoiceListening(listening)
+    }
+
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
         let target = session(workspaceId: activeWorkspaceId, sessionId: activeSessionId)

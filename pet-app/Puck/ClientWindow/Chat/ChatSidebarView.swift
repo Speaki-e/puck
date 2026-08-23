@@ -266,9 +266,25 @@ private struct ChatSessionRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            // Not pulsing: a session row sits on screen indefinitely, and a
-            // dot animating for minutes reads as activity that isn't there.
-            StatusDotView(status: dotStatus, palette: palette, pulses: session.isRunning)
+            // A spinner while the turn is running, a dot once it has
+            // settled, both in a box of the same size so the titles beside
+            // them do not shift as runs start and finish.
+            //
+            // The dot pulsed instead, which is not enough to answer "is that
+            // chat still working?" -- the question is being asked precisely
+            // because the answer lives in a session you are not looking at.
+            ZStack {
+                if session.isRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.6)
+                        .accessibilityLabel(Strings.text(.chatRunning))
+                        .help(Strings.text(.chatRunning))
+                } else {
+                    StatusDotView(status: dotStatus, palette: palette, pulses: false)
+                }
+            }
+            .frame(width: 12, height: 12)
             Text(session.displayTitle)
                 .lineLimit(1)
             Spacer(minLength: 4)
@@ -282,7 +298,6 @@ private struct ChatSessionRow: View {
     }
 
     private var dotStatus: DotStatus {
-        if session.isRunning { return .active }
         switch session.lastRunOk {
         case .some(true): return .success
         case .some(false): return .error

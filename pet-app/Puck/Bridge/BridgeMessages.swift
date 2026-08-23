@@ -197,6 +197,16 @@ enum BridgeMessage: Equatable {
     /// the size slider in Settings still decides.
     case petIslandHeight(Double)
 
+    /// PuckClient -> pet-app: start or stop listening (2026-08-23). The
+    /// microphone, the speech recogniser and the permission for both live in
+    /// pet-app; the chat window has none of them, so its mic button asks for
+    /// the same push-to-talk the hotkey drives. What is recognised comes back
+    /// the way the hotkey's does, as a `user_input` with `source: voice`.
+    ///
+    /// `true` is the key going down and `false` is it coming up -- recognition
+    /// finalises on the way up, so this is a hold rather than two events.
+    case voiceListen(Bool)
+
     // --- sessions/workspaces (2026-07-29, protocol 3.4) ---
 
     /// pet-app -> workspace: request a new workspace (project folder or pure-chat).
@@ -249,6 +259,7 @@ extension BridgeMessage: Codable {
         case userInput = "user_input"
         case petHome = "pet_home"
         case petIslandHeight = "pet_island_height"
+        case voiceListen = "voice_listen"
         case workspaceCreateRequest = "workspace_create_request"
         case workspaceCreate = "workspace_create"
         case sessionCreateRequest = "session_create_request"
@@ -270,7 +281,7 @@ extension BridgeMessage: Codable {
         case workspaceId = "workspace_id"
         case sessionId = "session_id"
         case attachments
-        case rect, visible
+        case rect, visible, listening
         case token
         case height
         case name
@@ -363,6 +374,9 @@ extension BridgeMessage: Codable {
 
         case .petIslandHeight:
             self = .petIslandHeight(try container.decode(Double.self, forKey: .height))
+
+        case .voiceListen:
+            self = .voiceListen(try container.decode(Bool.self, forKey: .listening))
 
         case .petHome:
             self = .petHome(
@@ -468,6 +482,10 @@ extension BridgeMessage: Codable {
         case .petIslandHeight(let height):
             try container.encode(TypeKey.petIslandHeight, forKey: .type)
             try container.encode(height, forKey: .height)
+
+        case .voiceListen(let listening):
+            try container.encode(TypeKey.voiceListen, forKey: .type)
+            try container.encode(listening, forKey: .listening)
 
         case .petHome(let rect, let visible):
             try container.encode(TypeKey.petHome, forKey: .type)

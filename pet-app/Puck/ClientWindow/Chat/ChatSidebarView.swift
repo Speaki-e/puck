@@ -46,7 +46,12 @@ struct ChatSidebarView: View {
     @State private var filter = ""
 
     var body: some View {
-        List(selection: selection) {
+        // No `selection:`. `List` draws its own highlight for a selected row
+        // -- a different shape, a different colour, and drawn edge to edge --
+        // so the chats looked nothing like the projects above them, which are
+        // buttons that draw their own. One list, one highlight: these draw
+        // theirs too.
+        List {
             // Three groups, top to bottom: what you can start, which project
             // you are in, and the chats inside it. Taken from the reference
             // -- the old shape was one section per workspace with its chats
@@ -78,8 +83,16 @@ struct ChatSidebarView: View {
             }
             Section {
                 ForEach(activeSessions) { session in
-                    ChatSessionRow(session: session)
-                        .tag(SessionSelection(workspaceId: store.activeWorkspaceId, sessionId: session.id))
+                    ChatSessionRow(
+                        session: session,
+                        isActive: session.id == store.activeSessionId,
+                        onSelect: {
+                            store.selectSession(
+                                workspaceId: store.activeWorkspaceId,
+                                sessionId: session.id
+                            )
+                        }
+                    )
                         .contextMenu {
                             // Right-click on the row rather than a visible
                             // button: destructive, rarely wanted, and a
@@ -255,19 +268,6 @@ struct ChatSidebarView: View {
             result[workspace.id] = workspace.projectPath
         }
     }
-
-    /// Two ids as one selection value: `List` selects a single tag, and a
-    /// session id alone is ambiguous -- every workspace has a session called
-    /// "default" (see ClientWindowStore's composite-key note).
-    private var selection: Binding<SessionSelection?> {
-        Binding(
-            get: { SessionSelection(workspaceId: store.activeWorkspaceId, sessionId: store.activeSessionId) },
-            set: { newValue in
-                guard let newValue else { return }
-                store.selectSession(workspaceId: newValue.workspaceId, sessionId: newValue.sessionId)
-            }
-        )
-    }
 }
 
 struct SessionSelection: Hashable {
@@ -352,9 +352,13 @@ private struct SidebarRowBackground: ViewModifier {
             .animation(.easeOut(duration: 0.12), value: isHovering)
     }
 
+    /// Darker than the panel it sits on rather than lighter. A pale fill on
+    /// a near-black sidebar draws more attention than the name it is behind,
+    /// which is backwards -- the highlight is there to say "this one", not to
+    /// be the brightest thing in the column.
     private var fill: Color {
-        if isSelected { return palette.surface }
-        return isHovering ? palette.surface.opacity(0.7) : .clear
+        if isSelected { return palette.surface.opacity(0.55) }
+        return isHovering ? palette.surface.opacity(0.28) : .clear
     }
 }
 
@@ -468,9 +472,19 @@ private struct ChatSessionRow: View {
     @ObservedObject private var localization = Localization.shared
 
     @ObservedObject var session: ChatSession
+    let isActive: Bool
+    let onSelect: () -> Void
     @Environment(\.clientPalette) private var palette
 
     var body: some View {
+        Button(action: onSelect) {
+            row
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(session.displayTitle)
+    }
+
+    private var row: some View {
         HStack(spacing: 6) {
             // A spinner while the turn is running, a dot once it has
             // settled, both in a box of the same size so the titles beside
@@ -504,10 +518,7 @@ private struct ChatSessionRow: View {
         }
         .padding(.horizontal, 6)
         .frame(height: 28)
-        // No selected fill of its own: `List` draws the selection for these,
-        // and a second highlight under it is two rectangles for one state.
-        // Only the pointer's is missing, so only the pointer's is added.
-        .sidebarRowBackground()
+        .sidebarRowBackground(isSelected: isActive)
     }
 
     private var dotStatus: DotStatus {

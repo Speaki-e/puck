@@ -53,6 +53,7 @@ struct ChatSidebarView: View {
             // under it, which buried the project you are actually in among
             // the ones you are not.
             Section { actionRows }
+                .listRowInsets(Self.rowInsets)
             Section {
                 ForEach(visibleWorkspaces) { workspace in
                     WorkspaceRow(
@@ -63,6 +64,7 @@ struct ChatSidebarView: View {
                         onSelect: { select(workspace) }
                     )
                 }
+                .listRowInsets(Self.rowInsets)
             } header: {
                 sectionHeader(Strings.text(.chatProjects)) {
                     Button { isAddingWorkspace = true } label: {
@@ -94,6 +96,7 @@ struct ChatSidebarView: View {
                                 sessionId: session.id
                             ))
                         }
+                        .listRowInsets(Self.rowInsets)
                 }
             } header: {
                 sectionHeader(Strings.text(.chatChatsAndTasks)) { EmptyView() }
@@ -149,6 +152,12 @@ struct ChatSidebarView: View {
         }
     }
 
+    /// One rule for every row here. `List` leaves a generous gutter around
+    /// each row by default, which is why the chats sat further from each
+    /// other than they did from the heading above them -- exactly backwards,
+    /// since the heading is what separates one group from the next.
+    private static let rowInsets = EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6)
+
     /// A group's name, with whatever acts on the group at its trailing edge.
     private func sectionHeader<Trailing: View>(
         _ title: String,
@@ -163,7 +172,11 @@ struct ChatSidebarView: View {
                 .foregroundStyle(palette.textSecondary)
         }
         .textCase(nil)
-        .padding(.top, 4)
+        // Air above the heading, not below it: a heading belongs to the rows
+        // under it, and the gap that says "new group" goes over the top.
+        .padding(.top, 12)
+        .padding(.bottom, 2)
+        .padding(.horizontal, 6)
     }
 
     /// The chats of the workspace being looked at. The list used to hold
@@ -262,6 +275,43 @@ struct SessionSelection: Hashable {
     let sessionId: String
 }
 
+/// The fill under a sidebar row: the selection's, the pointer's, or none.
+///
+/// Every row here is something you click, and until now only the selected one
+/// showed it. A list that does not react to the pointer reads as a picture of
+/// a list -- and with rows this close together, the highlight is also how you
+/// tell which one you are about to hit.
+private struct SidebarRowBackground: ViewModifier {
+    @Environment(\.clientPalette) private var palette
+
+    let isSelected: Bool
+    @State private var isHovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius)
+                    .fill(fill)
+            )
+            .contentShape(.rect)
+            // Animated, because the pointer crosses several rows on the way
+            // to one and a hard flicker down the list is noise.
+            .animation(.easeOut(duration: 0.12), value: isHovering)
+            .onHover { isHovering = $0 }
+    }
+
+    private var fill: Color {
+        if isSelected { return palette.surface }
+        return isHovering ? palette.surface.opacity(0.55) : .clear
+    }
+}
+
+private extension View {
+    func sidebarRowBackground(isSelected: Bool = false) -> some View {
+        modifier(SidebarRowBackground(isSelected: isSelected))
+    }
+}
+
 /// One of the things this sidebar can start. Flat, full-width and the same
 /// height as every other row here, which is what makes the top of the list
 /// read as a group rather than as three loose buttons.
@@ -341,12 +391,8 @@ private struct WorkspaceRow: View {
                 }
             }
             .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius)
-                    .fill(isActive ? palette.surface : .clear)
-            )
-            .contentShape(.rect)
+            .padding(.vertical, 5)
+            .sidebarRowBackground(isSelected: isActive)
         }
         .buttonStyle(.plain)
         .help(workspace.projectPath ?? workspace.displayName)
@@ -403,6 +449,12 @@ private struct ChatSessionRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.horizontal, 6)
+        .frame(height: 28)
+        // No selected fill of its own: `List` draws the selection for these,
+        // and a second highlight under it is two rectangles for one state.
+        // Only the pointer's is missing, so only the pointer's is added.
+        .sidebarRowBackground()
     }
 
     private var dotStatus: DotStatus {

@@ -151,6 +151,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// The tank's size as the client last reported it, kept so the pet can be
     /// sized to fit it rather than being refused by it.
     var lastTankSize: CGSize?
+    /// The scale the trip in progress is heading for. Held here rather than
+    /// captured by the trip's closure so the size lever can change it
+    /// mid-flight.
+    var travelTargetScale: Double = 1
     var voiceInputController: VoiceInputController?
     var stateBeforeListen: StateHandler?
 

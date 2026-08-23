@@ -83,6 +83,12 @@ extension AppDelegate {
     func applyPetIslandHeight(_ height: Double) {
         Self.tankPetHeight = CGFloat(height)
         guard desktopRoamableArea != nil, let controller = characterController else { return }
+        // The size a trip in progress is heading for, so a drag during the
+        // flight home lands at the size that was chosen rather than the one
+        // chosen before it: the trip lerps toward this every frame, and
+        // writing the scale directly would just be overwritten by the next.
+        travelTargetScale = tankScale
+        guard controller.currentState !== travelState else { return }
         applyLiveAvatarScale(tankScale)
         // The area was measured against the old size; a pet that just grew
         // would be standing through the floor of it.
@@ -193,8 +199,14 @@ extension AppDelegate {
         // reads as the pet arriving and *then* being resized, which is two
         // events where the eye expects one -- and going the other way it
         // popped to full size the instant it touched the desktop.
+        travelTargetScale = scale
         travelState.onProgress = { [weak self] progress in
-            self?.applyLiveAvatarScale(departingScale + (scale - departingScale) * progress)
+            guard let self else { return }
+            // Read live rather than captured: the size lever can move while
+            // the pet is in the air, and the trip should end at the size the
+            // person is looking at.
+            let target = self.travelTargetScale
+            self.applyLiveAvatarScale(departingScale + (target - departingScale) * progress)
         }
         travelState.onArrival = { controller.roamableArea = area }
         controller.roamableArea = controller.roamableArea.union(area)

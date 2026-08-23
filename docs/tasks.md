@@ -9,7 +9,12 @@
 
 ## 대기
 
-1. **Swift 6 언어 모드로 올리기** — 진행 중. `SWIFT_STRICT_CONCURRENCY: complete`
+1. **어항(섬)이 파일 탐색기 위까지 이어지게** — 지금은 대화 열 위에서 끊긴다.
+2. **기본 대화 이름을 "새로운 대화"로 통일** — 워크스페이스의 기본 세션이든
+   새로 만든 세션이든 같은 이름으로 시작하고, 대화가 진행되면 제목이 그 내용으로
+   바뀌게 한다.
+3. **워크스페이스도 우클릭으로 삭제** — 세션은 되는데 워크스페이스는 안 된다.
+4. **Swift 6 언어 모드로 올리기** — 진행 중. `SWIFT_STRICT_CONCURRENCY: complete`
  기준 경고가 292개(Puck 220 + PuckClient 72)에서 **104개**(59 + 45)로 줄었다.
  지금까지 한 것: AppDelegate와 상태 기계(StateHandler·CharacterController)와
  NSViewRepresentable 코디네이터들을 `@MainActor`로, 큐로 지키는 타입들을
@@ -18,10 +23,12 @@
  메뉴바·오버레이 컨트롤러까지 `@MainActor`. 남은 큰 덩어리는 진짜로 동시적인
  쪽이다: `CodeEditorRunner`(14), `LoopbackHTTPServer`(12), `AgentHost`(11),
  `AcpAgentProcess`, `BridgeConnection`, 툴 핸들러 몇 개. 0이 되면 `SWIFT_VERSION`을 6으로 올린다.
-2. **계속 리뷰하고 고치기** — 새로 짠 코드를 같은 방식으로 훑는다.
+5. **계속 리뷰하고 고치기** — 새로 짠 코드를 같은 방식으로 훑는다.
 
 ## 완료
 
+- 사이드바 설정 버튼 제거, 툴바 "에디터 떼기" 버튼 제거, 코드 열을 접으면
+  터미널도 함께 접히고, 탭 스트립의 터미널 버튼 제거(툴바에 있다) (`HEAD`)
 - 갈아끼우는 것들을 한 폴더로, README에 가이드 (`HEAD`) —
  `~/Library/Application Support/Puck/{Avatars,Tank}`. 수조 그림도
  `Tank/seabed.png`로 덮어쓸 수 있고, 설정에 그 폴더를 여는 버튼을 뒀다.

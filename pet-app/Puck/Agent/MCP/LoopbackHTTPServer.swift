@@ -259,7 +259,9 @@ final class LoopbackHTTPServer: @unchecked Sendable {
 /// `@unchecked` for the usual reason and with the usual justification: every
 /// access to the two stored properties goes through `lock`, which the compiler
 /// cannot see. Without it, arming this from a `@Sendable` closure warns.
-private final class ResumeOnce<Value>: @unchecked Sendable {
+/// `Value: Sendable` because it crosses: the value is produced on the
+/// listener's queue and handed to a continuation awaiting on another.
+private final class ResumeOnce<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value, Never>?
     private var isDone = false

@@ -29,14 +29,6 @@ struct CodeSplitView: View {
     /// here is how to put it away".
     var onCollapse: (() -> Void)?
 
-    /// Whether the shell under the code is showing. Remembered across
-    /// launches: someone who works with a terminal open wants it open the
-    /// next morning too, and someone who never opens it never sees it.
-    ///
-    /// Only the button lives here; the terminal itself is drawn by
-    /// ConversationSplit, one level up, so that it can be opened with no file
-    /// open at all.
-    @AppStorage(TerminalSection.openStorageKey) private var isTerminalOpen = false
 
     /// ⌘L's field, and what is typed into it. Held here rather than in the
     /// store: where the caret should go is the store's business, but whether
@@ -63,8 +55,7 @@ struct CodeSplitView: View {
                 onGoToLine: showGoToLine,
                 onFind: { store.showFind() },
                 onOpenQuickly: { isOpenQuicklyShowing = true },
-                onCollapse: onCollapse,
-                isTerminalOpen: $isTerminalOpen
+                onCollapse: onCollapse
             )
             Divider()
             // Only when it says something the tab does not. A file at the

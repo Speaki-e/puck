@@ -203,6 +203,9 @@ struct ChatSidebarView: View {
     /// The toolbar has ⌘N too, but a sidebar whose first row is "새 대화" is
     /// how every app of this shape opens -- and the toolbar's version is a
     /// glyph you have to already know.
+    ///
+    /// No settings row: the toolbar's gear is right above it, and two ways in
+    /// sitting a centimetre apart is one too many.
     @ViewBuilder
     private var actionRows: some View {
         SidebarActionRow(
@@ -220,10 +223,6 @@ struct ChatSidebarView: View {
             systemImage: "square.grid.2x2"
         ) {
             isBrowsingWorkspaces = true
-        }
-        .listRowInsets(Self.rowInsets)
-        SidebarActionRow(title: Strings.text(.chatSettings), systemImage: "gearshape") {
-            NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
         }
         .listRowInsets(Self.rowInsets)
     }

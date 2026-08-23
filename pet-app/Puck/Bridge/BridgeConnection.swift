@@ -72,7 +72,13 @@ enum BridgeConnectionError: Error, Equatable {
 
 /// Wraps a single NWConnection (one workspace client) and handles JSON Lines
 /// framing on top of it via JSONLinesDecoder.
-final class BridgeConnection {
+///
+/// `@unchecked Sendable`: every stored property here is touched only from the
+/// queue this connection was started on -- NWConnection delivers its state,
+/// receive and send callbacks there, and `role`'s own note already spells out
+/// that reading it anywhere else is a race over which process gets a message.
+/// The promise is the queue, and it predates the annotation.
+final class BridgeConnection: @unchecked Sendable {
     /// The largest line this will write, matching JSONLinesDecoder's own
     /// default ceiling for what it will read. One number for both directions,
     /// because the far side is another copy of this class.

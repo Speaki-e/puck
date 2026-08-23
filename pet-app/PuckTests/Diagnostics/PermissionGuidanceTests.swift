@@ -58,11 +58,14 @@ final class ClickElementPermissionTests: XCTestCase {
             "frame": .object(["x": .number(10), "y": .number(20), "width": .number(30), "height": .number(40)]),
         ])
 
-        var result: Result<JSONValue?, ToolExecutionError>?
-        handler.execute(id: "test", args: frame) { result = $0 }
+        // A box rather than a captured var: a handler's completion is
+        // `@Sendable`, because a handler answers from wherever its work
+        // finished.
+        let result = UncheckedBox<Result<JSONValue?, ToolExecutionError>?>(nil)
+        handler.execute(id: "test", args: frame) { result.value = $0 }
 
-        guard case .failure(let error) = result else {
-            return XCTFail("expected a failure, got \(String(describing: result))")
+        guard case .failure(let error) = result.value else {
+            return XCTFail("expected a failure, got \(String(describing: result.value))")
         }
         XCTAssertEqual(error, .permissionDenied)
     }
@@ -74,11 +77,11 @@ final class ClickElementPermissionTests: XCTestCase {
         let handler = ClickElementHandler()
         handler.isAccessibilityTrusted = { false }
 
-        var result: Result<JSONValue?, ToolExecutionError>?
-        handler.execute(id: "test", args: .object([:])) { result = $0 }
+        let result = UncheckedBox<Result<JSONValue?, ToolExecutionError>?>(nil)
+        handler.execute(id: "test", args: .object([:])) { result.value = $0 }
 
-        guard case .failure(let error) = result else {
-            return XCTFail("expected a failure, got \(String(describing: result))")
+        guard case .failure(let error) = result.value else {
+            return XCTFail("expected a failure, got \(String(describing: result.value))")
         }
         XCTAssertNotEqual(error, .permissionDenied)
     }

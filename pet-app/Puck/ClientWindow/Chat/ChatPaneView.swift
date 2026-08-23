@@ -160,21 +160,10 @@ struct ChatPaneView: View {
             // mouse (and could not be driven by automation at all).
             .keyboardShortcut("e", modifiers: [.command, .shift])
         }
-        ToolbarItem {
-            Button {
-                editor = editor == .detached ? .attached : .detached
-            } label: {
-                Label(
-                    Strings.text(editor == .detached ? .chatAttachEditor : .chatDetachEditor),
-                    systemImage: editor == .detached
-                        ? "arrow.down.right.and.arrow.up.left"
-                        : "macwindow.on.rectangle"
-                )
-            }
-            .disabled(activeWorkspace?.canOpenEditor != true)
-            .help(Strings.text(editor == .detached ? .chatAttachEditorHelp : .chatDetachEditorHelp))
-            .keyboardShortcut("d", modifiers: [.command, .shift])
-        }
+        // No detach button, and no ⌘⇧D with it. The toolbar carried two
+        // buttons for the same column and this was the one nobody pressed.
+        // DetachedEditorWindow stays wired up: nothing offers detaching now,
+        // but a window that is already out has to be able to come back.
         ToolbarItem {
             Button {
                 guard activeWorkspace?.canOpenEditor == true else { return }
@@ -274,7 +263,14 @@ private struct ConversationSplit<Chat: View>: View {
                     chat.frame(minWidth: 320)
                     VStack(spacing: 0) {
                         if store.activeTabPath != nil, !isCollapsed {
-                            CodeSplitView(store: store) { isCollapsed = true }
+                            // Putting the code away puts the shell under it
+                            // away too: it is the same column, and a terminal
+                            // left alone in it is a column holding a shell
+                            // nobody asked to keep.
+                            CodeSplitView(store: store) {
+                                isCollapsed = true
+                                isTerminalOpen = false
+                            }
                                 .frame(maxHeight: .infinity)
                         } else if store.activeTabPath != nil {
                             // Put away, but the terminal below it is keeping

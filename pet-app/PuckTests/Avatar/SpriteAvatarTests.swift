@@ -11,6 +11,9 @@ import AppKit
 import QuartzCore
 @testable import Puck
 
+/// `@MainActor`: sprite layers and their animations are the main
+/// thread's, like the window they are drawn in.
+@MainActor
 final class SpriteAvatarTests: XCTestCase {
     private var packageDirectory: URL!
 

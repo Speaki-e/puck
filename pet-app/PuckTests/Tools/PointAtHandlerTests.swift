@@ -78,27 +78,27 @@ final class PointAtHandlerTests: XCTestCase {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
 
-        var replied = false
-        handler.execute(id: "test", args: frameArgs) { _ in replied = true }
+        let replied = UncheckedBox(false)
+        handler.execute(id: "test", args: frameArgs) { _ in replied.value = true }
         await settle()
-        XCTAssertFalse(replied, "the pet is still walking there")
+        XCTAssertFalse(replied.value, "the pet is still walking there")
 
         coordinator.completeArrival()
-        XCTAssertTrue(replied)
+        XCTAssertTrue(replied.value)
     }
 
     func test_repliesSuccessOncePointingStarts() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
 
-        var ok: Bool?
+        let ok = UncheckedBox<Bool?>(nil)
         handler.execute(id: "test", args: frameArgs) { result in
-            if case .success = result { ok = true } else { ok = false }
+            if case .success = result { ok.value = true } else { ok.value = false }
         }
         await settle()
         coordinator.completeArrival()
 
-        XCTAssertEqual(ok, true)
+        XCTAssertEqual(ok.value, true)
     }
 
     /// ToolExecutor's default cancel() is a no-op -- a cancelled point_at

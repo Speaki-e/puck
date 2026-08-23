@@ -36,11 +36,6 @@ struct EditorTabStripView: View {
     /// Hides the code column without closing what is open in it. Nil in the
     /// detached window, which has nothing to collapse into.
     var onCollapse: (() -> Void)?
-    /// Whether the shell under the code is showing. A binding rather than a
-    /// closure: the button draws itself differently depending on the answer,
-    /// so it has to know it.
-    var isTerminalOpen: Binding<Bool>?
-
     @Environment(\.clientPalette) private var palette
 
     private static let stripHeight: CGFloat = 32
@@ -61,32 +56,10 @@ struct EditorTabStripView: View {
             if let onFind { findButton(onFind) }
             if let onGoToLine { goToLineButton(onGoToLine) }
             saveButton
-            if let isTerminalOpen { terminalButton(isTerminalOpen) }
             if let onCollapse { collapseButton(onCollapse) }
         }
         .frame(height: Self.stripHeight)
         .background(palette.surface)
-    }
-
-    /// Opens the shell under the code, or puts it away. ⌃` is where every
-    /// editor with a terminal puts this, so it is where this one puts it too.
-    private func terminalButton(_ isOpen: Binding<Bool>) -> some View {
-        Button {
-            isOpen.wrappedValue.toggle()
-        } label: {
-            Image(systemName: "terminal")
-                .font(.system(size: 11, weight: .semibold))
-                .frame(width: Self.stripHeight, height: Self.stripHeight)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(isOpen.wrappedValue ? palette.textPrimary : palette.textSecondary)
-        // The ⌃` shortcut is declared on the window instead. Declared here it
-        // only existed while the code column was open -- and with the column
-        // closed the key press fell through to whatever had focus, which put
-        // a backtick in the composer instead of opening a terminal.
-        .accessibilityLabel(Strings.text(.terminalToggle))
-        .help(Strings.text(.terminalToggle))
     }
 
     /// Puts the file away and gives the width back to the conversation.

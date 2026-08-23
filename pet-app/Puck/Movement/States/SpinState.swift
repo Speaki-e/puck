@@ -31,7 +31,9 @@ final class SpinState: StateHandler {
 
     /// However long BouncePreset.spin's flip animation takes -- this state
     /// just needs to stay entered exactly that long before returning to Idle.
-    static let duration: TimeInterval = BouncePreset.spinDuration
+    /// `nonisolated`: a constant, and the tests read it to place a moment in
+    /// the spin without standing on the main actor to do it.
+    nonisolated static let duration: TimeInterval = BouncePreset.spinDuration
 
     private var elapsed: TimeInterval = 0
     private var oneShot = OneShotTransition()

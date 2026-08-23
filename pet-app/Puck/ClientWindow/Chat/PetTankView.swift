@@ -100,8 +100,10 @@ struct PetTankView: View {
     /// other.
     static let heightStorageKey = "Puck.islandHeight"
 
-    /// How far the island floats from the window's own edges.
-    static let horizontalInset: CGFloat = 20
+    /// How far the island floats from the window's own edges. Was 20 on each
+    /// side, which read as a gap rather than as the island floating: the strip
+    /// is only ~90pt tall, and 40pt of the width went to nothing.
+    static let horizontalInset: CGFloat = 10
     static let verticalInset: CGFloat = 8
 
     /// The strip the island floats in.

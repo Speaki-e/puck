@@ -10,6 +10,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: what it exercises belongs to the main thread -- a
+/// window, the status item, or the character they draw.
+@MainActor
 final class OverlayWindowControllerTests: XCTestCase {
     func test_start_createsOneWindowPerDisplay_positionedAtItsAppKitFrame() throws {
         let screenManager = try XCTUnwrap(ScreenManager())

@@ -38,12 +38,17 @@ final class GitStatusModelTests: XCTestCase {
             return true
         }
 
-        /// Waits for a read to be in flight. Bounded, so a model that never
-        /// reads fails the test instead of hanging the suite.
+        /// Waits for a read to be in flight. Bounded by *time*, so a model
+        /// that never reads fails the test instead of hanging the suite --
+        /// and so a machine running the whole suite at once does not fail it
+        /// for being slow. A thousand yields was a budget of scheduler turns,
+        /// which under load ran out before the read had started.
         func waitForPendingRead() async -> Bool {
-            for _ in 0..<1000 {
+            let deadline = Date().addingTimeInterval(2)
+            while Date() < deadline {
                 if resume != nil { return true }
                 await Task.yield()
+                try? await Task.sleep(nanoseconds: 500_000)
             }
             return false
         }

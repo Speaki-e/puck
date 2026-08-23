@@ -31,6 +31,10 @@ enum MenuBarClick: Equatable {
     }
 }
 
+/// `@MainActor`: it owns the status item, its popover and the panel inside
+/// them. Every entry point is a click on that item or a call from the app
+/// delegate, both of which are the main thread.
+@MainActor
 final class MenuBarController {
     /// Built afresh on every open rather than cached: the panel shows live
     /// state (which toys are out, whether Accessibility has been granted

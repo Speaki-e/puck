@@ -24,12 +24,17 @@ cd "$(dirname "$0")/.."
 # clone has no project at all, so CI always generates one.
 scripts/generate.sh > /dev/null
 
+# Tee'd rather than streamed: the warning gate below reads what the build
+# said, and a warning nobody reads is a warning nobody fixes.
+BUILD_LOG=$(mktemp)
+trap 'rm -f "$BUILD_LOG"' EXIT
+
 xcodebuild test \
     -project Puck.xcodeproj \
     -scheme Puck \
     -destination 'platform=macOS' \
     -skipPackagePluginValidation \
-    CODE_SIGNING_ALLOWED=NO
+    CODE_SIGNING_ALLOWED=NO | tee "$BUILD_LOG"
 
 # PuckClient is a separate application target, so compiling PuckTests alone
 # cannot prove its target membership and app entry point still build.
@@ -38,10 +43,13 @@ xcodebuild build \
     -scheme PuckClient \
     -destination 'platform=macOS' \
     -skipPackagePluginValidation \
-    CODE_SIGNING_ALLOWED=NO
+    CODE_SIGNING_ALLOWED=NO | tee -a "$BUILD_LOG"
 
 # The app bundles the build just produced actually carry what the code looks
 # up at runtime. xcodebuild cannot answer this and neither can the unit tests
 # -- see scripts/check-resources.sh.
 scripts/check-resources.sh "$(xcodebuild -project Puck.xcodeproj -scheme PuckClient -showBuildSettings 2>/dev/null \
     | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/ { print $2; exit }')"
+
+# Warnings in our own sources, which xcodebuild reports and then forgets.
+scripts/check-warnings.sh "$BUILD_LOG"

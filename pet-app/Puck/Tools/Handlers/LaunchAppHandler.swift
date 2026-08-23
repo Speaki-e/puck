@@ -47,6 +47,14 @@ final class LaunchAppHandler: ToolHandler {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
+    /// NSWorkspace has no modern by-display-name lookup, so this is still
+    /// `fullPath(forApplication:)` -- deprecated, with no replacement that
+    /// takes a name. One call, in one place, and the warning gate
+    /// (scripts/check-warnings.sh) names this line as the one it allows.
+    private static func applicationURL(named appName: String) -> URL? {
+        NSWorkspace.shared.fullPath(forApplication: appName).map(URL.init(fileURLWithPath:))
+    }
+
     func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard case .object(let fields) = args else {
             completion(.failure(.executionFailed("launch_app requires an args object")))
@@ -57,9 +65,7 @@ final class LaunchAppHandler: ToolHandler {
         if case .string(let bundleID) = fields["bundle_id"] {
             appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
         } else if case .string(let appName) = fields["app_name"] {
-            // NSWorkspace has no modern by-display-name lookup API; fullPath(forApplication:)
-            // is deprecated but remains the practical way to resolve a plain app name.
-            appURL = NSWorkspace.shared.fullPath(forApplication: appName).map(URL.init(fileURLWithPath:))
+            appURL = Self.applicationURL(named: appName)
         } else {
             appURL = nil
         }

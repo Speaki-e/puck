@@ -13,7 +13,11 @@ import XCTest
 
 /// A transport that answers the handshake and holds `session/prompt` open
 /// until the test releases it, so overlap is observable.
-private final class FakeAgent: AcpAgentTransport {
+/// `@unchecked` because the test drives it from one place at a time and the
+/// counters are only read after the work being tested has finished -- the same
+/// claim the real transports make, and the reason the compiler cannot check
+/// it: a test double has no lock to point at.
+private final class FakeAgent: AcpAgentTransport, @unchecked Sendable {
     let connection: AcpConnection
     private(set) var isRunning = true
     private(set) var terminateCount = 0

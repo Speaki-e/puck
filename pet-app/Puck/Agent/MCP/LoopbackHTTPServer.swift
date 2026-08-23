@@ -239,7 +239,10 @@ final class LoopbackHTTPServer {
 /// Resumes a continuation exactly once, whichever state update gets there
 /// first. NWListener reports `.failed` after `.ready` on a listener that dies,
 /// and resuming twice traps.
-private final class ResumeOnce<Value> {
+/// `@unchecked` for the usual reason and with the usual justification: every
+/// access to the two stored properties goes through `lock`, which the compiler
+/// cannot see. Without it, arming this from a `@Sendable` closure warns.
+private final class ResumeOnce<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value, Never>?
     private var isDone = false

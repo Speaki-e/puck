@@ -240,17 +240,39 @@ struct PetTankView: View {
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
             }
-            .overlay(Rectangle().fill(.ultraThinMaterial).opacity(0.3))
-            .overlay(alignment: .top) {
+            .overlay(Rectangle().fill(.ultraThinMaterial).opacity(0.26))
+            // What makes it glass rather than a frosted photo: light collects
+            // along the top edge, thins out over the first inch, and the
+            // bottom sits in the shade of its own thickness.
+            .overlay {
                 LinearGradient(
-                    colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
+                    stops: [
+                        .init(color: .white.opacity(0.42), location: 0),
+                        .init(color: .white.opacity(0.10), location: 0.08),
+                        .init(color: .clear, location: 0.42),
+                        .init(color: .black.opacity(0.10), location: 1),
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 26)
+            }
+            // The glint, up in the corner the light comes from. Soft-edged
+            // and wide, so it reads as a sheen across the surface rather than
+            // as a lamp drawn on it.
+            .overlay(alignment: .topLeading) {
+                RadialGradient(
+                    colors: [.white.opacity(0.28), .clear],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: 220
+                )
+                .allowsHitTesting(false)
             }
             .clipShape(shape)
-            .overlay { shape.strokeBorder(.white.opacity(0.35), lineWidth: 1) }
+            // Two edges, not one: the bright one is the light caught on the
+            // rim, and the darker one under it is the glass having thickness.
+            .overlay { shape.strokeBorder(.white.opacity(0.45), lineWidth: 1) }
+            .overlay { shape.inset(by: 1).strokeBorder(.black.opacity(0.12), lineWidth: 1) }
         } else {
             shape.fill(palette.background)
         }

@@ -51,7 +51,9 @@ if ! xcrun -f metal > /dev/null 2>&1; then
 fi
 
 BUILD_LOG=$(mktemp)
-trap 'rm -f "$BUILD_LOG"' EXIT
+# $DERIVED too: the failure paths below used to leave a Release build of both
+# apps behind in /var/folders, and LaunchServices indexes what it finds there.
+trap 'rm -f "$BUILD_LOG"; rm -rf "$DERIVED"' EXIT
 for scheme in Puck PuckClient; do
     if ! xcodebuild build \
         -project Puck.xcodeproj \
@@ -85,6 +87,24 @@ done
 # scripts/test.sh so a missing one fails in both places rather than only here.
 scripts/check-resources.sh "$DERIVED/Build/Products/Release"
 
+# Everything that can be checked is checked before anything is replaced.
+# The two apps speak one protocol to each other, so a run that updated Puck
+# and then failed on PuckClient left a mismatched pair installed -- and the
+# old ones already killed. Nothing below this point is allowed to fail for a
+# reason that was knowable up here.
+for app in Puck PuckClient; do
+    built="$DERIVED/Build/Products/Release/$app.app"
+    if [ ! -d "$built" ]; then
+        echo "error: $app.app is missing from the build output." >&2
+        exit 1
+    fi
+    if ! codesign --verify --strict "$built" 2>/dev/null; then
+        echo "error: the $app.app that was just built is not correctly signed." >&2
+        echo "       Nothing has been replaced; /Applications still holds the previous pair." >&2
+        exit 1
+    fi
+done
+
 # Updated in place, never deleted first. macOS drops an app's privacy grants
 # when the app is *removed*, so `rm -rf` followed by a fresh copy handed back
 # the microphone, speech and Accessibility prompts on every single install --
@@ -104,6 +124,8 @@ for app in Puck PuckClient; do
     if ! codesign --verify --strict "/Applications/$app.app" 2>/dev/null; then
         echo "error: /Applications/$app.app is not correctly signed after the update." >&2
         echo "       Remove it and run this script again to reinstall from scratch." >&2
+        echo "       The two apps speak one protocol to each other, so run it before" >&2
+        echo "       launching either: the pair in /Applications is mixed right now." >&2
         exit 1
     fi
 done
@@ -127,8 +149,6 @@ if [ -x "$LSREGISTER" ]; then
         | while IFS= read -r stale; do "$LSREGISTER" -u "$stale" 2>/dev/null || true; done
     "$LSREGISTER" -f /Applications/Puck.app /Applications/PuckClient.app 2>/dev/null || true
 fi
-
-rm -rf "$DERIVED"
 
 open /Applications/Puck.app
 echo "installed: /Applications/Puck.app, /Applications/PuckClient.app"

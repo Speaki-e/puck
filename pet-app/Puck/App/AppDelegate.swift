@@ -148,6 +148,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// Runs only while the hotkeys are waiting for Accessibility to be
     /// granted; cleared by the retry itself once the tap is live.
     var accessibilityRetryTimer: Timer?
+    /// The tank's size as the client last reported it, kept so the pet can be
+    /// sized to fit it rather than being refused by it.
+    var lastTankSize: CGSize?
     var voiceInputController: VoiceInputController?
     var stateBeforeListen: StateHandler?
 

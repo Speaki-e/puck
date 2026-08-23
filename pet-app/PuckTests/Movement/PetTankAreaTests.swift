@@ -201,4 +201,57 @@ final class PetTankAreaTests: XCTestCase {
             XCTAssertGreaterThan(PetTankView.stripHeight(island: island), island)
         }
     }
+
+    /// The size slider bounds itself by the island's height, which is not the
+    /// dimension that binds: a tank has to be two pets across before it is
+    /// worth standing in, so a narrow window refuses a pet its height alone
+    /// would have allowed -- and a refusal is invisible from the outside.
+    func test_aNarrowTankSizesThePetDownRatherThanRefusingIt() {
+        let fitted = PetTankArea.fittedPetHeight(
+            desired: 200,
+            tank: CGSize(width: 300, height: 260),
+            aspect: 1
+        )
+
+        XCTAssertEqual(fitted, 150, "two pets wide is the rule, so 300pt of tank is a 150pt pet")
+    }
+
+    /// A tank with room to spare gives the size that was asked for. Sizing
+    /// down when nothing requires it would undo the slider.
+    func test_aRoomyTankGivesTheSizeThatWasAsked() {
+        let fitted = PetTankArea.fittedPetHeight(
+            desired: 72,
+            tank: CGSize(width: 1_100, height: 90),
+            aspect: 0.8
+        )
+
+        XCTAssertEqual(fitted, 72)
+    }
+
+    /// Height still binds when it is the smaller of the two.
+    func test_aShortTankBindsByHeight() {
+        let fitted = PetTankArea.fittedPetHeight(
+            desired: 200,
+            tank: CGSize(width: 2_000, height: 84),
+            aspect: 0.8
+        )
+
+        XCTAssertEqual(fitted, 84)
+    }
+
+    /// A wide pet needs more width per point of height, and the fit has to
+    /// know that rather than assuming a square.
+    func test_theAspectRatioIsPartOfTheFit() {
+        let narrow = PetTankArea.fittedPetHeight(desired: 300, tank: CGSize(width: 400, height: 400), aspect: 0.5)
+        let wide = PetTankArea.fittedPetHeight(desired: 300, tank: CGSize(width: 400, height: 400), aspect: 2)
+
+        XCTAssertEqual(narrow, 300, "a narrow pet fits at the size that was asked for")
+        XCTAssertEqual(wide, 100, "a wide one has to come down to fit the same tank")
+    }
+
+    /// Nothing to fit into: a report with no size yet must not answer zero,
+    /// which would put a pet of no height on the island.
+    func test_anEmptyTankLeavesTheDesiredSizeAlone() {
+        XCTAssertEqual(PetTankArea.fittedPetHeight(desired: 72, tank: .zero, aspect: 1), 72)
+    }
 }

@@ -17,6 +17,23 @@ enum PetTankArea {
     /// standing in. One pet-width leaves nowhere to walk.
     static let minimumWidthInPets: CGFloat = 2
 
+    /// How tall the pet can be and still fit the tank it was sent to.
+    ///
+    /// The size slider bounds itself by the island's *height*, which is the
+    /// dimension a person is looking at, and that is not the binding one: a
+    /// tank has to be two pets wide before it is worth standing in, so a
+    /// narrow window refuses a pet the height alone would have allowed. The
+    /// refusal is silent from the outside -- the pet simply stays on the
+    /// desktop and the window looks broken -- so the size gives way instead.
+    ///
+    /// - Parameter aspect: the pet's width divided by its height.
+    /// - Returns: the desired height, or as much of it as fits.
+    static func fittedPetHeight(desired: CGFloat, tank: CGSize, aspect: CGFloat) -> CGFloat {
+        guard tank.width > 0, tank.height > 0, aspect > 0 else { return desired }
+        let byWidth = tank.width / (minimumWidthInPets * aspect)
+        return max(0, min(desired, tank.height, byWidth))
+    }
+
     /// - Parameters:
     ///   - wire: the tank in Quartz global coordinates, as the client sent it.
     ///   - overlayOriginInQuartz: the overlay window's top-left in the same

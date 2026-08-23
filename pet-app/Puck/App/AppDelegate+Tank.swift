@@ -33,6 +33,9 @@ extension AppDelegate {
     /// in-or-out question to the decider; nothing moves until `tickPetHome`
     /// says the state has held.
     func applyPetHome(rect: BridgeRect?, visible: Bool, pinned: Bool) {
+        // Remembered before the area is worked out, because the size the pet
+        // travels at is worked out from it -- see `tankScale`.
+        lastTankSize = rect.map { CGSize(width: $0.width, height: $0.height) }
         petTankArea = rect.flatMap { wire in
             guard let window = primaryWindow, let space = screenManager?.current else { return nil }
             let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
@@ -128,12 +131,27 @@ extension AppDelegate {
         )
     }
 
-    /// The scale that puts the pet at `tankPetHeight`, whatever avatar is
-    /// loaded. 1 when there is no avatar yet, which only happens before one
-    /// is installed and never while a move is running.
+    /// The scale that puts the pet at `tankPetHeight` -- or at whatever the
+    /// tank can actually hold, when that is less. 1 when there is no avatar
+    /// yet, which only happens before one is installed and never while a move
+    /// is running.
+    ///
+    /// The tank's width is what usually binds: it has to be two pets across
+    /// before it is worth standing in, and a narrow window's island is not.
+    /// Sizing down is the difference between a small pet and no pet -- the
+    /// area is refused outright otherwise, and a refusal looks like the pet
+    /// ignoring the window.
     var tankScale: Double {
         guard baseHitboxSize.height > 0 else { return 1 }
-        return Double(Self.tankPetHeight / baseHitboxSize.height)
+        guard let lastTankSize, baseHitboxSize.width > 0 else {
+            return Double(Self.tankPetHeight / baseHitboxSize.height)
+        }
+        let fitted = PetTankArea.fittedPetHeight(
+            desired: Self.tankPetHeight,
+            tank: lastTankSize,
+            aspect: baseHitboxSize.width / baseHitboxSize.height
+        )
+        return Double(fitted / baseHitboxSize.height)
     }
 
     /// What `applyLiveAvatarScale` was last given, derived rather than stored:

@@ -63,15 +63,19 @@ enum ClientTheme {
         /// stretching the lines. ~75 characters at `transcriptBody`.
         ///
         /// Widened with the text: at 16pt the old 640 held about seventy
-        /// characters, and the conversation is what the window is for.
-        static let transcriptColumnWidth: CGFloat = 680
+        /// characters, and the conversation is what the window is for. 760
+        /// is a little past the classic measure on purpose -- code blocks and
+        /// tool cards live in this column too, and they were the things being
+        /// squeezed.
+        static let transcriptColumnWidth: CGFloat = 760
         /// Kept outside the column, so the text never sits against the window
         /// chrome or the editor pane's divider. Fixed at every width -- the
         /// column is what gives way when the pane is narrow.
         ///
-        /// 16 rather than 24: with the code column open the conversation is
-        /// already narrow, and this was the padding on both sides of it.
-        static let transcriptHorizontalPadding: CGFloat = 16
+        /// 12 rather than the original 24: with the code column open the
+        /// conversation is already narrow, and this was being paid twice --
+        /// once on each side of it.
+        static let transcriptHorizontalPadding: CGFloat = 12
         /// A floating panel's corners -- the island, the two sidebars.
         /// Rounded, not a capsule: a pill turns the ends into arcs and reads
         /// as a control, while these are panels with their corners taken off.

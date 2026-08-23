@@ -363,6 +363,10 @@ struct ChatInputBar: View {
     /// keystroke.
     @State private var effort = AgentConfiguration.effort()
     @State private var configuration = AgentConfiguration.load()
+    /// How much the agent may do on its own this turn. The setting that
+    /// changes most often and matters most per message, which is why it is
+    /// what the control says rather than which CLI is answering.
+    @State private var permissions = AgentConfiguration.permissionMode()
     @FocusState private var isFocused: Bool
 
     /// The height of the controls along the bottom of the box, and of the
@@ -415,7 +419,7 @@ struct ChatInputBar: View {
             controlRow
         }
         .padding(.horizontal, 14)
-        .padding(.top, 12)
+        .padding(.top, 16)
         .padding(.bottom, 8)
         // Rounder and quieter than the old box: the reference's composer is a
         // soft-edged well the controls sit inside, not a bordered field with
@@ -470,12 +474,22 @@ struct ChatInputBar: View {
         .foregroundStyle(palette.textSecondary)
     }
 
-    /// "Claude Code 보통 ∨". The model half is disabled where the model is not
-    /// ours to pick -- the coding CLI chooses its own -- and the effort half
-    /// always applies, so the two live in one menu with a section each rather
-    /// than in one disabled control.
+    /// "파일 수정까지 · 보통 ∨" -- the mode the agent is running under and how
+    /// much thinking it is doing, which are the two answers to "what happens
+    /// when I press return". Which CLI is behind it changes once a month and
+    /// lives in Settings; the mode changes several times an hour.
     private var settingsMenu: some View {
         Menu {
+            Section(Strings.text(.permissionsLabel)) {
+                ForEach(AgentPermissionMode.allCases) { mode in
+                    Button(mode.displayName) { run("/permissions \(mode.rawValue)") }
+                }
+            }
+            Section(Strings.text(.chatEffort)) {
+                ForEach(AgentEffort.allCases) { level in
+                    Button(level.displayName) { run("/effort \(level.rawValue)") }
+                }
+            }
             if configuration.provider.supportsModelSelection {
                 Section(Strings.text(.chatModel)) {
                     ForEach(
@@ -486,14 +500,9 @@ struct ChatInputBar: View {
                     }
                 }
             }
-            Section(Strings.text(.chatEffort)) {
-                ForEach(AgentEffort.allCases) { level in
-                    Button(level.displayName) { run("/effort \(level.rawValue)") }
-                }
-            }
         } label: {
             HStack(spacing: 5) {
-                Text(modelLabel)
+                Text(modeLabel)
                     .foregroundStyle(palette.textPrimary)
                 Text(effort.displayName)
                 Image(systemName: "chevron.down")
@@ -508,15 +517,10 @@ struct ChatInputBar: View {
         .fixedSize()
     }
 
-    /// What is actually answering, named the way the reference names it: a
-    /// model, not a category. Where the model is not ours to choose, that is
-    /// the CLI doing the answering -- "Claude Code", not "coding CLI", which
-    /// is a description of a mechanism and tells the reader nothing.
-    private var modelLabel: String {
-        guard configuration.provider.supportsModelSelection else {
-            return configuration.codingAgent.displayName
-        }
-        return configuration.model
+    /// The permission mode, or the model where the model is the thing being
+    /// chosen -- an API provider has no CLI to permit anything to.
+    private var modeLabel: String {
+        configuration.provider == .cli ? permissions.displayName : configuration.model
     }
 
     /// pet-app does the listening. Lit while it is, and drawn as a waveform
@@ -569,6 +573,7 @@ struct ChatInputBar: View {
         onSend(command, [])
         effort = AgentConfiguration.effort()
         configuration = AgentConfiguration.load()
+        permissions = AgentConfiguration.permissionMode()
     }
 
     private func chooseAttachment() {

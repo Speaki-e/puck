@@ -18,7 +18,9 @@ struct SoundTable: Equatable {
 
     func fileURL(for key: String) -> URL? {
         guard let relativePath = sounds[key] else { return nil }
-        return avatarDirectory.appendingPathComponent(relativePath)
+        // Inside the package or nowhere: the table is data the package
+        // brought with it, and it named the file to play.
+        return AvatarPackagePath.fileURL(in: avatarDirectory, relativePath: relativePath)
     }
 
     /// Every mapped key starting with `prefix`, sorted so the set is stable

@@ -55,7 +55,15 @@ enum AvatarImportValidator {
             }
             // 2026-07-29 2D switch: sprites clips are PNG files, not usdz.
             let fileExtension = manifest.type == .sprites ? "png" : "usdz"
-            let url = packageDirectory.appendingPathComponent("\(fileName).\(fileExtension)")
+            guard let url = AvatarPackagePath.fileURL(
+                in: packageDirectory,
+                relativePath: "\(fileName).\(fileExtension)"
+            ) else {
+                // Reported as missing rather than ok: nothing inside the
+                // package answers to that name, which is what the report is
+                // about.
+                return .missing
+            }
             guard
                 let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
                 let size = attributes[.size] as? Int

@@ -379,7 +379,10 @@ final class SpriteAvatar: AvatarPlayable {
         if let cached = loadedImages[fileName] {
             return cached
         }
-        let url = avatarDirectory.appendingPathComponent("\(fileName).png")
+        guard let url = AvatarPackagePath.fileURL(in: avatarDirectory, relativePath: "\(fileName).png") else {
+            AppLogger.shared.log(.error, "Avatar sprite name points outside the package: \(fileName)")
+            return nil
+        }
         guard
             let dataProvider = CGDataProvider(url: url as CFURL),
             let image = CGImage(

@@ -17,7 +17,7 @@ private final class SlowHandler: ToolHandler {
     private(set) var cancelCount = 0
     private var stored: ((Result<JSONValue?, ToolExecutionError>) -> Void)?
 
-    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         stored = completion // never completes on its own
     }
 
@@ -30,7 +30,7 @@ private final class InstantHandler: ToolHandler {
     let toolName = "instant"
     private(set) var cancelCount = 0
 
-    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         completion(.success(nil))
     }
 

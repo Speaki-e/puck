@@ -55,7 +55,7 @@ final class LaunchAppHandler: ToolHandler {
         NSWorkspace.shared.fullPath(forApplication: appName).map(URL.init(fileURLWithPath:))
     }
 
-    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard case .object(let fields) = args else {
             completion(.failure(.executionFailed("launch_app requires an args object")))
             return

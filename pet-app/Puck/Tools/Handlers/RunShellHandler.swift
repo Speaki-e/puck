@@ -104,7 +104,7 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
         }
     }
 
-    func execute(id: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let command = args.extractString(key: "command") else {
             completion(.failure(.executionFailed("run_shell requires a command string")))
             return

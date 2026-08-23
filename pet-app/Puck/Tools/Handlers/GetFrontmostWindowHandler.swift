@@ -18,7 +18,7 @@ final class GetFrontmostWindowHandler: ToolHandler {
         self.watcher = watcher
     }
 
-    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
             completion(.failure(.executionFailed("no frontmost application")))
             return

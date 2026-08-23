@@ -52,7 +52,7 @@ final class PointAtHandler: ToolHandler {
         self.coordinator = coordinator
     }
 
-    func execute(id: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let frame = args.extractFrame() else {
             completion(.failure(.executionFailed("point_at requires a frame {x,y,width,height}")))
             return

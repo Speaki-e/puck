@@ -284,7 +284,9 @@ extension AppDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.refreshRoamableAreaForCurrentSpace()
+            // `queue: .main` above is what makes this true; a notification
+            // block's signature cannot say it.
+            MainActor.assumeIsolated { self?.refreshRoamableAreaForCurrentSpace() }
         }
     }
 

@@ -58,7 +58,11 @@ protocol ToolHandler: AnyObject {
     ///   tears down whatever call happens to be in flight when it fires, and
     ///   the call it was actually for is left running with nobody to collect
     ///   it. Handlers with nothing to tear down ignore it.
-    func execute(id: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void)
+    /// `@Sendable` because it is: a handler answers from wherever its work
+    /// finished -- a Process's reader queue, a global timeout, the main actor
+    /// after a hop -- and the executor's own bookkeeping is behind a serial
+    /// queue for exactly that reason.
+    func execute(id: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void)
 
     /// Abandon what `execute` started for `id`, and nothing else. Called when
     /// that call times out or is cancelled — without it a timed-out run_shell

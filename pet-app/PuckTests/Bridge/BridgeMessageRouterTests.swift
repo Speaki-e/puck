@@ -17,7 +17,7 @@ private final class ThreadRecordingHandler: ToolHandler {
     let toolName = "launch_app"
     private(set) var ranOnMainThread: Bool?
 
-    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         ranOnMainThread = Thread.isMainThread
         completion(.success(.object(["pid": .number(1)])))
     }
@@ -91,7 +91,7 @@ final class BridgeMessageRouterTests: XCTestCase {
     func test_toolCancel_cancelsTheInFlightDispatch() {
         final class NeverCompletingHandler: ToolHandler {
             let toolName = "slow"
-            func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {}
+            func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {}
         }
         let executor = ToolExecutor()
         executor.register(NeverCompletingHandler())

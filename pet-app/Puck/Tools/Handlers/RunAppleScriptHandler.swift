@@ -12,7 +12,7 @@ import Foundation
 final class RunAppleScriptHandler: ToolHandler {
     let toolName = "run_applescript"
 
-    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         guard let script = args.extractString(key: "script") else {
             completion(.failure(.executionFailed("run_applescript requires a script string")))
             return

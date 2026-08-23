@@ -64,15 +64,19 @@ extension AppDelegate {
     /// check that costs nothing every few seconds is cheaper than a user
     /// wondering why their push-to-talk key does nothing.
     private func waitForAccessibilityThenStartHotkeys() {
+        // Scheduled on the main run loop, which is where it fires; the
+        // closure's own signature is not isolated, so it has to be said.
         let timer = Timer.scheduledTimer(withTimeInterval: Self.accessibilityRetrySeconds, repeats: true) { [weak self] timer in
-            guard let self, let manager = self.hotkeyManager else {
-                timer.invalidate()
-                return
-            }
-            guard AccessibilityPermission.isTrusted() else { return }
-            if manager.start() {
-                AppLogger.shared.log(.info, "GlobalHotkeyManager started after Accessibility was granted")
-                timer.invalidate()
+            MainActor.assumeIsolated {
+                guard let self, let manager = self.hotkeyManager else {
+                    timer.invalidate()
+                    return
+                }
+                guard AccessibilityPermission.isTrusted() else { return }
+                if manager.start() {
+                    AppLogger.shared.log(.info, "GlobalHotkeyManager started after Accessibility was granted")
+                    timer.invalidate()
+                }
             }
         }
         // The pet's own frame loop runs in a common mode, and a timer left in

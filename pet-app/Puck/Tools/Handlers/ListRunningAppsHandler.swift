@@ -11,7 +11,7 @@ import AppKit
 final class ListRunningAppsHandler: ToolHandler {
     let toolName = "list_running_apps"
 
-    func execute(id _: String, args: JSONValue, completion: @escaping (Result<JSONValue?, ToolExecutionError>) -> Void) {
+    func execute(id _: String, args: JSONValue, completion: @escaping @Sendable (Result<JSONValue?, ToolExecutionError>) -> Void) {
         let apps: [JSONValue] = NSWorkspace.shared.runningApplications
             .filter { $0.activationPolicy == .regular }
             .map { app in

@@ -176,7 +176,12 @@ extension AppDelegate {
         // would strand them.
         guard !isCharacterHidden else {
             if let onExpire {
-                DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: onExpire)
+                // Wrapped rather than handed over directly: `onExpire` is a
+                // main-actor closure and `asyncAfter` takes a Sendable one,
+                // which is only the same thing because this queue is main's.
+                DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                    MainActor.assumeIsolated(onExpire)
+                }
             }
             return
         }

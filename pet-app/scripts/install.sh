@@ -36,8 +36,15 @@ echo "note: signing with team ${DEVELOPMENT_TEAM}"
 xcodegen generate
 
 DERIVED=$(mktemp -d)
+# Output is held rather than streamed, and shown only if the build fails.
+# The vendored CodeEdit packages carry a SwiftLint plugin that cannot run
+# unattended, so every successful build also printed "The following build
+# commands failed: Running SwiftLint ... (2 failures)" -- which is exactly
+# what a real failure looks like to anyone reading the terminal.
+BUILD_LOG=$(mktemp)
+trap 'rm -f "$BUILD_LOG"' EXIT
 for scheme in Puck PuckClient; do
-    xcodebuild build \
+    if ! xcodebuild build \
         -project Puck.xcodeproj \
         -scheme "$scheme" \
         -configuration Release \
@@ -45,7 +52,12 @@ for scheme in Puck PuckClient; do
         -derivedDataPath "$DERIVED" \
         -skipPackagePluginValidation \
         DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
-        > /dev/null
+        > "$BUILD_LOG" 2>&1
+    then
+        echo "error: $scheme failed to build." >&2
+        cat "$BUILD_LOG" >&2
+        exit 1
+    fi
 done
 
 # Quit before replacing: copying over a running bundle leaves the old process

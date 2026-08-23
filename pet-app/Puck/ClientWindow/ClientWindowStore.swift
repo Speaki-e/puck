@@ -102,6 +102,15 @@ final class ClientWindowStore: ObservableObject {
         reportPetHome()
     }
 
+    /// Sends the tank as it stands, whether or not anything changed.
+    ///
+    /// For a reconnection: pet-app forgets the tank when the socket drops, and
+    /// everything else here reports only on change, so after a reconnect
+    /// nothing would ever tell it where the tank is again.
+    func reportPetHomeNow() {
+        reportPetHome()
+    }
+
     /// Sent only when something actually moved -- a resize produces a rect per
     /// layout pass, and an unchanged one carries no news.
     private func reportPetHome() {

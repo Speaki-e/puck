@@ -31,9 +31,23 @@ final class BridgeSocketClient {
     /// pet-app is up. That is harmless: failing nothing is a no-op.
     var onDisconnect: (() -> Void)?
 
+    /// Fires once the socket is up and this client has announced itself --
+    /// on the first connection and on every reconnection after.
+    ///
+    /// Reconnecting is not the same as starting: pet-app forgets the tank
+    /// when the socket drops, and the client only reports it when it changes,
+    /// so nothing would have told the pet where to live again. It stayed on
+    /// the desktop until the window happened to be resized.
+    var onConnect: (() -> Void)?
+
     private let socketURL: URL
     private let queue = DispatchQueue(label: "PuckClient.BridgeSocketClient")
     private var connection: BridgeConnection?
+    /// Whether the connection has reached `.ready`. Distinct from having a
+    /// connection object: a send before that is a send into something that
+    /// may never open, and reporting it as delivered is how a message goes
+    /// missing with the UI saying it was sent.
+    private var isReady = false
     private var reconnectDelay: TimeInterval = 1
     private let maxReconnectDelay: TimeInterval = 30
 
@@ -53,9 +67,12 @@ final class BridgeSocketClient {
         }
         bridgeConnection.onReady = { [weak self, weak bridgeConnection] in
             self?.reconnectDelay = 1
+            self?.isReady = true
             bridgeConnection?.send(.clientHello(role: .gui))
+            self?.onConnect?()
         }
         bridgeConnection.onClose = { [weak self] in
+            self?.isReady = false
             self?.onDisconnect?()
             self?.scheduleReconnect()
         }
@@ -65,6 +82,7 @@ final class BridgeSocketClient {
 
     private func scheduleReconnect() {
         connection = nil
+        isReady = false
         let delay = reconnectDelay
         reconnectDelay = min(reconnectDelay * 2, maxReconnectDelay)
         queue.asyncAfter(deadline: .now() + delay) { [weak self] in
@@ -78,13 +96,13 @@ extension BridgeSocketClient: UserInputTransport {
     // must not be called from `queue` itself (never from inside onMessage,
     // which BridgeConnection delivers there).
     var hasConnectedClients: Bool {
-        queue.sync { connection != nil }
+        queue.sync { connection != nil && isReady }
     }
 
     @discardableResult
     func broadcast(_ message: BridgeMessage) -> Bool {
         queue.sync {
-            guard let connection else { return false }
+            guard let connection, isReady else { return false }
             connection.send(message)
             return true
         }

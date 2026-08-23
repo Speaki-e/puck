@@ -131,4 +131,27 @@ final class BridgeSocketClientTests: XCTestCase {
         }
         poll()
     }
+
+    /// Reconnecting is not the same as starting. pet-app forgets the tank
+    /// when the socket drops and the window only reports it when it changes,
+    /// so something has to say "we are back" for the pet to have a way home.
+    func test_onConnect_firesOnceTheClientHasAnnouncedItself() {
+        let connected = expectation(description: "onConnect fired")
+        let client = BridgeSocketClient(socketURL: socketURL)
+        client.onConnect = { connected.fulfill() }
+
+        client.start()
+
+        wait(for: [connected], timeout: 2)
+    }
+
+    /// A send before the socket is open is a send into something that may
+    /// never open, and calling it delivered is how a message goes missing
+    /// while the UI says it was sent.
+    func test_broadcastBeforeTheSocketIsOpenReportsFailure() {
+        let client = BridgeSocketClient(socketURL: socketURL)
+
+        XCTAssertFalse(client.hasConnectedClients, "nothing is connected yet")
+        XCTAssertFalse(client.broadcast(.petHome(rect: nil, visible: false, pinned: false)))
+    }
 }

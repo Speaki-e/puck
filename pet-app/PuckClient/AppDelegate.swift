@@ -65,6 +65,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bridgeClient.onDisconnect = { [weak self] in
             DispatchQueue.main.async { self?.agentHost.socketDisconnected() }
         }
+        // pet-app forgets the tank when the socket drops, and the window only
+        // reports it when it changes -- so without this the pet had no way
+        // home after pet-app restarted, and stayed on the desktop until
+        // something in the window happened to move.
+        bridgeClient.onConnect = { [weak self] in
+            DispatchQueue.main.async { self?.clientWindowStore.reportPetHomeNow() }
+        }
         bridgeClient.start()
 
         clientWindowStore.onUserCommand = { [weak self] text, workspaceId, sessionId in

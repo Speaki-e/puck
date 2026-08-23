@@ -45,11 +45,27 @@ final class MenuBarController {
     static let panelSize = NSSize(width: 360, height: 560)
 
     private let statusItem: NSStatusItem
+
+    /// The app's own face in the menu bar, drawn at the height AppKit gives a
+    /// status item. Not a template image: it is a picture, and a template is
+    /// a stencil -- macOS would throw the drawing away and fill the
+    /// silhouette, which for a square is a black square.
+    ///
+    /// Falls back to the symbol it used to be if the asset is missing, since
+    /// a status item with no image is an invisible menu bar item.
+    private static func menuBarIcon() -> NSImage? {
+        guard let icon = NSImage(named: "MenuBarIcon") else {
+            return NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: AppIdentity.displayName)
+        }
+        icon.size = NSSize(width: 18, height: 18)
+        icon.accessibilityDescription = AppIdentity.displayName
+        return icon
+    }
     private let popover = NSPopover()
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: AppIdentity.displayName)
+        statusItem.button?.image = Self.menuBarIcon()
         statusItem.button?.target = self
         statusItem.button?.action = #selector(handleClick)
         // Left click alone triggers the button's action by default -- this

@@ -69,4 +69,53 @@ enum SlashCommand: Equatable {
     /// Every command, for `/help` and for the test that keeps the two lists
     /// from drifting.
     static let names = ["model", "effort", "fast", "permissions", "skills", "help"]
+
+    /// What to offer while someone is typing a command.
+    ///
+    /// Offered on the prefix alone -- `/` shows everything, `/e` narrows to
+    /// `/effort` -- and withdrawn the moment the name is complete and a space
+    /// follows it, because from there the argument is being typed and a list
+    /// of command names is in the way.
+    ///
+    /// Nothing is suggested for ordinary prose, including a message that
+    /// happens to contain a slash: the same rule `parse` uses, so the two
+    /// cannot disagree about what looks like a command.
+    static func suggestions(for text: String) -> [SlashSuggestion] {
+        // Only the leading space is ignored. A *trailing* one is the moment
+        // the name stopped being typed and the argument started, which is
+        // exactly when this list has to get out of the way -- trimming both
+        // ends made "/effort " look like "/effort" and kept it open.
+        let leading = text.drop { $0.isWhitespace }
+        guard leading.hasPrefix("/") else { return [] }
+        let body = leading.dropFirst()
+        let typed = String(body.prefix { $0.isLetter }).lowercased()
+        // Past the name: the rest is an argument, and so is a trailing space.
+        guard body.count == typed.count else { return [] }
+        return names
+            .filter { typed.isEmpty || $0.hasPrefix(typed) }
+            .map { SlashSuggestion(name: $0) }
+    }
+}
+
+/// One offered command: its name, and the single line that says what it does.
+struct SlashSuggestion: Identifiable, Equatable {
+    let name: String
+
+    var id: String { name }
+    /// What gets typed when this is taken. The trailing space is deliberate
+    /// for the ones that take an argument -- it is the next thing anyone
+    /// types -- and harmless for the ones that do not, which ignore it.
+    var completion: String { "/\(name) " }
+
+    var summary: String {
+        switch name {
+        case "model": return Strings.text(.slashSummaryModel)
+        case "effort": return Strings.text(.slashSummaryEffort)
+        case "fast": return Strings.text(.slashSummaryFast)
+        case "permissions": return Strings.text(.slashSummaryPermissions)
+        case "skills": return Strings.text(.slashSummarySkills)
+        case "help": return Strings.text(.slashSummaryHelp)
+        default: return ""
+        }
+    }
 }

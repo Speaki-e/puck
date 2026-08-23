@@ -357,6 +357,34 @@ struct ChatInputBar: View {
     static let controlHeight: CGFloat = 32
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Above the field, not below it: the field is already at the
+            // bottom of the window, and a list under it would open off
+            // screen.
+            if !suggestions.isEmpty {
+                SlashSuggestionList(suggestions: suggestions) { suggestion in
+                    text = suggestion.completion
+                    isFocused = true
+                }
+            }
+            composer
+        }
+        .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth)
+        .padding(.horizontal, ClientTheme.Metrics.transcriptHorizontalPadding)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+        .font(.title3)
+        .onAppear { isFocused = true }
+    }
+
+    /// Offered while a command is being typed, and only then -- see
+    /// SlashCommand.suggestions.
+    private var suggestions: [SlashSuggestion] {
+        SlashCommand.suggestions(for: text)
+    }
+
+    private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
             TextField(Strings.text(.chatComposerPlaceholder), text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
@@ -389,13 +417,6 @@ struct ChatInputBar: View {
                 .help(Strings.text(.chatSend))
             }
         }
-        .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth)
-        .padding(.horizontal, ClientTheme.Metrics.transcriptHorizontalPadding)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
-        .buttonStyle(.plain)
-        .font(.title3)
-        .onAppear { isFocused = true }
     }
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -404,6 +425,53 @@ struct ChatInputBar: View {
         guard !trimmed.isEmpty else { return }
         onSend(trimmed)
         text = ""
+    }
+}
+
+/// What can be typed next, while a command is being typed.
+///
+/// A plain list rather than a popover: the commands are few, the field is
+/// right below it, and a popover over a window that is mostly conversation
+/// hides the thing being talked about.
+private struct SlashSuggestionList: View {
+    /// Redraws this view when the UI language changes. Needed on every view
+    /// that resolves a string, not just the window root: SwiftUI skips a
+    /// child whose own inputs are unchanged, and a table lookup inside `body`
+    /// is not an input.
+    @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
+
+    let suggestions: [SlashSuggestion]
+    let onPick: (SlashSuggestion) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(suggestions) { suggestion in
+                Button {
+                    onPick(suggestion)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("/\(suggestion.name)")
+                            .font(ClientTheme.Typography.mono)
+                            .foregroundStyle(palette.textPrimary)
+                        Text(suggestion.summary)
+                            .font(ClientTheme.Typography.caption)
+                            .foregroundStyle(palette.textSecondary)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(palette.surface)
+        .clipShape(.rect(cornerRadius: ClientTheme.Metrics.cardCornerRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: ClientTheme.Metrics.cardCornerRadius)
+                .strokeBorder(palette.surfaceBorder, lineWidth: 1)
+        }
     }
 }
 

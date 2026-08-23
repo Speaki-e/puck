@@ -56,6 +56,55 @@ final class SlashCommandTests: XCTestCase {
     }
 }
 
+final class SlashSuggestionTests: XCTestCase {
+    private func names(_ text: String) -> [String] {
+        SlashCommand.suggestions(for: text).map(\.name)
+    }
+
+    /// A bare slash is someone asking what there is.
+    func test_aSlashOffersEverything() {
+        XCTAssertEqual(names("/"), SlashCommand.names)
+    }
+
+    func test_aPrefixNarrowsTheList() {
+        XCTAssertEqual(names("/s"), ["skills"])
+        XCTAssertEqual(names("/f"), ["fast"])
+        XCTAssertTrue(names("/e").contains("effort"))
+    }
+
+    /// Once the name is typed and an argument is being written, a list of
+    /// command names is in the way of what is actually being answered.
+    func test_nothingIsOfferedOnceAnArgumentIsBeingTyped() {
+        XCTAssertTrue(names("/effort ").isEmpty)
+        XCTAssertTrue(names("/effort hi").isEmpty)
+        XCTAssertTrue(names("/model gpt-5.5").isEmpty)
+    }
+
+    /// The same rule `parse` uses, so a message that merely mentions a path
+    /// is prose in both places.
+    func test_proseOffersNothing() {
+        XCTAssertTrue(names("안녕하세요").isEmpty)
+        XCTAssertTrue(names("/usr/bin/env 를 봐줘").isEmpty)
+        XCTAssertTrue(names("경로는 /help 처럼 쓰세요").isEmpty)
+    }
+
+    func test_aNameNobodyHasOffersNothing() {
+        XCTAssertTrue(names("/zzz").isEmpty)
+    }
+
+    /// Taking a suggestion has to leave something `parse` accepts, or the
+    /// list would offer a command that then goes to the agent as prose.
+    func test_everySuggestionCompletesToSomethingThatParses() {
+        for suggestion in SlashCommand.suggestions(for: "/") {
+            XCTAssertNotNil(
+                SlashCommand.parse(suggestion.completion),
+                "\(suggestion.completion) does not parse as a command"
+            )
+            XCTAssertFalse(suggestion.summary.isEmpty, "/\(suggestion.name) has no summary to show")
+        }
+    }
+}
+
 final class SlashCommandRunnerTests: XCTestCase {
     /// Records what a command wrote, so a test never touches the real `.env`.
     private final class Writes {

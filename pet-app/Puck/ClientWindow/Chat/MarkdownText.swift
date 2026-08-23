@@ -399,9 +399,10 @@ struct MarkdownText: View {
 /// A fenced block, with the two things anyone reading code in a chat wants:
 /// an edge so it is clearly not prose, and a way to take it.
 ///
-/// The button appears on hover rather than sitting there always: it overlaps
-/// the first line's right end, and a control parked on top of code is in the
-/// way of reading it.
+/// The button is always there, dimmed until the pointer is over the block. It
+/// tried appearing only on hover, which keeps it out of the way of the first
+/// line -- and makes it a button nobody knows about until they happen to
+/// sweep the mouse across the code.
 private struct CodeBlockView: View {
     /// Redraws this view when the UI language changes. Needed on every view
     /// that resolves a string, not just the window root: SwiftUI skips a
@@ -430,37 +431,48 @@ private struct CodeBlockView: View {
             .onHover { isHovering = $0 }
     }
 
-    @ViewBuilder
     private var copyButton: some View {
-        if isHovering {
-            Button(action: copy) {
-                Label(
+        Button(action: copy) {
+            Label(
                     hasCopied ? Strings.text(.codeBlockCopied) : Strings.text(.codeBlockCopy),
                     systemImage: hasCopied ? "checkmark" : "doc.on.doc"
                 )
-                .labelStyle(.iconOnly)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(hasCopied ? palette.accent : palette.textSecondary)
-                .frame(width: 22, height: 20)
-                .background(palette.surface, in: ClientTheme.Shapes.row)
-                .overlay {
-                    ClientTheme.Shapes.row.strokeBorder(palette.surfaceBorder, lineWidth: 1)
-                }
-                .contentShape(.rect)
+            .labelStyle(.iconOnly)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(hasCopied ? palette.accent : palette.textSecondary)
+            .frame(width: 22, height: 20)
+            .background(palette.surface, in: ClientTheme.Shapes.row)
+            .overlay {
+                ClientTheme.Shapes.row.strokeBorder(palette.surfaceBorder, lineWidth: 1)
             }
-            .buttonStyle(.plain)
-            .padding(6)
-            .accessibilityLabel(Strings.text(.codeBlockCopy))
-            .help(Strings.text(.codeBlockCopy))
+            .contentShape(.rect)
         }
+        .buttonStyle(.plain)
+        .opacity(isHovering || hasCopied ? 1 : 0.4)
+        .padding(6)
+        .accessibilityLabel(Strings.text(.codeBlockCopy))
+        .help(Strings.text(.codeBlockCopy))
     }
 
     private func copy() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(code, forType: .string)
+        CodeBlockClipboard.copy(code)
         // Said by the button itself rather than a banner: the answer to "did
         // that work" belongs where the click was.
         hasCopied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { hasCopied = false }
+    }
+}
+
+/// Putting a code block on the pasteboard, apart from the view that offers
+/// it -- so what the button does can be checked without a window, a pointer
+/// and a hover state.
+enum CodeBlockClipboard {
+    /// Cleared first: a pasteboard still holding the last thing copied would
+    /// otherwise hand out whichever type an app asked for, which is how a
+    /// paste comes back as something nobody copied.
+    @discardableResult
+    static func copy(_ code: String, to pasteboard: NSPasteboard = .general) -> Bool {
+        pasteboard.clearContents()
+        return pasteboard.setString(code, forType: .string)
     }
 }

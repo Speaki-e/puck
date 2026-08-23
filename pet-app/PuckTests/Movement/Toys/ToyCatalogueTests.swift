@@ -12,11 +12,7 @@ import XCTest
 
 final class ToyCatalogueTests: XCTestCase {
     private var toysDirectory: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // Movement
-            .deletingLastPathComponent() // PuckTests
-            .deletingLastPathComponent() // pet-app
-            .appendingPathComponent("Puck/Resources/Toys", isDirectory: true)
+        RepositorySources.url("Resources/Toys")
     }
 
     /// Each toy's artwork lives at Toys/<name>/<name>.png -- the lookup in

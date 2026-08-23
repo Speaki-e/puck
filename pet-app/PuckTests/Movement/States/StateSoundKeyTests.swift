@@ -36,12 +36,7 @@ final class StateSoundKeyTests: XCTestCase {
     /// The keys the states above ask for have to exist in the shipped avatar,
     /// or the whole wiring is silent in the app while green in tests.
     func test_dummyManifest_mapsTheKeysTheStatesAskFor() throws {
-        let manifestURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // States
-            .deletingLastPathComponent() // Movement
-            .deletingLastPathComponent() // PuckTests
-            .deletingLastPathComponent() // repo root
-            .appendingPathComponent("Puck/Resources/Avatars/dummy/manifest.json")
+        let manifestURL = RepositorySources.url("Resources/Avatars/dummy/manifest.json")
         let manifest = try JSONDecoder().decode(AvatarManifest.self, from: Data(contentsOf: manifestURL))
         let table = SoundTable(
             avatarDirectory: manifestURL.deletingLastPathComponent(),

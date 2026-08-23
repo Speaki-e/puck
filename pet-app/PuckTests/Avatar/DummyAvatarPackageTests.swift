@@ -17,11 +17,7 @@ final class DummyAvatarPackageTests: XCTestCase {
     /// The package as committed in the repo, not the installed copy under
     /// Application Support -- this is the one other people clone.
     private var packageDirectory: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // Avatar
-            .deletingLastPathComponent() // PuckTests
-            .deletingLastPathComponent() // pet-app
-            .appendingPathComponent("Puck/Resources/Avatars/dummy", isDirectory: true)
+        RepositorySources.url("Resources/Avatars/dummy")
     }
 
     private func loadManifest() throws -> AvatarLoadResult {

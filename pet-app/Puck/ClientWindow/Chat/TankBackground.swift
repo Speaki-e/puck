@@ -123,12 +123,13 @@ enum TankBackground: String, CaseIterable {
         case .meadow:
             Self.gradient(top: Color(red: 0.945, green: 0.804, blue: 0.616),
                           bottom: Color(red: 0.443, green: 0.545, blue: 0.373))
-        // The picture is the island's own fill, so what is left around it is
-        // the water above the scene rather than a second backdrop competing
-        // with it.
+        // Nothing, like `plain`. The picture is the island's own fill, and a
+        // matching blue behind it filled the strip edge to edge in the same
+        // colours -- so the island lost its outline and the whole band read
+        // as one sheet of water running under the toolbar and off the side of
+        // the window. What makes it an island is the ground showing around it.
         case .seabed:
-            Self.gradient(top: Color(red: 0.365, green: 0.741, blue: 0.941),
-                          bottom: Color(red: 0.176, green: 0.573, blue: 0.847))
+            Color.clear
         }
     }
 

@@ -223,15 +223,19 @@ struct PetTankView: View {
                 // open water, depending on how tall the island was that day.
                 // The sides are allowed to run off the end instead.
                 let unit = max(proxy.size.height * Self.artworkAspect(artwork), 1)
-                // A wide island takes more than one copy. The scene is water
-                // and seabed, which repeats without an obvious seam; the
-                // alternative at this shape is a gap.
+                // A wide island takes more than one copy, and every other one
+                // is mirrored. Repeated as-is there is a hard cut where the
+                // right edge of the scene meets its own left edge -- sand
+                // stopping against water. Mirrored, the seam is sand meeting
+                // sand and sky meeting sky, and only the lighthouse gives it
+                // away.
                 let copies = max(Int(ceil(proxy.size.width / unit)), 1)
                 HStack(spacing: 0) {
-                    ForEach(0..<copies, id: \.self) { _ in
+                    ForEach(0..<copies, id: \.self) { index in
                         Image(nsImage: artwork)
                             .resizable()
                             .frame(width: unit, height: proxy.size.height)
+                            .scaleEffect(x: index.isMultiple(of: 2) ? 1 : -1, y: 1)
                     }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)

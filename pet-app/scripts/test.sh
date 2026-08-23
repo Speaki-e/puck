@@ -15,7 +15,14 @@ cd "$(dirname "$0")/.."
 # Puck.xcodeproj is generated from project.yml and deliberately untracked (it
 # embeds a per-developer DEVELOPMENT_TEAM), so a fresh clone -- CI included --
 # has no project to test until xcodegen has run.
-[ -d Puck.xcodeproj ] || scripts/generate.sh
+#
+# Every time, not only when it is missing. Regenerating only when the directory
+# is absent means a local checkout keeps building the project it generated
+# before the last file was added or deleted -- which fails as "Build input file
+# cannot be found" for a file that is right there, or worse, passes while
+# silently leaving a new file out of the target. CI never sees it: a fresh
+# clone has no project at all, so CI always generates one.
+scripts/generate.sh > /dev/null
 
 xcodebuild test \
     -project Puck.xcodeproj \
@@ -32,3 +39,9 @@ xcodebuild build \
     -destination 'platform=macOS' \
     -skipPackagePluginValidation \
     CODE_SIGNING_ALLOWED=NO
+
+# The app bundles the build just produced actually carry what the code looks
+# up at runtime. xcodebuild cannot answer this and neither can the unit tests
+# -- see scripts/check-resources.sh.
+scripts/check-resources.sh "$(xcodebuild -project Puck.xcodeproj -scheme PuckClient -showBuildSettings 2>/dev/null \
+    | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/ { print $2; exit }')"

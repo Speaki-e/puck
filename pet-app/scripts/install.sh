@@ -41,6 +41,15 @@ DERIVED=$(mktemp -d)
 # unattended, so every successful build also printed "The following build
 # commands failed: Running SwiftLint ... (2 failures)" -- which is exactly
 # what a real failure looks like to anyone reading the terminal.
+# SwiftTerm ships a Metal shader, so the toolchain has to be there before the
+# first build on a machine -- otherwise it dies with "cannot execute tool
+# 'metal'" and a 688MB download to work out for yourself. GitHub's runners
+# have it; a new Mac does not.
+if ! xcrun -f metal > /dev/null 2>&1; then
+    echo "note: downloading the Metal toolchain (once per machine)"
+    xcodebuild -downloadComponent MetalToolchain
+fi
+
 BUILD_LOG=$(mktemp)
 trap 'rm -f "$BUILD_LOG"' EXIT
 for scheme in Puck PuckClient; do
@@ -72,27 +81,9 @@ for _ in $(seq 1 50); do
     sleep 0.2
 done
 
-# Resources the code looks up by name at runtime, per app. A missing one is
-# not a build error -- Bundle.url(forResource:) just returns nil and the
-# feature fails at the moment someone uses it. That is exactly how PuckClient
-# shipped without the ACP agents while Puck.app carried the copies it never
-# uses: the Puck target sources the whole Puck/ folder and picked them up
-# implicitly, PuckClient lists files one by one and had not been told.
-#
-# The unit tests cannot catch this. They resolve against the test bundle,
-# which is built from the Puck target and therefore always has everything.
-check_resource() {
-    if [ ! -e "$DERIVED/Build/Products/Release/$1.app/Contents/Resources/$2" ]; then
-        echo "error: $1.app is missing Resources/$2" >&2
-        echo "       Add it to that target's sources in project.yml." >&2
-        exit 1
-    fi
-}
-# PuckClient runs code_editor and shows the editor pane, so it needs both.
-check_resource PuckClient acp-claude.mjs
-check_resource PuckClient acp-codex.mjs
-check_resource PuckClient FileIcons/icon-map.json
-check_resource Puck Avatars
+# Resources the code looks up by name at runtime, per app. Shared with
+# scripts/test.sh so a missing one fails in both places rather than only here.
+scripts/check-resources.sh "$DERIVED/Build/Products/Release"
 
 # Updated in place, never deleted first. macOS drops an app's privacy grants
 # when the app is *removed*, so `rm -rf` followed by a fresh copy handed back

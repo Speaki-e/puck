@@ -65,10 +65,21 @@ final class BridgeSocketClient {
         bridgeConnection.onMessage = { [weak self] message in
             self?.onMessage?(message)
         }
+        let secretURL = BridgeHandshakeSecret.fileURL(besideSocketAt: socketURL)
         bridgeConnection.onReady = { [weak self, weak bridgeConnection] in
             self?.reconnectDelay = 1
             self?.isReady = true
-            bridgeConnection?.send(.clientHello(role: .gui))
+            // Read at connect time rather than cached: pet-app rotates it on
+            // every start, and this client reconnects across those restarts.
+            bridgeConnection?.send(
+                .clientHello(
+                    role: .gui,
+                    // The secret beside *this* socket: a client pointed at a
+                    // second bridge must present that bridge's token, not the
+                    // default one.
+                    token: BridgeHandshakeSecret.current(at: secretURL)
+                )
+            )
             self?.onConnect?()
         }
         bridgeConnection.onClose = { [weak self] in

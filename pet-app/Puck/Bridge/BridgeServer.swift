@@ -28,6 +28,14 @@ final class BridgeServer {
     private var connections: [BridgeConnection] = []
     private var listener: NWListener?
     private let socketURL: URL
+    /// This launch's handshake secret, rotated by `start()`. Held rather than
+    /// read per message so a client cannot be let in by a file written after
+    /// it connected.
+    private var handshakeSecret: String?
+    /// Fires when a connection that has not authenticated sends anything but
+    /// a hello -- worth logging, since the only thing that does it is a
+    /// process that should not be there.
+    var onUnauthenticatedMessage: ((BridgeMessage) -> Void)?
     private var lockFileURL: URL { socketURL.appendingPathExtension("lock") }
     private let queue = DispatchQueue(label: "Puck.BridgeServer")
 
@@ -85,6 +93,10 @@ final class BridgeServer {
         // another local user can connect. A directory nobody else can enter
         // closes the window rather than racing it.
         restrictSocketDirectoryPermissions()
+        // Before the listener, not after: a client that connects between the
+        // two would otherwise be checked against a secret that does not exist
+        // yet, and "no secret" must never read as "any secret".
+        handshakeSecret = BridgeHandshakeSecret.rotate(at: BridgeHandshakeSecret.fileURL(besideSocketAt: socketURL))
         let listener = try NWListener(using: parameters)
         Self.writeLockFile(at: lockFileURL, pid: ProcessInfo.processInfo.processIdentifier)
         listener.newConnectionHandler = { [weak self] newConnection in
@@ -139,7 +151,7 @@ final class BridgeServer {
     /// reads that property with no synchronisation at all -- and the answer
     /// decides which process a message is delivered to.
     private func connections(playing role: ClientRole) -> [BridgeConnection] {
-        queue.sync { connections.filter { $0.role == role } }
+        queue.sync { connections.filter { $0.isAuthenticated && $0.role == role } }
     }
 
     /// Thread-safe snapshot of currently-open connections.
@@ -156,9 +168,17 @@ final class BridgeServer {
         let connection = BridgeConnection(connection: nwConnection)
         connection.onMessage = { [weak self, weak connection] message in
             guard let self, let connection else { return }
-            if case .clientHello(let role) = message {
+            if case .clientHello(let role, let token) = message {
                 connection.role = role
+                connection.isAuthenticated = BridgeHandshakeSecret.matches(token, expected: self.handshakeSecret)
                 self.updateGUIPresence()
+                return
+            }
+            // Everything a tool can do, pet-app does with its own privileges.
+            // A connection that never proved it is the client we launched
+            // gets to say hello and nothing else.
+            guard connection.isAuthenticated else {
+                self.onUnauthenticatedMessage?(message)
                 return
             }
             self.relay(message, from: connection)
@@ -180,7 +200,11 @@ final class BridgeServer {
     /// (PuckClient) from workspace.
     private func relay(_ message: BridgeMessage, from origin: BridgeConnection) {
         guard let targetRole = ClientRelay.targetRole(for: message) else { return }
-        for connection in connections where connection.role == targetRole {
+        // Never back to the sender. Both sides of the bridge can play the gui
+        // role, so a gui-addressed message from a gui connection would
+        // otherwise arrive back at the process that just sent it.
+        for connection in connections
+        where connection !== origin && connection.isAuthenticated && connection.role == targetRole {
             connection.send(message)
         }
     }
@@ -190,7 +214,7 @@ final class BridgeServer {
     /// every connect/disconnect (multiple gui connections are possible in
     /// principle, even if only one PuckClient is expected in practice).
     private func updateGUIPresence() {
-        let hasGUI = connections.contains { $0.role == .gui }
+        let hasGUI = connections.contains { $0.isAuthenticated && $0.role == .gui }
         guard hasGUI != lastGUIPresence else { return }
         lastGUIPresence = hasGUI
         onGUIPresenceChanged?(hasGUI)
@@ -279,7 +303,9 @@ extension BridgeServer: UserInputTransport {
 
     /// Connections that can act on user input -- gui ones, which is all that
     /// is left. A connection that has not sent client_hello yet has no role
-    /// and does not count: it may never identify itself at all.
+    /// and does not count: it may never identify itself at all. Neither does
+    /// one whose hello carried the wrong secret -- what goes out this way is
+    /// the conversation itself, so an unproved listener is not given it.
     private func agentFacingConnections() -> [BridgeConnection] {
         connections(playing: .gui)
     }

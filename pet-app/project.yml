@@ -149,6 +149,7 @@ targets:
       - path: Puck/Bridge/JSONValue.swift
       - path: Puck/Bridge/BridgeConnection.swift
       - path: Puck/Bridge/BridgeSocketPath.swift
+      - path: Puck/Bridge/BridgeHandshakeSecret.swift
       - path: Puck/Bridge/BridgeSocketClient.swift
       - path: Puck/Bridge/UserInputSender.swift
       - path: Puck/App/CompanionAppLauncher.swift

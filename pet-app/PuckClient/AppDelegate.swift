@@ -178,23 +178,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the broadcast afterwards. Applied before the window is built, since
     /// every string in it is resolved as the views are constructed.
     private func setUpLanguage() {
-        Localization.shared.apply(currentLanguage())
+        Localization.shared.apply(Self.currentLanguage())
         languageObserver = DistributedNotificationCenter.default().addObserver(
             forName: AppLanguage.crossProcessChangeNotification,
             object: nil,
             queue: .main
-        ) { [weak self] notification in
+        ) { notification in
             // The value travels with the notification; re-reading Puck's
             // defaults domain is only the fallback for one that arrived
             // without it. See the theme observer below.
             let language = AppLanguage.resolved(fromCrossProcessUserInfo: notification.userInfo)
-                ?? self?.currentLanguage()
-                ?? .systemDefault
+                ?? Self.currentLanguage()
             Localization.shared.apply(language)
         }
     }
 
-    private func currentLanguage() -> AppLanguage {
+    /// nonisolated: the language observer runs outside the main actor's
+    /// isolation even though it is delivered on the main queue, and this reads
+    /// nothing but a defaults domain.
+    private nonisolated static func currentLanguage() -> AppLanguage {
         let raw = UserDefaults(suiteName: AppIdentity.puckBundleID)?.string(forKey: AppLanguage.defaultsKey)
         return AppLanguage.resolved(fromDefaultsValue: raw)
     }

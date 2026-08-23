@@ -165,7 +165,11 @@ struct BridgeRect: Codable, Equatable {
 /// Top-level type for every JSON Lines message on the socket, discriminated by "type".
 enum BridgeMessage: Equatable {
     /// Either side -> pet-app: identifies which role this connection plays (protocol 3.7).
-    case clientHello(role: ClientRole)
+    /// The token is what separates a client pet-app will run tools for from
+    /// any other process on the machine that can open the socket -- see
+    /// BridgeHandshakeSecret. Optional on the wire so an older client (or a
+    /// test) can still say hello; it simply does not get to dispatch tools.
+    case clientHello(role: ClientRole, token: String?)
     case toolDispatch(ToolDispatch)
     /// workspace -> pet-app: abandon an in-flight dispatch (protocol 3.1) --
     /// the handler is cancelled and the original id replies error="cancelled".
@@ -267,6 +271,7 @@ extension BridgeMessage: Codable {
         case sessionId = "session_id"
         case attachments
         case rect, visible
+        case token
         case height
         case name
         case projectPath = "project_path"
@@ -281,7 +286,10 @@ extension BridgeMessage: Codable {
 
         switch try container.decode(TypeKey.self, forKey: .type) {
         case .clientHello:
-            self = .clientHello(role: try container.decode(ClientRole.self, forKey: .role))
+            self = .clientHello(
+                role: try container.decode(ClientRole.self, forKey: .role),
+                token: try container.decodeIfPresent(String.self, forKey: .token)
+            )
 
         case .toolDispatch:
             self = .toolDispatch(
@@ -395,8 +403,9 @@ extension BridgeMessage: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .clientHello(let role):
+        case .clientHello(let role, let token):
             try container.encode(TypeKey.clientHello, forKey: .type)
+            try container.encodeIfPresent(token, forKey: .token)
             try container.encode(role, forKey: .role)
 
         case .toolDispatch(let dispatch):

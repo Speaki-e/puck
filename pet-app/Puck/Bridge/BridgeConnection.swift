@@ -92,6 +92,15 @@ final class BridgeConnection {
     /// over which process gets the message.
     var role: ClientRole?
 
+    /// Whether this connection presented the launch's handshake secret. Tools
+    /// only run for connections that did: pet-app holds the Accessibility and
+    /// Automation grants, and the approval prompt lives in the *client*, so a
+    /// process that can dispatch a tool here runs it with Puck's privileges
+    /// and no prompt at all.
+    ///
+    /// Queue-confined exactly like `role`, and for the same reason.
+    var isAuthenticated = false
+
     var onMessage: ((BridgeMessage) -> Void)?
     /// Fires once the wrapped connection reaches .ready -- PuckClient's
     /// own outbound connection (2026-07-30) needs this to know when it's

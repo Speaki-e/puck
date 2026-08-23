@@ -37,7 +37,7 @@ final class ClientRelayTests: XCTestCase {
         XCTAssertNil(ClientRelay.targetRole(for: .workspaceCreateRequest(name: "cat house", projectPath: nil)))
         XCTAssertNil(ClientRelay.targetRole(for: .sessionCreateRequest(workspaceId: "w1", title: "new chat")))
         // Connection lifecycle and tool dispatch, as before.
-        XCTAssertNil(ClientRelay.targetRole(for: .clientHello(role: .gui)))
+        XCTAssertNil(ClientRelay.targetRole(for: .clientHello(role: .gui, token: BridgeHandshakeSecret.current())))
         XCTAssertNil(ClientRelay.targetRole(for: .toolDispatch(ToolDispatch(id: "t1", tool: "launch_app", args: .object([:])))))
         XCTAssertNil(ClientRelay.targetRole(for: .toolCancel(id: "t1")))
         XCTAssertNil(ClientRelay.targetRole(for: .toolResult(ToolResult(id: "t1", ok: true, data: nil, error: nil))))

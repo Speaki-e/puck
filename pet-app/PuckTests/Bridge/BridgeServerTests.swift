@@ -29,6 +29,15 @@ final class BridgeServerTests: XCTestCase {
         try? FileManager.default.removeItem(at: socketURL.deletingLastPathComponent())
     }
 
+    /// The hello a client pet-app launched would send, with this server's own
+    /// secret.
+    private func sendAuthenticatedHello(on client: NWConnection) {
+        let secret = BridgeHandshakeSecret.current(
+            at: BridgeHandshakeSecret.fileURL(besideSocketAt: socketURL)
+        )
+        send(.clientHello(role: .gui, token: secret), on: client)
+    }
+
     private func makeClient() -> NWConnection {
         NWConnection(to: .unix(path: socketURL.path), using: .tcp)
     }
@@ -42,8 +51,12 @@ final class BridgeServerTests: XCTestCase {
         }
 
         let client = makeClient()
-        client.stateUpdateHandler = { state in
+        client.stateUpdateHandler = { [weak self] state in
             if case .ready = state {
+                // Anything but a hello needs the handshake first now: pet-app
+                // runs tools with its own privileges, so an unauthenticated
+                // connection gets to say hello and nothing else.
+                self?.sendAuthenticatedHello(on: client)
                 var data = try! JSONEncoder().encode(BridgeMessage.userInput(UserInput(text: "hello", source: .text)))
                 data.append(0x0A)
                 client.send(content: data, completion: .contentProcessed { _ in })
@@ -63,8 +76,9 @@ final class BridgeServerTests: XCTestCase {
 
         let client = makeClient()
         var buffer = Data()
-        client.stateUpdateHandler = { state in
+        client.stateUpdateHandler = { [weak self] state in
             if case .ready = state {
+                self?.sendAuthenticatedHello(on: client)
                 var data = try! JSONEncoder().encode(BridgeMessage.userInput(UserInput(text: "ping", source: .text)))
                 data.append(0x0A)
                 client.send(content: data, completion: .contentProcessed { _ in })
@@ -105,7 +119,7 @@ final class BridgeServerTests: XCTestCase {
         server.onMessage = { _, _ in connected.fulfill() }
         client.stateUpdateHandler = { state in
             if case .ready = state {
-                self.send(.clientHello(role: .gui), on: client)
+                self.sendAuthenticatedHello(on: client)
                 var data = try! JSONEncoder().encode(BridgeMessage.userInput(UserInput(text: "hi", source: .text)))
                 data.append(0x0A)
                 client.send(content: data, completion: .contentProcessed { _ in })
@@ -204,11 +218,11 @@ final class BridgeServerTests: XCTestCase {
         let workspaceBuffer = ReceiveBuffer()
 
         workspaceClient.stateUpdateHandler = { state in
-            if case .ready = state { self.send(.clientHello(role: .gui), on: workspaceClient) }
+            if case .ready = state { self.sendAuthenticatedHello(on: workspaceClient) }
         }
         guiClient.stateUpdateHandler = { state in
             if case .ready = state {
-                self.send(.clientHello(role: .gui), on: guiClient)
+                self.sendAuthenticatedHello(on: guiClient)
             }
         }
         receiveOne(on: workspaceClient, into: workspaceBuffer) { message in
@@ -244,11 +258,11 @@ final class BridgeServerTests: XCTestCase {
         let guiBuffer = ReceiveBuffer()
 
         guiClient.stateUpdateHandler = { state in
-            if case .ready = state { self.send(.clientHello(role: .gui), on: guiClient) }
+            if case .ready = state { self.sendAuthenticatedHello(on: guiClient) }
         }
         workspaceClient.stateUpdateHandler = { state in
             if case .ready = state {
-                self.send(.clientHello(role: .gui), on: workspaceClient)
+                self.sendAuthenticatedHello(on: workspaceClient)
                 self.send(.event(.agentThinking, workspaceId: "w1", sessionId: "s1"), on: workspaceClient)
             }
         }
@@ -283,7 +297,7 @@ final class BridgeServerTests: XCTestCase {
         let guiClient = makeClient()
         let guiBuffer = ReceiveBuffer()
         guiClient.stateUpdateHandler = { state in
-            if case .ready = state { self.send(.clientHello(role: .gui), on: guiClient) }
+            if case .ready = state { self.sendAuthenticatedHello(on: guiClient) }
         }
         receiveOne(on: guiClient, into: guiBuffer) { message in
             guard case .userInput(let input) = message else { return }
@@ -317,7 +331,7 @@ final class BridgeServerTests: XCTestCase {
 
         let guiClient = makeClient()
         guiClient.stateUpdateHandler = { state in
-            if case .ready = state { self.send(.clientHello(role: .gui), on: guiClient) }
+            if case .ready = state { self.sendAuthenticatedHello(on: guiClient) }
         }
         guiClient.start(queue: .main)
 
@@ -361,5 +375,60 @@ final class BridgeServerTests: XCTestCase {
         )
 
         XCTAssertEqual(attributes[.posixPermissions] as? NSNumber, 0o700)
+    }
+
+    /// pet-app holds the Accessibility and Automation grants, and the approval
+    /// prompt lives in the *client* -- so anything that can put a
+    /// `tool_dispatch` on this socket runs a shell command with Puck's
+    /// privileges and no prompt. The socket's 0600 mode keeps out other
+    /// accounts; it does not keep out another process running as the same
+    /// person, and the path is not a secret.
+    func test_aConnectionThatDidNotAuthenticateCannotDispatchATool() {
+        let refused = expectation(description: "the dispatch was refused")
+        var executed = false
+        server.onMessage = { message, _ in
+            if case .toolDispatch = message { executed = true }
+        }
+        server.onUnauthenticatedMessage = { message in
+            if case .toolDispatch = message { refused.fulfill() }
+        }
+
+        let client = NWConnection(to: .unix(path: socketURL.path), using: .tcp)
+        client.stateUpdateHandler = { [weak self] state in
+            guard case .ready = state, let self else { return }
+            // A hello with the wrong secret, then the thing it wanted.
+            self.send(.clientHello(role: .gui, token: "not-the-secret"), on: client)
+            self.send(
+                .toolDispatch(ToolDispatch(id: "1", tool: "run_shell", args: .object(["command": .string("id")]))),
+                on: client
+            )
+        }
+        client.start(queue: .main)
+        defer { client.cancel() }
+
+        wait(for: [refused], timeout: 3)
+        XCTAssertFalse(executed, "and it never reached the executor")
+    }
+
+    /// The client pet-app launched presents the secret and is served.
+    func test_aConnectionThatAuthenticatedIsServed() {
+        let dispatched = expectation(description: "the dispatch arrived")
+        server.onMessage = { message, _ in
+            if case .toolDispatch = message { dispatched.fulfill() }
+        }
+
+        let client = NWConnection(to: .unix(path: socketURL.path), using: .tcp)
+        client.stateUpdateHandler = { [weak self] state in
+            guard case .ready = state, let self else { return }
+            self.sendAuthenticatedHello(on: client)
+            self.send(
+                .toolDispatch(ToolDispatch(id: "1", tool: "run_shell", args: .object(["command": .string("id")]))),
+                on: client
+            )
+        }
+        client.start(queue: .main)
+        defer { client.cancel() }
+
+        wait(for: [dispatched], timeout: 3)
     }
 }

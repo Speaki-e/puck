@@ -22,7 +22,7 @@ enum ClientRelay {
         // which was workspace's agent and is now PuckClient's. Left pointing
         // at workspace it would be relayed to nobody, silently breaking both
         // of those inputs.
-        case .userInput, .event, .workspaceCreate, .sessionCreate:
+        case .userInput, .event, .workspaceCreate, .sessionCreate, .voiceListening:
             return .gui
 
         // Handled where they land rather than forwarded:

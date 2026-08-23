@@ -28,11 +28,19 @@ extension AppDelegate {
         // so a turn started from the window and one started from the keyboard
         // are the same turn.
         router.onVoiceListen = { [weak self] listening in
-            guard let controller = self?.voiceInputController else { return }
+            guard let self, let controller = self.voiceInputController else { return }
             if listening {
                 controller.pushToTalkDown()
             } else {
                 controller.pushToTalkUp()
+            }
+            // The answer, which is not always the request: a press with no
+            // speech-recognition permission is spent on the system prompt and
+            // records nothing. Without this the chat window's mic button lit
+            // up and stayed lit over a microphone that was never open.
+            _ = self.bridgeServer?.send(.voiceListening(controller.isListening), to: .gui)
+            if listening, !controller.isListening {
+                self.showNoticeBubble(Strings.text(.voicePermissionNeeded), for: 4)
             }
         }
         // Workspace/session creation is answered in-process as of 2026-08-15

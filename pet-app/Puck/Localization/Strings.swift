@@ -122,6 +122,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     case chatSelectAConversation, chatNewSession, chatCasualSession, chatThisWorkspace
     case chatSettings, chatComposerPlaceholder, chatStop, chatSend
+    case voicePermissionNeeded
     case chatAttach, chatModel, chatEffort, chatFilterPlaceholder, chatRunning, chatVoice
     case chatChatsAndTasks, chatWorkspaces, chatNoSessionsHere
     case chatEditor, chatAttachEditor, chatDetachEditor
@@ -400,6 +401,7 @@ enum Strings {
         .chatSettings: "설정",
         .chatComposerPlaceholder: "Agent에게 메시지를 보내세요…",
         .chatStop: "중지",
+        .voicePermissionNeeded: "음성 인식 권한이 필요해요. 시스템 설정 > 개인정보 보호 및 보안 > 음성 인식에서 Puck을 켜주세요.",
         .chatAttach: "이미지 첨부",
         .chatFilterPlaceholder: "대화 찾기",
         .chatRunning: "처리 중",
@@ -726,6 +728,7 @@ enum Strings {
         .chatSettings: "Settings",
         .chatComposerPlaceholder: "Message the agent…",
         .chatStop: "Stop",
+        .voicePermissionNeeded: "Speech recognition permission is needed. Turn Puck on in System Settings > Privacy & Security > Speech Recognition.",
         .chatAttach: "Attach an image",
         .chatFilterPlaceholder: "Filter chats",
         .chatRunning: "Working",

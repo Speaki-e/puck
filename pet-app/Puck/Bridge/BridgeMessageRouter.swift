@@ -123,6 +123,9 @@ final class BridgeMessageRouter {
                 self?.onVoiceListen?(listening)
             }
 
+        case .voiceListening:
+            break // pet-app's own answer, addressed to the client; nothing here reads it
+
         case .clientHello:
             break // intercepted by BridgeServer before reaching here (assigns the connection's role)
         }

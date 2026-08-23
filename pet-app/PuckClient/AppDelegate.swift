@@ -298,6 +298,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             agentHost.handle(event, sessionId: sessionId)
         case .workspaceCreate, .sessionCreate:
             clientWindowStore.handleClientUpdate(message)
+        case .voiceListening(let listening):
+            // pet-app owns the microphone; this is it saying whether the hold
+            // this window asked for is actually recording.
+            clientWindowStore.applyVoiceListening(listening)
         case .toolResult(let result):
             // The reply to a tool this app's agent dispatched. pet-app sends
             // it back on the same connection, so it arrives here rather than

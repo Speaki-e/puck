@@ -37,7 +37,11 @@ final class VoiceInputController {
     private var hasAskedForVoicePermissions = false
     private var pressStartUptime: TimeInterval?
     private var heldLongEnough = false
-    private var isActive = false
+    /// Whether a hold is actually recording. Read by the bridge so the chat
+    /// window's mic button can show the truth: a press with no speech
+    /// permission spends itself on the prompt and records nothing, and a
+    /// button that lights up anyway is a button that lies.
+    private(set) var isListening = false
 
     /// Enter Listen state + listen_start SFX (F3/F5's responsibility to react to this).
     var onListenStart: (() -> Void)?
@@ -70,8 +74,8 @@ final class VoiceInputController {
         speechService.onError = { [weak self] error in
             guard let self else { return }
             self.onError?(error)
-            if self.isActive {
-                self.isActive = false
+            if self.isListening {
+                self.isListening = false
                 self.pressStartUptime = nil
                 self.onListenEnd?()
             }
@@ -82,7 +86,7 @@ final class VoiceInputController {
     /// key-repeat guard. A duplicate down while already active must not
     /// slide the hold-start time forward or restart streaming.
     func pushToTalkDown() {
-        guard !isActive else { return }
+        guard !isListening else { return }
         // The first hold is where the microphone is asked for. Asking at
         // launch instead meant a dialog on the desktop for everyone, every
         // time the app was rebuilt, whether or not they ever speak to the pet
@@ -92,7 +96,7 @@ final class VoiceInputController {
         // stream cannot start until it is answered, and by then the key is
         // long since up. Every hold after it records.
         guard requestVoicePermissionsIfNeeded() else { return }
-        isActive = true
+        isListening = true
         pressStartUptime = now()
         heldLongEnough = false
         onListenStart?()
@@ -110,8 +114,8 @@ final class VoiceInputController {
     }
 
     func pushToTalkUp() {
-        guard isActive else { return }
-        isActive = false
+        guard isListening else { return }
+        isListening = false
         defer { pressStartUptime = nil }
         if let start = pressStartUptime, now() - start >= Self.minimumHoldDuration {
             heldLongEnough = true

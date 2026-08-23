@@ -402,11 +402,21 @@ final class ClientWindowStore: ObservableObject {
         return runner
     }()
 
+    /// Whether pet-app is actually listening, as pet-app reports it. The
+    /// button asks; this is the answer, and the two differ whenever the
+    /// permission is missing.
+    @Published private(set) var isVoiceListening = false
+
     /// Asks pet-app to listen. Held rather than pressed: recognition
     /// finalises when it is released, and what it heard arrives as an
     /// ordinary voice message in whichever session is active.
     func setVoiceListening(_ listening: Bool) {
         sender.setVoiceListening(listening)
+    }
+
+    /// pet-app's answer, off the socket.
+    func applyVoiceListening(_ listening: Bool) {
+        isVoiceListening = listening
     }
 
     @discardableResult

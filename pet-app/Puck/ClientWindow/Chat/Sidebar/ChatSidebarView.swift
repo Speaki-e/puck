@@ -287,9 +287,12 @@ struct ChatSidebarView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .frame(height: 28)
-        .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
+        // A capsule: it is a field you type a word into, not a panel, and at
+        // this height the 4pt corner read as a rectangle with the corners
+        // sanded off.
+        .background(palette.surface, in: .capsule)
         .padding(.horizontal, 4)
         .padding(.bottom, 6)
         .background(palette.background)

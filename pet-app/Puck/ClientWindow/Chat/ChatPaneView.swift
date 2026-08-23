@@ -41,7 +41,10 @@ struct ChatPaneView: View {
     /// the island climbs into the empty band past it, and a hard-coded x
     /// would be wrong the first time a button was added. Nil until the
     /// toolbar has laid itself out.
-    @State private var toolbarTrailingX: CGFloat?
+    /// Where the toolbar's last button ends. Owned by the window rather than
+    /// by this view: the island is drawn in both columns now, and the strip
+    /// over the file list has to climb into the same band this one does.
+    @Binding var toolbarTrailingX: CGFloat?
     /// The same key CodeSplitView stores it under. The toggle is in the
     /// window's toolbar as well as in the code column's own strip, because
     /// the column is what it opens: a shortcut that only exists once the
@@ -126,6 +129,7 @@ struct ChatPaneView: View {
                     store.sendMessage(text, source: .text, attachments: attachments.isEmpty ? nil : attachments)
                 },
                 onCancel: { store.cancelActiveRun() },
+                isListening: store.isVoiceListening,
                 onVoiceListening: { store.setVoiceListening($0) }
             )
         }

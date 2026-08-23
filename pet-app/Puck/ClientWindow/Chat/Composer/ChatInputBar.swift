@@ -34,16 +34,17 @@ struct ChatInputBar: View {
     let isRunning: Bool
     let onSend: (String, [Attachment]) -> Void
     let onCancel: () -> Void
+    /// Whether pet-app is holding its push-to-talk down for us -- as pet-app
+    /// reports it, not as this view asked. A press with no speech-recognition
+    /// permission is spent on the system prompt and records nothing, and a
+    /// button lit on its own say-so was telling the user something untrue.
+    var isListening = false
     /// Asks pet-app to hold its push-to-talk down or let it up. The chat
     /// window has no microphone; see BridgeMessage.voiceListen.
     var onVoiceListening: ((Bool) -> Void)?
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
-    /// Whether pet-app is holding its push-to-talk down for us. A hold, not a
-    /// press: speech is finalised on release, so the button stays lit until
-    /// it is clicked again.
-    @State private var isListening = false
     /// Read once and after every change rather than on each render: both come
     /// off disk (a `.env` and the environment), and `body` runs on every
     /// keystroke.
@@ -91,7 +92,6 @@ struct ChatInputBar: View {
         // while pet-app is still holding its push-to-talk down for us.
         .onDisappear {
             guard isListening else { return }
-            isListening = false
             onVoiceListening?(false)
         }
     }
@@ -233,8 +233,7 @@ struct ChatInputBar: View {
     /// then -- the same two glyphs the reference shows, one state each.
     private var micButton: some View {
         Button {
-            isListening.toggle()
-            onVoiceListening?(isListening)
+            onVoiceListening?(!isListening)
         } label: {
             Image(systemName: isListening ? "waveform" : "mic")
                 .font(.system(size: 14, weight: .medium))

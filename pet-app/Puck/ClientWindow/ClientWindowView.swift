@@ -59,6 +59,10 @@ struct ClientWindowView: View {
     /// view's chat pane, while the column itself is this view's own child.
     /// Remembered across launches for the same reason the code column is.
     @AppStorage("Puck.explorerTab") private var explorerTab: ExplorerTab = .files
+    /// Measured by the chat pane's toolbar and used by both columns' strips:
+    /// the island climbs into the toolbar's empty band, and where that band
+    /// starts is where the last button ends.
+    @State private var toolbarTrailingX: CGFloat?
 
     /// The window cannot go narrower than what it is currently showing. Two
     /// panes need more room than one, so the floor moves with the toggle
@@ -125,7 +129,8 @@ struct ClientWindowView: View {
                             editor: $editor,
                             editorStore: editorStore,
                             activeBranch: git.status?.branch,
-                            explorerTab: $explorerTab
+                            explorerTab: $explorerTab,
+                            toolbarTrailingX: $toolbarTrailingX
                         )
                         .frame(minWidth: 520)
                             // Free width goes here, not to the file list.
@@ -136,21 +141,49 @@ struct ClientWindowView: View {
                         // A file list needs room for names, not for a second
                         // editor: the code it opens goes beside the
                         // conversation instead.
-                        FileExplorerPane(store: editorStore, externalTab: $explorerTab)
+                        // The island runs over this column too. It is one
+                        // shelf across the top of the window; SwiftUI cannot
+                        // draw a view across a split, so each column draws its
+                        // own piece and the store unions them for the pet.
+                        VStack(spacing: 0) {
+                            PetTankView(
+                                onFrameChange: { store.setTankSegment($0, for: .editor) },
+                                toolbarTrailingX: toolbarTrailingX
+                            )
+                            FileExplorerPane(store: editorStore, externalTab: $explorerTab)
+                        }
                             .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else if editor.isAttached, let availability = activeWorkspace?.editorAvailability {
                     // Attached with no store: this workspace has no project,
                     // or its root went away. The empty state says which.
                     HSplitView {
-                        ChatPaneView(store: store, editor: $editor, editorStore: nil, activeBranch: git.status?.branch)
-                            .frame(minWidth: 520)
-                            .layoutPriority(1)
-                        EditorEmptyStateView(availability: availability)
+                        ChatPaneView(
+                            store: store,
+                            editor: $editor,
+                            editorStore: nil,
+                            activeBranch: git.status?.branch,
+                            toolbarTrailingX: $toolbarTrailingX
+                        )
+                        .frame(minWidth: 520)
+                        .layoutPriority(1)
+                        VStack(spacing: 0) {
+                            PetTankView(
+                                onFrameChange: { store.setTankSegment($0, for: .editor) },
+                                toolbarTrailingX: toolbarTrailingX
+                            )
+                            EditorEmptyStateView(availability: availability)
+                        }
                             .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else {
-                    ChatPaneView(store: store, editor: $editor, editorStore: nil, activeBranch: git.status?.branch)
+                    ChatPaneView(
+                        store: store,
+                        editor: $editor,
+                        editorStore: nil,
+                        activeBranch: git.status?.branch,
+                        toolbarTrailingX: $toolbarTrailingX
+                    )
                 }
             }
             ClientStatusBarView(

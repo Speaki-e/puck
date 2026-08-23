@@ -207,6 +207,13 @@ enum BridgeMessage: Equatable {
     /// finalises on the way up, so this is a hold rather than two events.
     case voiceListen(Bool)
 
+    /// pet-app -> PuckClient: whether it actually is listening (2026-08-24).
+    /// The answer to `voiceListen`, and not always the same thing: the press
+    /// that finds no speech-recognition permission is spent on the system
+    /// prompt and records nothing, so a mic button that lit up on its own
+    /// request was telling the user something untrue.
+    case voiceListening(Bool)
+
     // --- sessions/workspaces (2026-07-29, protocol 3.4) ---
 
     /// pet-app -> workspace: request a new workspace (project folder or pure-chat).
@@ -260,6 +267,7 @@ extension BridgeMessage: Codable {
         case petHome = "pet_home"
         case petIslandHeight = "pet_island_height"
         case voiceListen = "voice_listen"
+        case voiceListening = "voice_listening"
         case workspaceCreateRequest = "workspace_create_request"
         case workspaceCreate = "workspace_create"
         case sessionCreateRequest = "session_create_request"
@@ -378,6 +386,9 @@ extension BridgeMessage: Codable {
         case .voiceListen:
             self = .voiceListen(try container.decode(Bool.self, forKey: .listening))
 
+        case .voiceListening:
+            self = .voiceListening(try container.decode(Bool.self, forKey: .listening))
+
         case .petHome:
             self = .petHome(
                 rect: try container.decodeIfPresent(BridgeRect.self, forKey: .rect),
@@ -485,6 +496,10 @@ extension BridgeMessage: Codable {
 
         case .voiceListen(let listening):
             try container.encode(TypeKey.voiceListen, forKey: .type)
+            try container.encode(listening, forKey: .listening)
+
+        case .voiceListening(let listening):
+            try container.encode(TypeKey.voiceListening, forKey: .type)
             try container.encode(listening, forKey: .listening)
 
         case .petHome(let rect, let visible):

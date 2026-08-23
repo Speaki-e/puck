@@ -50,4 +50,27 @@ final class VoiceListenTests: XCTestCase {
         wait(for: [bothSeen], timeout: 2)
         XCTAssertEqual(seen, [true, false])
     }
+    /// pet-app's answer, which is not always the request: the press that
+    /// finds no speech-recognition permission is spent on the system prompt
+    /// and records nothing. The chat window's button follows this, not its
+    /// own click.
+    func test_voiceListening_survivesTheWire() throws {
+        XCTAssertEqual(try roundTrip(.voiceListening(true)), .voiceListening(true))
+        XCTAssertEqual(try roundTrip(.voiceListening(false)), .voiceListening(false))
+    }
+
+    /// It goes to the window that asked, which is the gui role.
+    func test_voiceListening_isRelayedToTheClient() {
+        XCTAssertEqual(ClientRelay.targetRole(for: .voiceListening(true)), .gui)
+    }
+
+    /// The request and the answer are different messages, so a client cannot
+    /// mistake its own ask coming back for pet-app agreeing to it.
+    func test_theRequestAndTheAnswerAreNamedApart() throws {
+        let request = String(decoding: try JSONEncoder().encode(BridgeMessage.voiceListen(true)), as: UTF8.self)
+        let answer = String(decoding: try JSONEncoder().encode(BridgeMessage.voiceListening(true)), as: UTF8.self)
+
+        XCTAssertNotEqual(request, answer)
+        XCTAssertTrue(answer.contains("voice_listening"), answer)
+    }
 }

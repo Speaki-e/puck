@@ -114,6 +114,27 @@ final class RunShellHandlerTests: XCTestCase {
         wait(for: [expectation], timeout: 10)
     }
 
+    /// The gap the head buffer left: output longer than half the cap but
+    /// shorter than the cap is not truncated, so all of it has to be there.
+    /// It was not -- the middle was dropped and `truncated` said false.
+    func test_outputUnderTheCap_isKeptWhole() {
+        let handler = RunShellHandler()
+        let byteCount = RunShellHandler.maximumCapturedBytes - 4096
+
+        let expectation = expectation(description: "completion called")
+        handler.execute(id: "test", args: .object(["command": .string("printf 'x%.0s' {1..\(byteCount)}")])) { result in
+            guard case .success(.object(let fields)?) = result, case .string(let stdout)? = fields["stdout"] else {
+                XCTFail("expected stdout string")
+                return
+            }
+            XCTAssertEqual(stdout.count, byteCount)
+            XCTAssertEqual(fields["truncated"], .bool(false))
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 20)
+    }
+
     /// What the cap is for: the answer travels over bridge.sock, which drops a
     /// message above 1 MiB outright -- so an uncapped `cat` of a large file did
     /// not arrive at all, and the dispatch sat there until it timed out.

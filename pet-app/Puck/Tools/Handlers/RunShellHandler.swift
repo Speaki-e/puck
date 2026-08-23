@@ -176,6 +176,11 @@ final class RunShellHandler: ToolHandler {
     /// its limit would hang the command it is running rather than truncate it.
     private static func drain(_ handle: FileHandle) -> Capture {
         let half = maximumCapturedBytes / 2
+        // Kept up to the whole cap, not to half of it. Half was enough for
+        // the truncated case, which only ever shows the first half -- and it
+        // silently threw away the middle of every output between half the cap
+        // and the cap, where nothing is truncated and everything is supposed
+        // to be there.
         var head = Data()
         var tail = Data()
         var total = 0
@@ -184,8 +189,8 @@ final class RunShellHandler: ToolHandler {
             let chunk = handle.availableData
             if chunk.isEmpty { break }
             total += chunk.count
-            if head.count < half {
-                head.append(chunk.prefix(half - head.count))
+            if head.count < maximumCapturedBytes {
+                head.append(chunk.prefix(maximumCapturedBytes - head.count))
             }
             tail.append(chunk)
             if tail.count > half { tail.removeFirst(tail.count - half) }
@@ -198,7 +203,7 @@ final class RunShellHandler: ToolHandler {
         // Decoded separately: the cut can land inside a multi-byte character,
         // and String(decoding:) turns that half into a replacement character
         // rather than losing the rest of the line.
-        let text = String(decoding: head, as: UTF8.self)
+        let text = String(decoding: head.prefix(half), as: UTF8.self)
             + "\n[... \(dropped) bytes of output dropped ...]\n"
             + String(decoding: tail, as: UTF8.self)
         return Capture(text: text, isTruncated: true)

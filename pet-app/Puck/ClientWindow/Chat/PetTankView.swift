@@ -234,6 +234,8 @@ struct PetTankView: View {
                     ForEach(0..<copies, id: \.self) { index in
                         Image(nsImage: artwork)
                             .resizable()
+                            .interpolation(.high)
+                            .antialiased(true)
                             .frame(width: unit, height: proxy.size.height)
                             .scaleEffect(x: index.isMultiple(of: 2) ? 1 : -1, y: 1)
                     }

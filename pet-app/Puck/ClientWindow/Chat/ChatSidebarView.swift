@@ -164,6 +164,11 @@ struct ChatSidebarView: View {
             await branches.reload(projects: projectsByWorkspace)
         }
         .listStyle(.sidebar)
+        // `List` keeps horizontal margins of its own around the scroll
+        // content, on top of every row's insets -- which is where the wide
+        // gap down the left of this column came from. `listRowInsets` cannot
+        // reach them; this can.
+        .contentMargins(.horizontal, 0, for: .scrollContent)
         // AppKit's own sidebar material sat two shades lighter than the
         // island beside it -- (40,39,39) against (16,16,16) -- which read as
         // two unrelated panels rather than one window. Hidden, and painted
@@ -240,7 +245,7 @@ struct ChatSidebarView: View {
         // under it, and the gap that says "new group" goes over the top.
         .padding(.top, 12)
         .padding(.bottom, 2)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
     }
 
     /// The chats that belong to no project: the default workspace's, shown
@@ -279,7 +284,7 @@ struct ChatSidebarView: View {
         .padding(.horizontal, 8)
         .frame(height: 28)
         .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 4)
         .padding(.bottom, 6)
         .background(palette.background)
     }
@@ -560,7 +565,7 @@ private struct WorkspaceGroup: View {
                         .help(Strings.text(.chatRunning))
                 }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 4)
             .padding(.vertical, 5)
             .sidebarRowBackground(isSelected: isActive)
         }
@@ -716,7 +721,7 @@ private struct ChatSessionRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
         .frame(height: 28)
         .sidebarRowBackground(isSelected: isActive)
     }

@@ -87,6 +87,11 @@ final class BallController {
             layer.contents = image
             layer.contentsGravity = .resizeAspect
             layer.contentsScale = parent.contentsScale
+            // Same reason as the pet's: toy artwork is drawn far larger than
+            // it is shown, and a toy that spins is a rotated layer whose
+            // edges need blending into the grid rather than cutting on it.
+            layer.minificationFilter = .trilinear
+            layer.allowsEdgeAntialiasing = true
             measurement = Self.measure(image)
             hitMask = AlphaHitMask(image: image)
             // Measured on the ARTWORK, not the canvas: a wand's canvas is

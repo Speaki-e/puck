@@ -85,6 +85,17 @@ final class SpriteAvatar: AvatarPlayable {
         // ~1.5pt per frame renders as stair-stepped jitter. SpriteLayerView
         // keeps the parent's value current across display changes.
         spriteLayer.contentsScale = parent.contentsScale
+        // Mipmapped downscaling. Avatar artwork is drawn at a few thousand
+        // pixels and shown at a hundred or so, and Core Animation's default
+        // filter samples that without mipmaps: every fine line in it lands on
+        // or between pixels depending on where the pet is standing, which is
+        // the stair-stepping along its outline. Trilinear costs one extra
+        // pyramid per image and takes it out.
+        spriteLayer.minificationFilter = .trilinear
+        // The pet is flipped, squashed and stretched every frame. Without
+        // this the edges of those transformed layers are cut on the pixel
+        // grid rather than blended into it.
+        spriteLayer.allowsEdgeAntialiasing = true
         // The FSM drives this layer every frame; Core Animation must not
         // interpolate between those frames on top of it.
         spriteLayer.disableImplicitAnimations()
@@ -98,6 +109,7 @@ final class SpriteAvatar: AvatarPlayable {
         tintMaskLayer.frame = spriteLayer.bounds
         tintMaskLayer.contentsGravity = spriteLayer.contentsGravity
         tintMaskLayer.contentsScale = spriteLayer.contentsScale
+        tintMaskLayer.minificationFilter = .trilinear
         tintMaskLayer.disableImplicitAnimations()
         tintLayer.mask = tintMaskLayer
         spriteLayer.addSublayer(tintLayer)

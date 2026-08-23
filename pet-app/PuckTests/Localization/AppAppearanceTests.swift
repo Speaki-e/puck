@@ -64,4 +64,33 @@ final class AppAppearanceTests: XCTestCase {
     func test_dark_mapsToDarkAquaNSApplicationAppearance() {
         XCTAssertEqual(AppAppearance.dark.nsApplicationAppearance?.name, .darkAqua)
     }
+    // MARK: - Cross-process
+
+    /// Only Puck has the picker, and PuckClient has its own NSApp: the
+    /// override reaches the second process this way or not at all. It did not
+    /// before -- PuckClient followed the client palette but stayed on the
+    /// system appearance, so with the app set to Light its menus, popovers and
+    /// visual-effect backgrounds sat in the other one.
+    func test_crossProcessUserInfo_roundTripsThroughResolved() {
+        for appearance in AppAppearance.allCases {
+            XCTAssertEqual(
+                AppAppearance.resolved(fromCrossProcessUserInfo: appearance.crossProcessUserInfo),
+                appearance
+            )
+        }
+    }
+
+    func test_resolved_fromMissingCrossProcessUserInfoKey_isNil() {
+        XCTAssertNil(AppAppearance.resolved(fromCrossProcessUserInfo: [:]))
+        XCTAssertNil(AppAppearance.resolved(fromCrossProcessUserInfo: nil))
+    }
+
+    /// One setting with two stores is two settings that disagree, which is
+    /// what this whole pairing is about: both processes read Puck's domain.
+    func test_sharedDefaults_isTheSameDomainTheThemeUses() {
+        XCTAssertEqual(
+            AppAppearance.sharedDefaults?.dictionaryRepresentation().isEmpty,
+            ClientThemeStyle.sharedDefaults?.dictionaryRepresentation().isEmpty
+        )
+    }
 }

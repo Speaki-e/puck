@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: ClientWindow?
     private var settingsWindow: NSWindow?
     private var clientThemeStyleObserver: NSObjectProtocol?
+    private var appearanceObserver: NSObjectProtocol?
     private var languageObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -55,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setUpLanguage()
         setUpClientThemeStyle()
+        setUpAppearance()
 
         bridgeClient.onMessage = { [weak self] message in
             DispatchQueue.main.async { self?.handle(message) }
@@ -224,6 +226,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.applyClientThemeStyle(style)
             }
         }
+    }
+
+    /// The light/dark override, which only Puck has a picker for. This
+    /// process has its own NSApp, and nothing was setting its appearance:
+    /// with the app set to Light, PuckClient's menus, popovers and every
+    /// NSVisualEffectView stayed in whatever the system was, so the two
+    /// windows of one app sat in two appearances.
+    private func setUpAppearance() {
+        applyAppearance(Self.currentAppearance())
+        appearanceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: AppAppearance.crossProcessChangeNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            // Same reasoning as the theme observer above: the value travels
+            // with the notification, and re-reading is only the fallback.
+            MainActor.assumeIsolated {
+                let appearance = AppAppearance.resolved(fromCrossProcessUserInfo: notification.userInfo)
+                    ?? Self.currentAppearance()
+                Self.applyAppearance(appearance)
+            }
+        }
+    }
+
+    private nonisolated static func currentAppearance() -> AppAppearance {
+        AppAppearance.resolved(
+            fromDefaultsValue: AppAppearance.sharedDefaults?.string(forKey: AppAppearance.defaultsKey)
+        )
+    }
+
+    @MainActor
+    private static func applyAppearance(_ appearance: AppAppearance) {
+        NSApp.appearance = appearance.nsApplicationAppearance
+    }
+
+    @MainActor
+    private func applyAppearance(_ appearance: AppAppearance) {
+        Self.applyAppearance(appearance)
     }
 
     private func currentClientThemeStyle() -> ClientThemeStyle {

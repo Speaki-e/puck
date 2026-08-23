@@ -55,4 +55,42 @@ enum AppAppearance: String, Equatable, CaseIterable {
     static func resolved(fromDefaultsValue raw: String?) -> AppAppearance {
         raw.flatMap(AppAppearance.init(rawValue:)) ?? .system
     }
+
+    // MARK: - Cross-process
+
+    /// Puck is the only process with the picker, and PuckClient is a separate
+    /// process: this is how the second one hears about a change. Same shape as
+    /// ClientThemeStyle's, which is the setting sitting next to it.
+    ///
+    /// PuckClient followed the client *palette* but never this, so with the
+    /// app set to Light its menus, popovers and every NSVisualEffectView
+    /// stayed in whatever the system was -- two windows of the same app in
+    /// two appearances.
+    static let crossProcessChangeNotification = Notification.Name("com.speaki-e.Puck.appearanceChanged")
+
+    private static let crossProcessUserInfoKey = "appearance"
+
+    /// The value travels with the notification. A `UserDefaults.set` in one
+    /// process is not guaranteed to be visible in another by the time a
+    /// distributed notification posted right after it is delivered.
+    var crossProcessUserInfo: [AnyHashable: Any] {
+        [Self.crossProcessUserInfoKey: rawValue]
+    }
+
+    static func resolved(fromCrossProcessUserInfo userInfo: [AnyHashable: Any]?) -> AppAppearance? {
+        (userInfo?[crossProcessUserInfoKey] as? String).flatMap(AppAppearance.init(rawValue:))
+    }
+
+    /// Announces the change to every process, including the one calling.
+    func broadcast() {
+        DistributedNotificationCenter.default().postNotificationName(
+            Self.crossProcessChangeNotification,
+            object: nil,
+            userInfo: crossProcessUserInfo,
+            deliverImmediately: true
+        )
+    }
+
+    /// Puck's own domain, which is where both apps read this from.
+    static var sharedDefaults: UserDefaults? { ClientThemeStyle.sharedDefaults }
 }

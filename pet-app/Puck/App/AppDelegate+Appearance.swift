@@ -21,6 +21,10 @@ extension AppDelegate {
         applyAppKitAppearance(settingsStore.appearance)
         settingsStore.onAppearanceChanged = { [weak self] appearance in
             self?.applyAppKitAppearance(appearance)
+            // PuckClient is a separate process with its own NSApp, and the
+            // picker only exists here. Without this its chrome stayed on the
+            // system appearance while this one followed the override.
+            appearance.broadcast()
         }
     }
 

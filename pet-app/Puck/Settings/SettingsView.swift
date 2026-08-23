@@ -41,6 +41,11 @@ struct SettingsView: View {
     @ObservedObject private var localization = Localization.shared
 
     @State private var appearance: AppAppearance
+    /// Held rather than read from the store on each render: the picker in
+    /// PuckClient's own settings writes the same setting, and nothing here
+    /// re-rendered when it did, so this panel kept showing the theme it was
+    /// opened with while the chat window was already in the new one.
+    @State private var clientTheme: ClientThemeStyle
     @State private var volume: Double
     @State private var isMuted: Bool
     @State private var autoMuteOnFocus: Bool
@@ -73,6 +78,7 @@ struct SettingsView: View {
         self.onToggleVisibility = onToggleVisibility
         self.onQuit = onQuit
         _appearance = State(initialValue: store.appearance)
+        _clientTheme = State(initialValue: store.clientThemeStyle)
         _volume = State(initialValue: Double(store.volume))
         _isMuted = State(initialValue: store.isMuted)
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
@@ -118,6 +124,14 @@ struct SettingsView: View {
         // (dark) chrome. Keying identity on the enum itself sidesteps the
         // diff path entirely for every transition, not just this one.
         .id(appearance)
+        // Wherever it was changed from -- this panel, or the picker in
+        // PuckClient's settings window, which writes the same key.
+        .onReceive(
+            DistributedNotificationCenter.default().publisher(for: ClientThemeStyle.crossProcessChangeNotification)
+        ) { notification in
+            guard let style = ClientThemeStyle.resolved(fromCrossProcessUserInfo: notification.userInfo) else { return }
+            clientTheme = style
+        }
     }
 
     /// The reference opens with its mark and name; ours is the pumpkin that
@@ -261,8 +275,11 @@ struct SettingsView: View {
                 // panel this narrow. A menu also takes a fourth without
                 // being redesigned.
                 Picker("", selection: Binding(
-                    get: { store.clientThemeStyle },
-                    set: { store.clientThemeStyle = $0 }
+                    get: { clientTheme },
+                    set: { style in
+                        clientTheme = style
+                        store.clientThemeStyle = style
+                    }
                 )) {
                     ForEach(ClientThemeStyle.allCases) { style in
                         Text(style.displayName).tag(style)

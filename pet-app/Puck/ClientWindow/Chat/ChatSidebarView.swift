@@ -44,6 +44,12 @@ struct ChatSidebarView: View {
     /// a filter left on from yesterday is a sidebar that looks empty for no
     /// visible reason.
     @State private var filter = ""
+    /// Which workspaces are showing their chats. Opened by clicking the
+    /// workspace, and the active one opens itself -- see `body`'s task.
+    @State private var expanded: Set<String> = []
+    /// The full list of workspaces, as a sheet. The sidebar shows them all
+    /// already when there are a few; this is for when there are not a few.
+    @State private var isBrowsingWorkspaces = false
 
     var body: some View {
         // No `selection:`. `List` draws its own highlight for a selected row
@@ -52,26 +58,49 @@ struct ChatSidebarView: View {
         // buttons that draw their own. One list, one highlight: these draw
         // theirs too.
         List {
-            // Three groups, top to bottom: what you can start, which project
-            // you are in, and the chats inside it. Taken from the reference
-            // -- the old shape was one section per workspace with its chats
-            // under it, which buried the project you are actually in among
-            // the ones you are not.
+            // Three groups, top to bottom: what you can start, the
+            // workspaces, and the chats that belong to no workspace in
+            // particular. The default workspace is not a row here -- it is
+            // the app's own home, and listing it beside the projects made the
+            // list say "기본 워크스페이스" twice, once as a place and once as
+            // the place you already were.
             Section { actionRows }
                 .listRowInsets(Self.rowInsets)
             Section {
                 ForEach(visibleWorkspaces) { workspace in
-                    WorkspaceRow(
+                    WorkspaceGroup(
                         workspace: workspace,
                         branch: branch(for: workspace),
                         isActive: workspace.id == store.activeWorkspaceId,
-                        isWorking: store.sessions(in: workspace.id).contains { $0.isRunning },
-                        onSelect: { select(workspace) }
+                        sessions: sessions(in: workspace),
+                        activeSessionId: store.activeSessionId,
+                        isExpanded: Binding(
+                            get: { expanded.contains(workspace.id) },
+                            set: { isOpen in
+                                if isOpen {
+                                    expanded.insert(workspace.id)
+                                } else {
+                                    expanded.remove(workspace.id)
+                                }
+                            }
+                        ),
+                        onSelectSession: { session in
+                            store.selectSession(workspaceId: workspace.id, sessionId: session.id)
+                        },
+                        onDeleteSession: { session in
+                            pendingDeletion = SessionSelection(
+                                workspaceId: workspace.id,
+                                sessionId: session.id
+                            )
+                        },
+                        canDeleteSession: { session in
+                            store.canDeleteSession(workspaceId: workspace.id, sessionId: session.id)
+                        }
                     )
                 }
                 .listRowInsets(Self.rowInsets)
             } header: {
-                sectionHeader(Strings.text(.chatProjects)) {
+                sectionHeader(Strings.text(.chatWorkspaces)) {
                     Button { isAddingWorkspace = true } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 12, weight: .medium))
@@ -82,38 +111,55 @@ struct ChatSidebarView: View {
                 }
             }
             Section {
-                ForEach(activeSessions) { session in
+                ForEach(homeSessions) { session in
                     ChatSessionRow(
                         session: session,
-                        isActive: session.id == store.activeSessionId,
+                        isActive: store.activeWorkspaceId == ClientWindowStore.defaultWorkspaceId
+                            && session.id == store.activeSessionId,
                         onSelect: {
                             store.selectSession(
-                                workspaceId: store.activeWorkspaceId,
+                                workspaceId: ClientWindowStore.defaultWorkspaceId,
                                 sessionId: session.id
                             )
                         }
                     )
-                        .contextMenu {
-                            // Right-click on the row rather than a visible
-                            // button: destructive, rarely wanted, and a
-                            // trash icon on every row is a mis-click waiting
-                            // to happen in a list you navigate by clicking.
-                            Button(Strings.text(.commonDelete), role: .destructive) {
-                                pendingDeletion = SessionSelection(
-                                    workspaceId: store.activeWorkspaceId,
-                                    sessionId: session.id
-                                )
-                            }
-                            .disabled(!store.canDeleteSession(
-                                workspaceId: store.activeWorkspaceId,
+                    .contextMenu {
+                        // Right-click on the row rather than a visible
+                        // button: destructive, rarely wanted, and a trash
+                        // icon on every row is a mis-click waiting to happen
+                        // in a list you navigate by clicking.
+                        Button(Strings.text(.commonDelete), role: .destructive) {
+                            pendingDeletion = SessionSelection(
+                                workspaceId: ClientWindowStore.defaultWorkspaceId,
                                 sessionId: session.id
-                            ))
+                            )
                         }
-                        .listRowInsets(Self.rowInsets)
+                        .disabled(!store.canDeleteSession(
+                            workspaceId: ClientWindowStore.defaultWorkspaceId,
+                            sessionId: session.id
+                        ))
+                    }
+                    .listRowInsets(Self.rowInsets)
                 }
             } header: {
                 sectionHeader(Strings.text(.chatChatsAndTasks)) { EmptyView() }
             }
+        }
+        // The workspace being worked in shows its chats without being asked;
+        // a collapsed group holding the chat you are in is a list that hides
+        // where you are.
+        .onChange(of: store.activeWorkspaceId, initial: true) {
+            guard store.activeWorkspaceId != ClientWindowStore.defaultWorkspaceId else { return }
+            expanded.insert(store.activeWorkspaceId)
+        }
+        .sheet(isPresented: $isBrowsingWorkspaces) {
+            WorkspaceBrowserSheet(
+                store: store,
+                onCreate: {
+                    isBrowsingWorkspaces = false
+                    isAddingWorkspace = true
+                }
+            )
         }
         .task(id: store.workspaces.map(\.id).joined()) {
             await branches.reload(projects: projectsByWorkspace)
@@ -155,10 +201,10 @@ struct ChatSidebarView: View {
             store.requestNewSession(title: ChatSession.placeholderTitle, in: store.activeWorkspaceId)
         }
         SidebarActionRow(
-            title: Strings.text(.chatNewWorkspace),
-            systemImage: "folder.badge.plus"
+            title: Strings.text(.chatWorkspaces),
+            systemImage: "square.grid.2x2"
         ) {
-            isAddingWorkspace = true
+            isBrowsingWorkspaces = true
         }
         SidebarActionRow(title: Strings.text(.chatSettings), systemImage: "gearshape") {
             NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
@@ -169,7 +215,7 @@ struct ChatSidebarView: View {
     /// each row by default, which is why the chats sat further from each
     /// other than they did from the heading above them -- exactly backwards,
     /// since the heading is what separates one group from the next.
-    private static let rowInsets = EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6)
+    private static let rowInsets = EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2)
 
     /// A group's name, with whatever acts on the group at its trailing edge.
     private func sectionHeader<Trailing: View>(
@@ -192,22 +238,14 @@ struct ChatSidebarView: View {
         .padding(.horizontal, 6)
     }
 
-    /// The chats of the workspace being looked at. The list used to hold
-    /// every workspace's at once, one section each; a project's chats belong
-    /// to the project, and the row above says which one that is.
-    private var activeSessions: [ChatSession] {
-        guard let workspace = store.workspaces.first(where: { $0.id == store.activeWorkspaceId }) else { return [] }
-        return sessions(in: workspace)
-    }
-
-    /// Switching project keeps you in a chat: its own most recent one, or a
-    /// new one if it has none.
-    private func select(_ workspace: ClientWorkspace) {
-        guard let session = store.sessions(in: workspace.id).first else {
-            store.activeWorkspaceId = workspace.id
-            return
+    /// The chats that belong to no project: the default workspace's, shown
+    /// directly under "채팅 및 작업" rather than behind a row named after a
+    /// place nobody chose to be in.
+    private var homeSessions: [ChatSession] {
+        guard let home = store.workspaces.first(where: { $0.id == ClientWindowStore.defaultWorkspaceId }) else {
+            return []
         }
-        store.selectSession(workspaceId: workspace.id, sessionId: session.id)
+        return sessions(in: home)
     }
 
     /// A row of its own above the list, the way Mail and Notes put it. Not
@@ -245,8 +283,12 @@ struct ChatSidebarView: View {
     /// answers the filter keeps all of its chats; otherwise it is here only
     /// if one of its chats answers it.
     private var visibleWorkspaces: [ClientWorkspace] {
-        guard SidebarFilter.isActive(filter) else { return store.workspaces }
-        return store.workspaces.filter { !sessions(in: $0).isEmpty }
+        let workspaces = store.workspaces.filter { $0.id != ClientWindowStore.defaultWorkspaceId }
+        guard SidebarFilter.isActive(filter) else { return workspaces }
+        return workspaces.filter {
+            SidebarFilter.matchesWorkspace(filter, name: $0.displayName, projectPath: $0.projectPath)
+                || !sessions(in: $0).isEmpty
+        }
     }
 
     private func sessions(in workspace: ClientWorkspace) -> [ChatSession] {
@@ -357,8 +399,8 @@ private struct SidebarRowBackground: ViewModifier {
     /// which is backwards -- the highlight is there to say "this one", not to
     /// be the brightest thing in the column.
     private var fill: Color {
-        if isSelected { return palette.surface.opacity(0.55) }
-        return isHovering ? palette.surface.opacity(0.28) : .clear
+        if isSelected { return palette.surface.opacity(0.68) }
+        return isHovering ? palette.surface.opacity(0.4) : .clear
     }
 }
 
@@ -396,10 +438,13 @@ private struct SidebarActionRow: View {
     }
 }
 
-/// One project. Selecting it moves the whole window -- the chats below, the
-/// files on the right, the branch in the footer -- so it is a row you press
-/// rather than a header over a group.
-private struct WorkspaceRow: View {
+/// One workspace, and the chats inside it.
+///
+/// Clicking it opens it rather than only switching to it: the chats that
+/// belong to a workspace are the reason to go there, and they used to be
+/// visible only after switching -- so choosing between two workspaces meant
+/// entering one to find out what was in it.
+private struct WorkspaceGroup: View {
     /// Redraws this view when the UI language changes. Needed on every
     /// view that resolves a string, not just the window root: SwiftUI
     /// skips a child whose own inputs are unchanged, and a table lookup
@@ -412,14 +457,61 @@ private struct WorkspaceRow: View {
     /// when HEAD is detached -- none of which is a branch name.
     let branch: String?
     let isActive: Bool
-    /// Whether any chat in it is mid-turn. The one thing about a project you
-    /// are *not* looking at that is worth a row of its own saying.
-    let isWorking: Bool
-    let onSelect: () -> Void
+    let sessions: [ChatSession]
+    let activeSessionId: String
+    @Binding var isExpanded: Bool
+    let onSelectSession: (ChatSession) -> Void
+    let onDeleteSession: (ChatSession) -> Void
+    let canDeleteSession: (ChatSession) -> Bool
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 1) {
+            header
+            if isExpanded {
+                ForEach(sessions) { session in
+                    ChatSessionRow(
+                        session: session,
+                        isActive: isActive && session.id == activeSessionId,
+                        onSelect: { onSelectSession(session) }
+                    )
+                    // Indented under the workspace they belong to, which is
+                    // what says they belong to it.
+                    .padding(.leading, 16)
+                    .contextMenu {
+                        Button(Strings.text(.commonDelete), role: .destructive) {
+                            onDeleteSession(session)
+                        }
+                        .disabled(!canDeleteSession(session))
+                    }
+                }
+                if sessions.isEmpty {
+                    Text(Strings.text(.chatNoSessionsHere))
+                        .font(ClientTheme.Typography.sessionTitle)
+                        .foregroundStyle(palette.textSecondary)
+                        .padding(.leading, 22)
+                        .frame(height: 24, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private var header: some View {
+        Button {
+            isExpanded.toggle()
+            // Opening a workspace is also choosing it: the first chat in it
+            // is what you came for, and leaving the window on another
+            // workspace while its chats are on screen is the confusion this
+            // list is being rebuilt to remove.
+            if isExpanded, let first = sessions.first, !isActive {
+                onSelectSession(first)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .foregroundStyle(palette.textSecondary)
+                    .frame(width: 12)
                 Image(systemName: workspace.projectPath == nil ? "bubble.left" : "folder")
                     .font(.system(size: 13))
                     .frame(width: 16)
@@ -438,7 +530,7 @@ private struct WorkspaceRow: View {
                     }
                 }
                 Spacer(minLength: 0)
-                if isWorking {
+                if sessions.contains(where: { $0.isRunning }) {
                     ProgressView()
                         .controlSize(.small)
                         .scaleEffect(0.6)
@@ -446,21 +538,107 @@ private struct WorkspaceRow: View {
                         .help(Strings.text(.chatRunning))
                 }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .sidebarRowBackground(isSelected: isActive)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(workspace.displayName)
         .help(workspace.projectPath ?? workspace.displayName)
+        .animation(.easeOut(duration: 0.15), value: isExpanded)
     }
 
     /// The project and the branch on one line: the sidebar is where you pick
-    /// which project to talk about, and which branch it is on is half of what
+    /// which workspace to talk in, and which branch it is on is half of what
     /// that choice means.
     private var subtitle: String? {
         let parts = [workspace.projectLabel, branch].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+/// Every workspace at once, with what each one is bound to.
+///
+/// The sidebar lists them too, but it lists them in a 220pt column beside
+/// everything else; this is the view for choosing between more of them than
+/// that column can show, and for making one.
+struct WorkspaceBrowserSheet: View {
+    /// Redraws this view when the UI language changes. Needed on every
+    /// view that resolves a string, not just the window root: SwiftUI
+    /// skips a child whose own inputs are unchanged, and a table lookup
+    /// inside `body` is not an input.
+    @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
+    @Environment(\.dismiss) private var dismiss
+
+    @ObservedObject var store: ClientWindowStore
+    let onCreate: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(Strings.text(.chatWorkspaces))
+                    .font(ClientTheme.Typography.sectionHeader)
+                Spacer()
+                Button(Strings.text(.chatNewWorkspace), systemImage: "plus", action: onCreate)
+            }
+            .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
+            .padding(.vertical, ClientTheme.Metrics.spacingMedium)
+            Divider()
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(store.workspaces) { workspace in
+                        row(workspace)
+                    }
+                }
+                .padding(ClientTheme.Metrics.spacingMedium)
+            }
+            Divider()
+            HStack {
+                Spacer()
+                Button(Strings.text(.commonClose)) { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(ClientTheme.Metrics.spacingLarge)
+        }
+        .frame(width: 460, height: 420)
+        .background(palette.background)
+    }
+
+    private func row(_ workspace: ClientWorkspace) -> some View {
+        Button {
+            if let session = store.sessions(in: workspace.id).first {
+                store.selectSession(workspaceId: workspace.id, sessionId: session.id)
+            } else {
+                store.activeWorkspaceId = workspace.id
+            }
+            dismiss()
+        } label: {
+            HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                Image(systemName: workspace.projectPath == nil ? "bubble.left" : "folder")
+                    .font(.system(size: 15))
+                    .foregroundStyle(workspace.id == store.activeWorkspaceId ? palette.accent : palette.textSecondary)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workspace.displayName)
+                        .font(ClientTheme.Typography.workspaceName)
+                        .foregroundStyle(palette.textPrimary)
+                    Text(workspace.projectPath ?? Strings.text(.chatNoProjectLinked))
+                        .font(ClientTheme.Typography.sessionTitle)
+                        .foregroundStyle(palette.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+                Spacer(minLength: 0)
+                Text(String(store.sessions(in: workspace.id).count))
+                    .font(ClientTheme.Typography.caption)
+                    .foregroundStyle(palette.textSecondary)
+            }
+            .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
+            .padding(.vertical, 6)
+            .sidebarRowBackground(isSelected: workspace.id == store.activeWorkspaceId)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -516,7 +694,7 @@ private struct ChatSessionRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 8)
         .frame(height: 28)
         .sidebarRowBackground(isSelected: isActive)
     }

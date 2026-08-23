@@ -216,27 +216,47 @@ struct PetTankView: View {
     @ViewBuilder
     private func islandFill(_ shape: IslandShape) -> some View {
         if let name = background.islandArtworkName, let artwork = TankBackground.artwork(named: name) {
-            Image(nsImage: artwork)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                // Anchored to the floor: the sand and everything standing in
-                // it are the part worth seeing at this height, and the open
-                // water above crops away without losing anything.
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .overlay(Rectangle().fill(.ultraThinMaterial).opacity(0.3))
-                .overlay(alignment: .top) {
-                    LinearGradient(
-                        colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 26)
+            GeometryReader { proxy in
+                // Scaled by height, never by width: the whole scene from the
+                // water down to the sand is the picture, and a strip that
+                // filled by width showed a horizontal slice of it -- sand, or
+                // open water, depending on how tall the island was that day.
+                // The sides are allowed to run off the end instead.
+                let unit = max(proxy.size.height * Self.artworkAspect(artwork), 1)
+                // A wide island takes more than one copy. The scene is water
+                // and seabed, which repeats without an obvious seam; the
+                // alternative at this shape is a gap.
+                let copies = max(Int(ceil(proxy.size.width / unit)), 1)
+                HStack(spacing: 0) {
+                    ForEach(0..<copies, id: \.self) { _ in
+                        Image(nsImage: artwork)
+                            .resizable()
+                            .frame(width: unit, height: proxy.size.height)
+                    }
                 }
-                .clipShape(shape)
-                .overlay { shape.strokeBorder(.white.opacity(0.35), lineWidth: 1) }
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
+            }
+            .overlay(Rectangle().fill(.ultraThinMaterial).opacity(0.3))
+            .overlay(alignment: .top) {
+                LinearGradient(
+                    colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 26)
+            }
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(.white.opacity(0.35), lineWidth: 1) }
         } else {
             shape.fill(palette.background)
         }
+    }
+
+    /// How wide one copy of the artwork is per point of height. Guarded
+    /// against a zero-height image, which would make the layout divide by it.
+    private static func artworkAspect(_ image: NSImage) -> CGFloat {
+        guard image.size.height > 0 else { return 1 }
+        return image.size.width / image.size.height
     }
 
     /// Where the shoulder begins in the island's own space: just past the

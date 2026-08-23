@@ -116,13 +116,13 @@ enum L10nKey: String, CaseIterable, Hashable {
     // MARK: - Client window (PuckClient)
 
     /// Shared by more than one surface, so they cannot drift apart.
-    case commonCancel, commonDelete, commonCreate, commonChoose
+    case commonCancel, commonDelete, commonCreate, commonChoose, commonClose
     case codeBlockCopy, codeBlockCopied
 
     case chatSelectAConversation, chatNewSession, chatCasualSession, chatThisWorkspace
     case chatSettings, chatComposerPlaceholder, chatStop, chatSend
     case chatAttach, chatModel, chatEffort, chatFilterPlaceholder, chatRunning, chatVoice
-    case chatProjects, chatChatsAndTasks
+    case chatChatsAndTasks, chatWorkspaces, chatNoSessionsHere
     case chatEditor, chatAttachEditor, chatDetachEditor
     case chatAttachEditorHelp, chatDetachEditorHelp
     case tankBackgroundMenu, tankBackgroundPlain, tankBackgroundNight
@@ -399,6 +399,7 @@ enum Strings {
         .tankBackgroundSeabed: "바다 밑",
         .codeBlockCopy: "복사",
         .codeBlockCopied: "복사했어요",
+        .commonClose: "닫기",
         .commonCancel: "취소",
         .commonDelete: "삭제",
         .commonCreate: "만들기",
@@ -415,7 +416,8 @@ enum Strings {
         .chatFilterPlaceholder: "대화 찾기",
         .chatRunning: "처리 중",
         .chatVoice: "음성으로 말하기",
-        .chatProjects: "프로젝트",
+        .chatWorkspaces: "워크스페이스",
+        .chatNoSessionsHere: "아직 대화가 없어요",
         .chatChatsAndTasks: "채팅 및 작업",
         .chatModel: "모델",
         .chatEffort: "사고량",
@@ -732,6 +734,7 @@ enum Strings {
         .tankBackgroundSeabed: "Seabed",
         .codeBlockCopy: "Copy",
         .codeBlockCopied: "Copied",
+        .commonClose: "Close",
         .commonCancel: "Cancel",
         .commonDelete: "Delete",
         .commonCreate: "Create",
@@ -748,7 +751,8 @@ enum Strings {
         .chatFilterPlaceholder: "Filter chats",
         .chatRunning: "Working",
         .chatVoice: "Speak",
-        .chatProjects: "Projects",
+        .chatWorkspaces: "Workspaces",
+        .chatNoSessionsHere: "No chats yet",
         .chatChatsAndTasks: "Chats and tasks",
         .chatModel: "Model",
         .chatEffort: "Thinking",

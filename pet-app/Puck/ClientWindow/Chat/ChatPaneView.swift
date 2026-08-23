@@ -11,6 +11,7 @@
 //  bridge, and removing it removes the mirror rather than any state.
 //
 
+import AppKit
 import SwiftUI
 
 struct ChatPaneView: View {
@@ -116,7 +117,9 @@ struct ChatPaneView: View {
             Divider()
             ChatInputBar(
                 isRunning: session.isRunning,
-                onSend: { text in store.sendMessage(text, source: .text) },
+                onSend: { text, attachments in
+                    store.sendMessage(text, source: .text, attachments: attachments.isEmpty ? nil : attachments)
+                },
                 onCancel: { store.cancelActiveRun() }
             )
         }
@@ -299,54 +302,43 @@ private struct ConversationSplit<Chat: View>: View {
     }
 }
 
-/// A composer button's icon, drawn at the control height instead of at the
-/// surrounding font's icon size. `Label` sizes a glyph from the font, which
-/// left a 15pt circle beside a 32pt field -- the hit target matched, but the
-/// button read as half the field's size.
-private struct ControlGlyph: View {
-    let systemName: String
-
-    var body: some View {
-        Image(systemName: systemName)
-            .resizable()
-            .scaledToFit()
-            .frame(width: ChatInputBar.controlHeight, height: ChatInputBar.controlHeight)
-            // The whole square is the target, not just the glyph -- .plain
-            // hit-tests the image's own bounds otherwise.
-            .contentShape(.rect)
-    }
-}
-
-/// The composer. `TextField(axis: .vertical)` grows with its content and
-/// keeps the stock focus ring and text behaviours, which a custom NSTextView
-/// wrapper would have to reproduce.
+/// The composer: one box holding the message and everything sent with it.
+///
+/// It used to be a field with a round arrow button floating beside it, and
+/// the settings that shape a turn -- how much thinking, which model -- lived
+/// only behind slash commands nobody discovers. They are on the box now, in
+/// the corners where every chat app of this kind puts them: what to attach on
+/// the left, what to answer with on the right.
+///
+/// `TextField(axis: .vertical)` grows with its content and keeps the stock
+/// focus ring and text behaviours, which a custom NSTextView wrapper would
+/// have to reproduce.
 struct ChatInputBar: View {
     /// Redraws this view when the UI language changes. Needed on every
     /// view that resolves a string, not just the window root: SwiftUI
     /// skips a child whose own inputs are unchanged, and a table lookup
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
 
     let isRunning: Bool
-    let onSend: (String) -> Void
+    let onSend: (String, [Attachment]) -> Void
     let onCancel: () -> Void
 
     @State private var text = ""
+    @State private var attachments: [Attachment] = []
+    /// Read once and after every change rather than on each render: both come
+    /// off disk (a `.env` and the environment), and `body` runs on every
+    /// keystroke.
+    @State private var effort = AgentConfiguration.effort()
+    @State private var configuration = AgentConfiguration.load()
     @FocusState private var isFocused: Bool
 
-    /// One number for both controls, rather than two intrinsic heights that
-    /// happen to be close: the field's collapsed height is `minHeight` and the
-    /// button is a square of the same size, so they cannot drift apart. 32 is
-    /// the field's own single-line height at `.title3` (an 18pt line plus the
-    /// 7pt padding twice) and the standard macOS control height.
-    ///
-    /// The field grows to eight lines; the button deliberately keeps this
-    /// height and stays bottom-aligned instead of stretching. A stop/send
-    /// glyph centred in a 200pt-tall column would drift away from the caret
-    /// and from where it sat a moment earlier, and the button is a control the
-    /// pointer aims at, not a panel -- the pair only has to read as aligned at
-    /// the edge the user is typing on.
-    static let controlHeight: CGFloat = 32
+    /// The height of the small controls along the bottom of the box, and of
+    /// the stop button. 22 rather than the 32 the old free-standing send
+    /// button used: these sit inside the box now, and a row of 32pt controls
+    /// under the text makes the composer taller than the message.
+    static let controlHeight: CGFloat = 22
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -366,7 +358,6 @@ struct ChatInputBar: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .buttonStyle(.plain)
-        .font(.title3)
         .onAppear { isFocused = true }
     }
 
@@ -377,46 +368,167 @@ struct ChatInputBar: View {
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
+            if !attachments.isEmpty { attachmentRow }
             TextField(Strings.text(.chatComposerPlaceholder), text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
+                .font(.title3)
                 .lineLimit(1...8)
                 .focused($isFocused)
+                // Return sends. There is no button to press instead, which is
+                // the point: the arrow was a control the eye had to find for
+                // something the hand was already doing.
                 .onSubmit(send)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .frame(minHeight: Self.controlHeight)
-                // A field the pointer can find. Bare text on the window looked
-                // like a label until you happened to click it.
-                .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(isFocused ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator), lineWidth: 1)
-                )
-
-            if isRunning {
-                Button(role: .cancel, action: onCancel) {
-                    ControlGlyph(systemName: "stop.circle.fill")
-                }
-                .accessibilityLabel(Strings.text(.chatStop))
-                .help(Strings.text(.chatStop))
-            } else {
-                Button(action: send) {
-                    ControlGlyph(systemName: "arrow.up.circle.fill")
-                }
-                .disabled(trimmed.isEmpty)
-                .accessibilityLabel(Strings.text(.chatSend))
-                .help(Strings.text(.chatSend))
-            }
+            controlRow
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(isFocused ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator), lineWidth: 1)
+        )
+    }
+
+    /// What is going with the message, above the text it belongs to.
+    private var attachmentRow: some View {
+        HStack(spacing: 4) {
+            ForEach(attachments, id: \.path) { attachment in
+                HStack(spacing: 4) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 9))
+                    Text((attachment.path as NSString).lastPathComponent)
+                        .font(ClientTheme.Typography.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Button {
+                        attachments.removeAll { $0.path == attachment.path }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .foregroundStyle(palette.textSecondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var controlRow: some View {
+        HStack(spacing: 6) {
+            attachButton
+            Spacer(minLength: 0)
+            modelMenu
+            effortMenu
+            if isRunning { stopButton }
+        }
+        .font(ClientTheme.Typography.caption)
+        .foregroundStyle(palette.textSecondary)
+    }
+
+    /// Images only: an attachment travels as `type: "image"` on the wire, and
+    /// offering a picker that accepts anything would promise more than the
+    /// protocol carries.
+    private var attachButton: some View {
+        Button(action: chooseAttachment) {
+            Image(systemName: "plus")
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: Self.controlHeight, height: Self.controlHeight)
+                .contentShape(.rect)
+        }
+        .accessibilityLabel(Strings.text(.chatAttach))
+        .help(Strings.text(.chatAttach))
+    }
+
+    /// The same `/model` the chat already understands, so there is one path
+    /// that writes this setting and one that reports it. Disabled where the
+    /// model is not ours to pick: the coding CLI chooses its own, and a menu
+    /// offering names it ignores would be a lie.
+    private var modelMenu: some View {
+        Menu {
+            ForEach(
+                AgentProvider.selectableModels(for: configuration.provider, configured: configuration.model),
+                id: \.self
+            ) { model in
+                Button(model) { run("/model \(model)") }
+            }
+        } label: {
+            menuLabel(configuration.provider.supportsModelSelection ? configuration.model : configuration.provider.displayName)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(!configuration.provider.supportsModelSelection)
+        .help(Strings.text(.chatModel))
+    }
+
+    private var effortMenu: some View {
+        Menu {
+            ForEach(AgentEffort.allCases) { level in
+                Button(level.displayName) { run("/effort \(level.rawValue)") }
+            }
+        } label: {
+            menuLabel(effort.displayName)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(Strings.text(.chatEffort))
+    }
+
+    private func menuLabel(_ title: String) -> some View {
+        Text(title)
+            .font(ClientTheme.Typography.caption)
+            .padding(.horizontal, 6)
+            .frame(height: Self.controlHeight)
+            .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
+    }
+
+    private var stopButton: some View {
+        Button(role: .cancel, action: onCancel) {
+            Image(systemName: "stop.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: Self.controlHeight, height: Self.controlHeight)
+                .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
+                .contentShape(.rect)
+        }
+        .accessibilityLabel(Strings.text(.chatStop))
+        .help(Strings.text(.chatStop))
+    }
+
+    /// Sends a slash command as if it had been typed, then re-reads what it
+    /// wrote -- the runner reports the value it read back, and so does this.
+    private func run(_ command: String) {
+        onSend(command, [])
+        effort = AgentConfiguration.effort()
+        configuration = AgentConfiguration.load()
+    }
+
+    private func chooseAttachment() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.image]
+        guard panel.runModal() == .OK else { return }
+        let chosen = panel.urls.map { Attachment(path: $0.path) }
+        // No duplicates: picking the same file twice sends it twice.
+        attachments += chosen.filter { candidate in !attachments.contains { $0.path == candidate.path } }
+        isFocused = true
     }
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private func send() {
-        guard !trimmed.isEmpty else { return }
-        onSend(trimmed)
+        // An attachment on its own is a message: "look at this" with the
+        // picture doing the talking.
+        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
+        onSend(trimmed, attachments)
         text = ""
+        attachments = []
     }
 }
 

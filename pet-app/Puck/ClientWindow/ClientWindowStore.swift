@@ -419,9 +419,15 @@ final class ClientWindowStore: ObservableObject {
         // gone for good. Unconditional, unlike markWaitingForAgent below: a
         // message that did not leave still has to be visible to the person who
         // typed it, and the echo has no answer to wait for.
-        target?.appendUserMessage(text)
+        // The in-process agent has no attachment channel -- ACP takes a
+        // prompt, and `onUserCommand` is a string. Rather than drop the
+        // pictures the user just attached, their paths go into the message,
+        // where the agent's own file tools can reach them. The socket path
+        // below carries them as attachments, which is what it is for.
+        let carried = Self.message(text, carrying: onUserCommand == nil ? [] : (attachments ?? []))
+        target?.appendUserMessage(carried)
         if let onUserCommand {
-            onUserCommand(text, activeWorkspaceId, activeSessionId)
+            onUserCommand(carried, activeWorkspaceId, activeSessionId)
             target?.markWaitingForAgent()
             // Not `.notDelivered`: the agent is right here, so the
             // offline banner would be a lie even though no
@@ -437,6 +443,15 @@ final class ClientWindowStore: ObservableObject {
         )
         if delivery == .sent { target?.markWaitingForAgent() }
         return delivery
+    }
+
+    /// `text` with the attached files named after it, or unchanged when
+    /// there are none. One blank line between, so a long message and its
+    /// attachments do not run together.
+    static func message(_ text: String, carrying attachments: [Attachment]) -> String {
+        guard !attachments.isEmpty else { return text }
+        let lines = attachments.map { "Attached file: \($0.path)" }.joined(separator: "\n")
+        return text.isEmpty ? lines : text + "\n\n" + lines
     }
 
     /// Shows text the user typed *somewhere else* (pet-app's quick-capture

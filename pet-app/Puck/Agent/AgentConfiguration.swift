@@ -454,6 +454,22 @@ enum AgentProvider: String, CaseIterable {
     static func resolved(fromRawValue raw: String?) -> AgentProvider {
         raw.flatMap(AgentProvider.init(rawValue:)) ?? AgentProvider.fallback
     }
+
+    /// What the composer's model menu offers: this provider's default, and
+    /// whatever is configured now if that is something else.
+    ///
+    /// Deliberately not a catalogue of every model a vendor sells. That list
+    /// is stale the week it is written, and `/model <name>` already takes any
+    /// name at all -- this menu exists to show what is in use and to get back
+    /// to the default, not to be the only way to change it.
+    static func selectableModels(for provider: AgentProvider, configured: String? = nil) -> [String] {
+        guard provider.supportsModelSelection else { return [] }
+        var models = [provider.defaultModel]
+        if let configured, !configured.isEmpty, !models.contains(configured) {
+            models.append(configured)
+        }
+        return models
+    }
 }
 private extension String {
     /// A key pasted into a file almost always arrives with surrounding

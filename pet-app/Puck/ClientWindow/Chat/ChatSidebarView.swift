@@ -39,12 +39,16 @@ struct ChatSidebarView: View {
     /// answered. Deleting a chat throws away everything said in it and there
     /// is no undo, so the menu item asks rather than acts.
     @State private var pendingDeletion: SessionSelection?
+    /// What is typed into the filter field. Not remembered across launches:
+    /// a filter left on from yesterday is a sidebar that looks empty for no
+    /// visible reason.
+    @State private var filter = ""
 
     var body: some View {
         List(selection: selection) {
-            ForEach(store.workspaces) { workspace in
+            ForEach(visibleWorkspaces) { workspace in
                 Section {
-                    ForEach(store.sessions(in: workspace.id)) { session in
+                    ForEach(sessions(in: workspace)) { session in
                         ChatSessionRow(session: session)
                             .tag(SessionSelection(workspaceId: workspace.id, sessionId: session.id))
                             .contextMenu {
@@ -64,6 +68,7 @@ struct ChatSidebarView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .top) { filterField }
         .task(id: store.workspaces.map(\.id).joined()) {
             await branches.reload(projects: projectsByWorkspace)
         }
@@ -107,6 +112,54 @@ struct ChatSidebarView: View {
         } message: { _ in
             Text(Strings.text(.chatDeleteSessionMessage))
         }
+    }
+
+    /// A row of its own above the list, the way Mail and Notes put it. Not
+    /// `.searchable`, which on macOS moves the field into the toolbar --
+    /// where it would be filtering a list it no longer sits above, and would
+    /// share the bar with the chat's own controls.
+    private var filterField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 10))
+                .foregroundStyle(palette.textSecondary)
+            TextField(Strings.text(.chatFilterPlaceholder), text: $filter)
+                .textFieldStyle(.plain)
+                .font(ClientTheme.Typography.sessionTitle)
+            if !filter.isEmpty {
+                Button {
+                    filter = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(palette.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 24)
+        .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 6)
+        .background(palette.background)
+    }
+
+    /// Workspaces with something left to show. A workspace whose own name
+    /// answers the filter keeps all of its chats; otherwise it is here only
+    /// if one of its chats answers it.
+    private var visibleWorkspaces: [ClientWorkspace] {
+        guard SidebarFilter.isActive(filter) else { return store.workspaces }
+        return store.workspaces.filter { !sessions(in: $0).isEmpty }
+    }
+
+    private func sessions(in workspace: ClientWorkspace) -> [ChatSession] {
+        let all = store.sessions(in: workspace.id)
+        guard SidebarFilter.isActive(filter) else { return all }
+        if SidebarFilter.matchesWorkspace(filter, name: workspace.displayName, projectPath: workspace.projectPath) {
+            return all
+        }
+        return all.filter { SidebarFilter.matchesSession(filter, title: $0.displayTitle) }
     }
 
     private func branch(for workspace: ClientWorkspace) -> String? {

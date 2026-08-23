@@ -11,6 +11,7 @@
 //  with it instead of asking for them to be rebuilt.
 //
 
+import AppKit
 import SwiftUI
 
 struct ChatSidebarView: View {
@@ -46,29 +47,58 @@ struct ChatSidebarView: View {
 
     var body: some View {
         List(selection: selection) {
-            ForEach(visibleWorkspaces) { workspace in
-                Section {
-                    ForEach(sessions(in: workspace)) { session in
-                        ChatSessionRow(session: session)
-                            .tag(SessionSelection(workspaceId: workspace.id, sessionId: session.id))
-                            .contextMenu {
-                                // Right-click on the row rather than a visible
-                                // button: destructive, rarely wanted, and a
-                                // trash icon on every row is a mis-click
-                                // waiting to happen in a list you navigate by
-                                // clicking.
-                                Button(Strings.text(.commonDelete), role: .destructive) {
-                                    pendingDeletion = SessionSelection(workspaceId: workspace.id, sessionId: session.id)
-                                }
-                                .disabled(!store.canDeleteSession(workspaceId: workspace.id, sessionId: session.id))
-                            }
+            // Three groups, top to bottom: what you can start, which project
+            // you are in, and the chats inside it. Taken from the reference
+            // -- the old shape was one section per workspace with its chats
+            // under it, which buried the project you are actually in among
+            // the ones you are not.
+            Section { actionRows }
+            Section {
+                ForEach(visibleWorkspaces) { workspace in
+                    WorkspaceRow(
+                        workspace: workspace,
+                        branch: branch(for: workspace),
+                        isActive: workspace.id == store.activeWorkspaceId,
+                        isWorking: store.sessions(in: workspace.id).contains { $0.isRunning },
+                        onSelect: { select(workspace) }
+                    )
+                }
+            } header: {
+                sectionHeader(Strings.text(.chatProjects)) {
+                    Button { isAddingWorkspace = true } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .medium))
+                            .contentShape(.rect)
                     }
-                } header: {
-                    WorkspaceHeader(workspace: workspace, branch: branch(for: workspace))
+                    .buttonStyle(.plain)
+                    .help(Strings.text(.chatNewWorkspace))
                 }
             }
+            Section {
+                ForEach(activeSessions) { session in
+                    ChatSessionRow(session: session)
+                        .tag(SessionSelection(workspaceId: store.activeWorkspaceId, sessionId: session.id))
+                        .contextMenu {
+                            // Right-click on the row rather than a visible
+                            // button: destructive, rarely wanted, and a
+                            // trash icon on every row is a mis-click waiting
+                            // to happen in a list you navigate by clicking.
+                            Button(Strings.text(.commonDelete), role: .destructive) {
+                                pendingDeletion = SessionSelection(
+                                    workspaceId: store.activeWorkspaceId,
+                                    sessionId: session.id
+                                )
+                            }
+                            .disabled(!store.canDeleteSession(
+                                workspaceId: store.activeWorkspaceId,
+                                sessionId: session.id
+                            ))
+                        }
+                }
+            } header: {
+                sectionHeader(Strings.text(.chatChatsAndTasks)) { EmptyView() }
+            }
         }
-        .safeAreaInset(edge: .top) { filterField }
         .task(id: store.workspaces.map(\.id).joined()) {
             await branches.reload(projects: projectsByWorkspace)
         }
@@ -79,24 +109,6 @@ struct ChatSidebarView: View {
         // with the same ground the island uses, so the two agree.
         .scrollContentBackground(.hidden)
         .background(palette.background)
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 0) {
-                Divider()
-                Button {
-                    isAddingWorkspace = true
-                } label: {
-                    Label(Strings.text(.chatNewWorkspace), systemImage: "plus.circle")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.borderless)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-            }
-            // Sits on the sidebar material rather than floating over the list,
-            // so the scrolling content passes behind a real edge.
-            .background(.bar)
-        }
         .sheet(isPresented: $isAddingWorkspace) {
             NewWorkspaceSheet(store: store)
         }
@@ -114,6 +126,64 @@ struct ChatSidebarView: View {
         }
     }
 
+    /// What can be started from here, above everything that already exists.
+    /// The toolbar has ⌘N too, but a sidebar whose first row is "새 대화" is
+    /// how every app of this shape opens -- and the toolbar's version is a
+    /// glyph you have to already know.
+    @ViewBuilder
+    private var actionRows: some View {
+        SidebarActionRow(
+            title: Strings.text(.chatNewSession),
+            systemImage: "square.and.pencil"
+        ) {
+            store.requestNewSession(title: ChatSession.placeholderTitle, in: store.activeWorkspaceId)
+        }
+        SidebarActionRow(
+            title: Strings.text(.chatNewWorkspace),
+            systemImage: "folder.badge.plus"
+        ) {
+            isAddingWorkspace = true
+        }
+        SidebarActionRow(title: Strings.text(.chatSettings), systemImage: "gearshape") {
+            NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
+        }
+    }
+
+    /// A group's name, with whatever acts on the group at its trailing edge.
+    private func sectionHeader<Trailing: View>(
+        _ title: String,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .font(ClientTheme.Typography.sessionTitle)
+                .foregroundStyle(palette.textSecondary)
+            Spacer(minLength: 0)
+            trailing()
+                .foregroundStyle(palette.textSecondary)
+        }
+        .textCase(nil)
+        .padding(.top, 4)
+    }
+
+    /// The chats of the workspace being looked at. The list used to hold
+    /// every workspace's at once, one section each; a project's chats belong
+    /// to the project, and the row above says which one that is.
+    private var activeSessions: [ChatSession] {
+        guard let workspace = store.workspaces.first(where: { $0.id == store.activeWorkspaceId }) else { return [] }
+        return sessions(in: workspace)
+    }
+
+    /// Switching project keeps you in a chat: its own most recent one, or a
+    /// new one if it has none.
+    private func select(_ workspace: ClientWorkspace) {
+        guard let session = store.sessions(in: workspace.id).first else {
+            store.activeWorkspaceId = workspace.id
+            return
+        }
+        store.selectSession(workspaceId: workspace.id, sessionId: session.id)
+    }
+
     /// A row of its own above the list, the way Mail and Notes put it. Not
     /// `.searchable`, which on macOS moves the field into the toolbar --
     /// where it would be filtering a list it no longer sits above, and would
@@ -121,11 +191,11 @@ struct ChatSidebarView: View {
     private var filterField: some View {
         HStack(spacing: 5) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 10))
+                .font(.system(size: 12))
                 .foregroundStyle(palette.textSecondary)
             TextField(Strings.text(.chatFilterPlaceholder), text: $filter)
                 .textFieldStyle(.plain)
-                .font(ClientTheme.Typography.sessionTitle)
+                .font(ClientTheme.Typography.workspaceName)
             if !filter.isEmpty {
                 Button {
                     filter = ""
@@ -138,7 +208,7 @@ struct ChatSidebarView: View {
             }
         }
         .padding(.horizontal, 8)
-        .frame(height: 24)
+        .frame(height: 28)
         .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
@@ -192,65 +262,102 @@ struct SessionSelection: Hashable {
     let sessionId: String
 }
 
-private struct WorkspaceHeader: View {
+/// One of the things this sidebar can start. Flat, full-width and the same
+/// height as every other row here, which is what makes the top of the list
+/// read as a group rather than as three loose buttons.
+private struct SidebarActionRow: View {
+    @Environment(\.clientPalette) private var palette
+
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13))
+                    .frame(width: 16)
+                Text(title)
+                    .font(ClientTheme.Typography.workspaceName)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(palette.textPrimary)
+            .frame(height: 26)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// One project. Selecting it moves the whole window -- the chats below, the
+/// files on the right, the branch in the footer -- so it is a row you press
+/// rather than a header over a group.
+private struct WorkspaceRow: View {
     /// Redraws this view when the UI language changes. Needed on every
     /// view that resolves a string, not just the window root: SwiftUI
     /// skips a child whose own inputs are unchanged, and a table lookup
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
 
     let workspace: ClientWorkspace
     /// nil when the workspace has no project, when it is not a repository, or
     /// when HEAD is detached -- none of which is a branch name.
     let branch: String?
+    let isActive: Bool
+    /// Whether any chat in it is mid-turn. The one thing about a project you
+    /// are *not* looking at that is worth a row of its own saying.
+    let isWorking: Bool
+    let onSelect: () -> Void
 
-    // No new-chat button here. It lived in this header so it could name its
-    // own workspace, but a section header styles its contents as small
-    // secondary text, so it read as a stray glyph in the corner. The toolbar's
-    // 새 대화 (⌘N) acts on the workspace being looked at, which is what the
-    // action means nearly every time; switching first is the cost, and it is
-    // smaller than a control nobody finds.
     var body: some View {
-        name
-    }
-
-    private var name: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            // Sized explicitly rather than inherited: a sidebar section
-            // header styles its contents as small secondary text, so a
-            // workspace's name arrived already shrunk and anything under it
-            // was smaller still.
-            Text(workspace.displayName)
-                .font(ClientTheme.Typography.workspaceName)
-                .foregroundStyle(.primary)
-            if workspace.projectLabel != nil || branch != nil {
-                HStack(spacing: 5) {
-                    if let label = workspace.projectLabel {
-                        Text(label)
+        Button(action: onSelect) {
+            HStack(spacing: 8) {
+                Image(systemName: workspace.projectPath == nil ? "bubble.left" : "folder")
+                    .font(.system(size: 13))
+                    .frame(width: 16)
+                    .foregroundStyle(isActive ? palette.accent : palette.textSecondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(workspace.displayName)
+                        .font(ClientTheme.Typography.workspaceName)
+                        .foregroundStyle(palette.textPrimary)
+                        .lineLimit(1)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(ClientTheme.Typography.sessionTitle)
+                            .foregroundStyle(palette.textSecondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
-                            // The whole path on hover, since the label is two
-                            // components of it.
-                            .help(workspace.projectPath ?? "")
-                    }
-                    if let branch {
-                        // The branch belongs next to the project, not in the
-                        // footer alone: the sidebar is where you pick which
-                        // project to talk about, and which branch it is on is
-                        // half of what that choice means.
-                        Label(branch, systemImage: "arrow.triangle.branch")
-                            .labelStyle(.titleAndIcon)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .help(branch)
                     }
                 }
-                .font(ClientTheme.Typography.sessionTitle)
-                .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                if isWorking {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.6)
+                        .frame(width: 12, height: 12)
+                        .help(Strings.text(.chatRunning))
+                }
             }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius)
+                    .fill(isActive ? palette.surface : .clear)
+            )
+            .contentShape(.rect)
         }
-        .padding(.vertical, 2)
-        .textCase(nil)
+        .buttonStyle(.plain)
+        .help(workspace.projectPath ?? workspace.displayName)
+    }
+
+    /// The project and the branch on one line: the sidebar is where you pick
+    /// which project to talk about, and which branch it is on is half of what
+    /// that choice means.
+    private var subtitle: String? {
+        let parts = [workspace.projectLabel, branch].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 
@@ -286,12 +393,13 @@ private struct ChatSessionRow: View {
             }
             .frame(width: 12, height: 12)
             Text(session.displayTitle)
+                .font(ClientTheme.Typography.workspaceName)
                 .lineLimit(1)
             Spacer(minLength: 4)
             let relative = RelativeTime.short(since: session.lastActivityAt)
             if !relative.isEmpty {
                 Text(relative)
-                    .font(.caption)
+                    .font(ClientTheme.Typography.sessionTitle)
                     .foregroundStyle(.secondary)
             }
         }

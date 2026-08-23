@@ -52,6 +52,14 @@ final class FocusModeObserver {
         }
     }
 
+    /// A block observer is kept by the notification centre, not by this
+    /// object, so one that is simply dropped goes on being registered and
+    /// firing into a closure whose `self` is gone. Same reason
+    /// WindowListWatcher and ClickDetector stop themselves.
+    deinit {
+        stopObserving()
+    }
+
     func stopObserving() {
         if let observerToken {
             center.removeObserver(observerToken)

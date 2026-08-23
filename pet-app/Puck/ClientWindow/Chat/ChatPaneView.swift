@@ -42,7 +42,7 @@ struct ChatPaneView: View {
     /// the column is what it opens: a shortcut that only exists once the
     /// column is showing cannot be the way you show it -- with the column
     /// closed the key press fell through to the composer as a stray backtick.
-    @AppStorage("Puck.terminalOpen") private var isTerminalOpen = false
+    @AppStorage(TerminalSection.openStorageKey) private var isTerminalOpen = false
 
     var body: some View {
         NavigationSplitView {
@@ -233,7 +233,7 @@ private struct ConversationSplit<Chat: View>: View {
     /// CodeSplitView because it has to be reachable with no file open: the
     /// terminal used to live inside the code column, so asking for one before
     /// opening a file toggled a setting and showed nothing.
-    @AppStorage("Puck.terminalOpen") private var isTerminalOpen = false
+    @AppStorage(TerminalSection.openStorageKey) private var isTerminalOpen = false
 
     /// Put away rather than closed. The tab stays open, so coming back to the
     /// file does not mean finding it again -- and opening another one from

@@ -26,7 +26,7 @@ struct TerminalSection: View {
     /// Dragged from the header, and remembered across launches like the
     /// island's height is. Clamped on read, so a value written by a version
     /// with different limits cannot leave a terminal too short to read.
-    @AppStorage("Puck.terminalHeight") private var storedHeight = Double(defaultHeight)
+    @AppStorage(TerminalSection.heightStorageKey) private var storedHeight = Double(defaultHeight)
     @State private var heightAtDragStart: CGFloat?
     /// Bumped to start a new shell in place of one that exited. The view is
     /// keyed on it, which is what makes SwiftUI build a fresh terminal rather
@@ -46,6 +46,14 @@ struct TerminalSection: View {
     /// A shell that lasted less than this never really started.
     static let earlyExitSeconds: TimeInterval = 2
     static let earlyExitLimit = 3
+
+    /// Written from three views -- the strip's button, the split that draws
+    /// the terminal, and the window's toolbar toggle -- so the key is spelled
+    /// once. Three string literals is three chances to desync a toggle from
+    /// the thing it toggles, and the symptom is a button that appears to do
+    /// nothing.
+    static let openStorageKey = "Puck.terminalOpen"
+    static let heightStorageKey = "Puck.terminalHeight"
 
     static let defaultHeight: CGFloat = 220
     static let minimumHeight: CGFloat = 90

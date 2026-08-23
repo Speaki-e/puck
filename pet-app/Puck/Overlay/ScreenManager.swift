@@ -35,6 +35,12 @@ final class ScreenManager {
         }
     }
 
+    /// Same as FocusModeObserver's: the notification centre keeps the block,
+    /// so dropping this object is not the same as stopping it.
+    deinit {
+        stopObserving()
+    }
+
     func stopObserving() {
         if let observer {
             NotificationCenter.default.removeObserver(observer)

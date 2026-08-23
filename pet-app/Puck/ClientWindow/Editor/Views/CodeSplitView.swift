@@ -35,7 +35,7 @@ struct CodeSplitView: View {
     /// Only the button lives here; the terminal itself is drawn by
     /// ConversationSplit, one level up, so that it can be opened with no file
     /// open at all.
-    @AppStorage("Puck.terminalOpen") private var isTerminalOpen = false
+    @AppStorage(TerminalSection.openStorageKey) private var isTerminalOpen = false
 
     var body: some View {
         VStack(spacing: 0) {

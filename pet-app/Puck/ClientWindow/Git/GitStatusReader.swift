@@ -38,7 +38,18 @@ enum GitStatusReader {
 
     static func read(projectPath: String) -> GitStatus? {
         guard let git = executable() else { return nil }
-        guard let status = run(git, ["-C", projectPath, "status", "--porcelain=v2", "--branch"]) else { return nil }
+        // `status.relativePaths=false` is not decoration. Run from a
+        // subdirectory, git answers in paths relative to *that* directory --
+        // `Sources/a.txt`, `../docs/readme.md` -- and whether it does depends
+        // on a setting the user can change. Pinned off, the answer is always
+        // relative to the repository root, which is the one thing `reroot`
+        // below can turn into a workspace-relative path deterministically.
+        guard let status = run(
+            git,
+            ["-C", projectPath, "-c", "status.relativePaths=false", "status", "--porcelain=v2", "--branch"]
+        ) else {
+            return nil
+        }
         let numstat = run(git, ["-C", projectPath, "diff", "--numstat", "HEAD"]) ?? ""
         let parsed = GitStatusParser.parse(status: status, numstat: numstat)
         // git answers in paths relative to the repository root; everything

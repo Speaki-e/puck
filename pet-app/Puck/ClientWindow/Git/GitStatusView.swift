@@ -13,6 +13,17 @@ import SwiftUI
 
 @MainActor
 final class GitStatusModel: ObservableObject {
+    /// How a status is read. Injectable so the coalescing below can be tested
+    /// without a repository and without forking git -- the rule it enforces
+    /// is about overlapping calls, not about what git says.
+    private let read: (String) async -> GitStatus?
+
+    init(read: @escaping (String) async -> GitStatus? = { path in
+        await Task.detached(priority: .utility) { GitStatusReader.read(projectPath: path) }.value
+    }) {
+        self.read = read
+    }
+
     @Published private(set) var status: GitStatus?
     @Published private(set) var isLoading = false
     /// Distinguishes "not a repository" from "not looked yet", which read the
@@ -41,7 +52,7 @@ final class GitStatusModel: ObservableObject {
         isLoading = true
         repeat {
             wantsAnotherRead = false
-            status = await Task.detached(priority: .utility) { GitStatusReader.read(projectPath: projectPath) }.value
+            status = await read(projectPath)
         } while wantsAnotherRead
         hasLoaded = true
         isLoading = false

@@ -461,7 +461,8 @@ final class AgentHost {
         runner.sessionId = sessionId
         // Before the run, not at init: which workspace is active changes
         // between turns, and the runner only re-announces it when it differs.
-        runner.workspaceContext = describeWorkspace(workspaceId)
+        let workspaceContext = describeWorkspace(workspaceId)
+        runner.workspaceContext = workspaceContext
         let thisRun = stateQueue.sync {
             runGeneration += 1
             return runGeneration
@@ -469,7 +470,11 @@ final class AgentHost {
 
         activeRun.start { [weak self] in
             guard let self else { return }
-            await self.runner.run(command: command)
+            // Both named rather than left to the runner to read: setting the
+            // properties above and starting this Task are two steps, and a
+            // command submitted in between would move them before this body
+            // ever ran.
+            await self.runner.run(command: command, session: sessionId, workspace: workspaceContext)
             // Backstop for the invariant: every approvalId handed to the UI is
             // answered or explicitly failed. By the time the run returns
             // nothing legitimate is still awaiting one -- anything left is an

@@ -324,12 +324,23 @@ final class AgentRunner {
     /// never goes through the `catch` path that reports a reason.
     static var cancelledSummary: String { Strings.text(.agentCancelled) }
 
-    func run(command: String) async {
+    /// - Parameters:
+    ///   - session: the chat this run belongs to, and every event it emits is
+    ///     addressed to. Passed by the host rather than read from `sessionId`
+    ///     here: the host sets the property and then *starts a Task*, so a
+    ///     second command submitted before this body first runs would have
+    ///     already moved the property, and this run would write its whole
+    ///     answer into the newer run's chat. Defaults to the property for the
+    ///     call sites -- the tests, mostly -- that only ever have one run.
+    ///   - workspace: which project this run's tools answer from, captured at
+    ///     the same moment and for the same reason.
+    func run(command: String, session: String? = nil, workspace: WorkspaceContext? = nil) async {
         // Captured once. Everything this run writes goes here even if a newer
         // run has already pointed `sessionId` somewhere else.
-        var key = sessionId
-        if let workspaceContext, markAnnounced(workspaceContext, to: key) {
-            append(.system(workspaceContext.promptLine), to: key)
+        var key = session ?? sessionId
+        let context = workspace ?? workspaceContext
+        if let context, markAnnounced(context, to: key) {
+            append(.system(context.promptLine), to: key)
         }
         append(.user(command), to: key)
         trimConversation(key)

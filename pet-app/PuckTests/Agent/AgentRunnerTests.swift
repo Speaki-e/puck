@@ -674,4 +674,62 @@ final class AgentRunnerTests: XCTestCase {
         }
         XCTAssertTrue(toolEntries.isEmpty)
     }
+    // MARK: - A run keeps the chat it was started for
+
+    /// AgentHost sets `sessionId` and then starts a Task; those are two steps,
+    /// and a second command submitted in between moves the property before the
+    /// first run's body has read it. The run then wrote its whole answer --
+    /// the user's message, the model's reply, agent_done -- into the chat that
+    /// replaced it. Naming the session at the call closes that window.
+    func test_aRunAddressesTheChatItWasStartedFor_evenIfTheRunnerMovesFirst() async {
+        let events = EventLog()
+        let runner = AgentRunner(
+            client: RecordingLLMClient(),
+            dispatcher: PetToolDispatcher(send: { _ in false }),
+            approve: { _, _ in false },
+            emit: { event, session in events.append(event, session) }
+        )
+        runner.sessionId = "chat-1"
+
+        let run = Task { await runner.run(command: "첫 질문", session: "chat-1") }
+        // What the host's next submission does before this run's body runs.
+        runner.sessionId = "chat-2"
+        await run.value
+
+        XCTAssertEqual(Set(events.sessions), ["chat-1"])
+    }
+
+    /// The same window for the workspace line: a run that read it late would
+    /// tell the model it is in the project the *next* command chose.
+    func test_aRunAnnouncesTheWorkspaceItWasStartedIn() async {
+        let (runner, client) = makeRecordingRunner()
+        runner.workspaceContext = AgentRunner.WorkspaceContext(name: "첫", projectPath: "/tmp/first")
+
+        let started = AgentRunner.WorkspaceContext(name: "첫", projectPath: "/tmp/first")
+        let run = Task { await runner.run(command: "여기 뭐 있어?", session: "chat-1", workspace: started) }
+        runner.workspaceContext = AgentRunner.WorkspaceContext(name: "둘", projectPath: "/tmp/second")
+        await run.value
+
+        XCTAssertTrue(client.lastSystemTexts.contains { $0.contains("/tmp/first") })
+        XCTAssertFalse(client.lastSystemTexts.contains { $0.contains("/tmp/second") })
+    }
+
+    /// Collects (event, session) pairs from whichever executor the run
+    /// resumes on.
+    private final class EventLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var pairs: [(BridgeEvent, String)] = []
+
+        func append(_ event: BridgeEvent, _ session: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            pairs.append((event, session))
+        }
+
+        var sessions: [String] {
+            lock.lock()
+            defer { lock.unlock() }
+            return pairs.map(\.1)
+        }
+    }
 }

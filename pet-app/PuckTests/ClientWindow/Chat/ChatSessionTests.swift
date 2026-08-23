@@ -458,4 +458,54 @@ final class ChatSessionTests: XCTestCase {
         XCTAssertEqual(session.pendingApprovals.count, 1)
         XCTAssertEqual(session.timeline.filter { if case .approvalRequested = $0 { return true } else { return false } }.count, 1)
     }
+    // MARK: - Every default name is replaced by what was said
+
+    /// The always-present chat used to keep its name for good, so every
+    /// workspace had a row called the same thing and the sidebar told you
+    /// nothing about which was which.
+    func test_theCasualChatIsNamedByItsFirstMessage() {
+        let session = ChatSession(
+            id: "default",
+            workspaceId: "w1",
+            title: ChatSession.casualTitle,
+            origin: .user
+        )
+
+        session.appendUserMessage("섬 어깨 높이 좀 봐줘")
+
+        XCTAssertEqual(session.title, "섬 어깨 높이 좀 봐줘")
+    }
+
+    func test_aSessionCreatedWithNoName_isNamedByItsFirstMessage() {
+        let session = ChatSession(
+            id: "s1",
+            workspaceId: "w1",
+            title: ChatSession.untitledTitle,
+            origin: .user
+        )
+
+        session.appendUserMessage("빌드가 왜 깨졌지")
+
+        XCTAssertEqual(session.title, "빌드가 왜 깨졌지")
+    }
+
+    /// A name the agent chose is not a default, and is left alone.
+    func test_anAgentNamedSessionKeepsItsName() {
+        let session = ChatSession(id: "s2", workspaceId: "w1", title: "섬 모양 다듬기", origin: .agent)
+
+        session.appendUserMessage("이어서 하자")
+
+        XCTAssertEqual(session.title, "섬 모양 다듬기")
+    }
+
+    /// And once a chat has earned a name, the second message does not
+    /// rename it.
+    func test_theSecondMessageDoesNotRenameIt() {
+        let session = ChatSession(id: "s3", workspaceId: "w1", title: ChatSession.placeholderTitle, origin: .user)
+
+        session.appendUserMessage("첫 질문")
+        session.appendUserMessage("두 번째 질문")
+
+        XCTAssertEqual(session.title, "첫 질문")
+    }
 }

@@ -221,6 +221,11 @@ enum BridgeMessage: Equatable {
     case workspaceCreateRequest(name: String, projectPath: String?)
     /// workspace -> pet-app: confirms a workspace now exists.
     case workspaceCreate(workspaceId: String, name: String, projectPath: String?)
+    /// PuckClient -> pet-app: throw a workspace away (2026-08-24). The
+    /// registry lives in pet-app, so the window asks rather than deletes.
+    case workspaceDeleteRequest(workspaceId: String)
+    /// pet-app -> PuckClient: it is gone, take it out of the sidebar.
+    case workspaceDelete(workspaceId: String)
     /// pet-app -> workspace: request a new chat session under a workspace.
     /// Confirmed by sessionCreate, which assigns sessionId.
     case sessionCreateRequest(workspaceId: String, title: String)
@@ -270,6 +275,8 @@ extension BridgeMessage: Codable {
         case voiceListening = "voice_listening"
         case workspaceCreateRequest = "workspace_create_request"
         case workspaceCreate = "workspace_create"
+        case workspaceDeleteRequest = "workspace_delete_request"
+        case workspaceDelete = "workspace_delete"
         case sessionCreateRequest = "session_create_request"
         case sessionCreate = "session_create"
     }
@@ -401,6 +408,12 @@ extension BridgeMessage: Codable {
                 projectPath: try container.decodeIfPresent(String.self, forKey: .projectPath)
             )
 
+        case .workspaceDeleteRequest:
+            self = .workspaceDeleteRequest(workspaceId: try container.decode(String.self, forKey: .workspaceId))
+
+        case .workspaceDelete:
+            self = .workspaceDelete(workspaceId: try container.decode(String.self, forKey: .workspaceId))
+
         case .workspaceCreate:
             self = .workspaceCreate(
                 workspaceId: try container.decode(String.self, forKey: .workspaceId),
@@ -511,6 +524,14 @@ extension BridgeMessage: Codable {
             try container.encode(TypeKey.workspaceCreateRequest, forKey: .type)
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(projectPath, forKey: .projectPath)
+
+        case .workspaceDeleteRequest(let workspaceId):
+            try container.encode(TypeKey.workspaceDeleteRequest, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
+
+        case .workspaceDelete(let workspaceId):
+            try container.encode(TypeKey.workspaceDelete, forKey: .type)
+            try container.encode(workspaceId, forKey: .workspaceId)
 
         case .workspaceCreate(let workspaceId, let name, let projectPath):
             try container.encode(TypeKey.workspaceCreate, forKey: .type)

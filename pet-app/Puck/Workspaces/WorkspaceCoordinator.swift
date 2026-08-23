@@ -71,9 +71,21 @@ final class WorkspaceCoordinator {
         case .sessionCreateRequest(let workspaceId, let title):
             return [createSession(workspaceId: workspaceId, title: title)]
 
+        case .workspaceDeleteRequest(let workspaceId):
+            return deleteWorkspace(workspaceId: workspaceId)
+
         default:
             return []
         }
+    }
+
+    /// Nothing is confirmed when the registry refuses -- the default
+    /// workspace cannot be removed, and neither can one that is not there.
+    /// A confirmation for a deletion that did not happen would take the row
+    /// out of the sidebar and leave the workspace on disk.
+    private func deleteWorkspace(workspaceId: String) -> [BridgeMessage] {
+        guard (try? workspaces.remove(id: workspaceId)) == true else { return [] }
+        return [.workspaceDelete(workspaceId: workspaceId)]
     }
 
     private func createWorkspace(name: String, projectPath: String?) -> [BridgeMessage] {

@@ -138,6 +138,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case chatDone, chatDoneFailed
     case chatApprovalAnswered, chatApprovalRespondToPreviousFirst
     case chatApprovalAllow, chatApprovalDeny
+    case chatDeleteWorkspaceTitleFormat, chatDeleteWorkspaceMessage
     case chatDeleteSessionTitle, chatDeleteSessionMessage
     case chatNewWorkspace, chatWorkspaceName, chatProjectFolder
     case chatNoFolderSelected, chatProjectFolderExplanation
@@ -396,8 +397,8 @@ enum Strings {
         .commonChoose: "선택…",
 
         .chatSelectAConversation: "대화를 선택하세요",
-        .chatNewSession: "새 대화",
-        .chatCasualSession: "일상 대화",
+        .chatNewSession: "새로운 대화",
+        .chatCasualSession: "새로운 대화",
         .chatThisWorkspace: "이 워크스페이스",
         .chatSettings: "설정",
         .chatComposerPlaceholder: "Agent에게 메시지를 보내세요…",
@@ -430,6 +431,8 @@ enum Strings {
         .chatApprovalRespondToPreviousFirst: "앞의 요청에 먼저 응답해 주세요.",
         .chatApprovalAllow: "허용",
         .chatApprovalDeny: "거부",
+        .chatDeleteWorkspaceTitleFormat: "%1$@를 삭제할까요?",
+        .chatDeleteWorkspaceMessage: "이 워크스페이스의 대화가 모두 사라집니다. 프로젝트 폴더는 그대로 남습니다.",
         .chatDeleteSessionTitle: "이 대화를 삭제할까요?",
         .chatDeleteSessionMessage: "주고받은 내용이 모두 사라지고, 되돌릴 수 없어요.",
         .chatNewWorkspace: "새 워크스페이스",
@@ -555,7 +558,7 @@ enum Strings {
         .keySourceEnvironmentFormat: "환경변수 %1$@",
 
         .workspaceDefaultName: "기본 워크스페이스",
-        .sessionDefaultTitle: "새 세션",
+        .sessionDefaultTitle: "새로운 대화",
         .themeLight: "화이트",
         .themeDark: "다크",
         .editorCollapse: "파일 접기",
@@ -725,7 +728,7 @@ enum Strings {
 
         .chatSelectAConversation: "Select a conversation",
         .chatNewSession: "New chat",
-        .chatCasualSession: "Everyday chat",
+        .chatCasualSession: "New chat",
         .chatThisWorkspace: "This workspace",
         .chatSettings: "Settings",
         .chatComposerPlaceholder: "Message the agent…",
@@ -758,6 +761,8 @@ enum Strings {
         .chatApprovalRespondToPreviousFirst: "Answer the earlier request first.",
         .chatApprovalAllow: "Allow",
         .chatApprovalDeny: "Deny",
+        .chatDeleteWorkspaceTitleFormat: "Delete %1$@?",
+        .chatDeleteWorkspaceMessage: "Every chat in this workspace goes with it. The project folder stays where it is.",
         .chatDeleteSessionTitle: "Delete this conversation?",
         .chatDeleteSessionMessage: "Everything said here goes with it, and it cannot be undone.",
         .chatNewWorkspace: "New workspace",
@@ -883,7 +888,7 @@ enum Strings {
         .keySourceEnvironmentFormat: "the %1$@ environment variable",
 
         .workspaceDefaultName: "Default workspace",
-        .sessionDefaultTitle: "New session",
+        .sessionDefaultTitle: "New chat",
         .themeLight: "Light",
         .themeDark: "Dark",
         .editorCollapse: "Collapse the file",

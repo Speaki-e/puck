@@ -90,7 +90,7 @@ final class BridgeMessageRouter {
                 self.onEventReaction?(reaction)
             }
 
-        case .workspaceCreateRequest, .sessionCreateRequest:
+        case .workspaceCreateRequest, .sessionCreateRequest, .workspaceDeleteRequest:
             // Answered in-process as of 2026-08-15 -- WorkspaceRegistry lives
             // here now, so these no longer leave for workspace (Electron) and
             // come back. ClientRelay stops routing them outward to match.
@@ -101,7 +101,7 @@ final class BridgeMessageRouter {
                 }
             }
 
-        case .toolResult, .userInput, .workspaceCreate, .sessionCreate:
+        case .toolResult, .userInput, .workspaceCreate, .sessionCreate, .workspaceDelete:
             // pet-app only ever sends these. The confirmations are produced
             // here (workspaceCoordinator, above) and consumed by PuckClient's
             // own ClientWindowStore over its own socket connection, so one

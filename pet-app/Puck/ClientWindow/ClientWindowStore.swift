@@ -240,6 +240,9 @@ final class ClientWindowStore: ObservableObject {
     /// PuckClient's AppDelegate never routes other kinds here.
     func handleClientUpdate(_ message: BridgeMessage) {
         switch message {
+        case .workspaceDelete(let workspaceId):
+            applyWorkspaceDeletion(workspaceId: workspaceId)
+
         case .workspaceCreate(let workspaceId, let name, let projectPath):
             // Idempotent, for the same reason session_create below is: this
             // arrives both when a workspace is created and when pet-app
@@ -475,6 +478,39 @@ final class ClientWindowStore: ObservableObject {
     /// ChatSession.placeholderTitle still armed -- a request whose confirmation never arrived would
     /// otherwise stay armed indefinitely and jump the user away from the chat
     /// they chose the next time any user-origin session turned up.
+    /// Asks pet-app to throw a workspace away. Nothing changes here until it
+    /// confirms: the registry is over there, and a sidebar that removed the
+    /// row on the ask would be showing a deletion that may not have happened.
+    ///
+    /// - Returns: whether it was worth asking. The default workspace is not
+    ///   removable -- it is where a deleted one's occupants land.
+    @discardableResult
+    func requestWorkspaceDeletion(workspaceId: String) -> Bool {
+        guard canDeleteWorkspace(workspaceId) else { return false }
+        sender.deleteWorkspace(workspaceId: workspaceId)
+        return true
+    }
+
+    /// Whether this one can go at all.
+    func canDeleteWorkspace(_ workspaceId: String) -> Bool {
+        workspaceId != Self.defaultWorkspaceId && workspaces.contains { $0.id == workspaceId }
+    }
+
+    /// pet-app confirmed the deletion: take the workspace, its chats, and any
+    /// selection standing in them out of this window.
+    func applyWorkspaceDeletion(workspaceId: String) {
+        guard workspaces.contains(where: { $0.id == workspaceId }) else { return }
+        workspaces.removeAll { $0.id == workspaceId }
+        for key in sessionOrder where key.workspaceId == workspaceId {
+            removeSession(key)
+        }
+        pendingSessionRequests.removeValue(forKey: workspaceId)
+        guard activeWorkspaceId == workspaceId else { return }
+        // Somewhere to stand: the workspace that cannot be deleted.
+        activeWorkspaceId = Self.defaultWorkspaceId
+        activeSessionId = Self.defaultSessionId
+    }
+
     func selectSession(workspaceId: String, sessionId: String) {
         pendingSessionRequests.removeValue(forKey: workspaceId)
         activeWorkspaceId = workspaceId

@@ -68,6 +68,9 @@ struct WorkspaceGroup: View {
     /// of its chats do -- and clicking it then opened the group and left the
     /// window in the workspace it was already in.
     let onSelectWorkspace: () -> Void
+    /// Right-click, delete. Nil for one that cannot go -- the default
+    /// workspace, which is where a deleted one's chats would have landed.
+    let onDelete: (() -> Void)?
     let onDeleteSession: (ChatSession) -> Void
     let canDeleteSession: (ChatSession) -> Bool
 
@@ -156,6 +159,14 @@ struct WorkspaceGroup: View {
         .buttonStyle(.plain)
         .accessibilityLabel(workspace.displayName)
         .help(workspace.projectPath ?? workspace.displayName)
+        .contextMenu {
+            // Same shape as a chat's: right-click on the row, destructive,
+            // and asked about before it happens -- a workspace takes its
+            // chats with it.
+            if let onDelete {
+                Button(Strings.text(.commonDelete), role: .destructive, action: onDelete)
+            }
+        }
         .animation(.easeOut(duration: 0.15), value: isExpanded)
     }
 

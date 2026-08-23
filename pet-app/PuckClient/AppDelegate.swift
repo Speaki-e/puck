@@ -296,7 +296,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // half had nothing left to do.
             clientWindowStore.handleChatEvent(event, workspaceId: workspaceId, sessionId: sessionId)
             agentHost.handle(event, sessionId: sessionId)
-        case .workspaceCreate, .sessionCreate:
+        case .workspaceCreate, .sessionCreate, .workspaceDelete:
             clientWindowStore.handleClientUpdate(message)
         case .voiceListening(let listening):
             // pet-app owns the microphone; this is it saying whether the hold

@@ -127,8 +127,10 @@ final class ChatSession: ObservableObject, Identifiable {
 
     /// Whether the name is one this app picked for itself, and may therefore
     /// replace. False for a task session the agent named through
-    /// open_task_session and for the casual chat -- renaming either out
-    /// from under its owner is not a refinement, it is a loss.
+    /// open_task_session -- renaming that out from under its owner is not a
+    /// refinement, it is a loss. True for every chat that still carries a
+    /// default name, the always-present one included: a sidebar of rows all
+    /// called the same thing is one you cannot navigate.
     let isAutoTitled: Bool
 
     /// Set once the model has named this chat after the first exchange, so a
@@ -140,7 +142,7 @@ final class ChatSession: ObservableObject, Identifiable {
         self.workspaceId = workspaceId
         self.title = title
         self.origin = origin
-        self.isAutoTitled = title == Self.placeholderTitle
+        self.isAutoTitled = Self.isDefaultTitle(title)
     }
 
     /// The opening question and the answer to it -- the material a title is
@@ -231,10 +233,21 @@ final class ChatSession: ObservableObject, Identifiable {
     }
 
     func appendUserMessage(_ text: String) {
-        if title == Self.placeholderTitle {
+        if Self.isDefaultTitle(title) {
             title = Self.title(fromFirstMessage: text)
         }
         timeline.append(.userMessage(id: UUID(), text: text))
+    }
+
+    /// Whether this is still a name the app gave it rather than one the
+    /// conversation earned.
+    ///
+    /// All three count now. The casual session was left out because it is the
+    /// always-present entry point under every workspace -- but every workspace
+    /// having one row called the same thing is exactly the sidebar you cannot
+    /// navigate, and being the entry point is about its id, not its name.
+    static func isDefaultTitle(_ title: String) -> Bool {
+        title == placeholderTitle || title == casualTitle || title == untitledTitle
     }
 
     /// What the chat turned out to be about, taken from the first thing said

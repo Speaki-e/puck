@@ -22,7 +22,7 @@ enum ClientRelay {
         // which was workspace's agent and is now PuckClient's. Left pointing
         // at workspace it would be relayed to nobody, silently breaking both
         // of those inputs.
-        case .userInput, .event, .workspaceCreate, .sessionCreate, .voiceListening:
+        case .userInput, .event, .workspaceCreate, .sessionCreate, .voiceListening, .workspaceDelete:
             return .gui
 
         // Handled where they land rather than forwarded:
@@ -34,7 +34,7 @@ enum ClientRelay {
         // - pet_home/pet_island_height/voice_listen: pet-app is the other end
         //   of these exchanges too -- PuckClient reports or asks,
         //   BridgeMessageRouter reads them directly.
-        case .workspaceCreateRequest, .sessionCreateRequest,
+        case .workspaceCreateRequest, .sessionCreateRequest, .workspaceDeleteRequest,
              .clientHello, .toolDispatch, .toolCancel, .toolResult,
              .petHome, .petIslandHeight, .voiceListen:
             return nil

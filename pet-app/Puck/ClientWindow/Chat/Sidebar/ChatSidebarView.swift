@@ -40,6 +40,9 @@ struct ChatSidebarView: View {
     /// answered. Deleting a chat throws away everything said in it and there
     /// is no undo, so the menu item asks rather than acts.
     @State private var pendingDeletion: SessionSelection?
+    /// The workspace whose Delete was picked, held until the confirmation is
+    /// answered. A workspace takes every chat in it, so this asks first.
+    @State private var pendingWorkspaceDeletion: ClientWorkspace?
     /// What is typed into the filter field. Not remembered across launches:
     /// a filter left on from yesterday is a sidebar that looks empty for no
     /// visible reason.
@@ -87,6 +90,9 @@ struct ChatSidebarView: View {
                             store.selectSession(workspaceId: workspace.id, sessionId: session.id)
                         },
                         onSelectWorkspace: { store.activeWorkspaceId = workspace.id },
+                        onDelete: store.canDeleteWorkspace(workspace.id)
+                            ? { pendingWorkspaceDeletion = workspace }
+                            : nil,
                         onDeleteSession: { session in
                             pendingDeletion = SessionSelection(
                                 workspaceId: workspace.id,
@@ -184,6 +190,21 @@ struct ChatSidebarView: View {
         .background(palette.background)
         .sheet(isPresented: $isAddingWorkspace) {
             NewWorkspaceSheet(store: store)
+        }
+        .confirmationDialog(
+            String(format: Strings.text(.chatDeleteWorkspaceTitleFormat), pendingWorkspaceDeletion?.displayName ?? ""),
+            isPresented: .init(
+                get: { pendingWorkspaceDeletion != nil },
+                set: { if !$0 { pendingWorkspaceDeletion = nil } }
+            ),
+            presenting: pendingWorkspaceDeletion
+        ) { target in
+            Button(Strings.text(.commonDelete), role: .destructive) {
+                store.requestWorkspaceDeletion(workspaceId: target.id)
+            }
+            Button(Strings.text(.commonCancel), role: .cancel) {}
+        } message: { _ in
+            Text(Strings.text(.chatDeleteWorkspaceMessage))
         }
         .confirmationDialog(
             Strings.text(.chatDeleteSessionTitle),

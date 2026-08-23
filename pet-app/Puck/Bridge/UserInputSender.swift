@@ -96,6 +96,13 @@ final class UserInputSender {
         broadcast(.voiceListen(listening))
     }
 
+    /// Throws a workspace away. pet-app owns the registry, so this asks and
+    /// waits for the `workspace_delete` that says it happened.
+    @discardableResult
+    func deleteWorkspace(workspaceId: String) -> UserInputDelivery {
+        broadcast(.workspaceDeleteRequest(workspaceId: workspaceId))
+    }
+
     /// F13 (2026-07-29, protocol 3.4): request a new chat session via the
     /// sidebar's "new chat". Confirmed later by a session_create arriving
     /// back over the socket (origin: .user).

@@ -66,6 +66,9 @@ final class BridgeServer {
     /// is the one truly momentary interaction pet-app can observe directly.
     var onGUIPresenceChanged: ((Bool) -> Void)?
     private var lastGUIPresence = false
+    /// Open for as long as this process is the one serving the socket. See
+    /// `acquireLock`.
+    private var lockDescriptor: Int32 = -1
 
     init(socketURL: URL = BridgeServer.defaultSocketURL) {
         self.socketURL = socketURL
@@ -75,9 +78,10 @@ final class BridgeServer {
         let directory = socketURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        guard !Self.isPetAppRunning(lockFileURL: lockFileURL) else {
+        guard let lock = Self.acquireLock(at: lockFileURL) else {
             throw BridgeServerError.alreadyRunning
         }
+        lockDescriptor = lock
         try? FileManager.default.removeItem(at: socketURL) // stale socket file from a previous (now-dead) run
 
         let parameters = NWParameters.tcp
@@ -97,8 +101,15 @@ final class BridgeServer {
         // two would otherwise be checked against a secret that does not exist
         // yet, and "no secret" must never read as "any secret".
         handshakeSecret = BridgeHandshakeSecret.rotate(at: BridgeHandshakeSecret.fileURL(besideSocketAt: socketURL))
-        let listener = try NWListener(using: parameters)
-        Self.writeLockFile(at: lockFileURL, pid: ProcessInfo.processInfo.processIdentifier)
+        let listener: NWListener
+        do {
+            listener = try NWListener(using: parameters)
+        } catch {
+            // The lock outlives a failed start otherwise, and this process
+            // then refuses its own next attempt.
+            releaseLock()
+            throw error
+        }
         listener.newConnectionHandler = { [weak self] newConnection in
             self?.accept(newConnection)
         }
@@ -127,7 +138,7 @@ final class BridgeServer {
         // dead endpoint sits in Application Support after every quit, and a
         // client can connect to a path nothing is listening on.
         try? FileManager.default.removeItem(at: socketURL)
-        try? FileManager.default.removeItem(at: lockFileURL)
+        releaseLock()
     }
 
     /// Sends to just the connections playing `role`, and reports whether
@@ -233,22 +244,39 @@ final class BridgeServer {
 
     // MARK: - Single-instance guard
 
-    /// Whether the lock file at `lockFileURL` names a PID that's still alive.
-    /// `kill(pid, 0)` sends no signal; it only reports whether the process
-    /// exists (and is signalable by us).
-    static func isPetAppRunning(lockFileURL: URL) -> Bool {
-        guard
-            let data = try? Data(contentsOf: lockFileURL),
-            let pidString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-            let pid = pid_t(pidString)
-        else {
-            return false
+    /// Takes an exclusive advisory lock on `lockFileURL`, or reports that
+    /// someone else holds it.
+    ///
+    /// This used to read a PID out of the file and ask `kill(pid, 0)` whether
+    /// it was alive. A pet-app that crashed left the file behind, and once the
+    /// OS recycled that number onto any unrelated process -- which it does,
+    /// PIDs wrap -- the answer became "still running" and the app refused to
+    /// start, permanently, with nothing on screen naming the file to delete.
+    ///
+    /// The kernel releases a `flock` when the process holding it dies, however
+    /// it dies, so a stale file is just a file. The PID is still written into
+    /// it, now only for whoever is reading the directory by hand.
+    static func acquireLock(at url: URL) -> Int32? {
+        let descriptor = open(url.path, O_CREAT | O_RDWR, 0o600)
+        guard descriptor >= 0 else { return nil }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            close(descriptor)
+            return nil
         }
-        return kill(pid, 0) == 0
+        ftruncate(descriptor, 0)
+        let pid = Array(String(ProcessInfo.processInfo.processIdentifier).utf8)
+        _ = pid.withUnsafeBufferPointer { write(descriptor, $0.baseAddress, $0.count) }
+        return descriptor
     }
 
-    private static func writeLockFile(at url: URL, pid: Int32) {
-        try? Data(String(pid).utf8).write(to: url)
+    /// Drops the lock and takes the file with it. Called from `stop()` and
+    /// from the failure paths of `start()`; safe to call without one held.
+    private func releaseLock() {
+        guard lockDescriptor >= 0 else { return }
+        flock(lockDescriptor, LOCK_UN)
+        close(lockDescriptor)
+        lockDescriptor = -1
+        try? FileManager.default.removeItem(at: lockFileURL)
     }
 
     /// The socket had no peer authentication and default permissions

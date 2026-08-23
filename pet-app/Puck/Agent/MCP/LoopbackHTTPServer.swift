@@ -72,6 +72,13 @@ final class LoopbackHTTPServer {
     private var sessions: [ObjectIdentifier: HTTPConnection] = [:]
     private var isStopped = false
     private var endpoint: Endpoint?
+    /// Minted before the listener opens, not after it is ready. `endpoint` is
+    /// only complete once the OS has assigned a port, and a connection
+    /// accepted before that read the token as "" -- against which a request
+    /// carrying a bare `Authorization: Bearer ` authenticated. The window was
+    /// short, but it was the whole listener, open to anything on the machine
+    /// that found the port.
+    private var tokenValue = ""
 
     init(handler: @escaping Handler) {
         self.handler = handler
@@ -89,6 +96,7 @@ final class LoopbackHTTPServer {
     private static let readyTimeout: TimeInterval = 5
 
     func start() async throws -> Endpoint {
+        let token = Self.makeToken()
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
         // Both, deliberately: the required endpoint decides what the socket is
@@ -107,6 +115,7 @@ final class LoopbackHTTPServer {
         let accepted: Bool = stateQueue.sync {
             guard !isStopped else { return false }
             self.listener = listener
+            self.tokenValue = token
             return true
         }
         guard accepted else {
@@ -155,7 +164,7 @@ final class LoopbackHTTPServer {
             stop()
             throw StartFailure.noPort
         }
-        let endpoint = Endpoint(port: port, token: Self.makeToken())
+        let endpoint = Endpoint(port: port, token: token)
         stateQueue.sync { self.endpoint = endpoint }
         return endpoint
     }
@@ -191,9 +200,13 @@ final class LoopbackHTTPServer {
     private func accept(_ connection: NWConnection) {
         let session: HTTPConnection? = stateQueue.sync {
             guard !isStopped else { return nil }
+            // An empty one would authenticate a bare "Bearer ", so there is
+            // no connection to serve without it. Unreachable now that the
+            // token is set before the listener opens; kept as the invariant.
+            guard !tokenValue.isEmpty else { return nil }
             let session = HTTPConnection(
                 connection: connection,
-                token: endpoint?.token ?? "",
+                token: tokenValue,
                 handler: handler,
                 onClose: { [weak self] in self?.forget(connection) }
             )

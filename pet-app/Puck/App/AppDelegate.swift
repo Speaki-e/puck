@@ -225,11 +225,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     func applicationWillTerminate(_ notification: Notification) {
         // Everything started in applicationDidFinishLaunching gets torn down
         // here. BridgeServer is the one that matters beyond this process:
-        // stop() removes the lock file and unlinks the socket, and skipping it
-        // left a lock file naming this (now dead) PID in Application Support.
-        // A dead PID is currently recovered from at next launch, but if the OS
-        // recycles that PID onto any live process, start() refuses forever with
-        // .alreadyRunning and nothing tells the user which file to delete.
+        // stop() unlinks the socket and drops the advisory lock, and skipping
+        // it leaves a dead endpoint in Application Support that a client can
+        // still connect to. The lock itself the kernel releases either way.
         frameClock.stop()
         hotkeyManager?.stop()
         voiceInputController?.pushToTalkUp()

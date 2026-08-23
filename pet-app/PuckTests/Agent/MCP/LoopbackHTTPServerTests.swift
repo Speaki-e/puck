@@ -182,6 +182,23 @@ final class LoopbackHTTPServerTests: XCTestCase {
         server?.stop()
         server?.stop()
     }
+    /// The shape the token race produced: a connection accepted before the
+    /// token existed compared against "", so a bare `Bearer ` was accepted.
+    /// The token is minted before the listener opens now, and a session is
+    /// refused outright without one.
+    func test_post_withAnEmptyBearerToken_is401() async throws {
+        let reached = UncheckedBox(false)
+        let endpoint = try await startEcho(answer: { _ in
+            reached.value = true
+            return Data("{}".utf8)
+        })
+
+        let (status, _) = try await post(to: endpoint, authorization: "Bearer ")
+
+        XCTAssertEqual(status, 401)
+        XCTAssertFalse(reached.value)
+    }
+
     // MARK: - Malformed framing
 
     /// `Content-Length: -1` cleared the size ceiling (it is below it) and then

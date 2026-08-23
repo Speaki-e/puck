@@ -49,25 +49,49 @@ final class BridgeServerInstanceGuardTests: XCTestCase {
         try? FileManager.default.removeItem(at: lockFileURL.deletingLastPathComponent())
     }
 
-    func test_noLockFile_isNotRunning() {
-        XCTAssertFalse(BridgeServer.isPetAppRunning(lockFileURL: lockFileURL))
+    func test_anUnheldLock_canBeTaken() throws {
+        let descriptor = try XCTUnwrap(BridgeServer.acquireLock(at: lockFileURL))
+        defer { close(descriptor) }
+
+        XCTAssertGreaterThanOrEqual(descriptor, 0)
     }
 
-    func test_lockFileWithOwnLivePID_isRunning() throws {
-        // The test process itself is a live PID we're allowed to signal.
+    func test_aHeldLock_cannotBeTakenAgain() throws {
+        let held = try XCTUnwrap(BridgeServer.acquireLock(at: lockFileURL))
+        defer { close(held) }
+
+        XCTAssertNil(BridgeServer.acquireLock(at: lockFileURL))
+    }
+
+    func test_aReleasedLock_canBeTakenAgain() throws {
+        let first = try XCTUnwrap(BridgeServer.acquireLock(at: lockFileURL))
+        close(first)
+
+        let second = try XCTUnwrap(BridgeServer.acquireLock(at: lockFileURL))
+        close(second)
+    }
+
+    /// The bug this replaced a PID check for: a crash leaves the file behind
+    /// naming a PID the OS later recycles onto something unrelated, and the
+    /// old guard read that as "pet-app is already running" -- forever, with
+    /// nothing on screen naming the file to delete. A file nobody holds is
+    /// just a file.
+    func test_aLockFileLeftBehindByADeadProcess_doesNotBlockTheNextOne() throws {
+        // The test process's own PID: alive, signalable, and not pet-app --
+        // exactly what a recycled PID looks like from here.
         try Data(String(ProcessInfo.processInfo.processIdentifier).utf8).write(to: lockFileURL)
-        XCTAssertTrue(BridgeServer.isPetAppRunning(lockFileURL: lockFileURL))
+
+        let descriptor = try XCTUnwrap(BridgeServer.acquireLock(at: lockFileURL))
+        close(descriptor)
     }
 
-    func test_lockFileWithDeadPID_isNotRunning() throws {
-        // PID 2^31-1 is not a valid/live process on any Mac.
-        try Data("2147483647".utf8).write(to: lockFileURL)
-        XCTAssertFalse(BridgeServer.isPetAppRunning(lockFileURL: lockFileURL))
-    }
+    /// Who holds it is worth knowing when reading the directory by hand.
+    func test_theLockFileNamesTheProcessHoldingIt() throws {
+        let descriptor = try XCTUnwrap(BridgeServer.acquireLock(at: lockFileURL))
+        defer { close(descriptor) }
 
-    func test_lockFileWithGarbageContents_isNotRunning() throws {
-        try Data("not a pid".utf8).write(to: lockFileURL)
-        XCTAssertFalse(BridgeServer.isPetAppRunning(lockFileURL: lockFileURL))
+        let written = try String(contentsOf: lockFileURL, encoding: .utf8)
+        XCTAssertEqual(written, String(ProcessInfo.processInfo.processIdentifier))
     }
 }
 
@@ -86,15 +110,27 @@ final class BridgeServerStartGuardTests: XCTestCase {
         try? FileManager.default.removeItem(at: socketURL.deletingLastPathComponent())
     }
 
-    func test_start_throwsAlreadyRunning_whenLockFileNamesALiveProcess() throws {
+    func test_start_throwsAlreadyRunning_whileAnotherServerHoldsTheSocket() throws {
+        let first = BridgeServer(socketURL: socketURL)
+        try first.start()
+        defer { first.stop() }
+
+        let second = BridgeServer(socketURL: socketURL)
+        XCTAssertThrowsError(try second.start()) { error in
+            XCTAssertEqual(error as? BridgeServerError, .alreadyRunning)
+        }
+    }
+
+    /// A lock file from a run that crashed names a PID, and the OS reuses
+    /// PIDs. Nothing holds the lock, so this must start.
+    func test_start_succeeds_whenOnlyAStaleLockFileIsLeft() throws {
         let lockFileURL = socketURL.appendingPathExtension("lock")
         try FileManager.default.createDirectory(at: socketURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(String(ProcessInfo.processInfo.processIdentifier).utf8).write(to: lockFileURL)
 
         let server = BridgeServer(socketURL: socketURL)
-        XCTAssertThrowsError(try server.start()) { error in
-            XCTAssertEqual(error as? BridgeServerError, .alreadyRunning)
-        }
+        XCTAssertNoThrow(try server.start())
+        server.stop()
     }
 
     func test_startStopStart_succeeds_lockFileIsClearedOnStop() throws {

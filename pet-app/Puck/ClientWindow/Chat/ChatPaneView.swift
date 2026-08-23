@@ -29,6 +29,9 @@ struct ChatPaneView: View {
     /// The project's files, when this workspace has one. Held by
     /// ClientWindowView; this view only splits its detail around it.
     var editorStore: EditorPaneStore?
+    /// Why there is no file list to show, when the editor is open and the
+    /// workspace cannot give it one.
+    var editorUnavailable: EditorAvailability?
     /// The active project's branch, passed through to the sidebar -- see
     /// ChatSidebarView.activeBranch.
     var activeBranch: String?
@@ -40,10 +43,8 @@ struct ChatPaneView: View {
     /// Where the toolbar's last button ends, measured rather than assumed --
     /// the island climbs into the empty band past it, and a hard-coded x
     /// would be wrong the first time a button was added. Nil until the
-    /// toolbar has laid itself out.
-    /// Where the toolbar's last button ends. Owned by the window rather than
-    /// by this view: the island is drawn in both columns now, and the strip
-    /// over the file list has to climb into the same band this one does.
+    /// toolbar has laid itself out. Owned by the window because the toolbar
+    /// that reports it is the window's.
     @Binding var toolbarTrailingX: CGFloat?
     /// The same key CodeSplitView stores it under. The toggle is in the
     /// window's toolbar as well as in the code column's own strip, because
@@ -69,13 +70,21 @@ struct ChatPaneView: View {
     @ViewBuilder
     private var detail: some View {
         if let session = activeSession {
-            // The island is drawn by the window, above this whole split: it
-            // is one shelf across the top, and anything inside a column can
-            // only ever be a piece of one.
-            conversation(session)
-                .navigationTitle(session.displayTitle)
-                .navigationSubtitle(activeWorkspace?.displayName ?? "")
-                .toolbar { toolbarContent }
+            // Above `conversation`, not inside the chat column: the tank is a
+            // strip across the whole detail area, and it was one before the
+            // code column existed. Putting it inside would shrink the pet's
+            // home to the chat's width the moment a file is opened.
+            VStack(spacing: 0) {
+                PetTankView(
+                    onFrameChange: { store.setTankFrame($0) },
+                    onPetHeightChange: { store.setPetIslandHeight($0) },
+                    toolbarTrailingX: toolbarTrailingX
+                )
+                columns(session)
+            }
+            .navigationTitle(session.displayTitle)
+            .navigationSubtitle(activeWorkspace?.displayName ?? "")
+            .toolbar { toolbarContent }
         } else {
             // Only reachable if the active ids point at a session that no
             // longer exists; the store always seeds one per workspace.
@@ -83,21 +92,50 @@ struct ChatPaneView: View {
         }
     }
 
-    /// The conversation, and beside it the file that was opened from the
-    /// explorer. Split rather than swapped: the reason to look at a file is
-    /// usually what was just said about it, and a layout that shows one by
-    /// hiding the other makes you choose between them.
+    /// Whether the file list is on screen. Pulled out as a function of its
+    /// two inputs because the toolbar's tab picker has to make the same
+    /// decision: it switches that column between three lists, so with no
+    /// column it is a control with nothing to switch.
+    static func showsExplorer(editorAttached: Bool, hasEditorStore: Bool) -> Bool {
+        editorAttached && hasEditorStore
+    }
+
+    /// Everything under the island: the conversation, the file it opened,
+    /// and the file list. One split, not a split inside a split -- nested,
+    /// the inner one took the width it wanted and the outer one handed the
+    /// file list whatever was left, which was less than its own minimum and
+    /// pushed the whole row (island included) off the window's right edge.
     @ViewBuilder
-    private func conversation(_ session: ChatSession) -> some View {
+    private func columns(_ session: ChatSession) -> some View {
         if let editorStore {
-            // Through a view that observes the store rather than deciding
-            // here: whether a file is open is one of its published
-            // properties, and a plain `var` is not an input SwiftUI watches.
-            // Read straight from this body, clicking a file in the explorer
-            // highlighted the row and split nothing.
-            ConversationSplit(store: editorStore) { chatColumn(session) }
+            ConversationSplit(store: editorStore) {
+                chatColumn(session)
+            } explorer: {
+                explorerColumn
+            }
+        } else if editor.isAttached, let editorUnavailable {
+            // Attached with no store: this workspace has no project, or its
+            // root went away. The empty state says which.
+            HSplitView {
+                chatColumn(session).frame(minWidth: 520)
+                EditorEmptyStateView(availability: editorUnavailable)
+                    .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
+            }
         } else {
             chatColumn(session)
+        }
+    }
+
+    /// The file list, when there is one. Beside the conversation rather than
+    /// beside this whole pane, so that the island above covers both.
+    @ViewBuilder
+    private var explorerColumn: some View {
+        if Self.showsExplorer(editorAttached: editor.isAttached, hasEditorStore: editorStore != nil),
+           let editorStore, let explorerTab {
+            // A file list needs room for names, not for a second editor: the
+            // code it opens goes beside the conversation instead.
+            FileExplorerPane(store: editorStore, externalTab: explorerTab)
+                .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
         }
     }
 
@@ -172,7 +210,11 @@ struct ChatPaneView: View {
             .keyboardShortcut("`", modifiers: .control)
             .help(Strings.text(.terminalToggle))
         }
-        if let explorerTab {
+        // Only alongside the column it drives. Shown with no file list it was
+        // three buttons that did nothing visible -- there is no third state
+        // where picking a tab is meaningful and the tabs are off screen.
+        if Self.showsExplorer(editorAttached: editor.isAttached, hasEditorStore: editorStore != nil),
+           let explorerTab {
             ToolbarItem(placement: .primaryAction) {
                 Picker("", selection: explorerTab) {
                     ForEach(ExplorerTab.allCases) { tab in
@@ -229,9 +271,14 @@ struct ChatPaneView: View {
 /// Split rather than swapped: the reason to look at a file is usually what
 /// was just said about it, and a layout that shows one by hiding the other
 /// makes you choose between them.
-private struct ConversationSplit<Chat: View>: View {
+private struct ConversationSplit<Chat: View, Explorer: View>: View {
     @ObservedObject var store: EditorPaneStore
     @ViewBuilder var chat: Chat
+    /// The file list, drawn as this split's last column rather than around
+    /// it. One NSSplitView can give three columns their minimum widths; two
+    /// nested ones cannot -- the outer one had already given this split
+    /// everything before the file list asked for anything.
+    @ViewBuilder var explorer: Explorer
 
     /// The shell under the code. Read here rather than only inside
     /// CodeSplitView because it has to be reachable with no file open: the
@@ -244,56 +291,79 @@ private struct ConversationSplit<Chat: View>: View {
     /// the explorer brings the column back, which is what the click means.
     @State private var isCollapsed = false
 
+    /// Whether there is a middle column at all: a file that is open and not
+    /// put away, or a terminal, which keeps the column even with no file.
+    private var showsCodeColumn: Bool {
+        if isTerminalOpen { return true }
+        return store.activeTabPath != nil && !isCollapsed
+    }
+
+    /// The file is open but put away, and nothing else is holding the column
+    /// -- so the way back rides along the chat's own edge.
+    private var showsInlineReopenHandle: Bool {
+        store.activeTabPath != nil && isCollapsed && !isTerminalOpen
+    }
+
     var body: some View {
-        Group {
-            if store.activeTabPath == nil, !isTerminalOpen {
-                chat
-            } else if store.activeTabPath != nil, isCollapsed, !isTerminalOpen {
-                HStack(spacing: 0) {
-                    chat
-                    Divider()
-                    reopenHandle
-                }
-            } else {
-                HSplitView {
-                    chat.frame(minWidth: 320)
-                    VStack(spacing: 0) {
-                        if store.activeTabPath != nil, !isCollapsed {
-                            // Putting the code away puts the shell under it
-                            // away too: it is the same column, and a terminal
-                            // left alone in it is a column holding a shell
-                            // nobody asked to keep.
-                            CodeSplitView(store: store) {
-                                isCollapsed = true
-                                isTerminalOpen = false
-                            }
-                                .frame(maxHeight: .infinity)
-                        } else if store.activeTabPath != nil {
-                            // Put away, but the terminal below it is keeping
-                            // the column on screen -- so the way back has to
-                            // stay reachable.
-                            HStack(spacing: 0) {
-                                Spacer(minLength: 0)
-                                reopenHandle
-                            }
-                            .frame(maxHeight: .infinity)
-                        } else {
-                            // Terminal only. The empty space above it is the
-                            // column holding its share of the window rather
-                            // than collapsing to the height of a shell.
-                            Spacer(minLength: 0)
-                        }
-                        if isTerminalOpen {
-                            TerminalSection(root: store.rootPath, isOpen: $isTerminalOpen)
-                        }
-                    }
-                    .frame(minWidth: 300, maxHeight: .infinity)
-                }
+        HSplitView {
+            chatSide
+                // Free width goes here, not to the file list -- the one
+                // column that gains nothing from being wider.
+                .layoutPriority(1)
+            if showsCodeColumn {
+                codeColumn
             }
+            explorer
         }
         // Opening anything at all brings the column back, whether or not it
         // changed the active tab.
         .onChange(of: store.openRequests) { isCollapsed = false }
+    }
+
+    @ViewBuilder
+    private var chatSide: some View {
+        if showsInlineReopenHandle {
+            HStack(spacing: 0) {
+                chat
+                Divider()
+                reopenHandle
+            }
+            .frame(minWidth: 320)
+        } else {
+            chat.frame(minWidth: 320)
+        }
+    }
+
+    private var codeColumn: some View {
+        VStack(spacing: 0) {
+            if store.activeTabPath != nil, !isCollapsed {
+                // Putting the code away puts the shell under it away too: it
+                // is the same column, and a terminal left alone in it is a
+                // column holding a shell nobody asked to keep.
+                CodeSplitView(store: store) {
+                    isCollapsed = true
+                    isTerminalOpen = false
+                }
+                .frame(maxHeight: .infinity)
+            } else if store.activeTabPath != nil {
+                // Put away, but the terminal below it is keeping the column
+                // on screen -- so the way back has to stay reachable.
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    reopenHandle
+                }
+                .frame(maxHeight: .infinity)
+            } else {
+                // Terminal only. The empty space above it is the column
+                // holding its share of the window rather than collapsing to
+                // the height of a shell.
+                Spacer(minLength: 0)
+            }
+            if isTerminalOpen {
+                TerminalSection(root: store.rootPath, isOpen: $isTerminalOpen)
+            }
+        }
+        .frame(minWidth: 300, maxHeight: .infinity)
     }
 
     /// The way back, and the only sign the file is still open.

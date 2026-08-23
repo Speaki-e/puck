@@ -33,12 +33,8 @@ final class ClientWindowStore: ObservableObject {
     static let tankPinnedKey = "Puck.tankPinned"
 
     /// Where the island is, in AppKit global coordinates, or nil when it is
-    /// not on screen.
-    ///
-    /// One frame again. It was two for a while -- the strip over the chat and
-    /// the strip over the file list -- because the island lived inside a
-    /// split and SwiftUI cannot draw one view across that boundary. The
-    /// island sits above the split now, so there is one view and one frame.
+    /// not on screen. One frame: the island is one view above the columns it
+    /// covers, and the sidebar it does not cover is outside it.
     private(set) var tankFrame: CGRect?
 
     /// Whether the client window is the one the user is looking at. Reported

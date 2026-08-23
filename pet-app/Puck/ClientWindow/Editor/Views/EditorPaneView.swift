@@ -21,13 +21,18 @@ struct EditorPaneView: View {
     /// re-deriving ClientWorkspace.editorAvailability, this view doesn't own
     /// that decision.
     let onUnavailable: () -> Void
+    /// The tank strip's frame, or nil when it is off screen. This view does
+    /// not hold ClientWindowStore -- see onUnavailable above -- so reporting
+    /// is threaded in the same way.
+    let onTankFrameChange: (CGRect?) -> Void
+
     @State private var store: EditorPaneStore?
 
-    /// No island here. This view is the detached window's whole contents,
-    /// and the pet cannot stand in a second window -- the strip it drew was
-    /// decoration reporting its frame to a closure that threw it away.
     var body: some View {
-        paneContent
+        VStack(spacing: 0) {
+            PetTankView(onFrameChange: onTankFrameChange)
+            paneContent
+        }
     }
 
     @ViewBuilder

@@ -111,99 +111,26 @@ struct ClientWindowView: View {
         editor = .attached
     }
 
+    /// The store to show a file list from: only when the editor is attached
+    /// and this workspace has one.
+    private var attachedEditorStore: EditorPaneStore? {
+        editor.isAttached ? editorStore : nil
+    }
+
+    /// Why there is no file list, when the editor is open and the workspace
+    /// cannot give it one. nil when there is nothing to explain.
+    private var unavailableEditorReason: EditorAvailability? {
+        guard editor.isAttached, attachedEditorStore == nil else { return nil }
+        return activeWorkspace?.editorAvailability
+    }
+
     private var activeWorkspace: ClientWorkspace? {
         store.workspaces.first { $0.id == store.activeWorkspaceId }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // One island, across the whole window and above the split. It
-            // used to be drawn inside the columns, which meant one piece per
-            // column and a seam down the middle -- SwiftUI cannot draw a view
-            // across a split, so the split gives way instead.
-            PetTankView(
-                onFrameChange: { store.setTankFrame($0) },
-                onPetHeightChange: { store.setPetIslandHeight($0) },
-                toolbarTrailingX: toolbarTrailingX
-            )
-            Group {
-                if editor.isAttached, let editorStore {
-                    HSplitView {
-                        // The conversation keeps the middle and the widest
-                        // minimum: it is what the window is for, and a file
-                        // opened from the explorer splits *this* column
-                        // rather than replacing it.
-                        ChatPaneView(
-                            store: store,
-                            editor: $editor,
-                            editorStore: editorStore,
-                            activeBranch: git.status?.branch,
-                            explorerTab: $explorerTab,
-                            toolbarTrailingX: $toolbarTrailingX
-                        )
-                        .frame(minWidth: 520)
-                            // Free width goes here, not to the file list.
-                            // Without it, collapsing the session sidebar grew
-                            // the explorer -- the one column that gains
-                            // nothing from being wider.
-                            .layoutPriority(1)
-                        // A file list needs room for names, not for a second
-                        // editor: the code it opens goes beside the
-                        // conversation instead.
-                        FileExplorerPane(store: editorStore, externalTab: $explorerTab)
-                            .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
-                    }
-                } else if editor.isAttached, let availability = activeWorkspace?.editorAvailability {
-                    // Attached with no store: this workspace has no project,
-                    // or its root went away. The empty state says which.
-                    HSplitView {
-                        ChatPaneView(
-                            store: store,
-                            editor: $editor,
-                            editorStore: nil,
-                            activeBranch: git.status?.branch,
-                            toolbarTrailingX: $toolbarTrailingX
-                        )
-                        .frame(minWidth: 520)
-                        .layoutPriority(1)
-                        EditorEmptyStateView(availability: availability)
-                            .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
-                    }
-                } else {
-                    ChatPaneView(
-                        store: store,
-                        editor: $editor,
-                        editorStore: nil,
-                        activeBranch: git.status?.branch,
-                        toolbarTrailingX: $toolbarTrailingX
-                    )
-                }
-            }
-            ClientStatusBarView(
-                workspace: activeWorkspace,
-                availability: activeWorkspace?.editorAvailability ?? .noProject,
-                palette: store.themeStyle.palette,
-                git: git.status
-            )
-        }
-        // No .frame(minWidth:) here: sizingOptions = [] on the hosting
-        // controller means SwiftUI's minimum never becomes a real resize
-        // limit anyway (see PuckClient's AppDelegate), and stating it twice
-        // is how the two drifted apart before. The window owns its floor.
-        // One ground for the whole window -- the blurred desktop, tinted by
-        // the theme. Painted here rather than per column so the toolbar strip
-        // and the gap under the traffic lights are part of it, which is what
-        // stops the top reading as a band of unrelated chrome.
-        .background {
-            WindowBackdrop()
-                .overlay(store.themeStyle.palette.background.opacity(ClientTheme.Metrics.windowTint))
-                .ignoresSafeArea()
-        }
-        // Hidden, not tinted: AppKit's own toolbar material would sit on top
-        // of the backdrop and put the band back.
-        .toolbarBackground(.hidden, for: .windowToolbar)
-        .background(WindowMinimumSize(width: minimumWindowWidth, height: ClientTheme.Metrics.windowMinHeight))
-        .detachedEditorWindow(
+        windowContent
+            .detachedEditorWindow(
             presentation: $editor,
             workspaceId: store.activeWorkspaceId,
             availability: activeWorkspace?.editorAvailability ?? .noProject,
@@ -252,4 +179,48 @@ struct ClientWindowView: View {
             guard !editor.isAttached else { return }
         }
     }
+
+    /// The window's contents and the ground they are painted on.
+    /// Split from `body`: the two modifier chains together were more
+    /// than the type checker would work through in reasonable time.
+    private var windowContent: some View {
+        VStack(spacing: 0) {
+            // One call, three states. Written as three branches it was three
+            // nearly identical argument lists, which is also what stopped the
+            // compiler type-checking this body in reasonable time.
+            ChatPaneView(
+                store: store,
+                editor: $editor,
+                editorStore: attachedEditorStore,
+                editorUnavailable: unavailableEditorReason,
+                activeBranch: git.status?.branch,
+                explorerTab: $explorerTab,
+                toolbarTrailingX: $toolbarTrailingX
+            )
+            ClientStatusBarView(
+                workspace: activeWorkspace,
+                availability: activeWorkspace?.editorAvailability ?? .noProject,
+                palette: store.themeStyle.palette,
+                git: git.status
+            )
+        }
+        // No .frame(minWidth:) here: sizingOptions = [] on the hosting
+        // controller means SwiftUI's minimum never becomes a real resize
+        // limit anyway (see PuckClient's AppDelegate), and stating it twice
+        // is how the two drifted apart before. The window owns its floor.
+        // One ground for the whole window -- the blurred desktop, tinted by
+        // the theme. Painted here rather than per column so the toolbar strip
+        // and the gap under the traffic lights are part of it, which is what
+        // stops the top reading as a band of unrelated chrome.
+        .background {
+            WindowBackdrop()
+                .overlay(store.themeStyle.palette.background.opacity(ClientTheme.Metrics.windowTint))
+                .ignoresSafeArea()
+        }
+        // Hidden, not tinted: AppKit's own toolbar material would sit on top
+        // of the backdrop and put the band back.
+        .toolbarBackground(.hidden, for: .windowToolbar)
+        .background(WindowMinimumSize(width: minimumWindowWidth, height: ClientTheme.Metrics.windowMinHeight))
+    }
+
 }

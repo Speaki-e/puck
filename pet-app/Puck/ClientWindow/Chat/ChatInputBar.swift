@@ -78,7 +78,22 @@ struct ChatInputBar: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .buttonStyle(.plain)
-        .onAppear { isFocused = true }
+        .onAppear {
+            isFocused = true
+            // Re-read on every appearance, not only when this view is first
+            // built: the same three settings are on the settings window, and
+            // a composer built this morning went on claiming whatever was set
+            // then.
+            refreshSettings()
+        }
+        // A hold that outlives the window is a microphone left open. The
+        // window can close, or the workspace switch out from under this view,
+        // while pet-app is still holding its push-to-talk down for us.
+        .onDisappear {
+            guard isListening else { return }
+            isListening = false
+            onVoiceListening?(false)
+        }
     }
 
     /// Offered while a command is being typed, and only then -- see
@@ -262,6 +277,12 @@ struct ChatInputBar: View {
     /// wrote -- the runner reports the value it read back, and so does this.
     private func run(_ command: String) {
         onSend(command, [])
+        refreshSettings()
+    }
+
+    /// All three come off disk -- a `.env` and the environment -- so they are
+    /// read at moments, never in `body`, which runs on every keystroke.
+    private func refreshSettings() {
         effort = AgentConfiguration.effort()
         configuration = AgentConfiguration.load()
         permissions = AgentConfiguration.permissionMode()

@@ -146,7 +146,7 @@ final class BallPhysicsTests: XCTestCase {
             direction: .right
         )
 
-        for _ in 0..<600 where state.phase == .kicked {
+        for _ in 0..<600 where state.phase == .kicked || state.phase == .rolling {
             state = BallPhysics.step(state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
             XCTAssertLessThanOrEqual(state.position.y, floor + 0.01, "fell through the floor")
         }
@@ -164,7 +164,7 @@ final class BallPhysicsTests: XCTestCase {
             direction: .right
         )
 
-        for _ in 0..<600 where state.phase == .kicked {
+        for _ in 0..<600 where state.phase == .kicked || state.phase == .rolling {
             state = BallPhysics.step(state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
         }
 
@@ -298,5 +298,106 @@ final class BallRestingSurfaceTests: XCTestCase {
 
         XCTAssertEqual(next.phase, .resting)
         XCTAssertEqual(next.position, state.position)
+    }
+    // MARK: - Rolling
+
+    /// What a kick used to do at the end of its last bounce: stop dead, in
+    /// one frame, with sideways speed still on it. Now it rolls that speed
+    /// off along the surface.
+    func test_aKickEndsByRollingRatherThanStoppingDead() {
+        let floor = roamableArea.maxY
+        var state = BallPhysics.kick(
+            BallState(position: CGPoint(x: 500, y: floor), phase: .resting),
+            direction: .right
+        )
+
+        var rolled = false
+        for _ in 0..<600 where state.phase == .kicked || state.phase == .rolling {
+            state = BallPhysics.step(state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+            if state.phase == .rolling { rolled = true }
+        }
+
+        XCTAssertTrue(rolled, "a kick with sideways speed on it should roll before it stops")
+        XCTAssertEqual(state.phase, .resting)
+    }
+
+    func test_aRollingToyKeepsGoingInTheDirectionItWasTravelling() {
+        let floor = roamableArea.maxY
+        let state = BallState(position: CGPoint(x: 500, y: floor), horizontalVelocity: 300, phase: .rolling)
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+
+        XCTAssertGreaterThan(next.position.x, 500)
+        XCTAssertEqual(next.position.y, floor, accuracy: 0.001, "a roll stays on the surface")
+        XCTAssertLessThan(next.horizontalVelocity, 300, "and is slowed by it")
+        XCTAssertGreaterThan(next.horizontalVelocity, 0, "but never pushed backwards")
+    }
+
+    /// Friction that overshoots zero would have the toy roll back the way it
+    /// came, which is the one thing a floor cannot do.
+    func test_aSlowRollStopsRatherThanReversing() {
+        let floor = roamableArea.maxY
+        let state = BallState(position: CGPoint(x: 500, y: floor), horizontalVelocity: 5, phase: .rolling)
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+
+        XCTAssertEqual(next.phase, .resting)
+        XCTAssertEqual(next.horizontalVelocity, 0)
+    }
+
+    func test_aRollingToyBouncesOffTheSideRatherThanLeaving() {
+        let floor = roamableArea.maxY
+        let state = BallState(position: CGPoint(x: 1010, y: floor), horizontalVelocity: 600, phase: .rolling)
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+
+        XCTAssertLessThan(next.horizontalVelocity, 0, "turned around")
+        XCTAssertLessThanOrEqual(next.position.x, roamableArea.maxX)
+    }
+
+    /// Rolling off the edge of the window it was on: it carries its sideways
+    /// speed into the air rather than dropping straight down off the lip.
+    func test_aToyThatRollsOffItsSurfaceGoesBackIntoTheAir() {
+        let state = BallState(position: CGPoint(x: 500, y: 300), horizontalVelocity: 400, phase: .rolling)
+
+        // Nothing under it any more: the surface is now the floor far below.
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: 900, roamableArea: roamableArea)
+
+        XCTAssertEqual(next.phase, .kicked)
+        XCTAssertEqual(next.horizontalVelocity, 400, "still travelling the way it was")
+    }
+
+    /// A wand dragged along the floor is not a ball: the caller decides how
+    /// grippy the surface is for this toy.
+    func test_friction_isTheCallers() {
+        let floor = roamableArea.maxY
+        let state = BallState(position: CGPoint(x: 500, y: floor), horizontalVelocity: 300, phase: .rolling)
+
+        let slippery = BallPhysics.step(
+            state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea, rollingFriction: 100
+        )
+        let grippy = BallPhysics.step(
+            state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea, rollingFriction: 5000
+        )
+
+        XCTAssertGreaterThan(slippery.horizontalVelocity, grippy.horizontalVelocity)
+    }
+
+    /// The floor takes some of the sideways speed too. Without this a kicked
+    /// toy crossed the whole screen at its launch speed however many times it
+    /// bounced on the way.
+    func test_aBounceOffTheFloorSlowsTheToySideways() {
+        let floor = roamableArea.maxY
+        let state = BallState(
+            position: CGPoint(x: 500, y: floor),
+            verticalVelocity: 800,
+            horizontalVelocity: 400,
+            phase: .kicked
+        )
+
+        let next = BallPhysics.step(state, dt: 1.0 / 60, landingY: floor, roamableArea: roamableArea)
+
+        XCTAssertLessThan(next.horizontalVelocity, 400)
+        XCTAssertGreaterThan(next.horizontalVelocity, 0)
     }
 }

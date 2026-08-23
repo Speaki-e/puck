@@ -37,6 +37,11 @@ enum BallPhase: Equatable {
     /// Kicked away -- flying off under gravity until its lifetime elapses or
     /// it exits the roamable area.
     case kicked
+    /// On a surface and still moving along it. A kick used to end with the
+    /// toy stopping dead the instant its bounce ran out, which is the one
+    /// moment of the whole interaction that reads as a bug rather than as
+    /// physics. Friction takes it from here to `.resting`.
+    case rolling
     /// Done -- nothing left to render or simulate.
     case gone
 }
@@ -56,6 +61,20 @@ enum BallPhysics {
     /// How far outside roamableArea still counts as "worth simulating" before
     /// a kicked ball is considered gone.
     static let outOfBoundsMargin: CGFloat = 200
+    /// How much of its sideways speed a toy keeps each time it bounces off
+    /// the floor. Nothing touched the horizontal component before, so a
+    /// kicked toy crossed the screen at its launch speed however many times
+    /// it bounced on the way.
+    static let floorFriction: CGFloat = 0.8
+    /// How quickly a rolling toy is slowed by the surface, in points per
+    /// second squared. The default is a round one; `step` takes it as a
+    /// parameter because a wand lying on its side does not roll, it scrapes.
+    static let rollingFriction: CGFloat = 900
+    /// Below this speed, in points per second, a rolling toy has stopped.
+    /// Without a floor the friction curve approaches zero and never reaches
+    /// it, leaving a toy that creeps for ever and is never playable again.
+    static let restingSpeed: CGFloat = 12
+
     /// How far a resting toy may sit above its surface before it counts as
     /// having nothing underneath it. Absorbs the rounding of the landing
     /// itself, so a toy that just settled doesn't immediately re-fall.
@@ -72,7 +91,8 @@ enum BallPhysics {
         dt: TimeInterval,
         landingY: CGFloat,
         roamableArea: CGRect,
-        visualBounds: CGRect = .zero
+        visualBounds: CGRect = .zero,
+        rollingFriction: CGFloat = rollingFriction
     ) -> BallState {
         switch state.phase {
         case .falling:
@@ -145,9 +165,16 @@ enum BallPhysics {
                 let bounced = ScreenBounds.reflect(next.position.y, at: landingY, velocity: next.verticalVelocity)
                 next.position.y = bounced.coordinate
                 next.verticalVelocity = bounced.velocity
+                // The floor takes some of the sideways speed too, every time.
+                next.horizontalVelocity *= floorFriction
                 if bounced.velocity == 0 {
-                    // Out of bounce: settle on the surface. An ordinary kick
-                    // ends here, back in play for the pet to chase again.
+                    // Out of bounce, but not necessarily out of motion: what
+                    // is left of the sideways speed rolls along the surface.
+                    // Stopping dead here is what made a kick end abruptly.
+                    if abs(next.horizontalVelocity) > restingSpeed {
+                        next.phase = .rolling
+                        return next
+                    }
                     next.horizontalVelocity = 0
                     next.phase = .resting
                     return next
@@ -162,6 +189,41 @@ enum BallPhysics {
             let outOfBounds = !roamableArea.insetBy(dx: -outOfBoundsMargin, dy: -outOfBoundsMargin)
                 .contains(next.position)
             next.phase = outOfBounds ? .gone : .kicked
+            return next
+
+        case .rolling:
+            // Rolled off whatever it was on -- a window edge, mostly. Back to
+            // the airborne case, which is the one that moves along both axes;
+            // `.falling` only moves down and would drop it straight off the
+            // edge it was still travelling over.
+            guard state.position.y >= landingY - surfaceTolerance else {
+                var next = state
+                next.phase = .kicked
+                next.kickedElapsed = 0
+                return next
+            }
+
+            var next = state
+            let travelled = CGPoint(x: state.position.x + state.horizontalVelocity * CGFloat(dt), y: landingY)
+            let sideways = ScreenBounds.bounceHorizontally(
+                position: travelled,
+                velocity: state.horizontalVelocity,
+                visualBounds: visualBounds,
+                in: roamableArea
+            )
+            next.position = sideways.position
+            next.verticalVelocity = 0
+
+            // Toward zero from whichever side it is on, and never past it:
+            // a friction that overshoots would have the toy roll backwards.
+            let slowed = abs(sideways.velocity) - rollingFriction * CGFloat(dt)
+            guard slowed > restingSpeed else {
+                next.horizontalVelocity = 0
+                next.phase = .resting
+                return next
+            }
+            next.horizontalVelocity = slowed * (sideways.velocity < 0 ? -1 : 1)
+            next.phase = .rolling
             return next
 
         case .gone:

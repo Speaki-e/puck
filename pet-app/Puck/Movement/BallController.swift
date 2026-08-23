@@ -130,7 +130,14 @@ final class BallController {
     /// sits below the centre.
     func tick(dt: TimeInterval, landingY: CGFloat, roamableArea: CGRect) {
         guard let current = state else { return }
-        let wasFalling = current.phase == .falling
+        // Any of the moving phases, not just falling. A toy the user threw
+        // ends its flight as a kick, and a kick used to settle in silence:
+        // nothing told the pet the toy had come to rest, so it stood there
+        // until its own wander timer happened to draw "go play" -- up to
+        // fifteen seconds of ignoring a toy thrown at its feet.
+        let wasMoving = current.phase == .falling
+            || current.phase == .kicked
+            || current.phase == .rolling
 
         let impactSpeed = current.verticalVelocity
         let next = BallPhysics.step(
@@ -138,16 +145,17 @@ final class BallController {
             dt: dt,
             landingY: landingY - visualBounds.maxY,
             roamableArea: roamableArea,
-            visualBounds: visualBounds
+            visualBounds: visualBounds,
+            rollingFriction: rollingFriction
         )
-        if wasFalling, next.phase == .resting {
+        if wasMoving, next.phase == .resting {
             lastImpactSpeed = impactSpeed
         }
         state = next
         layer.position = next.position
-        applyOrientation(for: next.phase, dt: dt)
+        applyOrientation(for: next, dt: dt)
 
-        if wasFalling, next.phase == .resting {
+        if wasMoving, next.phase == .resting {
             onLanded?(next.position)
         }
         if next.phase == .gone {
@@ -211,12 +219,38 @@ final class BallController {
     /// A toy that twirls overhead also twirls while it's in the air -- one
     /// that went rigid the moment it was thrown looks broken. And a long toy comes
     /// to rest lying on its side rather than standing on its end.
-    private func applyOrientation(for phase: BallPhase, dt: TimeInterval) {
-        switch phase {
+    /// How fast the surface takes the roll out of this toy. A round one
+    /// carries; something long lying on its side is being dragged across the
+    /// floor, so it stops almost at once -- rolling it any distance is what
+    /// would look wrong for a wand.
+    private var rollingFriction: CGFloat {
+        liesDownAtRest ? BallPhysics.rollingFriction * 6 : BallPhysics.rollingFriction
+    }
+
+    /// Half the toy's drawn width -- what one turn of a roll covers.
+    private var rollingRadius: CGFloat {
+        max(visualBounds.width, 1) / 2
+    }
+
+    private func applyOrientation(for state: BallState, dt: TimeInterval) {
+        switch state.phase {
         case .kicked, .falling:
             guard toy.play == .spinOverhead else { return }
             spinAngle += Self.spinRate * CGFloat(dt)
             layer.setAffineTransform(CGAffineTransform(rotationAngle: spinAngle))
+        case .rolling:
+            // A roll is not a spin rate: the angle follows the distance
+            // covered, so it slows down exactly as the toy does and stops
+            // with it. Positive is clockwise here -- the layer hangs in a
+            // flipped view (SpriteLayerView), so screen-right is the
+            // direction this turns toward.
+            guard !liesDownAtRest else {
+                layer.setAffineTransform(restingTransform)
+                return
+            }
+            spinAngle += state.horizontalVelocity * CGFloat(dt) / rollingRadius
+            layer.setAffineTransform(CGAffineTransform(rotationAngle: spinAngle))
+
         case .resting, .gone:
             spinAngle = 0
             layer.setAffineTransform(restingTransform)

@@ -72,7 +72,11 @@ extension AppDelegate {
                     // its head on the very next frame, and a spun toy can never
                     // be thrown at all -- every toy, including spin-style ones
                     // like the wand, has to remain throwable like the rest.
-                    let petMayHold = ball.state.map { $0.phase != .held && $0.phase != .kicked } ?? false
+                    // Nor a rolling one: it is still in motion, and taking it
+                    // out of the air mid-roll reads as the pet snatching it.
+                    let petMayHold = ball.state.map {
+                        $0.phase != .held && $0.phase != .kicked && $0.phase != .rolling
+                    } ?? false
                     if isPlaying, spins, petMayHold, ball === toyBox.focused {
                         ball.carry(
                             to: CGPoint(

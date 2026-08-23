@@ -822,4 +822,67 @@ final class BallToyBounceTests: XCTestCase {
             "never made it down to the floor"
         )
     }
+
+    /// A toy the user throws flies as a kick and settles out of one -- which
+    /// used to happen in silence, so the pet went on standing there until its
+    /// own wander timer drew "go and play", up to fifteen seconds later.
+    func test_tick_firesOnLanded_whenAThrownToyComesToRest() {
+        let controller = BallController(parent: CALayer())
+        controller.spawn(at: CGPoint(x: 200, y: 495))
+        controller.tick(dt: 0.1, landingY: 500, roamableArea: roamableArea) // lands
+        var settles = 0
+        controller.onLanded = { _ in settles += 1 }
+
+        controller.kick(direction: .right)
+        for _ in 0..<600 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: 500, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(controller.state?.phase, .resting)
+        XCTAssertEqual(settles, 1, "coming to rest is what the pet is waiting to hear")
+    }
+
+    /// And it still says so exactly once: resting is not a repeating event.
+    func test_tick_doesNotRefireOnLanded_whileTheToyStaysAtRest() {
+        let controller = BallController(parent: CALayer())
+        controller.spawn(at: CGPoint(x: 200, y: 495))
+        controller.tick(dt: 0.1, landingY: 500, roamableArea: roamableArea)
+        controller.kick(direction: .right)
+        for _ in 0..<600 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: 500, roamableArea: roamableArea)
+        }
+
+        var settles = 0
+        controller.onLanded = { _ in settles += 1 }
+        for _ in 0..<10 {
+            controller.tick(dt: 1.0 / 60, landingY: 500, roamableArea: roamableArea)
+        }
+
+        XCTAssertEqual(settles, 0)
+    }
+
+    /// The visible half of a roll: the artwork turns with the distance it
+    /// covers, so it slows down and stops turning exactly as the toy does.
+    func test_aRollingToyTurnsAsItTravels() {
+        let controller = BallController(parent: CALayer())
+        controller.spawn(at: CGPoint(x: 200, y: 495))
+        controller.tick(dt: 0.1, landingY: 500, roamableArea: roamableArea)
+        controller.kick(direction: .right)
+
+        var sawARoll = false
+        var angleWhileRolling: CGFloat = 0
+        for _ in 0..<600 where controller.state?.phase != .resting {
+            controller.tick(dt: 1.0 / 60, landingY: 500, roamableArea: roamableArea)
+            if controller.state?.phase == .rolling {
+                sawARoll = true
+                angleWhileRolling = atan2(
+                    controller.layer.affineTransform().b,
+                    controller.layer.affineTransform().a
+                )
+            }
+        }
+
+        XCTAssertTrue(sawARoll)
+        XCTAssertNotEqual(angleWhileRolling, 0, accuracy: 0.0001, "the toy slid instead of rolling")
+    }
 }

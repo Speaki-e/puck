@@ -238,8 +238,16 @@ struct PetTankView: View {
                             .scaleEffect(x: index.isMultiple(of: 2) ? 1 : -1, y: 1)
                     }
                 }
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
+                // Centred: what is worth seeing in a scene is in the middle
+                // of it, and anchoring at the left threw that away on the
+                // right-hand side of a wide island.
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .center)
             }
+            // Frosting, not Liquid Glass. The real material was tried here
+            // and it works -- it refracts what is behind it, which is the
+            // scene -- but at this size that turns a drawn picture into a
+            // smear: the ship and the lighthouse stop being anything. The
+            // glass on this island is the light, not the blur.
             .overlay(Rectangle().fill(.ultraThinMaterial).opacity(0.26))
             // What makes it glass rather than a frosted photo: light collects
             // along the top edge, thins out over the first inch, and the

@@ -83,7 +83,8 @@ struct PetSizeSlider: View {
         // VerticalSlider for what that cost.
         VerticalSlider(
             value: Binding(get: { safeHeight }, set: { send($0) }),
-            range: PetTankView.minimumPetHeight...ceiling
+            range: PetTankView.minimumPetHeight...ceiling,
+            fillColor: .white
         )
         .frame(width: Self.thickness, height: length)
         // pet-app forgets the size when it quits, so the first window of the

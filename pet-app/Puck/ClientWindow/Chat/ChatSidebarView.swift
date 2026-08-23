@@ -65,7 +65,6 @@ struct ChatSidebarView: View {
             // list say "기본 워크스페이스" twice, once as a place and once as
             // the place you already were.
             Section { actionRows }
-                .listRowInsets(Self.rowInsets)
             Section {
                 ForEach(visibleWorkspaces) { workspace in
                     WorkspaceGroup(
@@ -200,15 +199,21 @@ struct ChatSidebarView: View {
         ) {
             store.requestNewSession(title: ChatSession.placeholderTitle, in: store.activeWorkspaceId)
         }
+        // On the row itself, not on the Section around them: a Section's
+        // `listRowInsets` never reached these three, so they kept `List`'s
+        // own generous gutter and sat visibly shorter than every row below.
+        .listRowInsets(Self.rowInsets)
         SidebarActionRow(
             title: Strings.text(.chatWorkspaces),
             systemImage: "square.grid.2x2"
         ) {
             isBrowsingWorkspaces = true
         }
+        .listRowInsets(Self.rowInsets)
         SidebarActionRow(title: Strings.text(.chatSettings), systemImage: "gearshape") {
             NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
         }
+        .listRowInsets(Self.rowInsets)
     }
 
     /// One rule for every row here. `List` leaves a generous gutter around
@@ -381,13 +386,30 @@ private struct SidebarRowBackground: ViewModifier {
     let isSelected: Bool
     @State private var isHovering = false
 
+    /// Rounder than a list row's usual corner: these fills run the whole
+    /// width of the column, and at that length a 4pt corner is a rectangle.
+    private static let cornerRadius: CGFloat = 9
+
+    /// How far the fill runs past the row's own box on each side. `List`
+    /// keeps a margin of its own around every row that nothing can set to
+    /// zero, and inside it the fill read as a small tablet under the name
+    /// rather than as the row being lit. A background is allowed to overflow.
+    private static let overhang: CGFloat = 10
+
     func body(content: Content) -> some View {
         content
             .background(
-                RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius)
+                RoundedRectangle(cornerRadius: Self.cornerRadius)
                     .fill(fill)
-                    .overlay { HoverReporter { isHovering = $0 } }
+                    .padding(.horizontal, -Self.overhang)
             )
+            // An overlay, not a background: a row that is never selected has
+            // a `.clear` fill from the first frame, and a tracking view
+            // nested inside that never came up -- which is why the three rows
+            // at the top of this list, the only ones with no selected state,
+            // never lit at all. It refuses hit tests, so the button under it
+            // still takes the click.
+            .overlay(HoverReporter { isHovering = $0 }.padding(.horizontal, -Self.overhang))
             .contentShape(.rect)
             // Animated, because the pointer crosses several rows on the way
             // to one and a hard flicker down the list is noise.
@@ -476,7 +498,7 @@ private struct WorkspaceGroup: View {
                     )
                     // Indented under the workspace they belong to, which is
                     // what says they belong to it.
-                    .padding(.leading, 16)
+                    .padding(.leading, 12)
                     .contextMenu {
                         Button(Strings.text(.commonDelete), role: .destructive) {
                             onDeleteSession(session)
@@ -538,7 +560,7 @@ private struct WorkspaceGroup: View {
                         .help(Strings.text(.chatRunning))
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 6)
             .padding(.vertical, 5)
             .sidebarRowBackground(isSelected: isActive)
         }
@@ -694,7 +716,7 @@ private struct ChatSessionRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 6)
         .frame(height: 28)
         .sidebarRowBackground(isSelected: isActive)
     }

@@ -21,9 +21,12 @@
 6. **입력창을 참고 이미지처럼** — 텍스트 필드와 컨트롤을 한 상자에 넣고,
    왼쪽 아래 첨부(+), 오른쪽 아래에 모델·사고량 선택과 음성 버튼. 지금의 별도
    화살표 전송 버튼은 뺀다.
-7. **Swift 언어 모드가 5에 머물러 있다** — `project.yml`의 `SWIFT_VERSION: "5"`.
-   `SWIFT_STRICT_CONCURRENCY: complete`로 먼저 재보고, 남는 경고의 양을 보고
-   6으로 올릴지 정한다. 빌드 도구 점검의 나머지 한 건.
+7. **Swift 6 언어 모드로 올리기** — 재봤다. `SWIFT_STRICT_CONCURRENCY: complete`
+   로 Puck·PuckClient에서 경고 220개. 대부분은 AppKit을 만지는 쪽이 메인 액터
+   표시가 없어서 나는 것(AppDelegate 확장들, MenuBarController, 창 컨트롤러들)
+   이고, 나머지가 `static var` 전역과 non-Sendable 클로저 전달이다. 기계적이지만
+   격리를 실제로 바꾸는 변경이라 한 번에 하지 않는다. 파일 단위로 `@MainActor`를
+   붙여 나가며 줄이고, 0이 되면 `SWIFT_VERSION`을 6으로 올린다.
 8. **계속 리뷰하고 고치기** — 새로 짠 코드를 같은 방식으로 훑는다.
 
 ## 완료

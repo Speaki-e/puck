@@ -182,11 +182,13 @@ struct PetTankView: View {
         .overlay(alignment: .bottom) {
             Color.clear
                 .frame(height: islandHeight)
-                // The size bar's strip is not part of the pet's world: the
-                // pet is drawn by an overlay window above this one, so a pet
-                // standing on the bar takes the drags meant for it.
-                .padding(.leading, onPetHeightChange == nil ? 0 : PetSizeSlider.footprint)
+                // Measured *inside* the inset, not outside it. A background
+                // is sized to the view it is attached to, so reporting after
+                // the padding reported the full width and the strip was never
+                // actually kept clear -- the pet went on standing on the bar
+                // and taking the drags meant for it.
                 .background(PaneFrameReporter(onChange: onFrameChange))
+                .padding(.leading, onPetHeightChange == nil ? 0 : PetSizeSlider.footprint)
                 .allowsHitTesting(false)
         }
     }

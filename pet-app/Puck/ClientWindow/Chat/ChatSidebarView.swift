@@ -275,6 +275,58 @@ struct SessionSelection: Hashable {
     let sessionId: String
 }
 
+/// Reports the pointer entering and leaving, from AppKit rather than from
+/// SwiftUI's `.onHover`.
+///
+/// `.onHover` never fired for the rows at the top of this list. They sit
+/// inside a `List`, which is an NSTableView underneath, and the row views it
+/// manages do not hand plain SwiftUI content the mouse-moved events -- the
+/// chats appeared to work only because a selectable row gets AppKit's own
+/// hover highlight for free, and the rows with no selection tag got nothing
+/// at all. A tracking area is what AppKit answers this question with, so
+/// that is what this asks with.
+private struct HoverReporter: NSViewRepresentable {
+    let onChange: (Bool) -> Void
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.onChange = onChange
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingView, context: Context) {
+        nsView.onChange = onChange
+    }
+
+    final class TrackingView: NSView {
+        var onChange: ((Bool) -> Void)?
+        private var tracking: NSTrackingArea?
+
+        /// Never the answer to a click. This view sits behind the row's own
+        /// content, and an NSView that accepts hits there would swallow every
+        /// press meant for the button in front of it.
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            if let tracking { removeTrackingArea(tracking) }
+            // .activeAlways rather than .activeInKeyWindow: the pointer moves
+            // over this list on the way to clicking it, which is exactly the
+            // moment the window is not yet key.
+            let area = NSTrackingArea(
+                rect: .zero,
+                options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                owner: self
+            )
+            addTrackingArea(area)
+            tracking = area
+        }
+
+        override func mouseEntered(with event: NSEvent) { onChange?(true) }
+        override func mouseExited(with event: NSEvent) { onChange?(false) }
+    }
+}
+
 /// The fill under a sidebar row: the selection's, the pointer's, or none.
 ///
 /// Every row here is something you click, and until now only the selected one
@@ -292,17 +344,17 @@ private struct SidebarRowBackground: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: ClientTheme.Metrics.rowCornerRadius)
                     .fill(fill)
+                    .overlay { HoverReporter { isHovering = $0 } }
             )
             .contentShape(.rect)
             // Animated, because the pointer crosses several rows on the way
             // to one and a hard flicker down the list is noise.
             .animation(.easeOut(duration: 0.12), value: isHovering)
-            .onHover { isHovering = $0 }
     }
 
     private var fill: Color {
         if isSelected { return palette.surface }
-        return isHovering ? palette.surface.opacity(0.55) : .clear
+        return isHovering ? palette.surface.opacity(0.7) : .clear
     }
 }
 
@@ -395,6 +447,7 @@ private struct WorkspaceRow: View {
             .sidebarRowBackground(isSelected: isActive)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(workspace.displayName)
         .help(workspace.projectPath ?? workspace.displayName)
     }
 

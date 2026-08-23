@@ -512,7 +512,12 @@ struct ChatInputBar: View {
             .frame(height: Self.controlHeight)
             .contentShape(.rect)
         }
-        .menuStyle(.borderlessButton)
+        // `.borderlessButton` throws the label away: it renders as an
+        // NSPopUpButton, which takes a title and nothing else, so the two
+        // words and the chevron here came out as one word with the system's
+        // own arrow on the wrong side. `.button` draws what it was given.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
     }

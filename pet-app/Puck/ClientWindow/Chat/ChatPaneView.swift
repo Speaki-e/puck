@@ -69,21 +69,13 @@ struct ChatPaneView: View {
     @ViewBuilder
     private var detail: some View {
         if let session = activeSession {
-            // Above `conversation`, not inside the chat column: the tank is a
-            // strip across the whole detail area, and it was one before the
-            // code column existed. Putting it inside would shrink the pet's
-            // home to the chat's width the moment a file is opened.
-            VStack(spacing: 0) {
-                PetTankView(
-                    onFrameChange: { store.setTankSegment($0, for: .chat) },
-                    onPetHeightChange: { store.setPetIslandHeight($0) },
-                    toolbarTrailingX: toolbarTrailingX
-                )
-                conversation(session)
-            }
-            .navigationTitle(session.displayTitle)
-            .navigationSubtitle(activeWorkspace?.displayName ?? "")
-            .toolbar { toolbarContent }
+            // The island is drawn by the window, above this whole split: it
+            // is one shelf across the top, and anything inside a column can
+            // only ever be a piece of one.
+            conversation(session)
+                .navigationTitle(session.displayTitle)
+                .navigationSubtitle(activeWorkspace?.displayName ?? "")
+                .toolbar { toolbarContent }
         } else {
             // Only reachable if the active ids point at a session that no
             // longer exists; the store always seeds one per workspace.

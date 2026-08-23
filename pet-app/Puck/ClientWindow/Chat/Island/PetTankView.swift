@@ -42,6 +42,15 @@ struct PetTankView: View {
     /// the pet in an island it does not fit in.
     @AppStorage(PetTankView.heightStorageKey) private var storedHeight = Double(PetTankView.islandHeight)
 
+    /// Whether the shelf is folded away to a sliver.
+    ///
+    /// Folded, there is nowhere to stand, so the pet is told there is no tank
+    /// and goes back to the desktop -- which is the honest answer and also
+    /// the useful one: this is the control for "give me the window back".
+    /// Remembered, because someone who works with it away wants it away
+    /// tomorrow too.
+    @AppStorage(PetTankView.collapsedStorageKey) private var isCollapsed = false
+
     /// What each drag is working from, captured once when the gesture starts
     /// so it measures against where it began rather than against the value it
     /// is itself changing.
@@ -95,6 +104,13 @@ struct PetTankView: View {
     /// other.
     static let heightStorageKey = "Puck.islandHeight"
 
+    /// Its own key, like the height: whether the shelf is out and how tall it
+    /// is are two different questions.
+    static let collapsedStorageKey = "Puck.islandCollapsed"
+
+    /// What is left when it is folded: enough to see the water and to grab.
+    static let collapsedHeight: CGFloat = 16
+
     /// How far the island floats from the window's own edges. Was 20 on each
     /// side, which read as a gap rather than as the island floating: the strip
     /// is only ~90pt tall, and 40pt of the width went to nothing.
@@ -103,6 +119,10 @@ struct PetTankView: View {
 
     /// The strip the island floats in.
     static func stripHeight(island: CGFloat) -> CGFloat { island + verticalInset * 2 }
+
+    /// How tall the shelf is drawn right now: what it was dragged to, or the
+    /// sliver it folds down to.
+    private var drawnHeight: CGFloat { isCollapsed ? Self.collapsedHeight : islandHeight }
 
     /// The same corners every floating panel in this window has.
     static let cornerRadius: CGFloat = ClientTheme.Metrics.panelCornerRadius
@@ -168,13 +188,14 @@ struct PetTankView: View {
             // them. Softer than a card's: the island is a shelf, not a dialog.
             .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
         }
-        .frame(height: islandHeight + Self.shoulderRise + Self.baseLift)
-        // The grab area for resizing, on the edge it moves.
+        .frame(height: drawnHeight + Self.shoulderRise + Self.baseLift)
+        // The grab area for resizing, on the edge it moves -- and the way to
+        // fold the shelf away, since that edge is where the hand already is.
         .overlay(alignment: .bottom) { resizeHandle }
         // Up the left edge, the height of the island it sizes the pet for,
         // and clear of the toolbar's band -- which takes every click in it.
         .overlay(alignment: .bottomLeading) {
-            if let onPetHeightChange {
+            if let onPetHeightChange, !isCollapsed {
                 PetSizeSlider(
                     length: max(24, islandHeight - PetSizeSlider.inset * 2),
                     onChange: onPetHeightChange
@@ -190,14 +211,20 @@ struct PetTankView: View {
         .overlay(alignment: .bottom) {
             Color.clear
                 .frame(height: islandHeight)
+                .opacity(isCollapsed ? 0 : 1)
                 // Measured *inside* the inset, not outside it. A background
                 // is sized to the view it is attached to, so reporting after
                 // the padding reported the full width and the strip was never
                 // actually kept clear -- the pet went on standing on the bar
                 // and taking the drags meant for it.
-                .background(PaneFrameReporter(onChange: onFrameChange))
+                .background(isCollapsed ? nil : PaneFrameReporter(onChange: onFrameChange))
                 .padding(.leading, onPetHeightChange == nil ? 0 : PetSizeSlider.footprint)
                 .allowsHitTesting(false)
+        }
+        // Folding it away is the pet losing its floor, and the reporter that
+        // would have said so is the very thing being taken off screen.
+        .onChange(of: isCollapsed) {
+            if isCollapsed { onFrameChange(nil) }
         }
     }
 
@@ -311,12 +338,19 @@ struct PetTankView: View {
                 // The cursor says which way it moves before the drag starts.
                 if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
             }
+            // Click folds, drag resizes. One target for both because it is
+            // the same edge: the one the shelf's height is changed from.
+            .onTapGesture { isCollapsed.toggle() }
             .gesture(
                 DragGesture(minimumDistance: 1)
                     .updating($heightAtDragStart) { _, start, _ in
                         if start == nil { start = islandHeight }
                     }
                     .onChanged { value in
+                        // A drag on a folded shelf unfolds it: the gesture is
+                        // "make this taller", and refusing it would leave the
+                        // handle looking stuck.
+                        isCollapsed = false
                         let start = heightAtDragStart ?? islandHeight
                         // Down grows it: the handle is on the bottom edge, so
                         // the edge follows the pointer.
@@ -325,8 +359,8 @@ struct PetTankView: View {
                         )
                     }
             )
-            .accessibilityLabel(Strings.text(.islandResize))
-            .help(Strings.text(.islandResize))
+            .accessibilityLabel(Strings.text(isCollapsed ? .islandExpand : .islandCollapse))
+            .help(Strings.text(isCollapsed ? .islandExpand : .islandCollapse))
     }
 
     var body: some View {

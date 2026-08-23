@@ -32,24 +32,14 @@ final class ClientWindowStore: ObservableObject {
 
     static let tankPinnedKey = "Puck.tankPinned"
 
-    /// The tank is drawn in two pieces -- above the chat column, and above the
-    /// editor column when it is open -- because they are siblings in a split
-    /// and SwiftUI cannot draw one view across that boundary. The pet does not
-    /// care: it is drawn by the overlay, so it walks over the divider.
-    enum TankSegment: Hashable {
-        case chat
-        case editor
-    }
-
-    private var tankSegments: [TankSegment: CGRect] = [:]
-
-    /// The whole tank in AppKit global coordinates, or nil when none of it is
-    /// on screen.
-    var tankFrame: CGRect? {
-        tankSegments.values.reduce(nil) { union, frame in
-            union.map { $0.union(frame) } ?? frame
-        }
-    }
+    /// Where the island is, in AppKit global coordinates, or nil when it is
+    /// not on screen.
+    ///
+    /// One frame again. It was two for a while -- the strip over the chat and
+    /// the strip over the file list -- because the island lived inside a
+    /// split and SwiftUI cannot draw one view across that boundary. The
+    /// island sits above the split now, so there is one view and one frame.
+    private(set) var tankFrame: CGRect?
 
     /// Whether the client window is the one the user is looking at. Reported
     /// by the window itself; the pet only comes home for a frontmost window.
@@ -64,10 +54,9 @@ final class ClientWindowStore: ObservableObject {
     /// had been.
     private(set) var windowIsOpen = true
 
-    func setTankSegment(_ frame: CGRect?, for segment: TankSegment) {
-        let previous = tankSegments[segment]
-        tankSegments[segment] = frame
-        guard previous != frame else { return }
+    func setTankFrame(_ frame: CGRect?) {
+        guard tankFrame != frame else { return }
+        tankFrame = frame
         reportPetHome()
     }
 

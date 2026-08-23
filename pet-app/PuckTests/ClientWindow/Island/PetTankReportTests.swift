@@ -2,9 +2,9 @@
 //  PetTankReportTests.swift
 //  Puck
 //
-//  The tank spans the chat column and, when it is open, the editor column.
-//  Each reports its own rect; what the pet gets is the union, because the
-//  pet crosses the split's divider as if it were not there.
+//  Where the pet's home is, as the window reports it. One rect: the island
+//  is drawn above the split rather than inside its columns, so there is one
+//  view to report and nothing to union.
 //
 
 import XCTest
@@ -12,35 +12,36 @@ import CoreGraphics
 @testable import Puck
 
 final class PetTankReportTests: XCTestCase {
-    func test_theChatSegmentAloneIsTheTank() {
+    func test_theReportedFrameIsTheTank() {
         let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
 
-        store.setTankSegment(CGRect(x: 200, y: 800, width: 600, height: 90), for: .chat)
+        store.setTankFrame(CGRect(x: 200, y: 800, width: 600, height: 90))
 
         XCTAssertEqual(store.tankFrame, CGRect(x: 200, y: 800, width: 600, height: 90))
     }
 
-    func test_withTheEditorOpen_theTankIsTheUnion() {
+    /// The island moves and resizes -- the window is resized, the lever is
+    /// dragged -- and the pet is sent wherever it ends up.
+    func test_aNewFrameReplacesTheOldOne() {
         let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
+        store.setTankFrame(CGRect(x: 200, y: 800, width: 600, height: 90))
 
-        store.setTankSegment(CGRect(x: 200, y: 800, width: 600, height: 90), for: .chat)
-        store.setTankSegment(CGRect(x: 810, y: 800, width: 500, height: 90), for: .editor)
+        store.setTankFrame(CGRect(x: 200, y: 780, width: 900, height: 110))
 
-        XCTAssertEqual(store.tankFrame, CGRect(x: 200, y: 800, width: 1110, height: 90))
+        XCTAssertEqual(store.tankFrame, CGRect(x: 200, y: 780, width: 900, height: 110))
     }
 
-    /// Closing the editor takes its half of the tank with it.
-    func test_clearingTheEditorSegmentShrinksTheTank() {
+    /// The strip goes off screen with the window; nil is how it says so.
+    func test_clearingTheFrameLeavesNoTank() {
         let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
-        store.setTankSegment(CGRect(x: 200, y: 800, width: 600, height: 90), for: .chat)
-        store.setTankSegment(CGRect(x: 810, y: 800, width: 500, height: 90), for: .editor)
+        store.setTankFrame(CGRect(x: 200, y: 800, width: 600, height: 90))
 
-        store.setTankSegment(nil, for: .editor)
+        store.setTankFrame(nil)
 
-        XCTAssertEqual(store.tankFrame, CGRect(x: 200, y: 800, width: 600, height: 90))
+        XCTAssertNil(store.tankFrame)
     }
 
-    func test_noSegmentsMeansNoTank() {
+    func test_nothingReportedMeansNoTank() {
         let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
 
         XCTAssertNil(store.tankFrame)
@@ -50,7 +51,7 @@ final class PetTankReportTests: XCTestCase {
     /// in the space where the window had been.
     func test_aClosedWindowHasNoTank() {
         let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
-        store.setTankSegment(CGRect(x: 200, y: 800, width: 600, height: 90), for: .chat)
+        store.setTankFrame(CGRect(x: 200, y: 800, width: 600, height: 90))
 
         store.setWindowIsOpen(false)
 
@@ -63,7 +64,7 @@ final class PetTankReportTests: XCTestCase {
     func test_reopeningRestoresTheTank() {
         let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
         let frame = CGRect(x: 200, y: 800, width: 600, height: 90)
-        store.setTankSegment(frame, for: .chat)
+        store.setTankFrame(frame)
         store.setWindowIsOpen(false)
 
         store.setWindowIsOpen(true)

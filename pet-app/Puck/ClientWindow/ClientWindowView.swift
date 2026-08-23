@@ -117,6 +117,15 @@ struct ClientWindowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // One island, across the whole window and above the split. It
+            // used to be drawn inside the columns, which meant one piece per
+            // column and a seam down the middle -- SwiftUI cannot draw a view
+            // across a split, so the split gives way instead.
+            PetTankView(
+                onFrameChange: { store.setTankFrame($0) },
+                onPetHeightChange: { store.setPetIslandHeight($0) },
+                toolbarTrailingX: toolbarTrailingX
+            )
             Group {
                 if editor.isAttached, let editorStore {
                     HSplitView {
@@ -141,17 +150,7 @@ struct ClientWindowView: View {
                         // A file list needs room for names, not for a second
                         // editor: the code it opens goes beside the
                         // conversation instead.
-                        // The island runs over this column too. It is one
-                        // shelf across the top of the window; SwiftUI cannot
-                        // draw a view across a split, so each column draws its
-                        // own piece and the store unions them for the pet.
-                        VStack(spacing: 0) {
-                            PetTankView(
-                                onFrameChange: { store.setTankSegment($0, for: .editor) },
-                                toolbarTrailingX: toolbarTrailingX
-                            )
-                            FileExplorerPane(store: editorStore, externalTab: $explorerTab)
-                        }
+                        FileExplorerPane(store: editorStore, externalTab: $explorerTab)
                             .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else if editor.isAttached, let availability = activeWorkspace?.editorAvailability {
@@ -167,13 +166,7 @@ struct ClientWindowView: View {
                         )
                         .frame(minWidth: 520)
                         .layoutPriority(1)
-                        VStack(spacing: 0) {
-                            PetTankView(
-                                onFrameChange: { store.setTankSegment($0, for: .editor) },
-                                toolbarTrailingX: toolbarTrailingX
-                            )
-                            EditorEmptyStateView(availability: availability)
-                        }
+                        EditorEmptyStateView(availability: availability)
                             .frame(minWidth: 170, idealWidth: 200, maxWidth: 280)
                     }
                 } else {
@@ -257,7 +250,6 @@ struct ClientWindowView: View {
             // where it was, so re-attaching later lands where you left it.
             if editor != .detached { editorWasAttached = editor.isAttached }
             guard !editor.isAttached else { return }
-            store.setTankSegment(nil, for: .editor)
         }
     }
 }

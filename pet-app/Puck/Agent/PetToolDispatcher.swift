@@ -89,8 +89,15 @@ final class PetToolDispatcher: @unchecked Sendable {
 
         return await withCheckedContinuation { continuation in
             lock.lock()
-            pending[id] = continuation
+            // Nothing in the app reuses an id -- they are UUIDs -- but if one
+            // ever did, overwriting the entry would strand the earlier
+            // continuation and hang whoever was awaiting it forever. A
+            // displaced waiter is told instead.
+            let displaced = pending.updateValue(continuation, forKey: id)
             lock.unlock()
+            displaced?.resume(returning: DispatchedToolResult(
+                ok: false, data: nil, error: "execution_failed", detail: "dispatch id reused: \(id)"
+            ))
 
             guard send(.toolDispatch(ToolDispatch(id: id, tool: tool, args: arguments))) else {
                 // Nothing is connected. Answer immediately rather than after

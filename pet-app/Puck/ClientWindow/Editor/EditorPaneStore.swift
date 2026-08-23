@@ -22,6 +22,10 @@ final class EditorPaneStore: ObservableObject {
     @Published private(set) var treeRevision = 0
     @Published private(set) var openTabs: [EditorTab] = []
     @Published var activeTabPath: String?
+    /// The last thing that went wrong, for the pane to show. Cleared when
+    /// the next operation starts, and by the view once it has been read --
+    /// an error nothing displays is an operation that silently did nothing,
+    /// which is what a failed rename looked like.
     @Published var lastError: WorkspaceFileServiceError?
     /// Set by `requestClose(path:)` when the tab still holds unsaved edits:
     /// the view turns it into a confirmation dialog. Nil means nothing is
@@ -111,6 +115,8 @@ final class EditorPaneStore: ObservableObject {
     /// name is now open on a file that no longer exists, and a tree still
     /// showing it is a tree that lies.
     func rename(path: String, to newName: String) {
+        // Whatever went wrong last time is not what is being reported now.
+        lastError = nil
         do {
             let renamed = try service.rename(path, to: newName)
             if let index = openTabs.firstIndex(where: { $0.path == path }) {
@@ -134,6 +140,8 @@ final class EditorPaneStore: ObservableObject {
     /// Moves a file or directory to the Trash and closes anything open from
     /// under it -- a tab on a trashed file has nowhere to save to.
     func trash(path: String) {
+        // Whatever went wrong last time is not what is being reported now.
+        lastError = nil
         do {
             try service.trash(path)
             for tab in openTabs where tab.path == path || tab.path.hasPrefix(path + "/") {
@@ -150,6 +158,8 @@ final class EditorPaneStore: ObservableObject {
     /// Creates an empty file or a directory. A new file is opened straight
     /// away, because the only reason to make one is to put something in it.
     func create(name: String, directory: Bool, in parent: String?) {
+        // Whatever went wrong last time is not what is being reported now.
+        lastError = nil
         do {
             let created = try service.create(name: name, directory: directory, in: parent)
             loadTree()

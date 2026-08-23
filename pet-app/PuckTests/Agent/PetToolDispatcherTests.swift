@@ -186,4 +186,23 @@ final class AgentToolRegistryTests: XCTestCase {
             XCTAssertNotNil(ToolRegistry.tool(named: name), "\(name) is in ToolTimeouts but missing from ToolRegistry")
         }
     }
+
+    /// Ids are UUIDs, so this cannot happen by accident -- but if it ever
+    /// did, the first waiter must be told rather than left awaiting a
+    /// continuation nobody holds any more.
+    func test_reusingADispatchIdAnswersTheWaiterItDisplaces() async {
+        let sut = PetToolDispatcher(send: { _ in true })
+
+        async let first = sut.execute(tool: "launch_app", arguments: .object([:]), id: "same")
+        await Task.yield()
+        async let second = sut.execute(tool: "launch_app", arguments: .object([:]), id: "same")
+        await Task.yield()
+        sut.handle(ToolResult(id: "same", ok: true, data: nil, error: nil, detail: nil))
+
+        let displaced = await first
+        let answered = await second
+        XCTAssertFalse(displaced.ok)
+        XCTAssertEqual(displaced.detail, "dispatch id reused: same")
+        XCTAssertTrue(answered.ok)
+    }
 }

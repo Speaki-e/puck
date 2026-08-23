@@ -235,4 +235,47 @@ final class EditorPaneStoreTests: XCTestCase {
 
         XCTAssertEqual(store.openTabs.map(\.path), ["keep.txt"])
     }
+
+    /// A rename onto a name that is taken has to say so. It set an error
+    /// nothing displayed, so the menu item appeared to do nothing at all.
+    func test_aFailedRenameReportsWhyAndChangesNothing() throws {
+        try write("a", at: "a.txt")
+        try write("b", at: "b.txt")
+        let store = try makeStore()
+        store.open(path: "a.txt")
+
+        store.rename(path: "a.txt", to: "b.txt")
+
+        XCTAssertNotNil(store.lastError)
+        XCTAssertFalse(store.lastError?.message.isEmpty ?? true)
+        XCTAssertEqual(store.openTabs.map(\.path), ["a.txt"], "and the tab still points at the file that is still there")
+    }
+
+    /// The next attempt starts clean: an error from a minute ago must not be
+    /// shown as if it were about the thing just done.
+    func test_theNextOperationClearsTheLastError() throws {
+        try write("a", at: "a.txt")
+        try write("b", at: "b.txt")
+        let store = try makeStore()
+        store.rename(path: "a.txt", to: "b.txt")
+        XCTAssertNotNil(store.lastError)
+
+        store.rename(path: "a.txt", to: "c.txt")
+
+        XCTAssertNil(store.lastError)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("c.txt").path))
+    }
+
+    /// Same for the other two, which fail the same way and were equally
+    /// silent about it.
+    func test_creatingAndTrashingReportTheirFailures() throws {
+        try write("a", at: "a.txt")
+        let store = try makeStore()
+
+        store.create(name: "a.txt", directory: false, in: nil)
+        XCTAssertNotNil(store.lastError, "a name that is taken")
+
+        store.trash(path: "gone.txt")
+        XCTAssertNotNil(store.lastError, "something that is not there")
+    }
 }

@@ -78,6 +78,15 @@ struct FileExplorerPane: View {
                 )
             }
         }
+        // Under the list, where the actions that fail are: renaming onto a
+        // name that exists, deleting something already gone, creating in a
+        // folder that has moved. Every one of those used to set an error
+        // nothing displayed, so the menu item simply appeared to do nothing.
+        .safeAreaInset(edge: .bottom) {
+            if let error = store.lastError {
+                ExplorerErrorBanner(message: error.message) { store.lastError = nil }
+            }
+        }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(palette.background)
         // Read for the pane, not for the git tab: the file tree marks changed
@@ -149,6 +158,43 @@ struct FileExplorerPane: View {
                     }
                 )
             )
+        }
+    }
+}
+
+/// One line, in the pane the action was taken in. Not an alert: a name that
+/// is already taken is a correction, not an interruption, and an alert for it
+/// would take the keyboard away from someone in the middle of typing another.
+private struct ExplorerErrorBanner: View {
+    @Environment(\.clientPalette) private var palette
+
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(palette.statusError)
+            Text(message)
+                .font(ClientTheme.Typography.caption)
+                .foregroundStyle(palette.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(palette.textSecondary)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Strings.text(.commonCancel))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(palette.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(palette.surfaceBorder).frame(height: 1)
         }
     }
 }

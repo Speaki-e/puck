@@ -15,6 +15,7 @@
 //  would drop characters. Losing text is always worse than losing styling.
 //
 
+import AppKit
 import SwiftUI
 
 // MARK: - Model
@@ -361,12 +362,8 @@ struct MarkdownText: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-        case .codeBlock(_, let code):
-            Text(code)
-                .font(ClientTheme.Typography.transcriptCode)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(ClientTheme.Metrics.spacingMedium)
-                .background(.quaternary.opacity(0.4), in: ClientTheme.Shapes.card)
+        case .codeBlock(let language, let code):
+            CodeBlockView(language: language, code: code)
 
         case .quote(let text):
             Text(markdownInline(text))
@@ -396,5 +393,74 @@ struct MarkdownText: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.leading, CGFloat(item.level) * ClientTheme.Metrics.spacingLarge)
+    }
+}
+
+/// A fenced block, with the two things anyone reading code in a chat wants:
+/// an edge so it is clearly not prose, and a way to take it.
+///
+/// The button appears on hover rather than sitting there always: it overlaps
+/// the first line's right end, and a control parked on top of code is in the
+/// way of reading it.
+private struct CodeBlockView: View {
+    /// Redraws this view when the UI language changes. Needed on every view
+    /// that resolves a string, not just the window root: SwiftUI skips a
+    /// child whose own inputs are unchanged, and a table lookup inside `body`
+    /// is not an input.
+    @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
+
+    let language: String?
+    let code: String
+
+    @State private var isHovering = false
+    @State private var hasCopied = false
+
+    var body: some View {
+        Text(code)
+            .font(ClientTheme.Typography.transcriptCode)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(ClientTheme.Metrics.spacingMedium)
+            .background(.quaternary.opacity(0.4), in: ClientTheme.Shapes.card)
+            .overlay {
+                ClientTheme.Shapes.card.strokeBorder(palette.surfaceBorder, lineWidth: 1)
+            }
+            .overlay(alignment: .topTrailing) { copyButton }
+            .onHover { isHovering = $0 }
+    }
+
+    @ViewBuilder
+    private var copyButton: some View {
+        if isHovering {
+            Button(action: copy) {
+                Label(
+                    hasCopied ? Strings.text(.codeBlockCopied) : Strings.text(.codeBlockCopy),
+                    systemImage: hasCopied ? "checkmark" : "doc.on.doc"
+                )
+                .labelStyle(.iconOnly)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(hasCopied ? palette.accent : palette.textSecondary)
+                .frame(width: 22, height: 20)
+                .background(palette.surface, in: ClientTheme.Shapes.row)
+                .overlay {
+                    ClientTheme.Shapes.row.strokeBorder(palette.surfaceBorder, lineWidth: 1)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .padding(6)
+            .accessibilityLabel(Strings.text(.codeBlockCopy))
+            .help(Strings.text(.codeBlockCopy))
+        }
+    }
+
+    private func copy() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(code, forType: .string)
+        // Said by the button itself rather than a banner: the answer to "did
+        // that work" belongs where the click was.
+        hasCopied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { hasCopied = false }
     }
 }

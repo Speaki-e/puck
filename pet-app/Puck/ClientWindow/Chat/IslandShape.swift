@@ -37,9 +37,8 @@ struct IslandShape: InsettableShape {
     /// How much horizontal run the climb takes. Longer than the rise itself,
     /// so the curve leans rather than turning a corner.
     ///
-    /// The default; the shape takes the value as a property so it can be
-    /// tuned live -- see `IslandShapeTuning`.
-    static let blend: CGFloat = 46
+    /// Settled by eye against the real window, then fixed here.
+    static let blend: CGFloat = 48
 
     var blend: CGFloat = IslandShape.blend
 

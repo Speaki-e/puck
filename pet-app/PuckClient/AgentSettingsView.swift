@@ -39,10 +39,6 @@ struct AgentSettingsView: View {
     /// inside `body` is not an input.
     @ObservedObject private var localization = Localization.shared
 
-    /// Temporary knobs for the island's raised shoulder -- see
-    /// `islandShoulderRows`.
-    @AppStorage(IslandShapeTuning.riseKey) private var tunedRise = Double(PetTankView.shoulderRise)
-    @AppStorage(IslandShapeTuning.blendKey) private var tunedBlend = Double(IslandShape.blend)
     /// Repainted when the theme changes, wherever it was changed from. The
     /// window is kept alive after closing, so a value read once would show
     /// the theme it was built under for the rest of the session.
@@ -126,11 +122,6 @@ struct AgentSettingsView: View {
                     .labelsHidden()
                 }
 
-                // Temporary. The island's raised shoulder is being settled by
-                // eye rather than by guessing, so its two numbers are live
-                // here; once they are chosen they go back to being constants
-                // in IslandShape and this block goes away (docs/tasks.md).
-                islandShoulderRows
             }
 
             skillsSection
@@ -291,17 +282,6 @@ struct AgentSettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-    }
-
-    /// Temporary -- see the note at the call site.
-    @ViewBuilder
-    private var islandShoulderRows: some View {
-        SettingsStackedRow(label: "섬 어깨 높이", value: String(format: "%.0f", tunedRise)) {
-            Slider(value: $tunedRise, in: IslandShapeTuning.riseRange)
-        }
-        SettingsStackedRow(label: "섬 어깨 기울기 폭", value: String(format: "%.0f", tunedBlend)) {
-            Slider(value: $tunedBlend, in: IslandShapeTuning.blendRange)
-        }
     }
 
     private var credentialFieldLabel: String {

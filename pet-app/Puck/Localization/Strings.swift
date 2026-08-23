@@ -117,6 +117,7 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     /// Shared by more than one surface, so they cannot drift apart.
     case commonCancel, commonDelete, commonCreate, commonChoose
+    case codeBlockCopy, codeBlockCopied
 
     case chatSelectAConversation, chatNewSession, chatCasualSession, chatThisWorkspace
     case chatSettings, chatComposerPlaceholder, chatStop, chatSend
@@ -391,6 +392,8 @@ enum Strings {
         .tankBackgroundWorldTree: "세계수",
         .tankBackgroundBoundary: "경계",
         .tankBackgroundMeadow: "들녘",
+        .codeBlockCopy: "복사",
+        .codeBlockCopied: "복사했어요",
         .commonCancel: "취소",
         .commonDelete: "삭제",
         .commonCreate: "만들기",
@@ -706,6 +709,8 @@ enum Strings {
         .tankBackgroundWorldTree: "World tree",
         .tankBackgroundBoundary: "Boundary",
         .tankBackgroundMeadow: "Meadow",
+        .codeBlockCopy: "Copy",
+        .codeBlockCopied: "Copied",
         .commonCancel: "Cancel",
         .commonDelete: "Delete",
         .commonCreate: "Create",

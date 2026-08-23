@@ -12,6 +12,9 @@ import Foundation
 /// WanderScheduler timer fires — that decision needs the window list (F4,
 /// e.g. finding the nearest window), so it's delegated up to whatever owns
 /// CharacterController (the future App bootstrap wiring).
+/// `@MainActor`: the implementor is the app delegate and what it decides
+/// moves the character, which the frame loop draws on the main thread.
+@MainActor
 protocol IdleWanderDelegate: AnyObject {
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome)
 

@@ -165,7 +165,7 @@ extension AppDelegate {
     /// exactly, so it reads as being stuck rather than as having wandered.
     /// It can still be *carried* or thrown into a corner; it just won't
     /// choose one.
-    static let roamEdgeMargin: CGFloat = 0.08
+    nonisolated static let roamEdgeMargin: CGFloat = 0.08
 
     /// Where the next wander goes, drawn as a *distance from where the pet
     /// already is* rather than as a point anywhere on screen.
@@ -177,7 +177,7 @@ extension AppDelegate {
     /// wandering rather than commuting.
     ///
     /// Static and pure so the distribution is testable without a screen.
-    static func randomRoamPoint(in area: CGRect, from currentX: CGFloat) -> CGPoint {
+    nonisolated static func randomRoamPoint(in area: CGRect, from currentX: CGFloat) -> CGPoint {
         guard area.width > 0 else { return .zero }
         let margin = area.width * roamEdgeMargin
         let low = area.minX + margin
@@ -201,7 +201,7 @@ extension AppDelegate {
     /// however small the pet's world is right now, so a pet in its tank would
     /// set off at a window outside its own glass. A 90pt strip has no ceiling
     /// worth crawling along either.
-    static func wanderOutcome(
+    nonisolated static func wanderOutcome(
         _ outcome: WanderScheduler.Outcome,
         atHome: Bool
     ) -> WanderScheduler.Outcome {
@@ -250,7 +250,7 @@ extension AppDelegate {
 
     /// Mostly one leg, sometimes two, now and then three. More than that and
     /// the pet never settles.
-    static func drawWanderLegs() -> Int {
+    nonisolated static func drawWanderLegs() -> Int {
         let roll = CGFloat.random(in: 0...1)
         if roll < 0.55 { return 1 }
         return roll < 0.85 ? 2 : 3
@@ -258,7 +258,7 @@ extension AppDelegate {
 
     /// Long enough to read as the pet stopping to look at something, short
     /// enough that the walk still feels like one wander.
-    static func randomLegPause() -> TimeInterval { .random(in: 0.4...1.4) }
+    nonisolated static func randomLegPause() -> TimeInterval { .random(in: 0.4...1.4) }
 
     /// Where the pet is now, or the middle of the area before there is a
     /// body to ask -- a wander drawn without one has nothing to be relative to.
@@ -267,10 +267,10 @@ extension AppDelegate {
     }
 
     /// As a fraction of the roamable width.
-    private static let shortHopDistance: ClosedRange<CGFloat> = 0.05...0.3
-    private static let longTripDistance: ClosedRange<CGFloat> = 0.3...0.8
+    nonisolated private static let shortHopDistance: ClosedRange<CGFloat> = 0.05...0.3
+    nonisolated private static let longTripDistance: ClosedRange<CGFloat> = 0.3...0.8
     /// Most wanders are short; now and then the pet crosses the room.
-    private static let longTripChance: CGFloat = 0.25
+    nonisolated private static let longTripChance: CGFloat = 0.25
 
     /// A little slower or quicker each time, so repeated walks don't look
     /// like the same clip replayed. Applied per wander, on top of Settings'

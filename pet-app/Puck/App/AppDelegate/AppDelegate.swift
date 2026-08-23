@@ -12,6 +12,12 @@ import CoreGraphics
 import Foundation
 import SwiftUI
 
+/// `@MainActor`, stated rather than assumed. Every line of this class and its
+/// seventeen extensions runs on the main thread already -- it owns the
+/// windows, the menu bar, the frame loop and the character -- but the
+/// annotation is what lets the compiler check it, and what stops a callback
+/// arriving from a socket queue touching a window by accident.
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, PetPointingCoordinating {
     let settingsStore = SettingsStore()
 

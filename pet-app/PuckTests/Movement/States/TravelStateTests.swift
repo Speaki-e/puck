@@ -9,6 +9,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class TravelStateTests: XCTestCase {
     func test_easingStartsAndEndsAtRest() {
         XCTAssertEqual(TravelState.eased(0), 0, accuracy: 0.0001)

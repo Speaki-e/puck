@@ -9,6 +9,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class StateSoundKeyTests: XCTestCase {
     func test_soundKeyDefaultsToClipKey() {
         XCTAssertEqual(IdleState().soundKey, IdleState().clipKey)

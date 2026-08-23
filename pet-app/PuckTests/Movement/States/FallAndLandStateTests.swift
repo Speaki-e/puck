@@ -10,6 +10,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class FallStateTests: XCTestCase {
     func test_acceleratesDownwardEachFrame() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
@@ -267,6 +270,9 @@ final class FallStateTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class LandStateTests: XCTestCase {
     func test_returnsToIdleAfterTheLandingBeat() {
         let world = TestStateWorld()

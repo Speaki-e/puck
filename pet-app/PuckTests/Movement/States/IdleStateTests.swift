@@ -9,6 +9,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class IdleStateTests: XCTestCase {
     private final class SpyWanderDelegate: IdleWanderDelegate {
         private(set) var received: [WanderScheduler.Outcome] = []

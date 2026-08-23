@@ -13,6 +13,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class DummyAvatarPackageTests: XCTestCase {
     /// The package as committed in the repo, not the installed copy under
     /// Application Support -- this is the one other people clone.

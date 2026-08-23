@@ -13,6 +13,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: these reach into EditorPaneStorePool, which is the main
+/// thread's -- the same actor the app's own callers are on.
+@MainActor
 final class EditorFileDelegateTests: XCTestCase {
     private func makeDelegate(resolveProjectPath: @escaping (String) -> String?) -> EditorFileDelegate {
         EditorFileDelegate(resolveProjectPath: resolveProjectPath)

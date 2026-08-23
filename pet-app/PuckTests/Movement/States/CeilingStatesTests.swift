@@ -19,6 +19,9 @@ private func window(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> 
     WindowInfo(windowID: 1, ownerPID: 1, ownerName: nil, title: nil, layer: 0, frame: CGRect(x: x, y: y, width: width, height: height))
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class ClimbToCeilingStateTests: XCTestCase {
     // A wall tall enough to span from well below the pet's start position up
     // past the ceiling target, at x=100 so windowBeingClimbed recognizes it.
@@ -124,6 +127,9 @@ final class ClimbToCeilingStateTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class CeilingStateTests: XCTestCase {
     func test_enter_flipsTheBodyUpsideDown() {
         let world = TestStateWorld(position: CGPoint(x: 100, y: 0))

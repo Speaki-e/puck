@@ -14,6 +14,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class MoveToStateTests: XCTestCase {
     func test_movesTowardTheTargetAndHandsOverOnArrival() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 100))

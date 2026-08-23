@@ -13,6 +13,10 @@ import Foundation
 /// On transition, CharacterController calls AvatarPlayable.play AND triggers
 /// SFX using clipKey (not name) -- the manifest's sounds table is keyed by
 /// the same lowercase clip names as clips, not the capitalized state name.
+/// `@MainActor`: the whole state machine is driven by the frame loop, which
+/// is a CVDisplayLink hop onto the main thread -- a state that ran anywhere
+/// else would be moving a character AppKit is drawing.
+@MainActor
 protocol StateHandler: AnyObject {
     /// FSM state name (e.g. "Idle", "WalkOnTop") -- display/debugging only.
     var name: String { get }

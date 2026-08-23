@@ -12,9 +12,10 @@
 
 import Foundation
 
-/// Main-thread only, by the same convention as ClientWindowStore/other
-/// ObservableObject singletons in this codebase (no @MainActor enforcement
-/// here, consistent with the rest of Puck/ClientWindow).
+/// Main-thread only, and now stated rather than conventional: every caller
+/// is a SwiftUI view or the store it owns, and under strict concurrency a
+/// shared mutable singleton has to say which actor it belongs to.
+@MainActor
 final class EditorPaneStorePool {
     static let shared = EditorPaneStorePool()
 

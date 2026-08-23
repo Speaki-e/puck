@@ -77,6 +77,9 @@ private final class SpyState: StateHandler {
     func exit() { exitCallCount += 1 }
 }
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class StateTransitionTests: XCTestCase {
     func test_init_playsInitialStateClipAndTriggersSFXAndEnters() {
         let avatar = SpyAvatarPlayable()

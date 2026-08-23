@@ -24,7 +24,11 @@ import Foundation
 import Network
 import Security
 
-final class LoopbackHTTPServer {
+/// `@unchecked Sendable`: every stored property is read and written inside
+/// `stateQueue`, which is what the type's own comments have said all along --
+/// the annotation is that promise written where the compiler can see it. The
+/// listener's callbacks arrive on `queue`, which is why the discipline exists.
+final class LoopbackHTTPServer: @unchecked Sendable {
     /// Where the server ended up, and what it takes to talk to it.
     struct Endpoint: Equatable {
         let port: UInt16
@@ -277,7 +281,10 @@ private final class ResumeOnce<Value>: @unchecked Sendable {
 /// One accepted connection: reads requests, authenticates them, and writes
 /// answers. Persistent by default -- an MCP client sends initialize,
 /// tools/list and every tool call down the same socket.
-private final class HTTPConnection {
+/// `@unchecked Sendable` for the same reason as the server above: one
+/// connection's state is only touched from the queue its NWConnection
+/// callbacks arrive on.
+private final class HTTPConnection: @unchecked Sendable {
     private let connection: NWConnection
     private let token: String
     private let handler: LoopbackHTTPServer.Handler

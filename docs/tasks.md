@@ -9,12 +9,14 @@
 
 ## 대기
 
-1. **Swift 6 언어 모드로 올리기** — 재봤다. `SWIFT_STRICT_CONCURRENCY: complete`
- 로 Puck·PuckClient에서 경고 220개. 대부분은 AppKit을 만지는 쪽이 메인 액터
- 표시가 없어서 나는 것(AppDelegate 확장들, MenuBarController, 창 컨트롤러들)
- 이고, 나머지가 `static var` 전역과 non-Sendable 클로저 전달이다. 기계적이지만
- 격리를 실제로 바꾸는 변경이라 한 번에 하지 않는다. 파일 단위로 `@MainActor`를
- 붙여 나가며 줄이고, 0이 되면 `SWIFT_VERSION`을 6으로 올린다.
+1. **Swift 6 언어 모드로 올리기** — 진행 중. `SWIFT_STRICT_CONCURRENCY: complete`
+ 기준 경고가 292개(Puck 220 + PuckClient 72)에서 **133개**(88 + 45)로 줄었다.
+ 지금까지 한 것: AppDelegate와 상태 기계(StateHandler·CharacterController)와
+ NSViewRepresentable 코디네이터들을 `@MainActor`로, 큐로 지키는 타입들을
+ `@unchecked Sendable`로, 순수 헬퍼는 `nonisolated`로. 그 과정에서 point_at이
+ 타임아웃 시 백그라운드 큐에서 캐릭터를 만지던 진짜 버그가 드러나 고쳤다.
+ 남은 큰 덩어리: `AgentHost`(11), `LoopbackHTTPServer`(11), `CodeEditorRunner`(7),
+ `AcpAgentProcess`, `BridgeConnection`. 0이 되면 `SWIFT_VERSION`을 6으로 올린다.
 2. **계속 리뷰하고 고치기** — 새로 짠 코드를 같은 방식으로 훑는다.
 
 ## 완료

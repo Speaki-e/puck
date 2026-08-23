@@ -61,6 +61,10 @@ private struct DetachedEditorWindowHost: NSViewRepresentable {
         context.coordinator.sync(self)
     }
 
+    /// `@MainActor`: it owns an NSWindow and a hosting controller, and every
+    /// entry point into it is SwiftUI's own update pass or an NSWindowDelegate
+    /// callback -- both on the main thread.
+    @MainActor
     final class Coordinator: NSObject, NSWindowDelegate {
         private var window: NSWindow?
         private var hosting: NSHostingController<AnyView>?

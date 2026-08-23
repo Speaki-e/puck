@@ -7,6 +7,9 @@ import XCTest
 import CoreGraphics
 @testable import Puck
 
+/// `@MainActor`: it reads AppDelegate.tankPetHeight, which the frame loop
+/// and the bridge both touch from the main thread.
+@MainActor
 final class PetTankAreaTests: XCTestCase {
     private let overlayOrigin = CGPoint(x: 0, y: 0)
     private let overlaySize = CGSize(width: 1470, height: 956)

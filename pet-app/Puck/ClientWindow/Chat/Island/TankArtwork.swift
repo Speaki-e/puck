@@ -48,5 +48,8 @@ enum TankArtwork {
         return image.size.width / image.size.height
     }
 
-    private static let cache = NSCache<NSString, NSImage>()
+    /// `nonisolated(unsafe)` because NSCache is documented as thread-safe --
+    /// the compiler cannot see that, and the island draws from whichever
+    /// context SwiftUI evaluates it in.
+    private nonisolated(unsafe) static let cache = NSCache<NSString, NSImage>()
 }

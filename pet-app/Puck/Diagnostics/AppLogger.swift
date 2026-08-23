@@ -24,7 +24,14 @@ struct AppLogLine: Encodable {
 /// Thin file-I/O wrapper — not unit tested beyond what AppLogLine's plain
 /// Encodable conformance already guarantees.
 final class AppLogger {
-    static let shared = AppLogger(directory: isRunningTests ? testLogDirectory : defaultLogDirectory)
+    /// `nonisolated(unsafe)` because it is deliberately shared: this is
+    /// called from tool executors, socket queues and the frame loop, and
+    /// everything it does goes through JSONLinesFileAppender's own serial
+    /// queue. Pinning it to an actor would mean the one thing that records a
+    /// failure could not be called from wherever the failure happened.
+    nonisolated(unsafe) static let shared = AppLogger(
+        directory: isRunningTests ? testLogDirectory : defaultLogDirectory
+    )
 
     static let defaultLogDirectory = JSONLinesFileAppender.defaultLogDirectory
 

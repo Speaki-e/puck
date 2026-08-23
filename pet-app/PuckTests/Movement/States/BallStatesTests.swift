@@ -11,6 +11,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class ChaseBallStateTests: XCTestCase {
     func test_movesTowardTheBallAndRequestsJuggleOnArrival() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 100))
@@ -77,6 +80,9 @@ final class ChaseBallStateTests: XCTestCase {
 
 /// Playing with the toy overhead: catch, throw, repeat -- then get bored and
 /// throw it away after a while.
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class JuggleBallStateTests: XCTestCase {
     /// Runs one full catch-and-throw round, returning the throws it caused.
     private func playRound(_ state: JuggleBallState, in world: TestStateWorld) {
@@ -198,6 +204,9 @@ final class JuggleBallStateTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class KickBallStateTests: XCTestCase {
     func test_firesOnEnterOnceWhenEntered() {
         let state = KickBallState()
@@ -224,6 +233,9 @@ final class KickBallStateTests: XCTestCase {
 
 /// A spin-style toy is played with differently but for the same length of
 /// time.
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class JuggleBallSpinStyleTests: XCTestCase {
     private func spinning() -> JuggleBallState {
         let state = JuggleBallState()

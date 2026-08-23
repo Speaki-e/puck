@@ -25,6 +25,9 @@ protocol SFXTriggering: AnyObject {
 /// Drives and transitions the current StateHandler. On every state entry,
 /// AvatarPlayable.play and SFXTriggering.trigger are always called together
 /// from the same spot (enterCurrentState) — 02_pet-app.md F3's shared "enter()" requirement.
+/// `@MainActor`, like the states it drives: the frame loop hops onto the main
+/// thread and everything below this line moves a character AppKit is drawing.
+@MainActor
 final class CharacterController {
     private(set) var currentState: StateHandler
     private let body: CharacterBody

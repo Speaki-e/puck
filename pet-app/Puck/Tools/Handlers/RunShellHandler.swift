@@ -11,7 +11,10 @@ import Foundation
 /// args: `{"command": "..."}`. Approval-gated per the tool registry (except a
 /// whitelist) — approval itself happens upstream in the agent core; this
 /// handler only executes.
-final class RunShellHandler: ToolHandler {
+/// `@unchecked Sendable`: `calls` is guarded by `stateQueue` -- see its own
+/// note about the three execution contexts that reach it -- and everything
+/// else here is a constant.
+final class RunShellHandler: ToolHandler, @unchecked Sendable {
     let toolName = "run_shell"
 
     /// How long a SIGTERM'd process gets before cancel() escalates to
@@ -20,7 +23,11 @@ final class RunShellHandler: ToolHandler {
     /// "cancelled" (found via review) -- this is the highest-privilege tool
     /// in the registry, so its cancel guarantee shouldn't be defeatable by a
     /// trap.
-    static var killGracePeriod: TimeInterval = 0.5
+    ///
+    /// `nonisolated(unsafe)`: a knob two tests turn down so they do not wait
+    /// half a second, read once per cancel from whichever queue that lands
+    /// on. Nothing in the app writes it.
+    nonisolated(unsafe) static var killGracePeriod: TimeInterval = 0.5
 
     /// How much of one stream is kept, per call. Nothing capped this: the
     /// handler read both pipes to EOF, so `cat` on a large file or a `find /`
@@ -39,7 +46,10 @@ final class RunShellHandler: ToolHandler {
     /// at something that cannot launch -- a failed `run()` is otherwise
     /// unreachable from outside, and it is the path that used to leave a
     /// never-launched Process behind for the next cancel() to crash on.
-    static var shellPath = "/bin/zsh"
+    /// `nonisolated(unsafe)` for the same reason as killGracePeriod above:
+    /// written only by the test that points it at a shell that cannot
+    /// launch, read on the queue the command runs from.
+    nonisolated(unsafe) static var shellPath = "/bin/zsh"
 
     /// One dispatch's shell.
     ///

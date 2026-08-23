@@ -21,6 +21,9 @@ private func testWindow(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat)
                frame: CGRect(x: x, y: y, width: width, height: height))
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class ClimbHandoffTests: XCTestCase {
     /// Approaching from the left, Walk stops the pet at the window's *left*
     /// edge (WalkState: `edgeX = blocking.frame.minX`), so this is the x the

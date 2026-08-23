@@ -27,7 +27,9 @@ extension AppDelegate {
     /// Where the lever on the island puts it. Written by the client over the
     /// bridge and kept here rather than in SettingsStore: it is the size of
     /// the pet in one particular place, which is a property of that place.
-    static var tankPetHeight: CGFloat = defaultTankPetHeight
+    /// `@MainActor`: written when the bridge's message reaches the main
+    /// thread and read by the frame loop, which runs there too.
+    @MainActor static var tankPetHeight: CGFloat = defaultTankPetHeight
 
     /// The client reported its tank. Stores the geometry and hands the
     /// in-or-out question to the decider; nothing moves until `tickPetHome`

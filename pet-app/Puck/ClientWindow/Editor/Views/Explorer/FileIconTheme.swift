@@ -20,6 +20,7 @@ import SwiftUI
 /// Loaded once and shared: the map is ~350KB of JSON and the icons are read
 /// from disk on first use, neither of which should happen per row in a list
 /// that rebuilds on every keystroke in the filter field.
+@MainActor
 final class FileIconTheme {
     static let shared = FileIconTheme()
 

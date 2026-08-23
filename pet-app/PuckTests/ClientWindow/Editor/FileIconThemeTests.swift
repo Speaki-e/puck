@@ -10,6 +10,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: FileIconTheme is the main thread's, like the views that
+/// read it.
+@MainActor
 final class FileIconThemeTests: XCTestCase {
     private let theme = FileIconTheme.shared
 

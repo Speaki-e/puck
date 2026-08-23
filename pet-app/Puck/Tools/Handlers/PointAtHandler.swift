@@ -16,6 +16,9 @@ import Foundation
 
 /// How PointAtHandler asks the FSM to carry out a point_at. Implemented at
 /// bootstrap, where the character controller and pointing timer both live.
+/// `@MainActor`: the only implementor is the app delegate, which drives the
+/// character, and pointing moves it.
+@MainActor
 protocol PetPointingCoordinating: AnyObject {
     /// Walks the pet to `frame` and starts pointing at it.
     /// - Parameter holdSeconds: how long to keep pointing once it starts.
@@ -56,9 +59,15 @@ final class PointAtHandler: ToolHandler {
         }
 
         stateQueue.sync { activeID = id }
-        coordinator.pointAt(frame: frame, holdSeconds: Self.holdSeconds(from: args)) { [weak self] in
-            self?.stateQueue.sync { if self?.activeID == id { self?.activeID = nil } }
-            completion(.success(nil))
+        // Onto the main actor, because this is not always already there: an
+        // MCP call comes off the loopback server's queue, and the coordinator
+        // is the app delegate -- it moves the character AppKit is drawing.
+        // The hop was missing rather than unnecessary.
+        Task { @MainActor [coordinator] in
+            coordinator.pointAt(frame: frame, holdSeconds: Self.holdSeconds(from: args)) { [weak self] in
+                self?.stateQueue.sync { if self?.activeID == id { self?.activeID = nil } }
+                completion(.success(nil))
+            }
         }
     }
 
@@ -85,6 +94,11 @@ final class PointAtHandler: ToolHandler {
             return true
         }
         guard isCurrent else { return }
-        coordinator.cancelPointing()
+        // Same hop, and this one is the reason it matters: ToolExecutor's
+        // timeout fires on a global queue, so a point_at that timed out was
+        // reaching into the character from off the main thread.
+        Task { @MainActor [coordinator] in
+            coordinator.cancelPointing()
+        }
     }
 }

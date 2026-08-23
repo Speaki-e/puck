@@ -25,6 +25,9 @@ private final class SpyAvatar: AvatarPlayable {
     func setUpsideDown(_ isUpsideDown: Bool) { upsideDownCalls.append(isUpsideDown) }
 }
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class CharacterBodyTests: XCTestCase {
     func test_movingTheBody_pushesThePositionToTheAvatar() {
         let avatar = SpyAvatar()

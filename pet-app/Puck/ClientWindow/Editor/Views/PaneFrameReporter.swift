@@ -24,6 +24,9 @@ struct PaneFrameReporter: NSViewRepresentable {
         (nsView as? ReportingView)?.onChange = onChange
     }
 
+    /// `@MainActor`: an NSView, reporting its frame from `layout()` and the
+    /// window notifications AppKit delivers on the main thread.
+    @MainActor
     final class ReportingView: NSView {
         var onChange: ((CGRect?) -> Void)?
         private var windowObservers: [NSObjectProtocol] = []
@@ -60,7 +63,10 @@ struct PaneFrameReporter: NSViewRepresentable {
                         object: window,
                         queue: .main
                     ) { [weak self] _ in
-                        self?.report()
+                        // `queue: .main` above is what makes this true;
+                        // NotificationCenter's block is not isolated in its
+                        // signature, so the compiler cannot see it.
+                        MainActor.assumeIsolated { self?.report() }
                     }
                 )
             }

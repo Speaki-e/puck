@@ -52,6 +52,10 @@ struct WindowMinimumSize: NSViewRepresentable {
     /// window. Under the floor the panes do not compress, they overflow: the
     /// sidebar slides out of view and the editor's empty state is cut off
     /// mid-sentence.
+    /// `@MainActor`: an NSViewRepresentable's coordinator is only ever
+    /// touched by SwiftUI's update pass and by AppKit callbacks, both of
+    /// which are the main thread.
+    @MainActor
     final class Coordinator {
         private var observer: NSObjectProtocol?
         private var floor: CGSize = .zero
@@ -67,8 +71,13 @@ struct WindowMinimumSize: NSViewRepresentable {
                 object: window,
                 queue: .main
             ) { [weak self] notification in
-                guard let self, let window = notification.object as? NSWindow else { return }
-                Self.grow(window, toAtLeast: self.floor)
+                guard let window = notification.object as? NSWindow else { return }
+                // Delivered on `.main` by the queue above, which the
+                // signature of a notification block cannot say.
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    Self.grow(window, toAtLeast: self.floor)
+                }
             }
         }
 

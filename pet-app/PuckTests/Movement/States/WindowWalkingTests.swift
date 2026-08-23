@@ -26,6 +26,9 @@ private func window(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, id:
     )
 }
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class WalkStateWindowTests: XCTestCase {
     /// Walking into the side of a window is what starts a climb — the pet
     /// shouldn't walk through it.
@@ -90,6 +93,9 @@ final class WalkStateWindowTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class ClimbStateTests: XCTestCase {
     func test_climbsUpToTheWindowTopThenWalksOnIt() {
         let world = TestStateWorld(position: CGPoint(x: 300, y: 500))
@@ -142,6 +148,9 @@ final class ClimbStateTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class WalkOnTopStateTests: XCTestCase {
     func test_supportingWindowDisappears_falls() {
         let world = TestStateWorld(position: CGPoint(x: 400, y: 200))

@@ -35,6 +35,9 @@ private final class SpyPointingCoordinator: PetPointingCoordinating {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class PointAtHandlerTests: XCTestCase {
     private let frameArgs = JSONValue.object([
         "frame": .object([
@@ -58,31 +61,33 @@ final class PointAtHandlerTests: XCTestCase {
         wait(for: [done], timeout: 1)
     }
 
-    func test_sendsThePetToTheTargetFrame() {
+    func test_sendsThePetToTheTargetFrame() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
 
         handler.execute(id: "test", args: frameArgs) { _ in }
 
+        await settle()
         XCTAssertEqual(coordinator.requestedFrames, [CGRect(x: 100, y: 200, width: 50, height: 20)])
     }
 
     /// The old handler replied the instant it was called, before the pet had
     /// gone anywhere — the agent would tell the user it had been shown
     /// something it had not yet been shown.
-    func test_doesNotReplyUntilPointingActuallyStarts() {
+    func test_doesNotReplyUntilPointingActuallyStarts() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
 
         var replied = false
         handler.execute(id: "test", args: frameArgs) { _ in replied = true }
+        await settle()
         XCTAssertFalse(replied, "the pet is still walking there")
 
         coordinator.completeArrival()
         XCTAssertTrue(replied)
     }
 
-    func test_repliesSuccessOncePointingStarts() {
+    func test_repliesSuccessOncePointingStarts() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
 
@@ -90,6 +95,7 @@ final class PointAtHandlerTests: XCTestCase {
         handler.execute(id: "test", args: frameArgs) { result in
             if case .success = result { ok = true } else { ok = false }
         }
+        await settle()
         coordinator.completeArrival()
 
         XCTAssertEqual(ok, true)
@@ -99,12 +105,14 @@ final class PointAtHandlerTests: XCTestCase {
     /// left AppDelegate.pendingPointTracker's entry live, so the pet kept
     /// walking/pointing on the caller's behalf after cancellation (found via
     /// review).
-    func test_cancel_tellsTheCoordinatorToCancelPointing() {
+    func test_cancel_tellsTheCoordinatorToCancelPointing() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
         handler.execute(id: "test", args: frameArgs) { _ in }
+        await settle()
 
         handler.cancel(id: "test")
+        await settle()
 
         XCTAssertEqual(coordinator.cancelCount, 1)
     }
@@ -113,17 +121,20 @@ final class PointAtHandlerTests: XCTestCase {
     /// so a second call supersedes the first. Its cancel must not then stop
     /// the pointing the second call is doing -- which is what a 30s timeout on
     /// the abandoned first call would otherwise do.
-    func test_cancelOfASupersededCall_doesNotStopTheCurrentOne() {
+    func test_cancelOfASupersededCall_doesNotStopTheCurrentOne() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
         handler.execute(id: "first", args: frameArgs) { _ in }
         handler.execute(id: "second", args: frameArgs) { _ in }
+        await settle()
 
         handler.cancel(id: "first")
+        await settle()
 
         XCTAssertEqual(coordinator.cancelCount, 0, "the current point_at must keep going")
 
         handler.cancel(id: "second")
+        await settle()
         XCTAssertEqual(coordinator.cancelCount, 1)
     }
 
@@ -140,7 +151,7 @@ final class PointAtHandlerTests: XCTestCase {
 
     /// A tour stop holds until the next stop; a plain point_at keeps the 8s
     /// default so nothing that already calls it changes.
-    func test_holdSeconds_isPassedThroughWhenGiven() {
+    func test_holdSeconds_isPassedThroughWhenGiven() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
         let args = JSONValue.object([
@@ -151,15 +162,17 @@ final class PointAtHandlerTests: XCTestCase {
         ])
 
         handler.execute(id: "t", args: args) { _ in }
+        await settle()
 
         XCTAssertEqual(coordinator.requestedHolds, [45])
     }
 
-    func test_holdSeconds_omitted_leavesTheDefault() {
+    func test_holdSeconds_omitted_leavesTheDefault() async {
         let coordinator = SpyPointingCoordinator()
         let handler = PointAtHandler(coordinator: coordinator)
 
         handler.execute(id: "t", args: frameArgs) { _ in }
+        await settle()
 
         XCTAssertEqual(coordinator.requestedHolds, [nil])
     }
@@ -173,5 +186,13 @@ final class PointAtHandlerTests: XCTestCase {
         )
         XCTAssertNil(PointAtHandler.holdSeconds(from: .object(["hold_seconds": .number(-1)])))
         XCTAssertNil(PointAtHandler.holdSeconds(from: .object(["hold_seconds": .number(.infinity)])))
+    }
+
+    /// The handler hops onto the main actor before it touches the
+    /// coordinator -- ToolExecutor's timeout fires on a global queue, so that
+    /// hop is real rather than a formality. These tests are on the main actor
+    /// themselves, so yielding once is what lets the hop run.
+    private func settle() async {
+        await Task.yield()
     }
 }

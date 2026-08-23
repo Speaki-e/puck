@@ -10,6 +10,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class ReactClickStateTests: XCTestCase {
     func test_returnsToIdleAfterTheReactionPlays() {
         let world = TestStateWorld()
@@ -38,6 +41,9 @@ final class ReactClickStateTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class PettingStateTests: XCTestCase {
     func test_returnsToIdleAfterTheReactionPlays() {
         let world = TestStateWorld()
@@ -66,6 +72,9 @@ final class PettingStateTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class ReactDragStateTests: XCTestCase {
     /// One frame to register the grab, then the cursor moves. Mirrors how
     /// AppDelegate feeds .dragBegan and then .dragMoved.
@@ -245,6 +254,9 @@ final class ReactDragStateTests: XCTestCase {
 
 /// Stroking the pet's head holds the reaction open, then hands off to the
 /// twirl for a while.
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class PettingStrokeTests: XCTestCase {
     func test_strokingHoldsTheReactionOpenIndefinitely() {
         let world = TestStateWorld()
@@ -297,6 +309,9 @@ final class PettingStrokeTests: XCTestCase {
     }
 }
 
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class SpinStateTests: XCTestCase {
     func test_returnsToIdleAfterTheTwirl() {
         let world = TestStateWorld()
@@ -322,6 +337,9 @@ final class SpinStateTests: XCTestCase {
 }
 
 /// The flip itself. Turning about the vertical axis, not in the image plane.
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class SpinBouncePresetTests: XCTestCase {
     private let preset = BouncePreset.spin
 
@@ -399,6 +417,9 @@ final class SpinBouncePresetTests: XCTestCase {
 }
 
 /// The rainbow wash over the flips, one hue in order per flip.
+/// `@MainActor`: what it exercises belongs to the main thread -- the
+/// character, its states, or a view that draws them.
+@MainActor
 final class SpinRainbowTests: XCTestCase {
     private let preset = BouncePreset.spin
 

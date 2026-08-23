@@ -56,6 +56,10 @@ final class TestStateWorld {
     }
 
     /// Runs `seconds` of frames at 60fps.
+    ///
+    /// `@MainActor` because a state is: this stands in for the frame loop,
+    /// which is a hop onto the main thread.
+    @MainActor
     func run(_ state: StateHandler, seconds: TimeInterval) {
         let frame = 1.0 / 60
         var elapsed: TimeInterval = 0
@@ -66,6 +70,9 @@ final class TestStateWorld {
     }
 }
 
+/// `@MainActor`: the character and its states belong to the main thread,
+/// which is where the frame loop drives them.
+@MainActor
 final class WalkStateTests: XCTestCase {
     func test_walksTowardTheTarget() {
         let world = TestStateWorld(position: CGPoint(x: 0, y: 100))

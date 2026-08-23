@@ -54,7 +54,10 @@ final class RunShellHandlerTests: XCTestCase {
     /// before reading therefore deadlocks: the parent waits for a process that
     /// is waiting for the parent. Any real command the agent runs (a build, a
     /// test run, `git log`) clears 64KB easily.
-    func test_outputLargerThanPipeBuffer_completesWithFullOutput() {
+    ///
+    /// The whole stream is still read even though only the cap is kept -- the
+    /// dropped count adding up to what was written is the proof.
+    func test_outputLargerThanPipeBuffer_completesWithoutDeadlocking() {
         let handler = RunShellHandler()
         let byteCount = 200_000
 
@@ -70,7 +73,11 @@ final class RunShellHandlerTests: XCTestCase {
                     XCTFail("expected stdout string")
                     return
                 }
-                XCTAssertEqual(stdout.count, byteCount, "stdout was truncated at the pipe buffer boundary")
+                XCTAssertEqual(fields["truncated"], .bool(true))
+                XCTAssertTrue(
+                    stdout.contains("[... \(byteCount - RunShellHandler.maximumCapturedBytes) bytes of output dropped ...]"),
+                    "every byte the command wrote should be accounted for"
+                )
                 XCTAssertEqual(fields["exit_code"], .number(0))
             case .failure(let error):
                 XCTFail("expected success, got \(error)")
@@ -81,9 +88,9 @@ final class RunShellHandlerTests: XCTestCase {
         wait(for: [expectation], timeout: 10)
     }
 
-    /// stderr fills its own pipe independently — draining only stdout still
+    /// stderr fills its own pipe independently -- draining only stdout still
     /// deadlocks a command that is noisy on stderr.
-    func test_stderrLargerThanPipeBuffer_completesWithFullOutput() {
+    func test_stderrLargerThanPipeBuffer_completesWithoutDeadlocking() {
         let handler = RunShellHandler()
         let byteCount = 200_000
 
@@ -95,10 +102,53 @@ final class RunShellHandlerTests: XCTestCase {
                     XCTFail("expected stderr string")
                     return
                 }
-                XCTAssertEqual(stderr.count, byteCount, "stderr was truncated at the pipe buffer boundary")
+                XCTAssertTrue(
+                    stderr.contains("[... \(byteCount - RunShellHandler.maximumCapturedBytes) bytes of output dropped ...]")
+                )
             case .failure(let error):
                 XCTFail("expected success, got \(error)")
             }
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 10)
+    }
+
+    /// What the cap is for: the answer travels over bridge.sock, which drops a
+    /// message above 1 MiB outright -- so an uncapped `cat` of a large file did
+    /// not arrive at all, and the dispatch sat there until it timed out.
+    func test_hugeOutput_isKeptUnderTheBridgesMessageLimit() {
+        let handler = RunShellHandler()
+
+        let expectation = expectation(description: "completion called")
+        handler.execute(id: "test", args: .object(["command": .string("head -c 4000000 /dev/zero | tr '\\0' 'z'")])) { result in
+            guard case .success(.object(let fields)?) = result, case .string(let stdout)? = fields["stdout"] else {
+                XCTFail("expected stdout string")
+                return
+            }
+            XCTAssertLessThan(stdout.utf8.count, BridgeConnection.maximumMessageBytes)
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 20)
+    }
+
+    /// Head and tail, not head alone: a build log's errors are at the end, and
+    /// keeping only the beginning would cut off the part the command was run
+    /// for.
+    func test_truncatedOutput_keepsBothEnds() {
+        let handler = RunShellHandler()
+        let filler = RunShellHandler.maximumCapturedBytes
+
+        let expectation = expectation(description: "completion called")
+        let command = "echo FIRST-LINE; printf 'x%.0s' {1..\(filler)}; echo; echo LAST-LINE"
+        handler.execute(id: "test", args: .object(["command": .string(command)])) { result in
+            guard case .success(.object(let fields)?) = result, case .string(let stdout)? = fields["stdout"] else {
+                XCTFail("expected stdout string")
+                return
+            }
+            XCTAssertTrue(stdout.hasPrefix("FIRST-LINE"), "the start of the output is kept")
+            XCTAssertTrue(stdout.hasSuffix("LAST-LINE\n"), "so is the end, which is where errors are")
             expectation.fulfill()
         }
 

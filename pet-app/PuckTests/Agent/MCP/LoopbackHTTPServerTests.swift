@@ -8,6 +8,7 @@
 //  actually gone once the turn that opened it ends.
 //
 
+import Network
 import XCTest
 @testable import Puck
 
@@ -180,5 +181,69 @@ final class LoopbackHTTPServerTests: XCTestCase {
 
         server?.stop()
         server?.stop()
+    }
+    // MARK: - Malformed framing
+
+    /// `Content-Length: -1` cleared the size ceiling (it is below it) and then
+    /// indexed the buffer backwards from the body's start, which traps: the
+    /// whole app dies, not just the connection. URLSession will not send a
+    /// header like that, so the request goes out over a raw socket.
+    func test_post_withANegativeContentLength_is400AndTheServerLivesOn() async throws {
+        let endpoint = try await startEcho(answer: { _ in Data("{\"ok\":true}".utf8) })
+
+        let status = try await sendRaw(
+            """
+            POST /mcp HTTP/1.1\r
+            Host: 127.0.0.1\r
+            Authorization: \(endpoint.authorizationHeaderValue)\r
+            Content-Length: -1\r
+            Connection: close\r
+            \r
+
+            """,
+            to: endpoint
+        )
+
+        XCTAssertEqual(status, 400)
+        // The listener is what matters: a trap would have taken this process
+        // with it, so a second request answering at all is the real assertion.
+        let (second, _) = try await post(to: endpoint, authorization: endpoint.authorizationHeaderValue)
+        XCTAssertEqual(second, 200)
+    }
+
+    /// Writes `request` verbatim and returns the status line's code.
+    private func sendRaw(_ request: String, to endpoint: LoopbackHTTPServer.Endpoint) async throws -> Int {
+        let connection = NWConnection(
+            host: .ipv4(.loopback),
+            port: NWEndpoint.Port(rawValue: UInt16(endpoint.port))!,
+            using: .tcp
+        )
+        defer { connection.cancel() }
+        connection.start(queue: .global())
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let resumed = UncheckedBox(false)
+            func finish(_ result: Result<Int, Error>) {
+                guard !resumed.value else { return }
+                resumed.value = true
+                continuation.resume(with: result)
+            }
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    connection.send(content: Data(request.utf8), completion: .contentProcessed { _ in })
+                    connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { data, _, _, error in
+                        if let error { return finish(.failure(error)) }
+                        let head = String(decoding: data ?? Data(), as: UTF8.self)
+                        let code = head.split(separator: " ").dropFirst().first.flatMap { Int($0) }
+                        finish(.success(code ?? -1))
+                    }
+                case .failed(let error):
+                    finish(.failure(error))
+                default:
+                    break
+                }
+            }
+        }
     }
 }

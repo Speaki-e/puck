@@ -22,6 +22,19 @@ final class RunShellHandler: ToolHandler {
     /// trap.
     static var killGracePeriod: TimeInterval = 0.5
 
+    /// How much of one stream is kept, per call. Nothing capped this: the
+    /// handler read both pipes to EOF, so `cat` on a large file or a `find /`
+    /// grew a String as large as the output and then handed it on. Two things
+    /// then went wrong at once -- BridgeConnection drops a message over
+    /// `maximumMessageBytes` (1 MiB), so the answer never arrived and the
+    /// dispatch waited out its full timeout instead; and what did fit went
+    /// into the model's context whole.
+    ///
+    /// Head and tail rather than head alone: a build log's errors are at the
+    /// end, and a truncation that always kept the beginning would cut off the
+    /// part the command was run for.
+    static let maximumCapturedBytes = 128 * 1024
+
     /// The shell every command runs under. A `var` only so a test can point it
     /// at something that cannot launch -- a failed `run()` is otherwise
     /// unreachable from outside, and it is the path that used to leave a
@@ -121,22 +134,21 @@ final class RunShellHandler: ToolHandler {
                 let stderrHandle = stderrPipe.fileHandleForReading
 
                 let stderrQueue = DispatchQueue(label: "Puck.RunShellHandler.stderr")
-                var stderrData = Data()
-                stderrQueue.async { stderrData = stderrHandle.readDataToEndOfFile() }
+                var stderrCapture = Capture()
+                stderrQueue.async { stderrCapture = Self.drain(stderrHandle) }
 
-                let stdoutData = stdoutHandle.readDataToEndOfFile()
-                stderrQueue.sync {} // barrier: stderrData is fully written past this point
+                let stdoutCapture = Self.drain(stdoutHandle)
+                stderrQueue.sync {} // barrier: stderrCapture is fully written past this point
 
                 process.waitUntilExit()
                 self.stateQueue.sync { self.calls[id] = nil }
-                let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-                let stderr = String(data: stderrData, encoding: .utf8) ?? ""
                 completion(
                     .success(
                         .object([
-                            "stdout": .string(stdout),
-                            "stderr": .string(stderr),
+                            "stdout": .string(stdoutCapture.text),
+                            "stderr": .string(stderrCapture.text),
                             "exit_code": .number(Double(process.terminationStatus)),
+                            "truncated": .bool(stdoutCapture.isTruncated || stderrCapture.isTruncated),
                         ])
                     )
                 )
@@ -148,5 +160,47 @@ final class RunShellHandler: ToolHandler {
                 completion(.failure(.executionFailed(error.localizedDescription)))
             }
         }
+    }
+
+    /// What one stream produced, and whether the middle of it was dropped.
+    private struct Capture {
+        var text = ""
+        var isTruncated = false
+    }
+
+    /// Reads `handle` to EOF and keeps at most `maximumCapturedBytes` of it:
+    /// the first half from the front, the last half from the end.
+    ///
+    /// Reading to EOF regardless of the cap is not optional. The child blocks
+    /// in `write()` once the OS pipe buffer fills, so a reader that stopped at
+    /// its limit would hang the command it is running rather than truncate it.
+    private static func drain(_ handle: FileHandle) -> Capture {
+        let half = maximumCapturedBytes / 2
+        var head = Data()
+        var tail = Data()
+        var total = 0
+
+        while true {
+            let chunk = handle.availableData
+            if chunk.isEmpty { break }
+            total += chunk.count
+            if head.count < half {
+                head.append(chunk.prefix(half - head.count))
+            }
+            tail.append(chunk)
+            if tail.count > half { tail.removeFirst(tail.count - half) }
+        }
+
+        guard total > maximumCapturedBytes else {
+            return Capture(text: String(decoding: head, as: UTF8.self), isTruncated: false)
+        }
+        let dropped = total - half - half
+        // Decoded separately: the cut can land inside a multi-byte character,
+        // and String(decoding:) turns that half into a replacement character
+        // rather than losing the rest of the line.
+        let text = String(decoding: head, as: UTF8.self)
+            + "\n[... \(dropped) bytes of output dropped ...]\n"
+            + String(decoding: tail, as: UTF8.self)
+        return Capture(text: text, isTruncated: true)
     }
 }

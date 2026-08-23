@@ -358,6 +358,14 @@ private final class HTTPConnection {
         }
 
         let contentLength = headers["content-length"].flatMap(Int.init) ?? 0
+        // Negative as well as too large. A `Content-Length: -1` passed the
+        // ceiling check, then indexed the buffer backwards from the body's
+        // start -- a trap, which takes the whole app down with it, not just
+        // this connection.
+        guard contentLength >= 0 else {
+            respond(status: 400, headers: [:], body: Data(), thenClose: true)
+            return
+        }
         guard contentLength <= LoopbackHTTPServer.maximumBodyBytes else {
             respond(status: 413, headers: [:], body: Data(), thenClose: true)
             return

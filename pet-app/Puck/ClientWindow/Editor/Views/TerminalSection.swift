@@ -32,20 +32,10 @@ struct TerminalSection: View {
     /// keyed on it, which is what makes SwiftUI build a fresh terminal rather
     /// than reuse the dead one.
     @State private var generation = 0
-    /// Stops replacing a shell that cannot start.
-    ///
-    /// A shell that exits the moment it is spawned -- a broken `SHELL`, a
-    /// profile that calls `exit`, a project directory that has been deleted
-    /// -- was replaced immediately by another that did the same, forever, as
-    /// fast as the machine could fork. After a few in a row the pane says so
-    /// and stops rather than spinning.
-    @State private var consecutiveEarlyExits = 0
+    /// Whether to replace a shell that exited -- see TerminalRestartPolicy,
+    /// which owns the rule so it can be checked without a running terminal.
+    @State private var restarts = TerminalRestartPolicy()
     @State private var lastStartedAt = Date.distantPast
-    @State private var hasGivenUp = false
-
-    /// A shell that lasted less than this never really started.
-    static let earlyExitSeconds: TimeInterval = 2
-    static let earlyExitLimit = 3
 
     /// Written from three views -- the strip's button, the split that draws
     /// the terminal, and the window's toolbar toggle -- so the key is spelled
@@ -69,7 +59,7 @@ struct TerminalSection: View {
             Divider()
             header
             Divider()
-            if hasGivenUp {
+            if restarts.hasGivenUp {
                 message
             } else {
                 TerminalPane(root: root, palette: palette, onExit: shellExited)
@@ -92,19 +82,10 @@ struct TerminalSection: View {
     }
 
     private func shellExited() {
-        // Time, not a count of restarts: a shell someone worked in for an
-        // hour and then typed `exit` into should be replaced, and one that
-        // died at once should not.
-        if Date().timeIntervalSince(lastStartedAt) < Self.earlyExitSeconds {
-            consecutiveEarlyExits += 1
-        } else {
-            consecutiveEarlyExits = 0
+        switch restarts.shellExited(afterRunningFor: Date().timeIntervalSince(lastStartedAt)) {
+        case .restart: generation += 1
+        case .giveUp: break
         }
-        guard consecutiveEarlyExits < Self.earlyExitLimit else {
-            hasGivenUp = true
-            return
-        }
-        generation += 1
     }
 
     /// The name of the shell, a close button, and the whole strip doubling as

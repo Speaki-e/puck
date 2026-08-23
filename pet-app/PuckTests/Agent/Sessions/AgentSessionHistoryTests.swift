@@ -112,4 +112,23 @@ final class AgentSessionHistoryTests: XCTestCase {
         XCTAssertEqual(session.title, "the first ask")
         XCTAssertEqual(session.workingDirectory, "/big/project")
     }
+
+    /// The head is cut at a byte count, which can land in the middle of a
+    /// character. A transcript whose 256KB mark falls inside an emoji used to
+    /// decode as nothing and vanish from the list entirely.
+    func test_summarisesEvenWhenTheHeadIsCutInsideACharacter() throws {
+        var lines = [#"{"type":"user","cwd":"/emoji/project","message":{"content":"the first ask"}}"#]
+        // Padded with a line of emoji long enough to reach past the head, so
+        // wherever the cut lands it lands inside one of them.
+        let padding = String(repeating: "🐙", count: 4_000)
+        lines.append(contentsOf: Array(repeating: #"{"type":"assistant","message":{"content":"\#(padding)"}}"#, count: 40))
+        let file = try makeTranscript(lines)
+        let size = (try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
+        XCTAssertGreaterThan(size, AgentSessionHistory.headBytes)
+
+        let session = try XCTUnwrap(AgentSessionHistory.summarise(transcript: file, modifiedAt: .distantPast))
+
+        XCTAssertEqual(session.title, "the first ask")
+        XCTAssertEqual(session.workingDirectory, "/emoji/project")
+    }
 }

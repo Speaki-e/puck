@@ -22,6 +22,9 @@ struct CodeEditorHostView: View {
     /// The range a code tour (or anything else) asked to be shown. Applied
     /// only by the editor whose tab it names.
     let reveal: EditorPaneStore.RevealRequest?
+    /// A request to open the find bar. The bar belongs to the text view
+    /// itself -- all this does is say when.
+    let find: EditorPaneStore.FindRequest?
 
     @State private var state = SourceEditorState()
     @State private var revealCoordinator = EditorRevealCoordinator()
@@ -56,6 +59,10 @@ struct CodeEditorHostView: View {
             guard let reveal, reveal.path == path else { return }
             revealCoordinator.onScrollTarget = { state.scrollPosition = $0 }
             revealCoordinator.reveal(lines: reveal.lines)
+        }
+        .task(id: find?.token) {
+            guard let find, find.path == path else { return }
+            state.findPanelVisible = true
         }
     }
 

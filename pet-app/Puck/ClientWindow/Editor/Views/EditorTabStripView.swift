@@ -31,6 +31,7 @@ struct EditorTabStripView: View {
     var onPreviousTab: (() -> Void)?
     var onNextTab: (() -> Void)?
     var onGoToLine: (() -> Void)?
+    var onFind: (() -> Void)?
     /// Hides the code column without closing what is open in it. Nil in the
     /// detached window, which has nothing to collapse into.
     var onCollapse: (() -> Void)?
@@ -55,6 +56,7 @@ struct EditorTabStripView: View {
                 }
             }
             if let onPreviousTab, let onNextTab { tabNavigationButtons(previous: onPreviousTab, next: onNextTab) }
+            if let onFind { findButton(onFind) }
             if let onGoToLine { goToLineButton(onGoToLine) }
             saveButton
             if let isTerminalOpen { terminalButton(isTerminalOpen) }
@@ -124,6 +126,19 @@ struct EditorTabStripView: View {
         }
         .disabled(tabs.count < 2)
         .opacity(tabs.count < 2 ? 0.35 : 1)
+    }
+
+    /// ⌘F, into the editor's own find bar.
+    private func findButton(_ action: @escaping () -> Void) -> some View {
+        stripButton(
+            systemImage: "magnifyingglass",
+            label: Strings.text(.editorFind),
+            shortcut: "f",
+            modifiers: .command,
+            action: action
+        )
+        .disabled(activeTabPath == nil)
+        .opacity(activeTabPath == nil ? 0.35 : 1)
     }
 
     /// ⌘L. Disabled with nothing open, which is also what keeps the shortcut

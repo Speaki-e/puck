@@ -56,6 +56,7 @@ struct CodeSplitView: View {
                 onPreviousTab: { store.selectPreviousTab() },
                 onNextTab: { store.selectNextTab() },
                 onGoToLine: showGoToLine,
+                onFind: { store.showFind() },
                 onCollapse: onCollapse,
                 isTerminalOpen: $isTerminalOpen
             )

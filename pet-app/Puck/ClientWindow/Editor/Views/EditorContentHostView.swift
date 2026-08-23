@@ -35,7 +35,8 @@ struct EditorContentHostView: View {
                         ),
                         isEditable: !tab.readOnly,
                         path: tab.path,
-                        reveal: store.pendingReveal
+                        reveal: store.pendingReveal,
+                        find: store.pendingFind
                     )
                     // Rebuilt when the file changed underneath it, not on
                     // every keystroke: see EditorTab.adoptions.

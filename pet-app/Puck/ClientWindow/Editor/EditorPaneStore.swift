@@ -45,6 +45,18 @@ final class EditorPaneStore: ObservableObject {
     /// The last range someone asked to be shown, for the editor view to
     /// apply. Consumed by whichever tab's editor matches `path`.
     @Published private(set) var pendingReveal: RevealRequest?
+
+    /// A request to open the find bar over one file. Same token shape as
+    /// `pendingReveal`, and for the same reason: asking twice has to fire
+    /// twice, because the user may have closed it in between.
+    struct FindRequest: Equatable {
+        let path: String
+        let token: Int
+    }
+
+    /// Consumed by whichever tab's editor matches `path`. The find bar itself
+    /// belongs to the text view -- this only says when to show it.
+    @Published private(set) var pendingFind: FindRequest?
     /// Bumped on every `open(path:)`, whether or not it changed the tab.
     @Published private(set) var openRequests = 0
     /// Where the editor pane is, in AppKit global (bottom-left) screen
@@ -53,6 +65,7 @@ final class EditorPaneStore: ObservableObject {
     @Published private(set) var paneScreenFrame: CGRect?
 
     private var revealToken = 0
+    private var findToken = 0
 
     private let service: WorkspaceFileService
 
@@ -253,6 +266,13 @@ final class EditorPaneStore: ObservableObject {
         // +count before the modulo: Swift's % keeps the sign of the left
         // operand, so -1 % count is -1 and would index off the front.
         activeTabPath = openTabs[(current + offset + count) % count].path
+    }
+
+    /// Opens the editor's own find bar over the file being looked at. ⌘F.
+    func showFind() {
+        guard let path = activeTabPath else { return }
+        findToken += 1
+        pendingFind = FindRequest(path: path, token: findToken)
     }
 
     /// Puts the caret on `line` of the file already open, the way ⌘L does.

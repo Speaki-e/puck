@@ -130,4 +130,36 @@ final class EditorNavigationTests: XCTestCase {
         XCTAssertEqual(EditorPaneStore.clampedLine(99, in: "a\nb"), 2)
         XCTAssertEqual(EditorPaneStore.clampedLine(99, in: ""), 1)
     }
+    // MARK: - Find
+
+    /// The editor package has a find bar; nothing in this app ever opened it,
+    /// so searching inside a file meant reading it.
+    func test_showFind_asksTheEditorForTheFileBeingLookedAt() throws {
+        let store = try makeStore(withOpenFiles: ["a.txt", "b.txt"])
+        store.select(path: "a.txt")
+
+        store.showFind()
+
+        XCTAssertEqual(store.pendingFind?.path, "a.txt")
+    }
+
+    /// Asking twice has to fire twice: the bar may have been closed in
+    /// between, and an unchanged value is a value the view ignores.
+    func test_showFind_twice_changesTheToken() throws {
+        let store = try makeStore(withOpenFiles: ["a.txt"])
+
+        store.showFind()
+        let first = store.pendingFind?.token
+        store.showFind()
+
+        XCTAssertNotEqual(store.pendingFind?.token, first)
+    }
+
+    func test_showFind_withNothingOpen_doesNothing() throws {
+        let store = try EditorPaneStore(workspaceId: "w1", root: root, onRootChanged: {})
+
+        store.showFind()
+
+        XCTAssertNil(store.pendingFind)
+    }
 }

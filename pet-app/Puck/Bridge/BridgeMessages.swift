@@ -183,9 +183,9 @@ enum BridgeMessage: Equatable {
     /// the pet should be in it (2026-08-22). `rect` is nil when the client
     /// has no tank to offer -- the window is closed, or it is too small to
     /// hold a pet. `visible` is "the client window is frontmost and the tank
-    /// is on screen"; `pinned` is the user's home toggle. What pet-app does
-    /// with the three is PetHomeDecider's business, not the wire's.
-    case petHome(rect: BridgeRect?, visible: Bool, pinned: Bool)
+    /// is on screen". What pet-app does with the two is PetHomeDecider's
+    /// business, not the wire's.
+    case petHome(rect: BridgeRect?, visible: Bool)
 
     /// PuckClient -> pet-app: how tall the pet should stand on the island, in
     /// points (2026-08-23). The lever that sends this is on the island itself,
@@ -266,7 +266,7 @@ extension BridgeMessage: Codable {
         case workspaceId = "workspace_id"
         case sessionId = "session_id"
         case attachments
-        case rect, visible, pinned
+        case rect, visible
         case height
         case name
         case projectPath = "project_path"
@@ -359,8 +359,7 @@ extension BridgeMessage: Codable {
         case .petHome:
             self = .petHome(
                 rect: try container.decodeIfPresent(BridgeRect.self, forKey: .rect),
-                visible: try container.decode(Bool.self, forKey: .visible),
-                pinned: try container.decode(Bool.self, forKey: .pinned)
+                visible: try container.decode(Bool.self, forKey: .visible)
             )
 
         case .workspaceCreateRequest:
@@ -461,11 +460,10 @@ extension BridgeMessage: Codable {
             try container.encode(TypeKey.petIslandHeight, forKey: .type)
             try container.encode(height, forKey: .height)
 
-        case .petHome(let rect, let visible, let pinned):
+        case .petHome(let rect, let visible):
             try container.encode(TypeKey.petHome, forKey: .type)
             try container.encodeIfPresent(rect, forKey: .rect)
             try container.encode(visible, forKey: .visible)
-            try container.encode(pinned, forKey: .pinned)
 
         case .workspaceCreateRequest(let name, let projectPath):
             try container.encode(TypeKey.workspaceCreateRequest, forKey: .type)

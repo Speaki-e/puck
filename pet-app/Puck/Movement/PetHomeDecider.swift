@@ -53,15 +53,12 @@ final class PetHomeDecider {
 
     /// The client's latest word on its tank. `hasTank` is false when there is
     /// no usable rect at all (window closed, or too small for a pet).
-    func report(hasTank: Bool, visible: Bool, pinned: Bool) {
-        let wanted: Move
-        if !hasTank {
-            wanted = .desktop
-        } else if pinned {
-            wanted = .home
-        } else {
-            wanted = visible ? .home : .desktop
-        }
+    func report(hasTank: Bool, visible: Bool) {
+        // Two facts, one answer: the pet lives in the tank while there is one
+        // and the user is looking at it. There used to be a third -- a pin
+        // that kept it home regardless -- reachable only from a toolbar
+        // button nobody wanted there.
+        let wanted: Move = hasTank && visible ? .home : .desktop
         lastReported = wanted
         // Repeating the same answer must not restart the hold, or a client
         // that reports every frame would never leave it.

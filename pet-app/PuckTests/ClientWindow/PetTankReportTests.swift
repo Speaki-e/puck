@@ -46,13 +46,10 @@ final class PetTankReportTests: XCTestCase {
         XCTAssertNil(store.tankFrame)
     }
 
-    /// Closing the window takes the tank with it. Pinning is what keeps the
-    /// pet home while the window sits behind something else, and it must not
-    /// keep it home when there is no window -- the pet was left standing in
-    /// the space where the window had been.
-    func test_aClosedWindowHasNoTankEvenWhilePinned() {
+    /// Closing the window takes the tank with it -- the pet was left standing
+    /// in the space where the window had been.
+    func test_aClosedWindowHasNoTank() {
         let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
-        store.isTankPinned = true
         store.setTankSegment(CGRect(x: 200, y: 800, width: 600, height: 90), for: .chat)
 
         store.setWindowIsOpen(false)

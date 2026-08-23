@@ -270,8 +270,7 @@ final class BridgeMessageCodableTests: XCTestCase {
     func test_petHome_roundTrips() throws {
         let message = BridgeMessage.petHome(
             rect: BridgeRect(x: 15, y: 39, width: 1200, height: 90),
-            visible: true,
-            pinned: false
+            visible: true
         )
 
         let data = try JSONEncoder().encode(message)
@@ -283,7 +282,7 @@ final class BridgeMessageCodableTests: XCTestCase {
     /// The tank can be reported as gone -- the window closed, the workspace
     /// has no room for it -- without inventing a rect nobody should use.
     func test_petHome_withoutARect_roundTrips() throws {
-        let message = BridgeMessage.petHome(rect: nil, visible: false, pinned: true)
+        let message = BridgeMessage.petHome(rect: nil, visible: false)
 
         let data = try JSONEncoder().encode(message)
         let decoded = try JSONDecoder().decode(BridgeMessage.self, from: data)

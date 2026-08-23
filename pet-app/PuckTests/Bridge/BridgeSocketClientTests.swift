@@ -152,6 +152,6 @@ final class BridgeSocketClientTests: XCTestCase {
         let client = BridgeSocketClient(socketURL: socketURL)
 
         XCTAssertFalse(client.hasConnectedClients, "nothing is connected yet")
-        XCTAssertFalse(client.broadcast(.petHome(rect: nil, visible: false, pinned: false)))
+        XCTAssertFalse(client.broadcast(.petHome(rect: nil, visible: false)))
     }
 }

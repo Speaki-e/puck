@@ -33,7 +33,7 @@ final class BridgeMessageRouter {
     var onEventReaction: ((EventReaction) -> Void)?
 
     /// The client's tank report (2026-08-22), already on the main thread.
-    var onPetHome: ((BridgeRect?, Bool, Bool) -> Void)?
+    var onPetHome: ((BridgeRect?, Bool) -> Void)?
     /// How tall the pet should stand on the island, in points.
     var onPetIslandHeight: ((Double) -> Void)?
 
@@ -106,9 +106,9 @@ final class BridgeMessageRouter {
             // arriving inbound has no in-process reader.
             break
 
-        case .petHome(let rect, let visible, let pinned):
+        case .petHome(let rect, let visible):
             dispatchToMain { [weak self] in
-                self?.onPetHome?(rect, visible, pinned)
+                self?.onPetHome?(rect, visible)
             }
 
         case .petIslandHeight(let height):

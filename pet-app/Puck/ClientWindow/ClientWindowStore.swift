@@ -30,16 +30,6 @@ final class ClientWindowStore: ObservableObject {
     private var sessionsByKey: [SessionKey: ChatSession] = [:]
     private var sessionOrder: [SessionKey] = []
 
-    /// The user pinning the pet home whatever the window is doing. Stored in
-    /// UserDefaults rather than SettingsStore because SettingsStore belongs to
-    /// the Puck target and this window is PuckClient's.
-    @Published var isTankPinned: Bool = UserDefaults.standard.bool(forKey: ClientWindowStore.tankPinnedKey) {
-        didSet {
-            UserDefaults.standard.set(isTankPinned, forKey: Self.tankPinnedKey)
-            reportPetHome()
-        }
-    }
-
     static let tankPinnedKey = "Puck.tankPinned"
 
     /// The tank is drawn in two pieces -- above the chat column, and above the
@@ -120,7 +110,7 @@ final class ClientWindowStore: ObservableObject {
             let topLeft = space.normalized(fromAppKit: CGPoint(x: frame.minX, y: frame.maxY))
             return BridgeRect(x: topLeft.x, y: topLeft.y, width: frame.width, height: frame.height)
         }
-        sender.reportPetHome(rect: wire, visible: windowIsFrontmost && wire != nil, pinned: isTankPinned)
+        sender.reportPetHome(rect: wire, visible: windowIsFrontmost && wire != nil)
     }
 
     /// F15 (2026-07-31): set when an agent runs in this process, which it now

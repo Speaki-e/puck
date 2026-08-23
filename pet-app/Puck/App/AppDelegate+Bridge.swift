@@ -17,8 +17,8 @@ extension AppDelegate {
 
         let router = BridgeMessageRouter(toolExecutor: toolExecutor)
         router.onEventReaction = { [weak self] reaction in self?.applyEventReaction(reaction) }
-        router.onPetHome = { [weak self] rect, visible, pinned in
-            self?.applyPetHome(rect: rect, visible: visible, pinned: pinned)
+        router.onPetHome = { [weak self] rect, visible in
+            self?.applyPetHome(rect: rect, visible: visible)
         }
         router.onPetIslandHeight = { [weak self] height in
             self?.applyPetIslandHeight(height)

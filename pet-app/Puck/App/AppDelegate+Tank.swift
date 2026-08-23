@@ -32,7 +32,7 @@ extension AppDelegate {
     /// The client reported its tank. Stores the geometry and hands the
     /// in-or-out question to the decider; nothing moves until `tickPetHome`
     /// says the state has held.
-    func applyPetHome(rect: BridgeRect?, visible: Bool, pinned: Bool) {
+    func applyPetHome(rect: BridgeRect?, visible: Bool) {
         // Remembered before the area is worked out, because the size the pet
         // travels at is worked out from it -- see `tankScale`.
         lastTankSize = rect.map { CGSize(width: $0.width, height: $0.height) }
@@ -50,7 +50,7 @@ extension AppDelegate {
             )
         }
         petHomeDecider.isPetHidden = isCharacterHidden
-        petHomeDecider.report(hasTank: petTankArea != nil, visible: visible, pinned: pinned)
+        petHomeDecider.report(hasTank: petTankArea != nil, visible: visible)
 
         // PetHomeDecider only fires on a home<->desktop transition, so a
         // dragged or resized client window while the pet is already home
@@ -106,7 +106,7 @@ extension AppDelegate {
     /// a rect from a process that is gone is not somewhere to live.
     func petHomeConnectionLost() {
         petTankArea = nil
-        petHomeDecider.report(hasTank: false, visible: false, pinned: false)
+        petHomeDecider.report(hasTank: false, visible: false)
         sendPetToDesktop()
     }
 

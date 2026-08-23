@@ -19,7 +19,7 @@ final class PetHomeDeciderTests: XCTestCase {
 
     func test_aVisibleTankOnAFrontmostWindow_bringsThePetHome() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
 
         XCTAssertEqual(settled(decider), .home)
     }
@@ -27,10 +27,10 @@ final class PetHomeDeciderTests: XCTestCase {
     /// The window going to the back is the ordinary way the pet leaves.
     func test_theWindowLosingFront_sendsThePetOut() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
         _ = settled(decider)
 
-        decider.report(hasTank: true, visible: false, pinned: false)
+        decider.report(hasTank: true, visible: false)
 
         XCTAssertEqual(settled(decider), .desktop)
     }
@@ -38,7 +38,7 @@ final class PetHomeDeciderTests: XCTestCase {
     /// Alt-tabbing past the window should not teleport the pet twice.
     func test_aStateThatDoesNotHold_isNotActedOn() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
 
         // Measured against the hold rather than in fixed frames: how long a
         // state has to last before the pet acts on it is a number that gets
@@ -50,29 +50,31 @@ final class PetHomeDeciderTests: XCTestCase {
         for _ in 0..<Int(tooShort * 60) { move = decider.tick(dt: 1.0 / 60) ?? move }
         XCTAssertNil(move, "not held long enough yet")
 
-        decider.report(hasTank: true, visible: false, pinned: false)
+        decider.report(hasTank: true, visible: false)
         for _ in 0..<Int(tooShort * 60) { move = decider.tick(dt: 1.0 / 60) ?? move }
         XCTAssertNil(move, "the new state has not held either")
     }
 
-    func test_pinnedKeepsThePetHomeWhenTheWindowGoesBack() {
+    /// Looking away sends it back out. There is no pin any more: the pet is
+    /// home while there is a tank and the user is looking at it.
+    func test_theWindowGoingBehindSendsThePetToTheDesktop() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: true)
+        decider.report(hasTank: true, visible: true)
         XCTAssertEqual(settled(decider), .home)
 
-        decider.report(hasTank: true, visible: false, pinned: true)
+        decider.report(hasTank: true, visible: false)
 
-        XCTAssertNil(settled(decider), "still home; nothing to do")
+        XCTAssertEqual(settled(decider), .desktop)
     }
 
     /// A pet in a tank nobody can see is indistinguishable from a pet that
-    /// has vanished, so this outranks the pin.
-    func test_losingTheTankOutranksThePin() {
+    /// has vanished.
+    func test_losingTheTankSendsThePetOut() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: true)
+        decider.report(hasTank: true, visible: true)
         _ = settled(decider)
 
-        decider.report(hasTank: false, visible: false, pinned: true)
+        decider.report(hasTank: false, visible: false)
 
         XCTAssertEqual(settled(decider), .desktop)
     }
@@ -82,7 +84,7 @@ final class PetHomeDeciderTests: XCTestCase {
     func test_aHiddenPetIsNotMovedAtAll() {
         let decider = PetHomeDecider()
         decider.isPetHidden = true
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
 
         XCTAssertNil(settled(decider))
     }
@@ -91,7 +93,7 @@ final class PetHomeDeciderTests: XCTestCase {
     /// asks every frame and must not be told to move sixty times a second.
     func test_theSameStateIsReportedOnce() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
         XCTAssertEqual(settled(decider), .home)
 
         XCTAssertNil(settled(decider))
@@ -102,11 +104,11 @@ final class PetHomeDeciderTests: XCTestCase {
     /// restarted the timer, the pet would never move at all.
     func test_repeatingTheSameReportDoesNotRestartTheHold() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
 
         var move: PetHomeDecider.Move?
         for _ in 0..<60 {
-            decider.report(hasTank: true, visible: true, pinned: false)
+            decider.report(hasTank: true, visible: true)
             move = decider.tick(dt: 1.0 / 60) ?? move
         }
 
@@ -118,7 +120,7 @@ final class PetHomeDeciderTests: XCTestCase {
     /// and hiding the pet is not one.
     func test_showingThePetAgainActsOnTheLastReport() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
         decider.isPetHidden = true
         XCTAssertNil(settled(decider), "nothing moves while hidden")
 
@@ -132,7 +134,7 @@ final class PetHomeDeciderTests: XCTestCase {
     /// reported in between, so the move must not need one.
     func test_aTourSendsThePetOutAndTheRunEndingBringsItBack() {
         let decider = PetHomeDecider()
-        decider.report(hasTank: true, visible: true, pinned: false)
+        decider.report(hasTank: true, visible: true)
         XCTAssertEqual(settled(decider), .home)
 
         decider.forceDesktop()

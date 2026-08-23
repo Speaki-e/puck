@@ -77,8 +77,8 @@ final class UserInputSender {
     /// right now (2026-08-22). Sent on every change rather than on a timer --
     /// the caller only calls this when something actually moved.
     @discardableResult
-    func reportPetHome(rect: BridgeRect?, visible: Bool, pinned: Bool) -> UserInputDelivery {
-        broadcast(.petHome(rect: rect, visible: visible, pinned: pinned))
+    func reportPetHome(rect: BridgeRect?, visible: Bool) -> UserInputDelivery {
+        broadcast(.petHome(rect: rect, visible: visible))
     }
 
     /// How tall the pet stands on the island, in points, from the lever on

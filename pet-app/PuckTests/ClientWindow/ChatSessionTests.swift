@@ -445,4 +445,17 @@ final class ChatSessionTests: XCTestCase {
         session.apply(.agentDone(ok: true, summary: "완료"))
         XCTAssertEqual(session.lastRunOk, true, "the newest done entry wins")
     }
+
+    /// A re-broadcast approval is the same request arriving twice: one queued
+    /// item, and one card. The transcript used to show two, of which only the
+    /// first could be answered.
+    func test_aRebroadcastApprovalIsNotASecondCard() {
+        let session = ChatSession(id: "s", workspaceId: "w", title: "t", origin: .user)
+
+        session.apply(.awaitApproval(summary: "rm -rf /", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "rm -rf /", approvalId: "a1"))
+
+        XCTAssertEqual(session.pendingApprovals.count, 1)
+        XCTAssertEqual(session.timeline.filter { if case .approvalRequested = $0 { return true } else { return false } }.count, 1)
+    }
 }

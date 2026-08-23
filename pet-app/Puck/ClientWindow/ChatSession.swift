@@ -297,10 +297,12 @@ final class ChatSession: ObservableObject, Identifiable {
             timeline.append(.toolResult(id: id, ok: ok, data: data, error: error, detail: detail))
 
         case .awaitApproval(let summary, let approvalId):
-            // Re-broadcast of an id already queued is not a second request.
-            if !pendingApprovals.contains(where: { $0.approvalId == approvalId }) {
-                pendingApprovals.append(PendingApproval(approvalId: approvalId, summary: summary))
-            }
+            // Re-broadcast of an id already queued is not a second request --
+            // and it is not a second card either. The transcript printed the
+            // same approval twice while only one of them could be answered,
+            // which reads as a second thing to decide.
+            guard !pendingApprovals.contains(where: { $0.approvalId == approvalId }) else { break }
+            pendingApprovals.append(PendingApproval(approvalId: approvalId, summary: summary))
             timeline.append(.approvalRequested(id: UUID(), approvalId: approvalId, summary: summary))
 
         case .agentDone(let ok, let summary):

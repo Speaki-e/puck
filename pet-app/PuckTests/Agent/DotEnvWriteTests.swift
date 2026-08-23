@@ -94,6 +94,50 @@ final class DotEnvWriteTests: XCTestCase {
 
         XCTAssertEqual(permissions?.int16Value, 0o600)
     }
+
+    /// A `.env` is a text file people also edit by hand. Adding a key must
+    /// not cost it its trailing newline, nor leave a blank line where the
+    /// newline used to be.
+    func test_appendingKeepsTheFilesShape() throws {
+        let file = envFile
+        try Data("EXISTING=1\n".utf8).write(to: file)
+
+        XCTAssertTrue(DotEnv.write(key: "ADDED", value: "2", to: file))
+
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "EXISTING=1\nADDED=2\n")
+    }
+
+    /// And a file that ends without one stays that way rather than gaining a
+    /// line nobody asked for.
+    func test_appendingToAFileWithNoTrailingNewlineDoesNotAddOne() throws {
+        let file = envFile
+        try Data("EXISTING=1".utf8).write(to: file)
+
+        XCTAssertTrue(DotEnv.write(key: "ADDED", value: "2", to: file))
+
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "EXISTING=1\nADDED=2")
+    }
+
+    /// What a slash command writes has to read back as what was typed --
+    /// spaces and all, since a model name or a path can carry them.
+    func test_valuesRoundTripThroughTheFile() throws {
+        let file = envFile
+        let awkward = [
+            "AGENT_MODEL": "gpt 5.5 preview",
+            "AGENT_PATH": "/Users/someone/Library/Application Support/thing",
+            "AGENT_EQUALS": "a=b=c",
+            "AGENT_HASH": "value#not-a-comment",
+        ]
+
+        for (key, value) in awkward {
+            XCTAssertTrue(DotEnv.write(key: key, value: value, to: file))
+        }
+
+        let parsed = DotEnv.parse(fileAt: file)
+        for (key, value) in awkward {
+            XCTAssertEqual(parsed[key], value, "\(key) did not survive the round trip")
+        }
+    }
 }
 
 final class AgentConfigurationKeySourceTests: XCTestCase {

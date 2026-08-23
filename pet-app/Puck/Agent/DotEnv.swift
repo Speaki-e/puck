@@ -63,7 +63,15 @@ enum DotEnv {
         case (let index?, nil):
             lines.remove(at: index)
         case (nil, let assignment?):
-            lines.append(assignment)
+            // Before the file's trailing newline, not after it. A `.env` that
+            // ends the way text files end came back with a blank line in the
+            // middle and no newline at the end, which is a diff on a file the
+            // user also edits by hand.
+            if lines.last?.isEmpty == true {
+                lines.insert(assignment, at: lines.count - 1)
+            } else {
+                lines.append(assignment)
+            }
         case (nil, nil):
             return true // asked to clear something that was never set
         }

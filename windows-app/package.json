@@ -37,6 +37,7 @@
     "productName": "Puck",
     "asar": true,
     "asarUnpack": ["**/node_modules/node-pty/**"],
+    "directories": {"output": "release"},
     "files": ["dist/**/*", "electron/**/*", "package.json"],
     "win": {"target": ["nsis", "portable"]},
     "nsis": {"oneClick": false, "allowToChangeInstallationDirectory": true}

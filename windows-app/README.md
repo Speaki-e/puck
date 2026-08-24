@@ -45,4 +45,4 @@ npm run build
 npm run dist
 ```
 
-Installer/portable outputs are written by electron-builder under `windows-app/dist/`.
+Installer/portable outputs are written by electron-builder under `windows-app/release/`.

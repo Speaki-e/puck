@@ -19,8 +19,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: windows-app/package-lock.json
       - name: Install
         run: npm install
       - name: Typecheck
@@ -33,6 +31,6 @@ jobs:
         with:
           name: puck-windows
           path: |
-            windows-app/dist/*.exe
-            windows-app/dist/*.blockmap
+            windows-app/release/*.exe
+            windows-app/release/*.blockmap
           if-no-files-found: error

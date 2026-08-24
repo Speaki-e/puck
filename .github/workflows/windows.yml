@@ -1,0 +1,38 @@
+name: Windows
+
+on:
+  push:
+    branches: [windows]
+  pull_request:
+    paths:
+      - 'windows-app/**'
+      - '.github/workflows/windows.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: windows-app/package-lock.json
+      - name: Install
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build renderer
+        run: npm run build
+      - name: Package Windows app
+        run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: puck-windows
+          path: |
+            windows-app/dist/*.exe
+            windows-app/dist/*.blockmap
+          if-no-files-found: error

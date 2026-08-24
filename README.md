@@ -11,6 +11,54 @@ A macOS desktop pet that is also an AI agent. Two Swift apps:
 The two talk over a local socket bridge. The agent core (chat, tools,
 approvals, sessions) lives in `pet-app/Puck/Agent`.
 
+## Install
+
+Download `Puck-<version>.dmg` from
+[Releases](https://github.com/Speaki-e/puck/releases) and drag **both** apps
+into Applications. Not one: the pet and its window are one product talking to
+each other over a local socket, and either one alone does nothing. macOS 14 or
+newer; both apps are universal (Apple silicon and Intel).
+
+### The first launch is refused, and how to get past it
+
+The apps are signed ad-hoc, not notarised — there is no paid Apple Developer
+Program behind this, so macOS has no developer to name and treats the download
+as untrusted. Nothing is wrong with the app; this is the same wall every
+unnotarised download hits. Two ways through, either is fine:
+
+- **System Settings → Privacy & Security**, scroll to the bottom, and press
+  **Open Anyway** next to the blocked app. Do it once for each of the two.
+  (On macOS 15 and later this is the only way — Control-clicking the app no
+  longer offers it.)
+- **Or one line in Terminal**, which drops the quarantine flag from both at
+  once:
+
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/Puck.app /Applications/PuckClient.app
+  ```
+
+### Permissions it will ask for
+
+- **Accessibility** — required, and the pet is inert without it: this is what
+  reads the window list it walks on, moves the cursor, and receives the global
+  hotkey. Grant it to **Puck.app**.
+- **Microphone** and **Speech Recognition** — push-to-talk only. Decline them
+  and everything except the microphone button still works.
+- **Automation** — asked the first time the agent runs an AppleScript, and
+  named per app it wants to drive.
+
+### What it expects to find on your Mac
+
+- **`node`**, for the vendored ACP agent behind the `code_editor` tool and the
+  CLI chat provider. Not bundled.
+- **A `claude` or `codex` CLI you have already logged into**, for the same two.
+  Also not bundled — they are ~256MB per-platform binaries belonging to your
+  own account, and the app reuses that login rather than asking for it again.
+- **Or an API key**, if you would rather talk to Anthropic/OpenAI directly:
+  put it in `~/Library/Application Support/Puck/.env` as
+  `ANTHROPIC_API_KEY=…` / `OPENAI_API_KEY=…` (or `CLAUDE_CODE_OAUTH_TOKEN`,
+  `CODEX_API_KEY`), and pick the provider in Settings.
+
 ## Build
 
 ```sh
@@ -20,6 +68,23 @@ sh pet-app/scripts/install.sh   # builds + signs both apps into /Applications
 Needs Xcode, `xcodegen`, and an Apple Development certificate (a free personal
 team is fine — a stable signature is what keeps the Accessibility grant alive
 across rebuilds).
+
+### Packaging a release
+
+```sh
+sh pet-app/scripts/make-dmg.sh   # -> pet-app/build/Puck-<version>.dmg
+```
+
+Builds both apps in Release, signs them ad-hoc, refuses to package one
+carrying the debug entitlement, and writes one image holding the pair. The
+version comes from `MARKETING_VERSION` in `pet-app/project.yml`, which both
+apps report — they are only ever installed together, so a version that could
+differ between them would describe a pair that cannot exist.
+
+With a real certificate to hand, `SIGN_IDENTITY="Developer ID Application:
+NAME (TEAMID)"` signs with it instead; notarising and stapling that image
+(`xcrun notarytool submit --wait`, `xcrun stapler staple`) is what removes the
+first-launch wall above.
 
 ## Test
 

@@ -27,6 +27,12 @@ packages:
 
 settings:
   base:
+    # The version both apps report, and what a release is named after. One
+    # value for the pair on purpose: they speak a private protocol to each
+    # other and are only ever installed together, so a version that could
+    # differ between them would describe a pair that cannot exist.
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: true
@@ -74,6 +80,10 @@ targets:
       properties:
         LSUIElement: true
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        # From the build settings rather than written out here, so the pair
+        # cannot report two different versions -- see MARKETING_VERSION.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # Without this the compiled asset catalog is in the bundle but macOS
         # never looks for an icon in it -- both apps shipped iconless.
         CFBundleIconName: AppIcon
@@ -187,6 +197,8 @@ targets:
       path: PuckClient/Resources/Info.plist
       properties:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # Same pumpkin, stamped "client": two Dock icons from the same mark
         # are otherwise impossible to tell apart (byeolki, 2026-07-30).
         CFBundleIconName: AppIconClient

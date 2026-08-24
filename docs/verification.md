@@ -1,9 +1,7 @@
 # Verification and release gates
 
 This file is the current source of truth for deciding whether Puck is ready to
-ship. The M-A and M-B labels mentioned in the 2026-08-12 audit belong to the
-retired five-repository architecture. They are historical evidence, not current
-completion badges.
+ship.
 
 ## Automated gate
 
@@ -58,12 +56,17 @@ one pass of every item below on the supported macOS version:
 
 | Gate | Latest evidence | Status |
 |---|---|---|
-| Full automated suite | Local run on 2026-08-19 via `pet-app/scripts/test.sh` | Pass |
-| 2D frame policy regression | Focused XCTest run on 2026-08-19 | Pass |
-| ACP filesystem containment | Real child-process XCTest run on 2026-08-19 | Pass |
+| Full automated suite | Local run on 2026-08-24 via `pet-app/scripts/test.sh` (1819 tests) | Pass |
+| 2D frame policy regression | Part of the suite above | Pass |
+| ACP filesystem containment | Part of the suite above | Pass |
 | Clean-checkout CI | Workflow added; first remote run not yet available | Pending |
 | Signed-app manual smoke test | No current recording attached | Pending |
 
 A release is ready only when every row is `Pass`. For remote or manual runs,
 replace the pending text with a durable link to the workflow run or recording;
 do not infer a pass from an older architecture's badge.
+
+`v0.1.0` was tagged with the two rows above still pending, which is a fact
+about that release rather than a change to the rule: it ships unnotarised, to
+people who were told exactly that, and the smoke test is the thing standing
+between it and anyone else.

@@ -1,3 +1,22 @@
+# Puck has moved 🏃
+
+This repo is archived and no longer maintained here. Puck now lives at:
+
+### 👉 **[desFernan/puck-mac](https://github.com/desFernan/puck-mac)**
+
+Windows and Linux ports are getting their own repos too (nothing there yet,
+just placeholders):
+
+- [desFernan/puck-windows](https://github.com/desFernan/puck-windows)
+- [desFernan/puck-linux](https://github.com/desFernan/puck-linux)
+
+Go star/watch the new repo instead — this one won't get updates, issues, or
+PRs anymore.
+
+---
+
+*Everything below is the old README, kept for reference.*
+
 # Puck
 
 A macOS desktop pet that is also an AI agent. Two Swift apps:

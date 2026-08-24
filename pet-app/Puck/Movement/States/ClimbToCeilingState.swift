@@ -31,7 +31,11 @@ final class ClimbToCeilingState: StateHandler {
     func update(dt: TimeInterval, context: StateContext) {
         guard !oneShot.hasFired else { return }
 
-        guard WindowSupport.windowBeingClimbed(at: context.body.position, in: context.windows) != nil else {
+        guard WindowSupport.windowBeingClimbed(
+            at: context.body.position,
+            in: context.windows,
+            excluding: context.unclimbableWindowIDs
+        ) != nil else {
             // No wall here (or climbed past the top of a short one) --
             // there's nothing left to hold onto.
             oneShot.fire(.fall, using: context.requestTransition)

@@ -56,8 +56,13 @@ extension AppDelegate {
             // happen against an actual on-screen wall, never arbitrary
             // terrain. Checking here avoids ever entering the state
             // without a wall to begin with.
+            let ceilingWindows = overlayLocalWindows(excluding: nil)
             guard let body = characterBody,
-                  WindowSupport.windowBeingClimbed(at: body.position, in: overlayLocalWindows(excluding: nil)) != nil else {
+                  WindowSupport.windowBeingClimbed(
+                      at: body.position,
+                      in: ceilingWindows,
+                      excluding: unclimbableWindowIDs(in: ceilingWindows)
+                  ) != nil else {
                 walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
                 controller.transition(to: .walk)
                 return

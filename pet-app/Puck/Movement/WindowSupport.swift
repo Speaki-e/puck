@@ -65,14 +65,33 @@ enum WindowSupport {
     }
 
     /// The frontmost window the pet is pressed against the side of, and whose
-    /// body it would otherwise walk through.
-    static func windowBeingClimbed(at position: CGPoint, in windows: [WindowInfo]) -> WindowInfo? {
-        windows.first { window in
-            (abs(position.x - window.frame.minX) <= edgeTolerance
-                || abs(position.x - window.frame.maxX) <= edgeTolerance)
-                && position.y >= window.frame.minY
-                && position.y <= window.frame.maxY
+    /// body it would otherwise walk through. This is the wall a climb holds
+    /// on to, asked again on every frame of it.
+    ///
+    /// The edge has to be one that can actually be seen at the pet's height,
+    /// the same rule `nearestClimbTarget` starts a climb by. Without it, any
+    /// window mapped anywhere behind the frontmost one counted as a wall: a
+    /// desktop with four windows sharing the screen's own edges is four
+    /// stacked walls at x = 0, only the front one of which is drawn, so a
+    /// climb -- and a climb to the ceiling especially -- rode straight up a
+    /// line with nothing on it. From the outside, a pet going up thin air.
+    static func windowBeingClimbed(
+        at position: CGPoint,
+        in windows: [WindowInfo],
+        excluding: Set<CGWindowID> = []
+    ) -> WindowInfo? {
+        for index in windows.indices {
+            let window = windows[index]
+            guard !excluding.contains(window.windowID) else { continue }
+            guard position.y >= window.frame.minY, position.y <= window.frame.maxY else { continue }
+            let heldEdges = [window.frame.minX, window.frame.maxX]
+                .filter { abs(position.x - $0) <= edgeTolerance }
+            guard heldEdges.contains(where: {
+                isEdgeVisible($0, at: position.y, inFrontOf: index, in: windows)
+            }) else { continue }
+            return window
         }
+        return nil
     }
 
     /// The window the user is actually working in: the frontmost window of the

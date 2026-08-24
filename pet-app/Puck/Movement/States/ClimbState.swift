@@ -26,7 +26,11 @@ final class ClimbState: StateHandler {
     func update(dt: TimeInterval, context: StateContext) {
         guard !oneShot.hasFired else { return }
 
-        guard let window = WindowSupport.windowBeingClimbed(at: context.body.position, in: context.windows) else {
+        guard let window = WindowSupport.windowBeingClimbed(
+            at: context.body.position,
+            in: context.windows,
+            excluding: context.unclimbableWindowIDs
+        ) else {
             // The window went away mid-climb — there is nothing to hold on to.
             oneShot.fire(.fall, using: context.requestTransition)
             return

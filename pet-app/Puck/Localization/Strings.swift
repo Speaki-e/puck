@@ -46,6 +46,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case avatarsHeader, importAvatarButton, importPanelPrompt
     /// Picking a different installed avatar as a preset.
     case avatarSelectButton
+    case avatarReloadButton, avatarReloadedFormat
     /// The avatar package format needs to be explained to end users too --
     /// condensed from
     /// docs/avatar-spec.md for end users, not the full creator-facing spec.
@@ -280,6 +281,8 @@ enum Strings {
         .avatarsHeader: "아바타",
         .importAvatarButton: "아바타 패키지 가져오기…",
         .avatarSelectButton: "선택",
+        .avatarReloadButton: "아바타 다시 불러오기",
+        .avatarReloadedFormat: "'%1$@'을(를) 다시 불러왔습니다.",
         .avatarPackageFormatExplanation:
             "아바타 패키지는 폴더 하나입니다: manifest.json과 동작별 투명 배경 PNG(idle은 필수, walk·climb·fall 등은 권장), 그리고 선택적으로 .wav 파일이 담긴 sounds/ 폴더로 구성됩니다. 이미지는 긴 변 기준 1024px 내외, 파일당 약 500KB 이하를 권장합니다.",
         .importPanelPrompt: "가져오기",
@@ -609,6 +612,8 @@ enum Strings {
         .avatarsHeader: "Avatars",
         .importAvatarButton: "Import avatar package…",
         .avatarSelectButton: "Select",
+        .avatarReloadButton: "Reload avatars",
+        .avatarReloadedFormat: "Reloaded '%1$@'.",
         .avatarPackageFormatExplanation:
             "An avatar package is a single folder: manifest.json, a transparent PNG per motion (idle required; walk, climb and fall recommended), and optionally a sounds/ folder of .wav files. Around 1024px on the long edge and under about 500KB per file works best.",
         .importPanelPrompt: "Import",

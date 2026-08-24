@@ -79,6 +79,13 @@ struct AvatarManagementView: View {
                 SettingsActionRow(label: text(.importAvatarButton), systemImage: "square.and.arrow.down") {
                     importAvatar()
                 }
+                // For editing an avatar in place rather than importing one:
+                // the loader reads the package off disk, so a redrawn sprite
+                // or a hand-edited manifest only needed the pet to be built
+                // again -- which until now meant quitting the app.
+                SettingsActionRow(label: text(.avatarReloadButton), systemImage: "arrow.clockwise") {
+                    reloadAvatars()
+                }
                 // Where the swappable things live. Importing copies a package
                 // in for you; this is for everything else -- editing one that
                 // is already there, dropping in a tank picture, seeing what
@@ -153,6 +160,18 @@ struct AvatarManagementView: View {
             refreshInstalledAvatarNames()
             loadCurrentManifest()
         }
+    }
+
+    /// Re-reads the avatars folder and rebuilds the running pet from what is
+    /// in it now. The same path a selection takes -- selecting the avatar
+    /// that is already selected is exactly "load this one again" -- with the
+    /// list and the manifest below picked up again alongside it, since a
+    /// reload is also how a newly-dropped-in package first appears.
+    private func reloadAvatars() {
+        refreshInstalledAvatarNames()
+        loadCurrentManifest()
+        onSelectAvatar?(selectedAvatarName)
+        reportMessage = String(format: text(.avatarReloadedFormat), selectedAvatarName)
     }
 
     private func refreshInstalledAvatarNames() {

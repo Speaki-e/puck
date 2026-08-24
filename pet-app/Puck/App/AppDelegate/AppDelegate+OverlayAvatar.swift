@@ -310,7 +310,21 @@ extension AppDelegate {
             return
         }
 
-        let position = GroundedSpawnPosition.position(in: groundAwareSize(of: window))
+        // The window that came back is a different size, and every area the
+        // pet walks in was measured against the old one. Re-measure before
+        // anything reads them: left stale, the floor of the old area sits
+        // below the new screen's bottom edge and the pet drops out of sight
+        // with no state able to bring it back.
+        let relocation = DisplayChangeRelocation.relocate(
+            position: characterBody?.position ?? .zero,
+            visualBounds: characterBody?.visualBounds ?? .zero,
+            desktop: CGRect(origin: .zero, size: groundAwareSize(of: window)),
+            tank: petTankArea,
+            isHome: desktopRoamableArea != nil
+        )
+        characterController?.roamableArea = relocation.roamableArea
+        if desktopRoamableArea != nil { desktopRoamableArea = relocation.desktopArea }
+        let position = relocation.position
         // OverlayWindowController always orderFrontRegardless()s a freshly
         // rebuilt window -- a display change (monitor plug/unplug) shouldn't
         // silently un-hide a pet the user explicitly hid.

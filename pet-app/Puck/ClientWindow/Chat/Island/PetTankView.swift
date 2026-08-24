@@ -211,32 +211,17 @@ struct PetTankView: View {
     @ViewBuilder
     private func islandFill(_ shape: IslandShape) -> some View {
         if let artwork = TankArtwork.image() {
-            GeometryReader { proxy in
-                // Scaled by height, never by width: the whole scene from the
-                // water down to the sand is the picture, and a strip that
-                // filled by width showed a horizontal slice of it -- sand, or
-                // open water, depending on how tall the island was that day.
-                // The sides are allowed to run off the end instead.
-                let unit = max(proxy.size.height * TankArtwork.aspect(artwork), 1)
-                // A wide island takes more than one copy, laid end to end as
-                // drawn. They were mirrored for a while to hide the seam,
-                // which hid it by turning the scene round -- two lighthouses
-                // facing each other reads as a mistake in a way a repeat does
-                // not.
-                let copies = max(Int(ceil(proxy.size.width / unit)), 1)
-                HStack(spacing: 0) {
-                    ForEach(0..<copies, id: \.self) { _ in
-                        Image(nsImage: artwork)
-                            .resizable()
-                            .interpolation(.high)
-                            .antialiased(true)
-                            .frame(width: unit, height: proxy.size.height)
-                    }
+            // One Canvas, not a stack of Images. Every copy of a 4000px-wide
+            // PNG laid out as its own view is rescaled by the render server
+            // on each pass, and the island redraws whenever anything in the
+            // window moves -- which, with a pet walking about on it, is every
+            // frame. Drawn here the picture is resolved once and the tiles
+            // are placed by arithmetic instead of by layout.
+            Canvas { context, size in
+                let image = context.resolve(Image(nsImage: artwork))
+                for tile in Self.tiles(across: size, aspect: TankArtwork.aspect(artwork)) {
+                    context.draw(image, in: tile)
                 }
-                // Centred: what is worth seeing in a scene is in the middle
-                // of it, and anchoring at the left threw that away on the
-                // right-hand side of a wide island.
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .center)
             }
             // Frosting, not Liquid Glass. The real material was tried here
             // and it works -- it refracts what is behind it, which is the
@@ -280,6 +265,41 @@ struct PetTankView: View {
             shape.fill(palette.background)
         }
     }
+
+    /// The picture laid end to end across the island, as many copies as it
+    /// takes to fill it.
+    ///
+    /// Scaled by height, never by width: the whole scene from the water down
+    /// to the sand is the picture, and a strip that filled by width showed a
+    /// horizontal slice of it -- sand, or open water, depending on how tall
+    /// the island was that day. The sides are allowed to run off the end
+    /// instead, and the run is centred, because what is worth looking at in a
+    /// scene is in the middle of it.
+    ///
+    /// Copies are drawn as they are, never mirrored: mirroring hides the
+    /// seam by turning the scene round, and two lighthouses facing each other
+    /// reads as a mistake in a way a repeat does not.
+    static func tiles(across size: CGSize, aspect: CGFloat) -> [CGRect] {
+        guard size.width > 0, size.height > 0 else { return [] }
+        let unit = max(size.height * aspect, 1)
+        let copies = max(Int(ceil(size.width / unit)), 1)
+        let start = (size.width - unit * CGFloat(copies)) / 2
+        return (0..<copies).map { index in
+            CGRect(
+                x: start + unit * CGFloat(index),
+                y: 0,
+                // A hair wider than the tile it fills. Two rectangles that
+                // merely touch are antialiased against the ground separately,
+                // and the join shows as a pale line down the picture at any
+                // width where the edge lands between two pixels.
+                width: unit + Self.tileOverlap,
+                height: size.height
+            )
+        }
+    }
+
+    /// How far each copy reaches under the next one -- see `tiles`.
+    static let tileOverlap: CGFloat = 0.5
 
     /// Where the shoulder begins in the island's own space: just past the
     /// toolbar's last button, with a gap so the two do not touch.

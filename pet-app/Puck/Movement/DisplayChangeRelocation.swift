@@ -17,50 +17,20 @@
 import CoreGraphics
 
 enum DisplayChangeRelocation {
-    struct Outcome: Equatable {
-        /// What the pet may walk in from now on.
-        var roamableArea: CGRect
-        /// The desktop to come back to when it leaves the island, or nil when
-        /// it was not on one.
-        var desktopArea: CGRect?
-        /// Where it stands now -- its own place, pulled back inside.
-        var position: CGPoint
-    }
-
-    /// - Parameters:
-    ///   - desktop: the rebuilt window's roamable area, in overlay-local points.
-    ///   - tank: the island's area, when the client has reported one.
-    ///   - isHome: whether the pet is living on the island right now.
+    /// Where the pet belongs in a freshly measured area.
+    ///
+    /// Only the desktop is passed in, and that is the whole rule: the
+    /// island's rect is measured against the overlay window that has just
+    /// been torn down, so after a rebuild it does not describe anywhere on
+    /// the new screen. A pet held in it would stand somewhere the island is
+    /// not drawn. It comes out instead, and the client's next report -- which
+    /// a display change always produces, see PaneFrameReporter -- brings it
+    /// home to a rect measured against the window that exists now.
     ///
     /// The pet keeps its place rather than being sent back to a spawn point:
     /// the display changed, the pet did not, and a teleport across the screen
     /// reads as a glitch. Containing it is enough to bring it back on screen,
     /// because the only reason it was off screen is that the floor moved.
-    static func relocate(
-        position: CGPoint,
-        visualBounds: CGRect,
-        desktop: CGRect,
-        tank: CGRect?,
-        isHome: Bool
-    ) -> Outcome {
-        // On the island the island is still the room; only the desktop it
-        // would return to has to be re-measured. Its own area is re-reported
-        // by the client whenever the window moves or resizes.
-        if isHome, let tank {
-            return Outcome(
-                roamableArea: tank,
-                desktopArea: desktop,
-                position: contained(position, visualBounds: visualBounds, in: tank)
-            )
-        }
-        return Outcome(
-            roamableArea: desktop,
-            desktopArea: nil,
-            position: contained(position, visualBounds: visualBounds, in: desktop)
-        )
-    }
-
-    /// Inside the area on both axes.
     ///
     /// ScreenBounds.contain is horizontal only, and deliberately so: which
     /// surface a pet comes down on is the falling states' business, not a
@@ -69,7 +39,7 @@ enum DisplayChangeRelocation {
     /// vertical limit is applied too. Feet no lower than the floor, head no
     /// higher than the ceiling, and the floor wins when the area is shorter
     /// than the pet.
-    private static func contained(_ position: CGPoint, visualBounds: CGRect, in area: CGRect) -> CGPoint {
+    static func contained(_ position: CGPoint, visualBounds: CGRect, in area: CGRect) -> CGPoint {
         let horizontal = ScreenBounds.contain(position, visualBounds: visualBounds, in: area)
         // Y grows downward: the outline reaches up from the feet, so its minY
         // is negative and the highest the feet may be is that far below the

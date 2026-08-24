@@ -72,6 +72,13 @@ extension AppDelegate {
     /// Called every frame. Does nothing until a reported state has held.
     func tickPetHome(dt: TimeInterval) {
         petHomeDecider.isPetHidden = isCharacterHidden
+        // Read from the state machine rather than set when a drag begins and
+        // ends. Nothing moves the pet while it is in somebody's hand -- but a
+        // flag raised on mouse-down is only lowered by a mouse-up that can go
+        // missing (a display change replaces the click monitor mid-drag), and
+        // one stuck raised means the pet can never come home again. Asking
+        // where the pet *is* cannot get stuck.
+        petHomeDecider.isBeingHeld = characterController?.currentState === reactDragState
         switch petHomeDecider.tick(dt: dt) {
         case .home: movePetHome()
         case .desktop: sendPetToDesktop()
@@ -128,6 +135,23 @@ extension AppDelegate {
             arrivingIn: tank,
             scale: tankScale
         )
+    }
+
+    /// Comes out of the tank without the trip, for a display change.
+    ///
+    /// `sendPetToDesktop` carries the pet across the screen, which is right
+    /// when the window went away under it and wrong here: the overlay is
+    /// being rebuilt and the pet is about to be put down in a freshly
+    /// measured area anyway. What still has to happen is everything else that
+    /// leaving does -- the desktop size back, the desktop's slower wander,
+    /// and the memory of having been home cleared, without which the pet
+    /// stays island-sized on the desktop forever and can never leave again.
+    func leaveTankAfterDisplayChange() {
+        guard desktopRoamableArea != nil else { return }
+        cancelWander()
+        desktopRoamableArea = nil
+        idleState.pace = .desktop
+        applyLiveAvatarScale(desktopAvatarScale)
     }
 
     func sendPetToDesktop() {

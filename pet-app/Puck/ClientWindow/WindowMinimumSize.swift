@@ -57,7 +57,7 @@ struct WindowMinimumSize: NSViewRepresentable {
     /// which are the main thread.
     @MainActor
     final class Coordinator {
-        private var observer: NSObjectProtocol?
+        private let observers = NotificationTokens()
         private var floor: CGSize = .zero
         private weak var observed: NSWindow?
 
@@ -65,12 +65,8 @@ struct WindowMinimumSize: NSViewRepresentable {
             self.floor = floor
             guard let window, window !== observed else { return }
             observed = window
-            if let observer { NotificationCenter.default.removeObserver(observer) }
-            observer = NotificationCenter.default.addObserver(
-                forName: NSWindow.didResizeNotification,
-                object: window,
-                queue: .main
-            ) { [weak self] notification in
+            observers.removeAll()
+            observers.observe(NSWindow.didResizeNotification, object: window) { [weak self] notification in
                 guard let window = notification.object as? NSWindow else { return }
                 // Delivered on `.main` by the queue above, which the
                 // signature of a notification block cannot say.
@@ -81,9 +77,9 @@ struct WindowMinimumSize: NSViewRepresentable {
             }
         }
 
-        deinit {
-            if let observer { NotificationCenter.default.removeObserver(observer) }
-        }
+        // No deinit: NotificationTokens unregisters itself when this
+        // coordinator releases it -- see its own header for why that is not
+        // the same as doing it here.
 
         static func grow(_ window: NSWindow, toAtLeast floor: CGSize) {
             let size = window.frame.size

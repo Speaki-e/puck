@@ -13,6 +13,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: NSScreen and a `.main` notification, same as the type
+/// under test.
+@MainActor
 final class ScreenManagerTests: XCTestCase {
     func test_initSucceeds_onARealMachineWithAtLeastOneScreen() throws {
         let manager = try XCTUnwrap(ScreenManager())

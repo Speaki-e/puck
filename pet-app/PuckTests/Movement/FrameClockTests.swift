@@ -11,6 +11,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: the type under test is, being a timer on the main run
+/// loop and the state it drives.
+@MainActor
 final class FrameClockTests: XCTestCase {
     func test_start_deliversRepeatedTicksWithPositiveDeltas() {
         let clock = FrameClock(framesPerSecond: 60)

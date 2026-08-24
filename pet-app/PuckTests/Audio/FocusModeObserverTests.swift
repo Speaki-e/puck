@@ -19,6 +19,9 @@
 import XCTest
 @testable import Puck
 
+/// `@MainActor`: the type under test is -- it observes on `.main` and is
+/// read by the app delegate and the frame loop.
+@MainActor
 final class FocusModeObserverTests: XCTestCase {
     private func post(to center: NotificationCenter) {
         center.post(name: FocusModeObserver.distributedNotificationName, object: nil)

@@ -13,6 +13,10 @@ import CoreGraphics
 /// already filtered to layer-0 app windows) up to date. Polls at `idlePollHz`
 /// by default; an NSWorkspace app-activate/launch/terminate notification
 /// triggers an immediate refresh plus `burstDuration` seconds at `burstPollHz`.
+/// `@MainActor`: a Timer on the main run loop plus NSWorkspace
+/// notifications delivered on `.main`, read every frame by the character
+/// controller -- which runs on the main thread because it moves an NSWindow.
+@MainActor
 final class WindowListWatcher {
     static let idlePollHz: Double = 10
     static let burstPollHz: Double = 15
@@ -22,11 +26,18 @@ final class WindowListWatcher {
 
     private let selfPID: pid_t
     private let minimumSize: CGSize
-    private var pollTimer: Timer?
+    /// `nonisolated(unsafe)` so `stop()` can be called from `deinit`, which
+    /// is nonisolated whatever this class is. Written and read on the main
+    /// thread everywhere else; a timer left running past its owner is the
+    /// failure this deinit exists to prevent, and it is worse than the one
+    /// the annotation gives up.
+    nonisolated(unsafe) private var pollTimer: Timer?
     /// Monotonic (ProcessInfo.systemUptime), not Date() — a wall-clock jump from
     /// NTP sync or waking from sleep must not affect when the burst window ends.
     private var burstEndUptime: TimeInterval?
-    private var observerTokens: [NSObjectProtocol] = []
+    /// The workspace centre, not the default one: app activate/launch/quit
+    /// are posted there and nowhere else.
+    nonisolated private let observerTokens = NotificationTokens(center: NSWorkspace.shared.notificationCenter)
 
     init(
         selfPID: pid_t = ProcessInfo.processInfo.processIdentifier,
@@ -40,15 +51,16 @@ final class WindowListWatcher {
         refresh()
         scheduleTimer(hz: Self.idlePollHz)
 
-        let center = NSWorkspace.shared.notificationCenter
         let names: [NSNotification.Name] = [
             NSWorkspace.didActivateApplicationNotification,
             NSWorkspace.didLaunchApplicationNotification,
             NSWorkspace.didTerminateApplicationNotification,
         ]
-        observerTokens = names.map { name in
-            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                self?.triggerBurst()
+        for name in names {
+            observerTokens.observe(name, object: nil) { [weak self] _ in
+                // `queue: .main` (NotificationTokens' default) is what makes
+                // this true; a notification block cannot say so itself.
+                MainActor.assumeIsolated { self?.triggerBurst() }
             }
         }
     }
@@ -61,11 +73,12 @@ final class WindowListWatcher {
         stop()
     }
 
-    func stop() {
+    /// `nonisolated` so `deinit` may call it -- see `pollTimer`. Everything
+    /// it touches either has no isolation of its own (the tokens) or is the
+    /// timer this class alone owns.
+    nonisolated func stop() {
         pollTimer?.invalidate()
         pollTimer = nil
-        let center = NSWorkspace.shared.notificationCenter
-        observerTokens.forEach { center.removeObserver($0) }
         observerTokens.removeAll()
     }
 
@@ -78,7 +91,9 @@ final class WindowListWatcher {
     private func scheduleTimer(hz: Double) {
         pollTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / hz, repeats: true) { [weak self] _ in
-            self?.tick()
+            // Added to RunLoop.main just below, which is what makes this
+            // true; a Timer block cannot say so in its signature.
+            MainActor.assumeIsolated { self?.tick() }
         }
         // .common (not the default add(timer:forMode:) mode) so polling doesn't
         // pause while the user has a menu open or a modal/tracking loop is active.
@@ -102,7 +117,7 @@ final class WindowListWatcher {
     /// keeps only normal app windows (layer 0), excludes this process's own
     /// windows, and drops anything smaller than `minimumSize`. Z-order
     /// (input array order) is preserved.
-    static func filter(_ windows: [WindowInfo], excludingPID selfPID: pid_t, minimumSize: CGSize) -> [WindowInfo] {
+    nonisolated static func filter(_ windows: [WindowInfo], excludingPID selfPID: pid_t, minimumSize: CGSize) -> [WindowInfo] {
         windows.filter { window in
             window.layer == 0
                 && window.ownerPID != selfPID
@@ -114,7 +129,7 @@ final class WindowListWatcher {
     /// Live CGWindowListCopyWindowInfo fetch, parsed into WindowInfo, already in
     /// front-to-back Z order. Not unit tested — it depends on real on-screen
     /// windows; keep this a thin, trusted parsing layer and put logic in `filter`.
-    private static func fetchRawWindowList() -> [WindowInfo] {
+    nonisolated private static func fetchRawWindowList() -> [WindowInfo] {
         guard
             let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: AnyObject]]

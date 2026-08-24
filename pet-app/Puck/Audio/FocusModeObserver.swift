@@ -20,6 +20,9 @@
 
 import Foundation
 
+/// `@MainActor`: a distributed notification observed on `.main`, read by the
+/// app delegate and the frame loop, which are both there already.
+@MainActor
 final class FocusModeObserver {
     static let distributedNotificationName = Notification.Name("com.apple.notificationcenterui.dndStatusChanged")
 
@@ -34,21 +37,22 @@ final class FocusModeObserver {
     /// above is one macOS itself posts, so a test that posts through it is
     /// racing both the daemon and anything else on the Mac that toggles
     /// Focus while it runs.
-    private let center: NotificationCenter
-
-    private var observerToken: NSObjectProtocol?
+    /// Observed through this rather than through the centre directly, so the
+    /// registration is dropped when this object is -- see NotificationTokens.
+    /// Built from the injected centre, which is the whole point of injecting
+    /// one: a test posts through its own rather than through distnoted.
+    nonisolated private let observerToken: NotificationTokens
 
     init(center: NotificationCenter = DistributedNotificationCenter.default()) {
-        self.center = center
+        observerToken = NotificationTokens(center: center)
     }
 
     func startObserving() {
-        observerToken = center.addObserver(
-            forName: Self.distributedNotificationName,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.handleNotification(notification)
+        observerToken.observe(Self.distributedNotificationName, object: nil) { [weak self] notification in
+            // `queue: .main` (NotificationTokens' default) is what makes this
+            // true; a notification block cannot say so itself.
+            // Nothing from the notification crosses: see handleNotification.
+            MainActor.assumeIsolated { self?.handleNotification() }
         }
     }
 
@@ -60,17 +64,19 @@ final class FocusModeObserver {
         stopObserving()
     }
 
-    func stopObserving() {
-        if let observerToken {
-            center.removeObserver(observerToken)
-        }
-        observerToken = nil
+    /// `nonisolated` so `deinit` may call it: a deinit has no isolation
+    /// whatever the type it belongs to, and NotificationTokens has none of
+    /// its own to conflict with.
+    nonisolated func stopObserving() {
+        observerToken.removeAll()
     }
 
-    private func handleNotification(_ notification: Notification) {
-        // The legacy notification's userInfo doesn't reliably carry the new
-        // status across macOS versions, so this just flips state on each
-        // notification rather than trusting an unstable payload shape.
+    /// Takes no payload, on purpose: the legacy notification's userInfo
+    /// doesn't reliably carry the new status across macOS versions, so this
+    /// flips state on each notification rather than trusting an unstable
+    /// shape -- and a Notification is not Sendable, so not needing it is also
+    /// what keeps the hop to the main actor clean.
+    private func handleNotification() {
         isFocusActive.toggle()
         onChange?(isFocusActive)
     }

@@ -315,16 +315,17 @@ extension AppDelegate {
         // anything reads them: left stale, the floor of the old area sits
         // below the new screen's bottom edge and the pet drops out of sight
         // with no state able to bring it back.
-        let relocation = DisplayChangeRelocation.relocate(
-            position: characterBody?.position ?? .zero,
+        let desktop = CGRect(origin: .zero, size: groundAwareSize(of: window))
+        // Out of the tank first, if it was in one: that rect was measured
+        // against the window just torn down. The client re-reports its island
+        // on a display change and the pet walks back into it a moment later.
+        leaveTankAfterDisplayChange()
+        characterController?.roamableArea = desktop
+        let position = DisplayChangeRelocation.contained(
+            characterBody?.position ?? .zero,
             visualBounds: characterBody?.visualBounds ?? .zero,
-            desktop: CGRect(origin: .zero, size: groundAwareSize(of: window)),
-            tank: petTankArea,
-            isHome: desktopRoamableArea != nil
+            in: desktop
         )
-        characterController?.roamableArea = relocation.roamableArea
-        if desktopRoamableArea != nil { desktopRoamableArea = relocation.desktopArea }
-        let position = relocation.position
         // OverlayWindowController always orderFrontRegardless()s a freshly
         // rebuilt window -- a display change (monitor plug/unplug) shouldn't
         // silently un-hide a pet the user explicitly hid.

@@ -10,7 +10,7 @@
 ## 대기
 
 1. **Swift 6 언어 모드로 올리기** — 진행 중. `SWIFT_STRICT_CONCURRENCY: complete`
- 기준 경고가 292개(Puck 220 + PuckClient 72)에서 **104개**(59 + 45)로 줄었다.
+ 기준 경고가 292개(Puck 220 + PuckClient 72)에서 **46개**(두 타깃 합쳐 고유 기준)로 줄었다.
  지금까지 한 것: AppDelegate와 상태 기계(StateHandler·CharacterController)와
  NSViewRepresentable 코디네이터들을 `@MainActor`로, 큐로 지키는 타입들을
  `@unchecked Sendable`로, 순수 헬퍼는 `nonisolated`로. 그 과정에서 point_at이
@@ -22,6 +22,12 @@
 
 ## 완료
 
+- 전체 리뷰 한 바퀴 + 동시성 정리 (`HEAD`) — 리뷰가 찾은 5건(디스플레이 변경 시
+  섬 좌표/스케일이 남는 문제, 잡고 있음 플래그가 걸리는 문제, 오르는 중에
+  포커스 창 설정이 발을 놓게 하던 것, 주석 부패)을 고치고, 알림 관찰자를
+  스스로 등록 해제하는 `NotificationTokens`로 모아 메인 액터 타입들의 deinit
+  문제를 없앴다. `get_frontmost_window`가 다른 스레드에서 갱신되는 창 목록을
+  읽던 진짜 경합도 그 과정에서 드러나 고쳤다.
 - 어항에서 잡으면 펫이 탈출하던 것 (`HEAD`) — 커서가 펫 위에 오면 오버레이가
   클릭을 받는데, 보통 창은 클릭하면 그 앱이 앞으로 나온다. 그래서 펫을 잡는
   순간 채팅 창이 프론트에서 밀렸고, 그게 바로 펫을 데스크톱으로 보내는 조건이었다.

@@ -38,16 +38,10 @@ extension AppDelegate {
             // the cursor had already moved on by, shifting the pet.
             controller.transition(to: .reactDrag)
             reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
-            // Nothing sends the pet home or out while it is in somebody's
-            // hand. Even with the overlay no longer taking focus, a window
-            // closing or a Space changing mid-drag would otherwise pull the
-            // pet out of the grip holding it.
-            petHomeDecider.isBeingHeld = true
         case .dragMoved(let point):
             reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
         case .dragEnded:
             reactDragState.release()
-            petHomeDecider.isBeingHeld = false
         }
     }
 

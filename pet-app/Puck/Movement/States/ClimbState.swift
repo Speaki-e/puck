@@ -26,10 +26,15 @@ final class ClimbState: StateHandler {
     func update(dt: TimeInterval, context: StateContext) {
         guard !oneShot.hasFired else { return }
 
+        // No `excluding:` here, deliberately. That set is "windows the pet
+        // may not start climbing", resolved fresh each frame from whichever
+        // app is frontmost -- so passing it here made clicking the window the
+        // pet was already on halfway up drop it off the side. Whether a wall
+        // is *there* is this check's business; whether it was allowed to be
+        // climbed was WalkState's, one transition ago.
         guard let window = WindowSupport.windowBeingClimbed(
             at: context.body.position,
-            in: context.windows,
-            excluding: context.unclimbableWindowIDs
+            in: context.windows
         ) else {
             // The window went away mid-climb — there is nothing to hold on to.
             oneShot.fire(.fall, using: context.requestTransition)

@@ -22,7 +22,12 @@
 import AppKit
 import CodeEditSourceEditor
 
-final class EditorRevealCoordinator: TextViewCoordinator {
+/// `@unchecked Sendable`: every entry point is a main-thread UI callback --
+/// the editor handing over a controller it has just built or shown, or
+/// SwiftUI asking for a reveal -- and the two stored properties are touched
+/// nowhere else. The compiler cannot see that, because TextViewCoordinator's
+/// requirements are nonisolated and so this type cannot be main-actor either.
+final class EditorRevealCoordinator: TextViewCoordinator, @unchecked Sendable {
     /// Where the view should scroll to, handed back rather than done here.
     ///
     /// Scrolling the controller directly does not survive: the editor's own
@@ -57,7 +62,21 @@ final class EditorRevealCoordinator: TextViewCoordinator {
         flush()
     }
 
+    /// Applies the pending reveal, if there is one and there is a text view
+    /// to apply it to.
+    ///
+    /// `MainActor.assumeIsolated` because everything below touches the text
+    /// view: TextViewController is main-actor isolated, and this type cannot
+    /// be -- TextViewCoordinator's requirements are nonisolated, so a
+    /// main-actor method would not satisfy them. Every route in here is the
+    /// main thread already: two of the three callers are the editor telling
+    /// us about a view it has just built or shown, and the third is SwiftUI.
     private func flush() {
+        MainActor.assumeIsolated { flushOnMainActor() }
+    }
+
+    @MainActor
+    private func flushOnMainActor() {
         guard let lines = pending, lines.lowerBound >= 1,
               let controller,
               let layoutManager = controller.textView?.layoutManager,

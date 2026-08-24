@@ -418,12 +418,20 @@ final class ClientWindowStore: ObservableObject {
             target?.appendNotice(slashCommands.run(command))
             return .sent
         }
-        // The user's own text never comes back over the socket, so this echo is
-        // the only thing that puts it in the transcript -- and ChatInputBar
-        // clears its field the instant it sends, so without it the message is
-        // gone for good. Unconditional, unlike markWaitingForAgent below: a
-        // message that did not leave still has to be visible to the person who
-        // typed it, and the echo has no answer to wait for.
+        // Nothing else puts the user's own text in the transcript -- the
+        // agent runs in this process and is handed a string, and ChatInputBar
+        // clears its field the instant it sends, so without this echo the
+        // message is gone for good. Unconditional, unlike markWaitingForAgent
+        // below: a message that did not leave still has to be visible to the
+        // person who typed it, and the echo has no answer to wait for.
+        //
+        // The socket branch further down is a different matter. pet-app
+        // relays a gui-addressed message back to the connection it came from
+        // (BridgeServer.relay, deliberately -- that is how this process hears
+        // its own agent's events), so a user_input sent from here would
+        // arrive back and be echoed and run a second time. It is unreachable
+        // in PuckClient, where `onUserCommand` is always wired, and anything
+        // reviving it has to carry a sender id and drop its own.
         // The in-process agent has no attachment channel -- ACP takes a
         // prompt, and `onUserCommand` is a string. Rather than drop the
         // pictures the user just attached, their paths go into the message,
@@ -464,7 +472,8 @@ final class ClientWindowStore: ObservableObject {
     /// and switches to the session it was sent to -- submitting from the
     /// quick-capture bubble should bring this window up showing what was
     /// typed. Messages sent from this window's own input bar are echoed by
-    /// sendMessage instead; those never come back over the socket.
+    /// `sendMessage` instead, and go to the in-process agent rather than over
+    /// the socket -- see the note there about what would happen if they did.
     ///
     /// - Returns: whether it landed in an existing session (an unknown
     ///   workspace/session is dropped rather than fabricated, same rule as

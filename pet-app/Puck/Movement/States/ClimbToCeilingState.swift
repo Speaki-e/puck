@@ -31,10 +31,11 @@ final class ClimbToCeilingState: StateHandler {
     func update(dt: TimeInterval, context: StateContext) {
         guard !oneShot.hasFired else { return }
 
+        // Without `excluding:` -- see ClimbState for why an in-progress
+        // climb is not re-decided by a setting about starting one.
         guard WindowSupport.windowBeingClimbed(
             at: context.body.position,
-            in: context.windows,
-            excluding: context.unclimbableWindowIDs
+            in: context.windows
         ) != nil else {
             // No wall here (or climbed past the top of a short one) --
             // there's nothing left to hold onto.

@@ -44,12 +44,15 @@ struct FrameTicker {
 }
 
 /// Timer + FrameTicker. Thin by design — the logic lives in FrameTicker.
+/// `@MainActor`: it drives the frame loop, and everything the frame loop
+/// touches is AppKit.
+@MainActor
 final class FrameClock {
     /// The 2D renderer needs a continuous heartbeat for movement, toy physics,
     /// and time-based behaviors, but it does not need the old 60 Hz 3D loop.
     /// Active work is capped at 30 Hz and long idle periods run at 15 Hz.
-    static let activeFramesPerSecond: Double = 30
-    static let idleFramesPerSecond: Double = 15
+    nonisolated static let activeFramesPerSecond: Double = 30
+    nonisolated static let idleFramesPerSecond: Double = 15
 
     var onTick: ((TimeInterval) -> Void)?
 
@@ -89,8 +92,12 @@ final class FrameClock {
     private func schedule() {
         timer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / framesPerSecond, repeats: true) { [weak self] _ in
-            guard let self, let dt = self.ticker.delta(now: self.now()) else { return }
-            self.onTick?(dt)
+            // Added to RunLoop.main just below, which is what makes this
+            // true; a Timer block cannot say so in its signature.
+            MainActor.assumeIsolated {
+                guard let self, let dt = self.ticker.delta(now: self.now()) else { return }
+                self.onTick?(dt)
+            }
         }
         // .common so the pet keeps animating while a menu is open or a window
         // is being resized — the same reason WindowListWatcher uses it.

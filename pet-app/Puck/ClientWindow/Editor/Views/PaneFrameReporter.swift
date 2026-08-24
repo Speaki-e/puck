@@ -29,7 +29,7 @@ struct PaneFrameReporter: NSViewRepresentable {
     @MainActor
     final class ReportingView: NSView {
         var onChange: ((CGRect?) -> Void)?
-        private var windowObservers: [NSObjectProtocol] = []
+        private let windowObservers = NotificationTokens()
 
         /// Moving a window lays nothing out, so `layout()` never runs and the
         /// rect reported from it goes stale the moment the window is dragged:
@@ -41,14 +41,26 @@ struct PaneFrameReporter: NSViewRepresentable {
             report()
         }
 
-        deinit {
-            windowObservers.forEach(NotificationCenter.default.removeObserver)
-        }
+        // No deinit: NotificationTokens unregisters itself when this view
+        // releases it, which is the only way a nonisolated deinit and
+        // main-actor state can both be honest about each other.
 
         private func observeWindow() {
-            windowObservers.forEach(NotificationCenter.default.removeObserver)
-            windowObservers = []
+            windowObservers.removeAll()
             guard let window else { return }
+            // The displays themselves, not only this window: unplugging a
+            // second monitor while this window stays put moves nothing and
+            // resizes nothing, so none of the notifications below fire -- and
+            // pet-app, which rebuilds its overlay on exactly that event, is
+            // left holding a rect measured against a window that no longer
+            // exists. Observed with `object: nil` because it is posted by the
+            // application, not by a window.
+            windowObservers.observe(
+                NSApplication.didChangeScreenParametersNotification,
+                object: nil
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.report() }
+            }
             // Screen changes matter as much as moves: the same window on a
             // display with a different origin is a different rect in the
             // coordinates the pet lives in.
@@ -57,18 +69,12 @@ struct PaneFrameReporter: NSViewRepresentable {
                 NSWindow.didResizeNotification,
                 NSWindow.didChangeScreenNotification,
             ] {
-                windowObservers.append(
-                    NotificationCenter.default.addObserver(
-                        forName: name,
-                        object: window,
-                        queue: .main
-                    ) { [weak self] _ in
-                        // `queue: .main` above is what makes this true;
-                        // NotificationCenter's block is not isolated in its
-                        // signature, so the compiler cannot see it.
-                        MainActor.assumeIsolated { self?.report() }
-                    }
-                )
+                windowObservers.observe(name, object: window) { [weak self] _ in
+                    // `queue: .main` (NotificationTokens' default) is what
+                    // makes this true; a notification block is not isolated in
+                    // its signature, so the compiler cannot see it.
+                    MainActor.assumeIsolated { self?.report() }
+                }
             }
         }
 

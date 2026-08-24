@@ -86,4 +86,47 @@ struct AvatarManifest: Equatable, Codable {
         case bounceIntensity = "bounce_intensity"
         case name, type, scale, hitbox, clips, emotions, sounds
     }
+
+    /// Written out rather than synthesised so `scale` and `sounds` may be left
+    /// out of the file.
+    ///
+    /// Both have an obvious answer when absent -- draw it at the size it was
+    /// drawn, play nothing -- and requiring them made the smallest working
+    /// avatar two lines of boilerplate longer than it needed to be. Someone
+    /// putting one drawing in a folder should not have to write `"scale": 1.0`
+    /// and `"sounds": {}` to be told their character is valid.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        name = try container.decode(String.self, forKey: .name)
+        type = try container.decode(AvatarType.self, forKey: .type)
+        scale = try container.decodeIfPresent(Double.self, forKey: .scale) ?? 1
+        bounceIntensity = try container.decodeIfPresent(Double.self, forKey: .bounceIntensity)
+        hitbox = try container.decode(Hitbox.self, forKey: .hitbox)
+        clips = try container.decode([String: ClipReference].self, forKey: .clips)
+        emotions = try container.decodeIfPresent([String: ClipReference].self, forKey: .emotions)
+        sounds = try container.decodeIfPresent([String: String].self, forKey: .sounds) ?? [:]
+    }
+
+    init(
+        schemaVersion: Int,
+        name: String,
+        type: AvatarType,
+        scale: Double,
+        bounceIntensity: Double?,
+        hitbox: Hitbox,
+        clips: [String: ClipReference],
+        emotions: [String: ClipReference]?,
+        sounds: [String: String]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.name = name
+        self.type = type
+        self.scale = scale
+        self.bounceIntensity = bounceIntensity
+        self.hitbox = hitbox
+        self.clips = clips
+        self.emotions = emotions
+        self.sounds = sounds
+    }
 }

@@ -114,12 +114,12 @@ Everything you can swap lives in one folder:
 ```
 
 Settings has a button that opens it (아바타 → 커스터마이징 폴더 열기), which also
-creates the folders if they are not there yet. Both are read at launch, so
-restart the pet after dropping something in.
+creates the folders if they are not there yet.
 
 ### The tank
 
 Drop a `seabed.png` into `Tank/` and it replaces the one the app ships. It is
+read once at launch, so restart the pet after changing it. It is
 scaled to the island's height with the sides cropped, and repeated end to end
 if the window is wider than one copy — so a wide, shallow picture (the bundled
 one is 3596×447) fits without repeating on most windows.
@@ -134,6 +134,44 @@ Avatars/my-pet/
     idle.png  walk.png  fall.png  …
     sounds/*.wav
 ```
+
+#### Adding one, start to finish
+
+1. **Open the folder.** Settings → 아바타 → **커스터마이징 폴더 열기**. It creates
+   `Avatars/` and `Tank/` if they are not there yet, so this also tells you the
+   folder exists.
+2. **Make a folder for your character** inside `Avatars/`. Its name is the name
+   the picker shows: `Avatars/my-pet/` appears as `my-pet`.
+3. **Drop in one PNG and a `manifest.json`.** One drawing is a working
+   character — `idle` is the only clip that has to exist and every other state
+   falls back to it, so you can start with a single picture and add walking,
+   climbing and the rest whenever you feel like it. Transparent background,
+   drawn facing right (the pet is mirrored when it walks the other way).
+   The smallest manifest that works:
+
+   ```json
+   {
+     "schema_version": 1,
+     "name": "my-pet",
+     "type": "sprites",
+     "hitbox": { "width": 130, "height": 133 },
+     "clips": { "idle": "idle" }
+   }
+   ```
+
+   `hitbox` is the size it will be drawn and clicked at, in points — match your
+   drawing's proportions or it will look squashed.
+4. **Load it.** Settings → 아바타 → **아바타 다시 불러오기**, then press **선택**
+   next to its name. No restart: the reload button rebuilds the running pet
+   from what is on disk, which is also how you see a redrawn sprite or an
+   edited manifest without quitting.
+
+If something is wrong with the package the pet does not change and the reason
+is in the log (`~/Library/Application Support/Puck/logs/`) — a missing `idle`
+file, a manifest that will not parse, or a `schema_version` this build does not
+know. The import button (**아바타 패키지 가져오기…**) takes a folder like the
+above and copies it in for you, and it checks the package before it does,
+so it is the louder way to find out what is missing.
 
 `manifest.json`, with the fields that matter:
 
@@ -164,6 +202,9 @@ Avatars/my-pet/
 - **`hitbox`** is the character's size in points at `scale` 1 — what the pet is
   clicked, stood and thrown by. **`bounce_intensity`** (0–1) is how much the
   squash-and-stretch shows on a still drawing.
+- Only `schema_version`, `name`, `type`, `hitbox` and `clips` have to be there.
+  `scale` defaults to 1, `sounds` and `emotions` to nothing at all, and
+  `bounce_intensity` to the app's own default.
 - Paths in the manifest stay inside the package: a name that climbs out of it
   is refused rather than read.
 

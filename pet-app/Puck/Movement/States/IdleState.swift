@@ -33,6 +33,14 @@ final class IdleState: StateHandler {
     weak var wanderDelegate: IdleWanderDelegate?
     private let scheduler: WanderScheduler
 
+    /// How busy the pet should look, which depends on where it is standing --
+    /// see WanderScheduler.Pace. Set by whoever moves it in and out of its
+    /// tank.
+    var pace: WanderScheduler.Pace {
+        get { scheduler.pace }
+        set { scheduler.pace = newValue }
+    }
+
     init(scheduler: WanderScheduler = WanderScheduler()) {
         self.scheduler = scheduler
     }

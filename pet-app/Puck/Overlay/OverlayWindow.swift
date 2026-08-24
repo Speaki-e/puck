@@ -13,11 +13,20 @@ import AppKit
 /// never steals focus from whatever app the user is actually working in —
 /// F6's text-input bubble is a separate window that's the deliberate
 /// exception to that rule.
-final class OverlayWindow: NSWindow {
+///
+/// A non-activating panel rather than a plain window, and that is not a
+/// detail: the pet becomes clickable the moment the cursor is over it
+/// (ClickThroughController), and clicking a plain window brings its
+/// application forward -- so grabbing the pet deactivated whatever the user
+/// was in. On the island that was visible as the pet escaping: the chat
+/// window stopped being frontmost the instant it was picked up, which is
+/// exactly the condition that sends the pet back to the desktop. Refusing key
+/// is not enough on its own; the application is activated either way.
+final class OverlayWindow: NSPanel {
     convenience init(screenFrame: CGRect) {
         self.init(
             contentRect: screenFrame,
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )

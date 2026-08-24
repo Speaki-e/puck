@@ -103,4 +103,18 @@ final class RoamPointTests: XCTestCase {
         XCTAssertEqual(AppDelegate.wanderOutcome(.climbNearestWindow, atHome: false), .climbNearestWindow)
         XCTAssertEqual(AppDelegate.wanderOutcome(.climbToCeiling, atHome: false), .climbToCeiling)
     }
+
+    /// The island is small enough that one leg of it is barely a step, so a
+    /// wander there is made of more of them, with less standing about between.
+    func test_aWanderOnTheIslandHasMoreLegsAndShorterPauses() {
+        let home = (0..<600).map { _ in AppDelegate.drawWanderLegs(atHome: true) }
+        let desktop = (0..<600).map { _ in AppDelegate.drawWanderLegs(atHome: false) }
+
+        XCTAssertTrue(home.allSatisfy { (2...4).contains($0) })
+        XCTAssertGreaterThan(
+            home.reduce(0, +) / home.count,
+            desktop.reduce(0, +) / desktop.count
+        )
+        XCTAssertTrue((0..<100).allSatisfy { _ in AppDelegate.randomLegPause(atHome: true) <= 0.7 })
+    }
 }

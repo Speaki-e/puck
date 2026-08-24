@@ -42,6 +42,19 @@ final class PetHomeDecider {
         }
     }
 
+    /// The user has hold of the pet. Nothing moves it while that is true:
+    /// picking it up is the one moment it is under somebody else's control,
+    /// and a decision that fires mid-drag pulls it out of the hand holding
+    /// it. Letting go re-decides from the last report, so a pet dragged out
+    /// of its tank still goes back to it.
+    var isBeingHeld = false {
+        didSet {
+            guard isBeingHeld != oldValue else { return }
+            elapsed = 0
+            if !isBeingHeld { pending = lastReported }
+        }
+    }
+
     private var current: Move = .desktop
     private var pending: Move?
     /// What the last report worked out to, kept so an unhide -- or the end of
@@ -93,7 +106,7 @@ final class PetHomeDecider {
             self.forced = nil
             return forced
         }
-        guard !isPetHidden, let pending else { return nil }
+        guard !isPetHidden, !isBeingHeld, let pending else { return nil }
         elapsed += dt
         guard elapsed >= Self.holdSeconds else { return nil }
         self.pending = nil

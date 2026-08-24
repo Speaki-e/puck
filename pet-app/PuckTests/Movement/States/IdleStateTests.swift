@@ -25,7 +25,7 @@ final class IdleStateTests: XCTestCase {
     }
 
     func test_update_notifiesDelegate_whenWanderTimerFires() {
-        let scheduler = WanderScheduler(nextIntervalProvider: { 8 }, outcomeProvider: { .walkToRandomPoint })
+        let scheduler = WanderScheduler(nextIntervalProvider: { _ in 8 }, outcomeProvider: { _ in .walkToRandomPoint })
         let state = IdleState(scheduler: scheduler)
         let delegate = SpyWanderDelegate()
         state.wanderDelegate = delegate

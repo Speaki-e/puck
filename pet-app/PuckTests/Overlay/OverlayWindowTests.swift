@@ -19,7 +19,7 @@ final class OverlayWindowTests: XCTestCase {
     func test_isBorderlessAndTransparent() {
         let window = makeWindow()
 
-        XCTAssertEqual(window.styleMask, [.borderless])
+        XCTAssertEqual(window.styleMask, [.borderless, .nonactivatingPanel])
         XCTAssertFalse(window.isOpaque)
         XCTAssertEqual(window.backgroundColor, .clear)
         XCTAssertFalse(window.hasShadow)
@@ -36,6 +36,13 @@ final class OverlayWindowTests: XCTestCase {
 
     func test_ignoresMouseEventsByDefault() {
         XCTAssertTrue(makeWindow().ignoresMouseEvents)
+    }
+
+    /// Clicking the pet must not bring pet-app forward: whatever the user was
+    /// working in stays frontmost, which on the island is the difference
+    /// between picking the pet up and the pet leaving.
+    func test_doesNotActivateTheAppWhenClicked() {
+        XCTAssertTrue(makeWindow().styleMask.contains(.nonactivatingPanel))
     }
 
     func test_neverBecomesKeyOrMain() {

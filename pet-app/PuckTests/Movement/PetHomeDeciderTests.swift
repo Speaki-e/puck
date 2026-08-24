@@ -24,6 +24,35 @@ final class PetHomeDeciderTests: XCTestCase {
         XCTAssertEqual(settled(decider), .home)
     }
 
+    /// Picking the pet up puts it under somebody else's control. Whatever
+    /// the desktop does while it is held -- a window closing, the chat
+    /// window losing front -- must not pull it out of the hand holding it.
+    func test_nothingMovesThePetWhileItIsHeld() {
+        let decider = PetHomeDecider()
+        decider.report(hasTank: true, visible: true)
+        XCTAssertEqual(settled(decider), .home)
+
+        decider.isBeingHeld = true
+        decider.report(hasTank: true, visible: false)
+
+        XCTAssertNil(settled(decider), "the pet stays where the hand put it")
+    }
+
+    /// Letting go decides again from what was reported meanwhile, rather than
+    /// waiting for the next change -- which may never come.
+    func test_lettingGoAppliesWhatWasReportedDuringTheDrag() {
+        let decider = PetHomeDecider()
+        decider.report(hasTank: true, visible: true)
+        XCTAssertEqual(settled(decider), .home)
+
+        decider.isBeingHeld = true
+        decider.report(hasTank: true, visible: false)
+        _ = settled(decider)
+        decider.isBeingHeld = false
+
+        XCTAssertEqual(settled(decider), .desktop)
+    }
+
     /// The window going to the back is the ordinary way the pet leaves.
     func test_theWindowLosingFront_sendsThePetOut() {
         let decider = PetHomeDecider()

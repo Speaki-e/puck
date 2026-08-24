@@ -50,18 +50,58 @@ final class WanderScheduler {
     /// come back `.stay`, so some observed rests span two intervals.
     static let defaultIntervalRange: ClosedRange<TimeInterval> = 8...15
 
+    /// Where the pet is, which is also how busy it should look.
+    enum Pace: Hashable {
+        /// The whole desktop. There is a lot of it, the pet is off to one
+        /// side of whatever the user is doing, and constant motion in the
+        /// corner of the eye is the thing this timer exists to avoid.
+        case desktop
+        /// The island. A shelf a few pets wide, in the window being looked
+        /// at -- and a pet that stands still on it for fifteen seconds reads
+        /// as one that has stopped working. Short trips, taken often.
+        case island
+    }
+
+    /// The island's range. Not simply "smaller numbers": a wander is one to
+    /// three legs with pauses, so the draw interval is the gap *between*
+    /// wanders, and 3-7 there puts the pet in motion for about half the time
+    /// rather than a tenth of it.
+    static let islandIntervalRange: ClosedRange<TimeInterval> = 3...7
+
+    static func intervalRange(for pace: Pace) -> ClosedRange<TimeInterval> {
+        switch pace {
+        case .desktop: return defaultIntervalRange
+        case .island: return islandIntervalRange
+        }
+    }
+
+    /// Changed when the pet moves in or out of its tank.
+    ///
+    /// Shortens a wait already running rather than only the next one: coming
+    /// home in the middle of a fifteen-second desktop interval, the pet stood
+    /// on the island doing nothing for the rest of it, which is the first
+    /// thing anybody would look at.
+    var pace: Pace = .desktop {
+        didSet {
+            guard pace != oldValue else { return }
+            nextFireInterval = min(nextFireInterval, Self.intervalRange(for: pace).upperBound)
+        }
+    }
+
     private var elapsed: TimeInterval = 0
     private var nextFireInterval: TimeInterval
-    private let nextIntervalProvider: () -> TimeInterval
-    private let outcomeProvider: () -> Outcome
+    private let nextIntervalProvider: (Pace) -> TimeInterval
+    private let outcomeProvider: (Pace) -> Outcome
 
     init(
-        nextIntervalProvider: @escaping () -> TimeInterval = { .random(in: WanderScheduler.defaultIntervalRange) },
-        outcomeProvider: @escaping () -> Outcome = WanderScheduler.weightedRandomOutcome
+        nextIntervalProvider: @escaping (Pace) -> TimeInterval = {
+            .random(in: WanderScheduler.intervalRange(for: $0))
+        },
+        outcomeProvider: @escaping (Pace) -> Outcome = WanderScheduler.weightedRandomOutcome(pace:)
     ) {
         self.nextIntervalProvider = nextIntervalProvider
         self.outcomeProvider = outcomeProvider
-        self.nextFireInterval = nextIntervalProvider()
+        self.nextFireInterval = nextIntervalProvider(.desktop)
     }
 
     /// Accumulates dt. Once elapsed time passes the timer, returns an Outcome
@@ -71,8 +111,8 @@ final class WanderScheduler {
         elapsed += dt
         guard elapsed >= nextFireInterval else { return nil }
         elapsed = 0
-        nextFireInterval = nextIntervalProvider()
-        return outcomeProvider()
+        nextFireInterval = nextIntervalProvider(pace)
+        return outcomeProvider(pace)
     }
 
     /// Default weights: 35% random move, 25% climb nearest window, 15% climb
@@ -83,7 +123,14 @@ final class WanderScheduler {
     /// falls back to when the draw can't be honoured (no toy is out, nothing
     /// to climb), so borrowing from it doesn't change how often the pet ends
     /// up walking as much as the numbers suggest.
-    static func weightedRandomOutcome() -> Outcome {
+    static func weightedRandomOutcome(pace: Pace = .desktop) -> Outcome {
+        // Nothing on the island can be climbed and no toy is lying on it, so
+        // those three draws would all fall through to a walk anyway -- but
+        // `.stay` is drawn on its own terms, and one in six wanders spent
+        // standing still is a lot on a shelf. Half as often there.
+        guard pace == .desktop else {
+            return Double.random(in: 0..<1) < 0.92 ? .walkToRandomPoint : .stay
+        }
         switch Double.random(in: 0..<1) {
         case ..<0.35: return .walkToRandomPoint
         case ..<0.60: return .climbNearestWindow

@@ -20,7 +20,8 @@ extension AppDelegate {
     /// the window list), which is bootstrap knowledge, not state knowledge.
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) {
         guard let controller = characterController else { return }
-        let outcome = Self.wanderOutcome(outcome, atHome: desktopRoamableArea != nil)
+        let atHome = desktopRoamableArea != nil
+        let outcome = Self.wanderOutcome(outcome, atHome: atHome)
         // Whatever was half-walked is abandoned: the pet has been given
         // something else to do, and finishing the old route afterwards would
         // read as it changing its mind twice.
@@ -30,8 +31,8 @@ extension AppDelegate {
             // A wander is one to three legs with a beat between them, not one
             // straight line to one point. Drawn here; the rest are started by
             // continueWanderIfNeeded once each leg lands.
-            pendingWanderLegs = Self.drawWanderLegs() - 1
-            wanderLegPause = Self.randomLegPause()
+            pendingWanderLegs = Self.drawWanderLegs(atHome: atHome) - 1
+            wanderLegPause = Self.randomLegPause(atHome: atHome)
             startWanderLeg(controller)
         case .climbNearestWindow:
             // Walk to the nearest climbable window's side; WalkState's own
@@ -241,7 +242,7 @@ extension AppDelegate {
         wanderLegPause -= dt
         guard wanderLegPause <= 0 else { return }
         pendingWanderLegs -= 1
-        wanderLegPause = Self.randomLegPause()
+        wanderLegPause = Self.randomLegPause(atHome: desktopRoamableArea != nil)
         startWanderLeg(controller)
     }
 
@@ -255,15 +256,25 @@ extension AppDelegate {
 
     /// Mostly one leg, sometimes two, now and then three. More than that and
     /// the pet never settles.
-    nonisolated static func drawWanderLegs() -> Int {
+    /// On the island it walks further per wander: the shelf is small enough
+    /// that one leg of it is barely a step, and the pet is being watched
+    /// there rather than glanced at.
+    nonisolated static func drawWanderLegs(atHome: Bool = false) -> Int {
         let roll = CGFloat.random(in: 0...1)
+        if atHome {
+            if roll < 0.3 { return 2 }
+            return roll < 0.75 ? 3 : 4
+        }
         if roll < 0.55 { return 1 }
         return roll < 0.85 ? 2 : 3
     }
 
     /// Long enough to read as the pet stopping to look at something, short
-    /// enough that the walk still feels like one wander.
-    nonisolated static func randomLegPause() -> TimeInterval { .random(in: 0.4...1.4) }
+    /// enough that the walk still feels like one wander. Shorter on the
+    /// island, where the legs themselves are short.
+    nonisolated static func randomLegPause(atHome: Bool = false) -> TimeInterval {
+        atHome ? .random(in: 0.2...0.7) : .random(in: 0.4...1.4)
+    }
 
     /// Where the pet is now, or the middle of the area before there is a
     /// body to ask -- a wander drawn without one has nothing to be relative to.

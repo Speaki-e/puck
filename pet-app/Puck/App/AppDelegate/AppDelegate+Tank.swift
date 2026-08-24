@@ -115,6 +115,9 @@ extension AppDelegate {
     private func movePetHome() {
         guard let controller = characterController, let tank = petTankArea else { return }
         cancelWander()
+        // A shelf a few pets wide, in the window being looked at: the pet
+        // potters about on it rather than keeping the desktop's slower beat.
+        idleState.pace = .island
         if desktopRoamableArea == nil {
             desktopRoamableArea = controller.roamableArea
             desktopAvatarScale = currentAvatarScale
@@ -130,6 +133,7 @@ extension AppDelegate {
     func sendPetToDesktop() {
         guard let controller = characterController, let desktop = desktopRoamableArea else { return }
         cancelWander()
+        idleState.pace = .desktop
         desktopRoamableArea = nil
         carryPet(
             of: controller,
